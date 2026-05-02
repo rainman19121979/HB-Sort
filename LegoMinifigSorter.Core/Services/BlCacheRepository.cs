@@ -409,6 +409,60 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         return Task.CompletedTask;
     }
 
+    public Task<int> BulkInsertSubsetsAsync(IEnumerable<BlSubset> subsets, CancellationToken ct = default)
+    {
+        var count = 0;
+        lock (_lock)
+        {
+            using var transaction = _connection.BeginTransaction();
+            using var cmd = _connection.CreateCommand();
+            cmd.Transaction = transaction;
+            cmd.CommandText = @"
+                INSERT OR REPLACE INTO bl_subsets
+                    (parent_type, parent_no, item_type, item_no, color_id,
+                     quantity, extra_quantity, is_alternate, is_counterpart,
+                     match_id, fetched_at, is_from_supersets)
+                VALUES
+                    ($pt, $pn, $it, $in, $cid, $qty, $eqty, $alt, $cp,
+                     $mid, $fetched, $fromSup);";
+
+            var pPt = cmd.CreateParameter(); pPt.ParameterName = "$pt"; cmd.Parameters.Add(pPt);
+            var pPn = cmd.CreateParameter(); pPn.ParameterName = "$pn"; cmd.Parameters.Add(pPn);
+            var pIt = cmd.CreateParameter(); pIt.ParameterName = "$it"; cmd.Parameters.Add(pIt);
+            var pIn = cmd.CreateParameter(); pIn.ParameterName = "$in"; cmd.Parameters.Add(pIn);
+            var pCid = cmd.CreateParameter(); pCid.ParameterName = "$cid"; cmd.Parameters.Add(pCid);
+            var pQty = cmd.CreateParameter(); pQty.ParameterName = "$qty"; cmd.Parameters.Add(pQty);
+            var pEqty = cmd.CreateParameter(); pEqty.ParameterName = "$eqty"; cmd.Parameters.Add(pEqty);
+            var pAlt = cmd.CreateParameter(); pAlt.ParameterName = "$alt"; cmd.Parameters.Add(pAlt);
+            var pCp = cmd.CreateParameter(); pCp.ParameterName = "$cp"; cmd.Parameters.Add(pCp);
+            var pMid = cmd.CreateParameter(); pMid.ParameterName = "$mid"; cmd.Parameters.Add(pMid);
+            var pFet = cmd.CreateParameter(); pFet.ParameterName = "$fetched"; cmd.Parameters.Add(pFet);
+            var pFromSup = cmd.CreateParameter(); pFromSup.ParameterName = "$fromSup"; cmd.Parameters.Add(pFromSup);
+            cmd.Prepare();
+
+            foreach (var s in subsets)
+            {
+                ct.ThrowIfCancellationRequested();
+                pPt.Value = s.ParentType;
+                pPn.Value = s.ParentNo;
+                pIt.Value = s.ItemType;
+                pIn.Value = s.ItemNo;
+                pCid.Value = s.ColorId;
+                pQty.Value = s.Quantity;
+                pEqty.Value = s.ExtraQuantity;
+                pAlt.Value = s.IsAlternate ? 1 : 0;
+                pCp.Value = s.IsCounterpart ? 1 : 0;
+                pMid.Value = s.MatchId;
+                pFet.Value = s.FetchedAt.ToString("o", CultureInfo.InvariantCulture);
+                pFromSup.Value = s.IsFromSupersets ? 1 : 0;
+                cmd.ExecuteNonQuery();
+                count++;
+            }
+            transaction.Commit();
+        }
+        return Task.FromResult(count);
+    }
+
     public Task<List<string>> FindParentsByItemAsync(string itemType, string itemNo, int colorId, CancellationToken ct = default)
     {
         var result = new List<string>();

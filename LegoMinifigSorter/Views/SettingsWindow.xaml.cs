@@ -234,4 +234,87 @@ public partial class SettingsWindow : Window
             MessageBox.Show(ex.Message, "Loeschen", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
+
+    // ====================================================================
+    // Tab "BL-Catalog-Daten" (Phase 5.5: BrickStore-Bulk-Import)
+    // ====================================================================
+
+    /// <summary>"Von GitHub importieren": laedt downloads.zip + entpackt + importiert.</summary>
+    private async void ImportFromGitHub_Click(object sender, RoutedEventArgs e)
+    {
+        var importer = App.Services.GetRequiredService<IBlBulkImportService>();
+        var notif = App.Services.GetRequiredService<INotificationService>();
+        await RunImportAsync(notif, importer.ImportFromGitHubAsync);
+    }
+
+    /// <summary>"Aus lokalem Ordner importieren": parst items/M.xml + M/*.xml direkt.</summary>
+    private async void ImportFromFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_viewModel.LocalImportFolder)
+            || !System.IO.Directory.Exists(_viewModel.LocalImportFolder))
+        {
+            _viewModel.ImportResultText = "Bitte gueltigen Ordner waehlen.";
+            return;
+        }
+        var folder = _viewModel.LocalImportFolder;
+        var importer = App.Services.GetRequiredService<IBlBulkImportService>();
+        var notif = App.Services.GetRequiredService<INotificationService>();
+        await RunImportAsync(notif,
+            (progress, ct) => importer.ImportFromFolderAsync(folder, progress, ct));
+    }
+
+    /// <summary>Ordner-Picker via Microsoft.Win32.OpenFolderDialog (.NET 8).</summary>
+    private void BrowseImportFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "BrickStore-Daten-Ordner waehlen"
+        };
+        if (dlg.ShowDialog(this) == true)
+        {
+            _viewModel.LocalImportFolder = dlg.FolderName;
+        }
+    }
+
+    /// <summary>Gemeinsamer Wrapper: Progress, Toast, Stats-Refresh, Fehler-Handling.</summary>
+    private async Task RunImportAsync(
+        INotificationService notif,
+        Func<IProgress<Core.Services.BlBulkImportProgress>?, System.Threading.CancellationToken,
+            Task<Core.Services.BlBulkImportResult>> importer)
+    {
+        _viewModel.IsImporting = true;
+        _viewModel.ImportResultText = string.Empty;
+        _viewModel.ImportProgress = 0;
+        _viewModel.ImportStatus = "Starte Import...";
+
+        var progress = new Progress<Core.Services.BlBulkImportProgress>(p =>
+        {
+            _viewModel.ImportStatus = $"{p.Phase}: {p.CurrentItem}";
+            _viewModel.ImportProgress = p.Total > 0
+                ? Math.Min(100, (double)p.Current / p.Total * 100)
+                : 0;
+        });
+
+        try
+        {
+            var result = await importer(progress, default);
+            _viewModel.ImportResultText =
+                $"Import erfolgreich: {result.ItemsImported:N0} Items, " +
+                $"{result.InventoriesImported:N0} Subsets in {result.Duration.TotalSeconds:F1}s." +
+                (result.Errors.Count > 0 ? $" ({result.Errors.Count} Fehler)" : string.Empty);
+            await _viewModel.RefreshBrickStoreStatsAsync();
+            await _viewModel.RefreshBlCacheStatsAsync();
+            notif.ShowSuccess("BrickStore-Import abgeschlossen.");
+        }
+        catch (System.Exception ex)
+        {
+            _viewModel.ImportResultText = $"Fehler: {ex.Message}";
+            notif.ShowError($"Import fehlgeschlagen: {ex.Message}");
+            Log.Error(ex, "BrickStore-Import fehlgeschlagen");
+        }
+        finally
+        {
+            _viewModel.IsImporting = false;
+        }
+    }
 }

@@ -156,6 +156,44 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _blCacheStatsText = "Cache-Statistik wird geladen...";
 
+    // --- Phase 5.5: BrickStore-Bulk-Import ---
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsNotImporting))]
+    private bool _isImporting;
+
+    public bool IsNotImporting => !IsImporting;
+
+    [ObservableProperty] private double _importProgress;
+    [ObservableProperty] private string _importStatus = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasImportResult))]
+    private string _importResultText = string.Empty;
+
+    [ObservableProperty] private string _localImportFolder = string.Empty;
+    [ObservableProperty] private int _blCacheItemsCount;
+    [ObservableProperty] private int _blCacheSubsetsCount;
+    [ObservableProperty] private string _blCacheSizeLabel = string.Empty;
+
+    public bool HasImportResult => !string.IsNullOrEmpty(ImportResultText);
+
+    /// <summary>Laed Stats fuer den BrickStore-Import-Tab (Items/Subsets/Groesse).</summary>
+    public async Task RefreshBrickStoreStatsAsync()
+    {
+        try
+        {
+            var stats = await _blCatalogService.GetCacheStatsAsync();
+            BlCacheItemsCount = stats.ItemCount;
+            BlCacheSubsetsCount = stats.SubsetCount;
+            BlCacheSizeLabel = $"{stats.DbFileSizeBytes / 1024.0 / 1024.0:F1} MB";
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "RefreshBrickStoreStats geworfen");
+        }
+    }
+
     // --- BL-Rate-Limit (Phase R2.5) ---
 
     [ObservableProperty]
@@ -260,6 +298,7 @@ public partial class SettingsViewModel : ObservableObject
         // sie sehen / aendern kann ohne neu eingeben zu muessen.
         _ = LoadBricklinkTokensAsync();
         _ = RefreshBlCacheStatsAsync();
+        _ = RefreshBrickStoreStatsAsync();
 
         // Rate-Limit-Schwellen aus Settings + aktuellen Counter
         BricklinkSoftThreshold = settingsService.Current.Bricklink.SoftThreshold;

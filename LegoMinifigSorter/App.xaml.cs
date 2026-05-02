@@ -178,6 +178,8 @@ public partial class App : Application
 
         // Phase R2: BL-Cache-Repository + BlCatalogService (Cache-First-Lookup).
         services.AddSingleton<IBlCacheRepository, BlCacheRepository>();
+        // Phase 5.5: BrickStore-Bulk-Import (GitHub-Download + lokaler Folder).
+        services.AddSingleton<IBlBulkImportService, BlBulkImportService>();
         // Phase R2.5: eigener Rate-Limiter mit Hard-Stop vor BLs 5000/24h.
         services.AddSingleton<IBricklinkRateLimiter, BricklinkRateLimiter>();
         services.AddSingleton<IBlCatalogService, BlCatalogService>();

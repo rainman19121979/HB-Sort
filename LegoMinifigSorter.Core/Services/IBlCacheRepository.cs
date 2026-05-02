@@ -38,6 +38,13 @@ public interface IBlCacheRepository
     Task ReplaceSubsetsAsync(string parentType, string parentNo, IEnumerable<BlSubset> subsets, CancellationToken ct = default);
 
     /// <summary>
+    /// Bulk-Insert von Subsets ohne vorheriges Loeschen pro Parent. Nutzt
+    /// INSERT OR REPLACE auf den PRIMARY KEY. Genutzt vom BrickStore-Bulk-Import
+    /// (Phase 5.5) fuer ~140.000 Eintraege in einer einzigen Transaction.
+    /// </summary>
+    Task<int> BulkInsertSubsetsAsync(IEnumerable<BlSubset> subsets, CancellationToken ct = default);
+
+    /// <summary>
     /// Reverse-Lookup: welche Parent-Items enthalten dieses Item in dieser Farbe?
     /// (Phase 5 nutzt das fuer "wartende Figuren brauchen Teil X").
     /// </summary>
