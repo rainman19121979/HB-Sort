@@ -1,0 +1,30 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:system="clr-namespace:System;assembly=System.Runtime">
+    <!--
+        Default-Dichte. Werte sind ausgewogen fuer normale Bildschirme.
+        Wird ueber DynamicResource in den Views referenziert, damit
+        ein Wechsel zur Laufzeit funktioniert.
+    -->
+
+    <!-- Schrift-Groessen -->
+    <system:Double x:Key="HeaderFontSize">14</system:Double>
+    <system:Double x:Key="BodyFontSize">12</system:Double>
+    <system:Double x:Key="DetailFontSize">11</system:Double>
+    <system:Double x:Key="MicroFontSize">10</system:Double>
+
+    <!-- Spacing -->
+    <Thickness x:Key="CardPadding">8</Thickness>
+    <Thickness x:Key="BorderPadding">10</Thickness>
+    <Thickness x:Key="ContentMargin">8</Thickness>
+    <Thickness x:Key="ItemMargin">2</Thickness>
+
+    <!-- Bild-Groessen -->
+    <GridLength x:Key="CardImageHeight">200</GridLength>
+    <system:Double x:Key="PartImageSize">64</system:Double>
+    <system:Double x:Key="MinifigImageSize">120</system:Double>
+    <system:Double x:Key="ColorSwatchSize">16</system:Double>
+
+    <!-- Button -->
+    <Thickness x:Key="ButtonPadding">12,4</Thickness>
+</ResourceDictionary>

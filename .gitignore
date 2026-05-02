@@ -1,0 +1,84 @@
+# ============================================
+# .NET / Visual Studio
+# ============================================
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+
+# ============================================
+# Visual Studio Cache & temp files
+# ============================================
+*.tlog
+*.dbmdl
+*.dbproj.schemaview
+*.jfm
+.vshistory/
+StyleCop.Cache
+
+# ============================================
+# Rider / VS Code
+# ============================================
+.idea/
+.vscode/
+*.DotSettings.user
+
+# ============================================
+# NuGet
+# ============================================
+packages/
+*.nupkg
+*.snupkg
+.nuget/
+
+# ============================================
+# Local config / Secrets / User-Data
+# ============================================
+appsettings.Development.json
+appsettings.Local.json
+secrets.json
+.env
+.env.local
+
+# ============================================
+# Claude Code lokale Settings
+# ============================================
+.claude/settings.local.json
+
+# ============================================
+# Seed-Daten (16 MB, werden via tools/download-catalog-seed.ps1 geholt)
+# ============================================
+seed-data/*.zip
+LegoMinifigSorter.Core/Resources/CatalogSeed/*.zip
+
+# ============================================
+# Logs
+# ============================================
+*.log
+logs/
+
+# ============================================
+# Test-Outputs
+# ============================================
+TestResults/
+coverage/
+*.trx
+
+# ============================================
+# Temporary / Backup
+# ============================================
+*.bak
+*.tmp
+*~
+~*
+*.swp
+
+# ============================================
+# OS
+# ============================================
+Thumbs.db
+.DS_Store
+desktop.ini

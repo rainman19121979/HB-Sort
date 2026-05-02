@@ -1,0 +1,226 @@
+<UserControl x:Class="LegoMinifigSorter.Views.PartLookupView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+        Phase 5: Detailansicht eines erkannten Teils (Modus B).
+        DataContext = PartLookupViewModel.
+    -->
+
+    <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+            BorderThickness="1" CornerRadius="4"
+            Padding="{DynamicResource BorderPadding}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>  <!-- Header -->
+                <RowDefinition Height="Auto"/>  <!-- Trenner -->
+                <RowDefinition Height="*"/>     <!-- Wartende-Liste -->
+                <RowDefinition Height="Auto"/>  <!-- Trenner + Alternativen-Header -->
+                <RowDefinition Height="Auto"/>  <!-- Floating-Combo + Wo-kommt-vor -->
+                <RowDefinition Height="Auto"/>  <!-- Buttons -->
+            </Grid.RowDefinitions>
+
+            <!-- ===== HEADER ===== -->
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Image Grid.Column="0"
+                       Source="{Binding ImageUrl}"
+                       Stretch="Uniform"
+                       Width="100" Height="100"
+                       HorizontalAlignment="Left" VerticalAlignment="Top"/>
+
+                <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                    <TextBlock Text="ERKANNTES TEIL"
+                               FontSize="{DynamicResource DetailFontSize}"
+                               Foreground="Gray" FontWeight="SemiBold"/>
+                    <TextBlock Text="{Binding PartName}"
+                               FontSize="{DynamicResource HeaderFontSize}" FontWeight="SemiBold"
+                               TextWrapping="Wrap"/>
+
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="60"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="BL:"
+                                   Foreground="Gray"
+                                   FontSize="{DynamicResource DetailFontSize}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding BlPartNo}"
+                                   FontFamily="Consolas"
+                                   FontSize="{DynamicResource DetailFontSize}"/>
+                    </Grid>
+
+                    <!-- Color-Zeile mit Swatch + Korrektur-Dropdown -->
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="60"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Text="Farbe:"
+                                   Foreground="Gray" VerticalAlignment="Center"
+                                   FontSize="{DynamicResource DetailFontSize}"/>
+                        <Border Grid.Column="1" Width="20" Height="20"
+                                Background="{Binding SwatchBrush}"
+                                BorderBrush="Black" BorderThickness="1"
+                                Margin="0,0,8,0"/>
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding ColorDisplayLabel}"
+                                   VerticalAlignment="Center"
+                                   FontSize="{DynamicResource DetailFontSize}"/>
+                    </Grid>
+
+                    <!-- Korrektur-Dropdown unter der Color-Zeile -->
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Korrektur:"
+                                   Foreground="Gray" VerticalAlignment="Center"
+                                   FontSize="{DynamicResource MicroFontSize}"/>
+                        <ComboBox Grid.Column="1" MinWidth="200"
+                                  ItemsSource="{Binding AvailableColors}"
+                                  SelectedItem="{Binding SelectedColor}"
+                                  DisplayMemberPath="Name"
+                                  ToolTip="Nur Farben in denen das Teil bei BL existiert"
+                                  IsEnabled="{Binding IsLoadingColors,
+                                       Converter={StaticResource InverseBoolToVisibility}}"
+                                  SelectionChanged="Color_SelectionChanged"/>
+                        <ProgressBar Grid.Column="2" Width="60" Height="6"
+                                     IsIndeterminate="True" Margin="6,0,0,0"
+                                     Visibility="{Binding IsLoadingColors,
+                                         Converter={StaticResource BoolToVisibility}}"/>
+                    </Grid>
+
+                    <!-- Anzahl -->
+                    <Grid Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Anzahl:"
+                                   Foreground="Gray" VerticalAlignment="Center"
+                                   FontSize="{DynamicResource DetailFontSize}"/>
+                        <TextBox Grid.Column="1"
+                                 Text="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="Anzahl Teile (Default 1, fuer Mehrfach-Scans)"/>
+                    </Grid>
+                </StackPanel>
+            </Grid>
+
+            <Separator Grid.Row="1" Margin="0,8"/>
+
+            <!-- ===== WARTENDE FIGUREN ===== -->
+            <StackPanel Grid.Row="2">
+                <TextBlock FontSize="{DynamicResource DetailFontSize}" FontWeight="SemiBold"
+                           Margin="0,0,0,6">
+                    <Run Text="PASSENDE WARTENDE FIGUREN"/>
+                    <Run Text="("/><Run Text="{Binding WaitingMatches.Count, Mode=OneWay}"/><Run Text=")"/>
+                </TextBlock>
+
+                <TextBlock Text="Keine wartende Figur braucht dieses Teil in dieser Farbe."
+                           Foreground="Gray" FontStyle="Italic"
+                           Visibility="{Binding HasWaitingMatches,
+                                Converter={StaticResource InverseBoolToVisibility}}"/>
+
+                <ItemsControl ItemsSource="{Binding WaitingMatches}"
+                              Visibility="{Binding HasWaitingMatches,
+                                  Converter={StaticResource BoolToVisibility}}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                    BorderThickness="1" CornerRadius="4"
+                                    Padding="6" Margin="0,2,0,2">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Image Grid.Column="0" Source="{Binding ImageUrl}"
+                                           Width="60" Height="60" Stretch="Uniform"/>
+
+                                    <StackPanel Grid.Column="1" Margin="8,0,8,0" VerticalAlignment="Center">
+                                        <TextBlock FontSize="{DynamicResource BodyFontSize}"
+                                                   FontWeight="SemiBold" TextWrapping="Wrap">
+                                            <Run Text="{Binding MinifigName, Mode=OneWay}"/>
+                                            <Run Text="{Binding BinLabel, Mode=OneWay}" Foreground="Gray"/>
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding ProgressLabel}"
+                                                   FontSize="{DynamicResource DetailFontSize}"
+                                                   Foreground="Gray"/>
+                                    </StackPanel>
+
+                                    <Button Grid.Column="2" Content="Zuordnen"
+                                            Click="Assign_Click"
+                                            Tag="{Binding}"
+                                            Padding="8,4"
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource AccentButtonStyle}"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- ===== ALTERNATIVEN-HEADER ===== -->
+            <StackPanel Grid.Row="3" Margin="0,12,0,0">
+                <Separator/>
+                <TextBlock Text="ALTERNATIVEN" Margin="0,8,0,4"
+                           FontSize="{DynamicResource DetailFontSize}" FontWeight="SemiBold"/>
+                <TextBlock Text="Als Einzelteil lagern in:"
+                           FontSize="{DynamicResource DetailFontSize}" Foreground="Gray"/>
+            </StackPanel>
+
+            <!-- ===== FLOATING-COMBO + WO-KOMMT-VOR ===== -->
+            <StackPanel Grid.Row="4" Margin="0,4,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="80"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ComboBox Grid.Column="0" MinWidth="200"
+                              ItemsSource="{Binding AvailableBins}"
+                              SelectedItem="{Binding SelectedFloatingBin}"
+                              DisplayMemberPath="Label"/>
+                    <TextBlock Grid.Column="1" Text="Anzahl:"
+                               VerticalAlignment="Center" Margin="12,0,6,0"
+                               Foreground="Gray"
+                               FontSize="{DynamicResource DetailFontSize}"/>
+                    <TextBox Grid.Column="2"
+                             Text="{Binding FloatingQuantity, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="Anzahl"/>
+                    <Button Grid.Column="3" Content="Lagern" Width="100"
+                            Margin="8,0,0,0"
+                            Click="StoreFloating_Click"
+                            Style="{StaticResource AccentButtonStyle}"
+                            ToolTip="Teil als Einzelteil im gewaehlten Fach lagern"/>
+                </Grid>
+
+                <Button Content="Wo kommt das Teil vor? (BL-API)"
+                        Click="ShowSupersets_Click"
+                        Margin="0,8,0,0" HorizontalAlignment="Stretch"
+                        ToolTip="Oeffnet eine Liste aller Minifiguren in denen dieses Teil in dieser Farbe vorkommt."/>
+            </StackPanel>
+
+            <!-- ===== BUTTONS ===== -->
+            <StackPanel Grid.Row="5" Orientation="Horizontal"
+                        HorizontalAlignment="Right" Margin="0,12,0,0">
+                <Button Content="Verwerfen" Width="100"
+                        Click="Discard_Click"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

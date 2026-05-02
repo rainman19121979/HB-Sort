@@ -1,0 +1,29 @@
+<Application x:Class="LegoMinifigSorter.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.modernwpf.com/2019"
+             xmlns:converters="clr-namespace:LegoMinifigSorter.Converters"
+             Startup="Application_Startup"
+             ShutdownMode="OnExplicitShutdown">
+    <!--
+        ShutdownMode="OnExplicitShutdown": Die App beendet sich NICHT automatisch wenn
+        das Fenster geschlossen wird. Stattdessen minimieren wir ins Tray-Icon.
+        Erst über das Tray-Menü "Beenden" wird die App wirklich geschlossen.
+    -->
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- ModernWpfUI Theme-Ressourcen: Folgt automatisch dem Windows-System-Theme -->
+                <ui:ThemeResources />
+                <ui:XamlControlsResources />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Converter für Datenbindung (z.B. bool → Visibility umkehren) -->
+            <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>
+            <converters:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
+            <converters:ToastKindToBrushConverter x:Key="ToastKindToBrush"/>
+            <converters:BrickognizeStatusToBrushConverter x:Key="BrickognizeStatusToBrush"/>
+            <converters:RateLimitStateToBrushConverter x:Key="RateLimitStateToBrush"/>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
