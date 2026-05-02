@@ -6,6 +6,7 @@
         xmlns:views="clr-namespace:HBSort.Views"
         ui:WindowHelper.UseModernWindowStyle="True"
         Title="HB-Sort"
+        Icon="Resources/app.ico"
         Height="900" Width="1400"
         WindowState="Maximized"
         Closing="Window_Closing"
@@ -55,11 +56,21 @@
         <!-- === TITELLEISTE === -->
         <Grid Grid.Row="0" Margin="16,8">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <TextBlock Grid.Column="0"
+            <!-- Logo links -->
+            <Image Grid.Column="0"
+                   Source="Resources/logo.png"
+                   Width="40" Height="40"
+                   Margin="0,0,12,0"
+                   VerticalAlignment="Center"
+                   ToolTip="HB-Sort - HB-Bricks"/>
+
+            <!-- Titel mit Version -->
+            <TextBlock Grid.Column="1"
                        FontSize="18" FontWeight="SemiBold"
                        VerticalAlignment="Center">
                 <Run Text="HB-Sort"/>
@@ -67,7 +78,7 @@
                      FontSize="12" Foreground="Gray"/>
             </TextBlock>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal">
+            <StackPanel Grid.Column="2" Orientation="Horizontal">
                 <Button Content="Einstellungen" Click="OpenSettings_Click"
                         ToolTip="Kamera, Schwellwerte und andere Einstellungen"/>
             </StackPanel>
@@ -150,6 +161,7 @@
 
         <!-- === TRAY-ICON === -->
         <tb:TaskbarIcon x:Name="TrayIcon"
+                        IconSource="Resources/app.ico"
                         ToolTipText="HB-Sort"
                         TrayMouseDoubleClick="TrayIcon_TrayMouseDoubleClick"
                         Visibility="Visible">

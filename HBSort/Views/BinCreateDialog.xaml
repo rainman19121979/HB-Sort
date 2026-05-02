@@ -4,6 +4,7 @@
         xmlns:ui="http://schemas.modernwpf.com/2019"
         ui:WindowHelper.UseModernWindowStyle="True"
         Title="Lagerfach anlegen"
+        Icon="../Resources/app.ico"
         Width="400" Height="280"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">

@@ -5,6 +5,7 @@
         xmlns:vm="clr-namespace:HBSort.ViewModels"
         ui:WindowHelper.UseModernWindowStyle="True"
         Title="Einstellungen"
+        Icon="../Resources/app.ico"
         Width="1100" Height="720"
         MinWidth="800" MinHeight="500"
         WindowStartupLocation="CenterOwner"
@@ -879,6 +880,84 @@
                                    Foreground="DarkGreen"
                                    Margin="0,16,0,0"
                                    Visibility="{Binding HasImportResult, Converter={StaticResource BoolToVisibility}}"/>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ====================================== -->
+            <!-- TAB: INFO (Logo, Beschreibung, Disclaimer) -->
+            <!-- ====================================== -->
+            <TabItem Header="Info">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                    <StackPanel HorizontalAlignment="Center" MaxWidth="600">
+
+                        <!-- Logo -->
+                        <Image Source="../Resources/logo.png"
+                               Width="200" Height="240"
+                               HorizontalAlignment="Center"
+                               Margin="0,16,0,16"/>
+
+                        <!-- App-Name -->
+                        <TextBlock Text="HB-Sort"
+                                   FontSize="28" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"/>
+
+                        <!-- Untertitel -->
+                        <TextBlock Text="Sortier-Werkzeug fuer Klemmbausteine"
+                                   FontSize="14" Foreground="Gray"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,4,0,0"/>
+
+                        <!-- Version (gesetzt via Code-Behind) -->
+                        <TextBlock x:Name="AboutVersionText"
+                                   FontSize="12" Foreground="Gray"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,2,0,16"/>
+
+                        <Separator Margin="0,8"/>
+
+                        <!-- Beschreibung -->
+                        <TextBlock TextWrapping="Wrap"
+                                   FontSize="12"
+                                   Margin="0,8,0,16">
+                            HB-Sort erkennt Klemmbaustein-Minifiguren und Teile per
+                            USB-Kamera (Brickognize-API), schlaegt deren BrickLink-IDs
+                            vor und verwaltet einen Lagerfach-basierten Workflow zur
+                            Sortierung von Sammlungen oder Wuhlkisten.
+                        </TextBlock>
+
+                        <!-- Markenrechte -->
+                        <Border Background="#FFF3E0" BorderBrush="#E65100"
+                                BorderThickness="1" CornerRadius="4"
+                                Padding="12" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="Markenrechte / Disclaimer"
+                                           FontWeight="SemiBold" FontSize="13"
+                                           Margin="0,0,0,4"/>
+                                <TextBlock TextWrapping="Wrap" FontSize="11">
+                                    LEGO ist eine eingetragene Marke der LEGO Gruppe,
+                                    die diese Software weder sponsert noch
+                                    unterstuetzt. HB-Sort ist ein unabhaengiges
+                                    Werkzeug ohne offizielle Verbindung zur LEGO
+                                    Gruppe.
+                                    <LineBreak/><LineBreak/>
+                                    BrickLink-Catalog-Daten sind Eigentum von
+                                    BrickLink (bricklink.com). Diese Anwendung nutzt
+                                    die Aufbereitung dieser Daten durch BrickStore von
+                                    Robert Griebl (brickstore.dev, GPL-3,
+                                    github.com/rgriebl/brickstore-database).
+                                    <LineBreak/><LineBreak/>
+                                    Brickognize ist ein Service von brickognize.com.
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Copyright -->
+                        <TextBlock Text="(c) 2026 Holger Buchmann - HB-Bricks"
+                                   FontSize="11" Foreground="Gray"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,8,0,0"/>
 
                     </StackPanel>
                 </ScrollViewer>

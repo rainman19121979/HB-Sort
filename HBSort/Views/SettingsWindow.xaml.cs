@@ -23,6 +23,14 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         _viewModel = viewModel;
         DataContext = _viewModel;
+
+        // Versionstext im Info-Tab aus der Assembly-Version setzen.
+        // SettingsViewModel kennt keine VersionText-Property, daher direkt im Code-Behind.
+        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        if (version != null)
+        {
+            AboutVersionText.Text = $"v{version.Major}.{version.Minor}.{version.Build}";
+        }
     }
 
     /// <summary>Speichern-Button: Settings übernehmen und Fenster schließen</summary>

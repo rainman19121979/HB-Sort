@@ -4,6 +4,7 @@
         xmlns:ui="http://schemas.modernwpf.com/2019"
         ui:WindowHelper.UseModernWindowStyle="True"
         Title="Lagerfaecher anlegen (Bulk)"
+        Icon="../Resources/app.ico"
         Width="500" Height="560"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">

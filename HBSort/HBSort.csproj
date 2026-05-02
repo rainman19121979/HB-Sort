@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <LangVersion>12</LangVersion>
-    <!-- ApplicationIcon kommt in Phase 7 -->
+    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
     <Version>0.1.0</Version>
     <AssemblyTitle>HB-Sort</AssemblyTitle>
     <Product>HB-Sort</Product>
@@ -48,6 +48,12 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+  </ItemGroup>
+
+  <!-- Logo-Resources fuer Splash, About-Dialog, Window-Icons -->
+  <ItemGroup>
+    <Resource Include="Resources\logo.png" />
+    <Resource Include="Resources\app.ico" />
   </ItemGroup>
 
 </Project>
