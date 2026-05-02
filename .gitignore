@@ -53,6 +53,14 @@ secrets.json
 # ============================================
 seed-data/*.zip
 LegoMinifigSorter.Core/Resources/CatalogSeed/*.zip
+HBSort.Core/Resources/CatalogSeed/*.zip
+
+# BrickStore-Datenbank-Download-Cache (~570 MB, wird zur Laufzeit
+# heruntergeladen via Settings -> BL-Catalog-Daten -> "Von GitHub importieren")
+downloads/
+
+# Lokale Resources (Icons, Screenshots etc. die nicht ins Repo gehoeren)
+Resources/
 
 # ============================================
 # Logs

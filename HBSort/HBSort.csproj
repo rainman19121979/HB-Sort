@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <LangVersion>12</LangVersion>
+    <!-- ApplicationIcon kommt in Phase 7 -->
+    <Version>0.1.0</Version>
+    <AssemblyTitle>HB-Sort</AssemblyTitle>
+    <Product>HB-Sort</Product>
+    <Company>HB-Bricks</Company>
+    <Description>Sortier-Werkzeug fuer Klemmbausteine</Description>
+    <Copyright>(c) 2026 Holger</Copyright>
+  </PropertyGroup>
+
+  <!-- Projekt-Referenz auf die Core-Bibliothek (enthält alle Services und Models) -->
+  <ItemGroup>
+    <ProjectReference Include="..\HBSort.Core\HBSort.Core.csproj" />
+  </ItemGroup>
+
+  <!-- NuGet-Pakete für das WPF-Hauptprojekt -->
+  <ItemGroup>
+    <!-- CommunityToolkit.Mvvm: Microsoft-Bibliothek die MVVM-Boilerplate reduziert
+         (ObservableObject, RelayCommand etc.) -->
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+
+    <!-- ModernWpfUI: Bringt das moderne Windows-Look-and-Feel (Hell/Dunkel-Theme)
+         automatisch passend zum System-Theme -->
+    <PackageReference Include="ModernWpfUI" Version="0.9.6" />
+
+    <!-- H.NotifyIcon.Wpf: Tray-Icon-Bibliothek mit MVVM-Support,
+         damit die App beim Schließen in die Taskleiste minimiert wird -->
+    <PackageReference Include="H.NotifyIcon.Wpf" Version="2.3.0" />
+
+    <!-- Serilog: Strukturiertes Logging-Framework mit tagesweiser Rotation -->
+    <PackageReference Include="Serilog" Version="4.2.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+
+    <!-- DI-Container von Microsoft -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+
+    <!-- EF Core Design-Package wird vom Startup-Projekt gebraucht für Migrations-Tooling -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.13">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,226 @@
+<UserControl x:Class="HBSort.Views.MinifigDetailView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+        Phase R3: Detailansicht der erkannten Minifigur (Daten aus BlCatalogService).
+        Header mit Bild + Name + BL-ID + Jahr + Anzahl Teile,
+        Teileliste mit Bild, BL-Part-No, BL-Color (Swatch + Name + ID), Anzahl,
+        Footer mit Lagerfach-Auswahl (Phase-4-Stub) + Verwerfen-Button.
+    -->
+
+    <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+            BorderThickness="1" CornerRadius="4"
+            Padding="{DynamicResource BorderPadding}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <!-- Header: Bild + Daten -->
+                <RowDefinition Height="Auto"/>
+                <!-- Trenner -->
+                <RowDefinition Height="Auto"/>
+                <!-- Source-Label (z.B. "Aus Cache") -->
+                <RowDefinition Height="Auto"/>
+                <!-- Teileliste -->
+                <RowDefinition Height="*"/>
+                <!-- Footer mit Lagerfach + Buttons -->
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- ===== HEADER ===== -->
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Image Grid.Column="0"
+                       Source="{Binding ImageUrl}"
+                       Stretch="Uniform"
+                       Width="{DynamicResource MinifigImageSize}"
+                       Height="{DynamicResource MinifigImageSize}"
+                       HorizontalAlignment="Left" VerticalAlignment="Top"/>
+
+                <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                    <TextBlock Text="{Binding Name}"
+                               FontSize="{DynamicResource HeaderFontSize}" FontWeight="SemiBold"
+                               TextWrapping="Wrap"/>
+
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="60"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="BL:" Foreground="Gray"
+                                   FontSize="{DynamicResource DetailFontSize}"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding BricklinkId}"
+                                   FontSize="{DynamicResource DetailFontSize}"
+                                   FontFamily="Consolas"/>
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="60"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Jahr:" Foreground="Gray"
+                                   FontSize="{DynamicResource DetailFontSize}"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding YearReleased, TargetNullValue=-}"
+                                   FontSize="{DynamicResource DetailFontSize}"/>
+                    </Grid>
+
+                    <TextBlock Text="{Binding PartsHeaderLabel}"
+                               FontSize="{DynamicResource DetailFontSize}"
+                               Foreground="Gray" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Grid>
+
+            <Separator Grid.Row="1" Margin="0,8"/>
+
+            <TextBlock Grid.Row="2"
+                       Text="{Binding SourceLabel}"
+                       FontSize="{DynamicResource DetailFontSize}"
+                       FontStyle="Italic" Foreground="Gray"
+                       Margin="0,0,0,4"/>
+
+            <!-- ===== TEILELISTE ===== -->
+            <ScrollViewer Grid.Row="3"
+                          VerticalScrollBarVisibility="Auto"
+                          MaxHeight="320">
+                <ItemsControl ItemsSource="{Binding Parts}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                    BorderThickness="0,0,0,1"
+                                    Padding="6,6,0,6">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="BorderBrush"
+                                                Value="{DynamicResource SystemControlForegroundBaseLowBrush}"/>
+                                        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsCollected}" Value="True">
+                                                <!-- Linker gruener Balken + dezenter Hintergrund -->
+                                                <Setter Property="BorderBrush" Value="#4CAF50"/>
+                                                <Setter Property="BorderThickness" Value="3,0,0,1"/>
+                                                <Setter Property="Background" Value="#1A4CAF50"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <!-- Checkbox (in Phase 5 aktivierbar) -->
+                                        <ColumnDefinition Width="Auto"/>
+                                        <!-- Teil-Bild -->
+                                        <ColumnDefinition Width="80"/>
+                                        <!-- Beschreibung -->
+                                        <ColumnDefinition Width="*"/>
+                                        <!-- Quantity -->
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <CheckBox Grid.Column="0"
+                                              IsChecked="{Binding IsCollected, Mode=TwoWay}"
+                                              VerticalAlignment="Center"
+                                              ToolTip="Markieren wenn du dieses Teil bereits hast — beim &quot;In Fach legen&quot; wird es als &quot;gesammelt&quot; uebernommen."/>
+
+                                    <Image Grid.Column="1"
+                                           Source="{Binding ImageUrl}"
+                                           Stretch="Uniform"
+                                           Width="{DynamicResource PartImageSize}"
+                                           Height="{DynamicResource PartImageSize}"
+                                           Margin="8,0"/>
+
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding PartName}"
+                                                   FontSize="{DynamicResource BodyFontSize}"
+                                                   FontWeight="SemiBold"
+                                                   TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding PartDisplayLabel}"
+                                                   Foreground="Gray"
+                                                   FontSize="{DynamicResource DetailFontSize}"
+                                                   FontFamily="Consolas"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                            <Border Width="{DynamicResource ColorSwatchSize}"
+                                                    Height="{DynamicResource ColorSwatchSize}"
+                                                    Background="{Binding SwatchBrush}"
+                                                    BorderBrush="Black" BorderThickness="1"
+                                                    Margin="0,0,6,0"
+                                                    VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding ColorDisplayLabel}"
+                                                       FontSize="{DynamicResource DetailFontSize}"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <!-- Alt-Teil-Hinweis (Match-Group) – nur sichtbar wenn IsAlternate=true -->
+                                        <TextBlock Text="{Binding AlternateLabel}"
+                                                   FontSize="{DynamicResource MicroFontSize}"
+                                                   Foreground="#FF8000"
+                                                   FontStyle="Italic" Margin="0,2,0,0"
+                                                   Visibility="{Binding IsAlternate, Converter={StaticResource BoolToVisibility}}"/>
+                                    </StackPanel>
+
+                                    <TextBlock Grid.Column="3"
+                                               Text="{Binding QuantityLabel}"
+                                               FontSize="{DynamicResource BodyFontSize}"
+                                               VerticalAlignment="Center"
+                                               FontWeight="SemiBold"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- ===== FOOTER ===== -->
+            <StackPanel Grid.Row="4" Margin="0,12,0,0">
+
+                <!-- Notizen-Feld -->
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Notizen:"
+                               VerticalAlignment="Top" Margin="0,4,8,0"/>
+                    <TextBox Grid.Column="1"
+                             Text="{Binding UserNotes, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True" TextWrapping="Wrap"
+                             Height="40" VerticalScrollBarVisibility="Auto"
+                             ToolTip="Optionale Notiz zur Figur (z.B. 'Helm fehlt original')"/>
+                </Grid>
+
+                <!-- Lagerfach + Buttons -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="Lagerfach:"
+                               VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding AvailableBins}"
+                              SelectedItem="{Binding SelectedBin}"
+                              DisplayMemberPath="Label"
+                              ToolTip="Fach in das die Figur gelegt wird (Default: erstes freies Fach)"/>
+
+                    <!-- Buttons rechtsbuendig -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                HorizontalAlignment="Right" Margin="12,0,0,0">
+                        <Button Content="Verwerfen" Width="100"
+                                Click="Discard_Click"
+                                Margin="0,0,8,0"/>
+                        <Button Content="{Binding PersistButtonText}" MinWidth="160"
+                                Style="{StaticResource AccentButtonStyle}"
+                                IsEnabled="{Binding CanPersist}"
+                                Click="Persist_Click"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

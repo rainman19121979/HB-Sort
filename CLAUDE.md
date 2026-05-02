@@ -1,4 +1,18 @@
-# LEGO Minifigur-Sortier-Tool
+# HB-Sort (Klemmbaustein-Sortier-Werkzeug)
+
+## Migrations-Notiz (2026-05-02)
+
+Software umbenannt von "LegoMinifigSorter" auf "HBSort" (Code) bzw.
+"HB-Sort" (UI). Grund: LEGO-Markenrechte.
+
+- Top-Level-Folder: `C:\Projekte\LegoMinifigSorter` -> `C:\Projekte\HBSort`
+- AppData: `%APPDATA%\LegoMinifigSorter` -> `%APPDATA%\HBSort`
+- Auto-Migration in `App.xaml.cs::MigrateLegacyAppDataIfNeeded()`
+  kopiert beim ersten Start den alten Datenbestand in den neuen Ordner.
+- Backup-Tag: `pre-rename-backup-2026-05-02`.
+
+LEGO ist eine eingetragene Marke der LEGO Gruppe; diese Software hat
+keine offizielle Verbindung zur LEGO Gruppe.
 
 ## Projektzweck
 
@@ -58,7 +72,7 @@ spaeter den Verkauf auf BL massiv vereinfacht.
 ## Datenbanken
 
 ```
-%APPDATA%\LegoMinifigSorter\
+%APPDATA%\HBSort\
 ├── userdata.db         ← Lagerfaecher, wartende Figuren, Scan-Historie
 ├── userdata.db.bak     ← Backup beim App-Start
 ├── bl_cache.db         ← BL-API-Antworten gecached (Items, Subsets, Colors)
@@ -621,8 +635,8 @@ Da wir intern bereits BL-IDs verwenden, ist der BSX-Export trivial:
 ## Architektur (mit BL-API-Services)
 
 ```
-LegoMinifigSorter.sln
-├── LegoMinifigSorter/                  (WPF-Hauptprojekt)
+HBSort.sln
+├── HBSort/                  (WPF-Hauptprojekt)
 │   ├── App.xaml / MainWindow.xaml
 │   ├── Views/
 │   │   ├── ScanView, MinifigDetailView, BinManagerView, ...
@@ -632,7 +646,7 @@ LegoMinifigSorter.sln
 │   ├── Converters/
 │   └── Resources/
 │
-├── LegoMinifigSorter.Core/             (Reine Logik)
+├── HBSort.Core/             (Reine Logik)
 │   ├── Models/
 │   ├── Services/
 │   │   ├── ICameraService / CameraService.cs
@@ -662,9 +676,9 @@ LegoMinifigSorter.sln
 │       ├── UserDataContext.cs (EF Core)
 │       └── Migrations/
 │
-├── LegoMinifigSorter.Build/            (DEPRECATED - wird entfernt)
+├── HBSort.Build/            (DEPRECATED - wird entfernt)
 │
-└── LegoMinifigSorter.Tests/            (xUnit)
+└── HBSort.Tests/            (xUnit)
     ├── BricklinkClientTests.cs ★ NEU
     ├── BlCatalogServiceTests.cs ★ NEU
     ├── BlCacheRepositoryTests.cs ★ NEU
@@ -711,7 +725,7 @@ Wir setzen das Refactoring in 4 Etappen um:
 
 ### Phase R4 – Cleanup
 - catalog.db.csproj-Embedded-Resources entfernen
-- LegoMinifigSorter.Build-Projekt entfernen oder reduzieren
+- HBSort.Build-Projekt entfernen oder reduzieren
 - CatalogImporter / CatalogService als deprecated markieren
 - catalog.db kann optional weiter als Fallback bleiben (fuer RGB-Werte
   bei nicht-erkannten Farben), aber kein Bestandteil des Hauptflusses

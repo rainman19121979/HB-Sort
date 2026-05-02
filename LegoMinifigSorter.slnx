@@ -1,6 +1,0 @@
-<Solution>
-  <Project Path="LegoMinifigSorter.Build/LegoMinifigSorter.Build.csproj" />
-  <Project Path="LegoMinifigSorter.Core/LegoMinifigSorter.Core.csproj" />
-  <Project Path="LegoMinifigSorter.Tests/LegoMinifigSorter.Tests.csproj" />
-  <Project Path="LegoMinifigSorter/LegoMinifigSorter.csproj" />
-</Solution>
