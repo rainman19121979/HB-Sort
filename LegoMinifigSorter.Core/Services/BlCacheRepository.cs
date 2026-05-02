@@ -76,6 +76,12 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         // Inkrementelle Migrationen fuer existierende DBs (CREATE TABLE IF NOT EXISTS
         // legt die Spalte nicht nachtraeglich an).
         EnsureColumn("bl_subsets", "is_from_supersets", "INTEGER NOT NULL DEFAULT 0");
+
+        // Bereinigung: alte Single-Row-Pseudo-Eintraege markieren die noch von vor
+        // der is_from_supersets-Migration in der DB stehen. Sonst wuerde der
+        // EnsureFullSubsets-Cache-Hit fuer eine 1-Eintrag-Minifig faelschlich
+        // greifen und "Diese Figur anlegen" eine 1/1-Pseudo-Figur produzieren.
+        MarkOrphanSingleRowSubsetsAsFromSupersets();
     }
 
     /// <summary>
@@ -105,6 +111,41 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         alterCmd.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {columnType};";
         alterCmd.ExecuteNonQuery();
         Log.Information("BlCache-Migration: Spalte '{Col}' zu '{Table}' hinzugefuegt", column, table);
+    }
+
+    /// <summary>
+    /// Heuristische Bereinigung: alte Single-Row-Pseudo-Eintraege fuer Minifigs
+    /// (parent_type='M', genau 1 Eintrag, is_from_supersets=0) werden auf
+    /// is_from_supersets=1 gesetzt. So erkennt EnsureFullSubsets sie als
+    /// unvollstaendig und triggert beim naechsten Lookup einen force-fetch
+    /// via BL-API.
+    ///
+    /// Idempotent: nach dem ersten Lauf findet die Subquery 0 Treffer.
+    /// Risiko bei echten 1-Teil-Minifigs ist akzeptabel: kostet maximal einen
+    /// zusaetzlichen GetSubsets-Call beim naechsten Lookup.
+    /// </summary>
+    private void MarkOrphanSingleRowSubsetsAsFromSupersets()
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = @"
+            UPDATE bl_subsets
+            SET is_from_supersets = 1
+            WHERE parent_type = 'M'
+              AND is_from_supersets = 0
+              AND parent_no IN (
+                  SELECT parent_no
+                  FROM bl_subsets
+                  WHERE parent_type = 'M'
+                  GROUP BY parent_no
+                  HAVING COUNT(*) = 1
+              );";
+        var updated = cmd.ExecuteNonQuery();
+        if (updated > 0)
+        {
+            Log.Information(
+                "BlCache-Cleanup: {Count} verwaiste Single-Row-Subsets als IsFromSupersets markiert (force-fetch beim naechsten Lookup)",
+                updated);
+        }
     }
 
     private static string LoadEmbeddedResource(string resourceName)
