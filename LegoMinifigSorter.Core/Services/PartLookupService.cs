@@ -15,15 +15,18 @@ public class PartLookupService : IPartLookupService
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
     private readonly IBlCatalogService _catalog;
     private readonly IMinifigPersistenceService _persistence;
+    private readonly IPartImageProvider _imageProvider;
 
     public PartLookupService(
         IDbContextFactory<UserDataContext> ctxFactory,
         IBlCatalogService catalog,
-        IMinifigPersistenceService persistence)
+        IMinifigPersistenceService persistence,
+        IPartImageProvider imageProvider)
     {
         _ctxFactory = ctxFactory;
         _catalog = catalog;
         _persistence = persistence;
+        _imageProvider = imageProvider;
     }
 
     public async Task<PartLookupResult> LookupPartAsync(string blPartNo, int blColorId, CancellationToken ct = default)
@@ -283,6 +286,18 @@ public class PartLookupService : IPartLookupService
         var item = await _catalog.GetMinifigDetailsAsync(blMinifigId, ct)
             ?? throw new InvalidOperationException($"Minifig '{blMinifigId}' nicht in BL gefunden.");
 
+        // 2b) Bild lokal cachen (best-effort). bl_items.image_url ist bei
+        // Subset-Eintraegen oft leer, deshalb laed PartImageProvider via BL-Direct-URL.
+        string? localImagePath = null;
+        try
+        {
+            localImagePath = await _imageProvider.GetImageFileByBlAsync("M", blMinifigId, null);
+        }
+        catch (Exception imgEx)
+        {
+            Log.Debug(imgEx, "CollectMinifig: Bild fuer {Bl} nicht ladbar", blMinifigId);
+        }
+
         // 3) RequiredParts aus den Subsets bauen (mit Color-Name aus bl_colors)
         var subsets = await _catalog.GetMinifigPartsAsync(blMinifigId, ct);
         var allColors = await _catalog.GetAllColorsAsync(ct);
@@ -298,6 +313,7 @@ public class PartLookupService : IPartLookupService
             BricklinkId = blMinifigId,
             Name = item.Name,
             ImageUrl = item.ImageUrl,
+            LocalImagePath = localImagePath,
             CreatedAt = DateTime.UtcNow,
             Status = TrackedMinifigStatus.Waiting,
             StorageBinId = storageBinId,

@@ -858,6 +858,9 @@ public partial class ScanViewModel : ObservableObject
 
         // Known-Colors fuer Korrektur-Dropdown laden
         _ = LoadKnownColorsForPendingPartAsync(pending);
+
+        // BL-Catalog-Treffer-Bilder im Hintergrund nachladen
+        _ = LoadBlCatalogImagesAsync(pending);
     }
 
     /// <summary>Re-Lookup nach Farb-Korrektur ueber das Dropdown.</summary>
@@ -877,6 +880,32 @@ public partial class ScanViewModel : ObservableObject
         }
 
         _ = LoadPartImageAsync(pending);
+        _ = LoadBlCatalogImagesAsync(pending);
+    }
+
+    /// <summary>
+    /// Best-effort: fuer jeden BL-Catalog-Treffer in der PartLookupView das
+    /// Minifig-Bild via PartImageProvider laden falls noch nicht da.
+    /// Aenderungen werden auf den UI-Thread gepostet (ImageUrl ist ObservableProperty).
+    /// </summary>
+    private async Task LoadBlCatalogImagesAsync(PartLookupViewModel pending)
+    {
+        foreach (var match in pending.BlCatalogMatches.ToList())
+        {
+            if (!string.IsNullOrEmpty(match.ImageUrl)) continue;
+            try
+            {
+                var url = await _imageProvider.GetImageFileByBlAsync("M", match.BlMinifigId, null);
+                if (!string.IsNullOrEmpty(url))
+                {
+                    System.Windows.Application.Current?.Dispatcher.Invoke(() => match.ImageUrl = url);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "BL-Catalog-Bild fuer {Bl} nicht ladbar", match.BlMinifigId);
+            }
+        }
     }
 
     private async Task LoadPartImageAsync(PartLookupViewModel pending)

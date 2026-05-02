@@ -98,6 +98,13 @@ public partial class MinifigSummaryViewModel : ObservableObject
             _ = LoadPartImagesAndSwatchesAsync();
         }
 
+        // Fallback: wenn LocalImagePath leer ist (alte Figuren oder beim
+        // BL-Catalog-Collect nicht gespeichert), Bild nachladen + persistieren.
+        if (string.IsNullOrEmpty(m.LocalImagePath) && _imageProvider != null)
+        {
+            _ = LoadAndPersistMinifigImageAsync(m.Id, m.BricklinkId ?? m.FigNum);
+        }
+
         // Move-Targets: alle Faecher AUSSER dem aktuellen
         AvailableBins.Clear();
         var bins = await _binService.GetAllAsync();
@@ -160,6 +167,40 @@ public partial class MinifigSummaryViewModel : ObservableObject
         catch (Exception ex)
         {
             Log.Warning(ex, "LoadPartImagesAndSwatches geworfen");
+        }
+    }
+
+    /// <summary>
+    /// Best-effort: Header-Bild via PartImageProvider laden, in DB als
+    /// LocalImagePath persistieren und das UI aktualisieren. Wird aufgerufen
+    /// wenn LocalImagePath beim Laden noch leer war.
+    /// </summary>
+    private async Task LoadAndPersistMinifigImageAsync(int minifigId, string blId)
+    {
+        try
+        {
+            if (_imageProvider == null) return;
+            var url = await _imageProvider.GetImageFileByBlAsync("M", blId, null);
+            if (string.IsNullOrEmpty(url)) return;
+
+            await using var ctx = await _ctxFactory.CreateDbContextAsync();
+            var dbm = await ctx.TrackedMinifigs.FirstOrDefaultAsync(x => x.Id == minifigId);
+            if (dbm == null) return;
+            dbm.LocalImagePath = url;
+            await ctx.SaveChangesAsync();
+
+            // UI aktualisieren – ImageUrl ist ein normales Property mit
+            // OnPropertyChanged-Trigger via Dialog-Binding.
+            Application.Current?.Dispatcher.Invoke(() =>
+            {
+                ImageUrl = url;
+                OnPropertyChanged(nameof(ImageUrl));
+            });
+            Log.Debug("MinifigSummary: LocalImagePath fuer {Bl} nachgeladen", blId);
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "MinifigSummary: Bild fuer {Bl} nicht nachladbar", blId);
         }
     }
 
