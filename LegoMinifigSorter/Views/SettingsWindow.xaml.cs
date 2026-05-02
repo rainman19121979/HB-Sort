@@ -297,7 +297,9 @@ public partial class SettingsWindow : Window
 
         try
         {
-            var result = await importer(progress, default);
+            // Schwere Operation auf den Threadpool – UI-Thread bleibt responsiv,
+            // Progress-Reports kommen dank IProgress<T> auf dem UI-Thread an.
+            var result = await Task.Run(() => importer(progress, default));
             _viewModel.ImportResultText =
                 $"Import erfolgreich: {result.ItemsImported:N0} Items, " +
                 $"{result.InventoriesImported:N0} Subsets in {result.Duration.TotalSeconds:F1}s." +

@@ -858,10 +858,19 @@
                         <!-- Progress -->
                         <StackPanel Margin="0,16,0,0"
                                     Visibility="{Binding IsImporting, Converter={StaticResource BoolToVisibility}}">
-                            <TextBlock Text="{Binding ImportStatus}" FontSize="12"/>
-                            <ProgressBar Height="6" Margin="0,4,0,0"
+                            <TextBlock Text="{Binding ImportStatus}"
+                                       FontSize="12" FontWeight="SemiBold"
+                                       TextWrapping="Wrap"/>
+                            <ProgressBar Height="6" Margin="0,6,0,4"
                                          Minimum="0" Maximum="100"
                                          Value="{Binding ImportProgress, Mode=OneWay}"/>
+                            <TextBlock FontSize="11" Foreground="Gray"
+                                       HorizontalAlignment="Right"
+                                       Text="{Binding ImportProgress, Mode=OneWay, StringFormat={}{0:F0}%}"/>
+                            <TextBlock FontSize="11" Foreground="Gray"
+                                       FontStyle="Italic" Margin="0,4,0,0"
+                                       TextWrapping="Wrap"
+                                       Text="Import laeuft im Hintergrund. Die App ist nicht eingefroren – bitte warten."/>
                         </StackPanel>
 
                         <!-- Result -->

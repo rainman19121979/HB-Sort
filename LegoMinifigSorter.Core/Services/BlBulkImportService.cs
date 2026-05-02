@@ -78,10 +78,40 @@ public class BlBulkImportService : IBlBulkImportService
             Log.Information("BrickStore-ZIP geladen: {Size:F1} MB",
                 new FileInfo(zipPath).Length / 1024.0 / 1024.0);
 
-            // PHASE: Entpacken
-            progress?.Report(new BlBulkImportProgress(
-                "Entpacken", 0, 0, "downloads.zip..."));
-            ZipFile.ExtractToDirectory(zipPath, tempDir);
+            // PHASE: Entpacken (entry-by-entry mit Progress; ZIP enthaelt
+            // ~37000+ Dateien, ohne Progress wirkt die App eingefroren).
+            using (var archive = ZipFile.OpenRead(zipPath))
+            {
+                var totalEntries = archive.Entries.Count;
+                progress?.Report(new BlBulkImportProgress(
+                    "Entpacken", 0, totalEntries, $"0 / {totalEntries} Dateien"));
+
+                int extracted = 0;
+                foreach (var entry in archive.Entries)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    // Verzeichnis-Eintraege haben einen leeren Name – ueberspringen.
+                    if (string.IsNullOrEmpty(entry.Name)) continue;
+
+                    var destPath = Path.Combine(tempDir, entry.FullName);
+                    var destDir = Path.GetDirectoryName(destPath);
+                    if (!string.IsNullOrEmpty(destDir))
+                        Directory.CreateDirectory(destDir);
+
+                    entry.ExtractToFile(destPath, overwrite: true);
+                    extracted++;
+
+                    if (extracted % 500 == 0)
+                    {
+                        progress?.Report(new BlBulkImportProgress(
+                            "Entpacken", extracted, totalEntries,
+                            $"{extracted} / {totalEntries} Dateien"));
+                    }
+                }
+                progress?.Report(new BlBulkImportProgress(
+                    "Entpacken", totalEntries, totalEntries, "fertig"));
+            }
             File.Delete(zipPath);
 
             // Eigentlicher Import aus dem Temp-Ordner
@@ -116,11 +146,13 @@ public class BlBulkImportService : IBlBulkImportService
         if (!Directory.Exists(folder))
             throw new DirectoryNotFoundException($"Ordner nicht gefunden: {folder}");
 
-        // PHASE 1: Stammdaten aus items/M.xml + items/P.xml
+        // PHASE 1: Stammdaten – alle BL-Item-Types
+        // (B=Book, C=Catalog, G=Gear, I=Instruction, M=Minifig, O=OriginalBox,
+        //  P=Part, S=Set). BrickStore liefert pro Type genau eine items/{T}.xml.
         var itemsFolder = Path.Combine(folder, "items");
         if (Directory.Exists(itemsFolder))
         {
-            foreach (var typeChar in new[] { "M", "P" })
+            foreach (var typeChar in new[] { "B", "C", "G", "I", "M", "O", "P", "S" })
             {
                 ct.ThrowIfCancellationRequested();
                 var xmlPath = Path.Combine(itemsFolder, $"{typeChar}.xml");
@@ -143,39 +175,56 @@ public class BlBulkImportService : IBlBulkImportService
             }
         }
 
-        // PHASE 2: Inventories aus M\*.xml
-        var minifigFolder = Path.Combine(folder, "M");
-        if (Directory.Exists(minifigFolder))
+        // PHASE 2: Inventories aus allen Type-Ordnern (M, P, S, G, B, C, I, O).
+        // BrickStore legt pro Item-Type einen Ordner an mit *.xml pro Parent.
+        var inventoryFolders = new[] { "M", "P", "S", "G", "B", "C", "I", "O" };
+
+        for (int folderIdx = 0; folderIdx < inventoryFolders.Length; folderIdx++)
         {
-            var xmlFiles = Directory.GetFiles(minifigFolder, "*.xml");
+            ct.ThrowIfCancellationRequested();
+            var folderChar = inventoryFolders[folderIdx];
+            var invFolder = Path.Combine(folder, folderChar);
+            if (!Directory.Exists(invFolder)) continue;
+
+            // Datei-Liste laden (kann bei 18000+ Eintraegen kurz dauern).
+            progress?.Report(new BlBulkImportProgress(
+                $"Vorbereite {folderChar}", 0, 0,
+                $"Lese Datei-Liste aus {folderChar}/..."));
+
+            var xmlFiles = Directory.GetFiles(invFolder, "*.xml");
+            if (xmlFiles.Length == 0) continue;
+
             var total = xmlFiles.Length;
             var batch = new List<BlSubset>(2000);
             const int batchFlushSize = 2000;
 
-            Log.Information("BrickStore-Import: {Count} Minifig-Inventories werden importiert", total);
+            Log.Information("BrickStore-Import: {Count} Inventories aus '{Folder}'",
+                total, folderChar);
 
             for (int i = 0; i < xmlFiles.Length; i++)
             {
                 ct.ThrowIfCancellationRequested();
                 var xmlFile = xmlFiles[i];
-                var minifigId = Path.GetFileNameWithoutExtension(xmlFile);
+                var parentNo = Path.GetFileNameWithoutExtension(xmlFile);
 
-                if (i % 50 == 0)
+                // Progress alle 25 Files reporten – haeufiger Update fuer User-Feedback.
+                if (i % 25 == 0)
                 {
                     progress?.Report(new BlBulkImportProgress(
-                        "Inventories", i + 1, total, minifigId));
+                        $"Inventories {folderChar} (Phase {folderIdx + 1}/{inventoryFolders.Length})",
+                        i + 1, total, parentNo));
                 }
 
                 try
                 {
-                    var subsets = ParseInventoryXml(xmlFile, minifigId);
+                    var subsets = ParseInventoryXml(xmlFile, folderChar, parentNo);
                     batch.AddRange(subsets);
                     invImported += subsets.Count;
                     filesProcessed++;
                 }
                 catch (Exception ex)
                 {
-                    errors.Add($"M/{minifigId}.xml: {ex.Message}");
+                    errors.Add($"{folderChar}/{parentNo}.xml: {ex.Message}");
                     filesSkipped++;
                 }
 
@@ -192,7 +241,8 @@ public class BlBulkImportService : IBlBulkImportService
             }
 
             progress?.Report(new BlBulkImportProgress(
-                "Inventories", total, total, "fertig"));
+                $"Inventories {folderChar}",
+                total, total, $"fertig ({total} Files)"));
         }
 
         sw.Stop();
@@ -206,10 +256,10 @@ public class BlBulkImportService : IBlBulkImportService
     }
 
     /// <summary>
-    /// Parst eine einzelne Minifig-Inventory-XML (z.B. M/cty0527.xml).
+    /// Parst eine einzelne Inventory-XML (z.B. M/cty0527.xml oder S/75300-1.xml).
     /// Format: BrickStore INVENTORY mit ITEM-Bloecken (ITEMTYPE/ITEMID/QTY/COLOR/...).
     /// </summary>
-    private static List<BlSubset> ParseInventoryXml(string xmlPath, string parentNo)
+    private static List<BlSubset> ParseInventoryXml(string xmlPath, string parentType, string parentNo)
     {
         var doc = XDocument.Load(xmlPath);
         var now = DateTime.UtcNow;
@@ -219,7 +269,7 @@ public class BlBulkImportService : IBlBulkImportService
         {
             subsets.Add(new BlSubset
             {
-                ParentType = "M",
+                ParentType = parentType,
                 ParentNo = parentNo,
                 ItemType = item.Element("ITEMTYPE")?.Value ?? "P",
                 ItemNo = item.Element("ITEMID")?.Value ?? string.Empty,
@@ -257,13 +307,28 @@ public class BlBulkImportService : IBlBulkImportService
         };
 
         using var reader = XmlReader.Create(xmlPath, settings);
-        while (await reader.ReadAsync())
+
+        // WICHTIG: ReadOuterXmlAsync positioniert den Reader bereits hinter
+        // dem gerade gelesenen Element. Wenn wir danach erneut ReadAsync()
+        // rufen, wird das naechste Element uebersprungen. Mit `moveNext`
+        // steuern wir explizit, ob die naechste Iteration ReadAsync() braucht.
+        bool moveNext = true;
+        while (true)
         {
+            if (moveNext)
+            {
+                if (!await reader.ReadAsync()) break;
+            }
+            moveNext = true;
             ct.ThrowIfCancellationRequested();
 
             if (reader.NodeType == XmlNodeType.Element && reader.Name == "ITEM")
             {
                 var elementXml = await reader.ReadOuterXmlAsync();
+                // Reader steht jetzt bereits auf dem naechsten Knoten – beim
+                // naechsten Schleifen-Durchlauf NICHT ReadAsync() rufen.
+                moveNext = false;
+
                 XElement root;
                 try { root = XElement.Parse(elementXml); }
                 catch { continue; }
@@ -294,11 +359,16 @@ public class BlBulkImportService : IBlBulkImportService
                 });
                 count++;
 
+                // Progress haeufig genug fuer User-Feedback (alle 500 Items).
+                if (count % 500 == 0)
+                {
+                    progress?.Report(new BlBulkImportProgress(
+                        $"Stammdaten {itemType}", count, 0, items[^1].ItemNo));
+                }
+
                 if (items.Count >= 1000)
                 {
                     await _cache.UpsertItemsAsync(items, ct);
-                    progress?.Report(new BlBulkImportProgress(
-                        $"Stammdaten {itemType}", count, 0, items[^1].ItemNo));
                     items.Clear();
                 }
             }
