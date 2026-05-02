@@ -9,9 +9,9 @@
     -->
     <Grid x:Name="MainQuadrantsGrid">
         <Grid.RowDefinitions>
-            <RowDefinition Height="3*" x:Name="TopRow"/>
+            <RowDefinition Height="65*" x:Name="TopRow"/>
             <RowDefinition Height="5"/>
-            <RowDefinition Height="2*" x:Name="BottomRow"/>
+            <RowDefinition Height="35*" x:Name="BottomRow"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" x:Name="LeftCol"/>
@@ -29,15 +29,11 @@
                       Cursor="SizeWE"
                       DragCompleted="ColumnSplitter_DragCompleted"/>
 
-        <!-- Horizontaler Splitter (zwischen Zeilen) -->
-        <GridSplitter Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
-                      Height="5"
-                      HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                      Background="Transparent"
-                      ShowsPreview="True"
-                      ResizeBehavior="PreviousAndNext"
-                      Cursor="SizeNS"
-                      DragCompleted="RowSplitter_DragCompleted"/>
+        <!--
+            Horizontaler Splitter wurde absichtlich entfernt: das 65/35-Verhaeltnis
+            zwischen oberer und unterer Zeile ist fix. Vertikaler Splitter (Spalten)
+            bleibt aktiv und wird weiter persistiert.
+        -->
 
         <!-- ===== OBEN-LINKS (R0,C0): Webcam-Bereich ===== -->
         <Border Grid.Row="0" Grid.Column="0"

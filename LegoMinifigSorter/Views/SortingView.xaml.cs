@@ -119,29 +119,18 @@ public partial class SortingView : UserControl
         }
     }
 
-    private void RowSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
-    {
-        var settingsService = Service<ISettingsService>();
-        var topHeight = TopRow.ActualHeight;
-        var bottomHeight = BottomRow.ActualHeight;
-        var total = topHeight + bottomHeight;
-        if (total > 0)
-        {
-            settingsService.Current.WindowState.SplitterRowRatio = topHeight / total;
-            _ = settingsService.SaveAsync();
-        }
-    }
-
-    /// <summary>Stellt die gespeicherten Splitter-Verhaeltnisse wieder her.</summary>
+    /// <summary>
+    /// Stellt das gespeicherte Spalten-Verhaeltnis wieder her. Das Zeilen-
+    /// Verhaeltnis ist fix (65/35 aus XAML-Defaults) und wird nicht mehr
+    /// vom User editierbar gemacht.
+    /// </summary>
     private void ApplySplitterRatios()
     {
         var ws = Service<ISettingsService>().Current.WindowState;
         var col = Math.Clamp(ws.SplitterColumnRatio, 0.1, 0.9);
-        var row = Math.Clamp(ws.SplitterRowRatio, 0.1, 0.9);
 
         LeftCol.Width = new GridLength(col, GridUnitType.Star);
         RightCol.Width = new GridLength(1.0 - col, GridUnitType.Star);
-        TopRow.Height = new GridLength(row, GridUnitType.Star);
-        BottomRow.Height = new GridLength(1.0 - row, GridUnitType.Star);
+        // TopRow / BottomRow bleiben auf den 65*/35*-Defaults aus XAML.
     }
 }
