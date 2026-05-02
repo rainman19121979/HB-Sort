@@ -171,6 +171,55 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+
+                <!-- ===== BL-CATALOG-TREFFER (Cache) ===== -->
+                <TextBlock FontSize="{DynamicResource DetailFontSize}" FontWeight="SemiBold"
+                           Margin="0,12,0,4"
+                           Visibility="{Binding HasBlCatalogMatches,
+                               Converter={StaticResource BoolToVisibility}}">
+                    <Run Text="MOEGLICHE BL-FIGUREN MIT DIESEM TEIL"/>
+                    <Run Text="("/><Run Text="{Binding BlCatalogMatches.Count, Mode=OneWay}"/><Run Text=")"/>
+                </TextBlock>
+                <ItemsControl ItemsSource="{Binding BlCatalogMatches}"
+                              Visibility="{Binding HasBlCatalogMatches,
+                                  Converter={StaticResource BoolToVisibility}}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                    BorderThickness="1" CornerRadius="4"
+                                    Padding="6" Margin="0,2,0,2">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Image Grid.Column="0" Source="{Binding ImageUrl}"
+                                           Width="48" Height="48" Stretch="Uniform"/>
+                                    <StackPanel Grid.Column="1" Margin="8,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding MinifigName}"
+                                                   FontSize="{DynamicResource BodyFontSize}"
+                                                   FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                        <TextBlock FontSize="{DynamicResource MicroFontSize}"
+                                                   Foreground="Gray" FontFamily="Consolas">
+                                            <Run Text="BL:"/>
+                                            <Run Text="{Binding BlMinifigId, Mode=OneWay}"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="{Binding QuantityLabel}"
+                                               FontStyle="Italic"
+                                               VerticalAlignment="Center" Margin="8,0"/>
+                                    <Button Grid.Column="3" Content="Diese Figur anlegen"
+                                            Click="CollectFromBlCatalog_Click"
+                                            Tag="{Binding}"
+                                            Padding="8,4"
+                                            VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </StackPanel>
 
             <!-- ===== ALTERNATIVEN-HEADER ===== -->

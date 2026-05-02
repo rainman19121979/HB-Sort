@@ -160,6 +160,59 @@ public partial class PartLookupView : UserControl
         }
     }
 
+    /// <summary>
+    /// "Diese Figur anlegen" auf einem BL-Catalog-Treffer: legt die Figur an,
+    /// markiert das gescannte Trigger-Teil sofort als gesammelt, macht
+    /// Reverse-Match gegen vorhandene Einzelteile.
+    /// </summary>
+    private async void CollectFromBlCatalog_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button b || b.Tag is not BlCatalogMatchViewModel match) return;
+        if (DataContext is not PartLookupViewModel vm) return;
+
+        var notif = Service<INotificationService>();
+        var partLookup = Service<IPartLookupService>();
+        var binService = Service<IStorageBinService>();
+
+        // Default-Bin: aktuell in der Floating-Combo selektiertes Fach,
+        // sonst erstes freies (Konsistenz mit dem Lager-Workflow).
+        var bin = vm.SelectedFloatingBin
+                  ?? await binService.GetNextFreeAsync()
+                  ?? vm.AvailableBins.FirstOrDefault();
+        if (bin == null)
+        {
+            notif.ShowWarning("Kein Lagerfach verfuegbar – bitte erst ein Fach anlegen.");
+            return;
+        }
+
+        vm.IsBusy = true;
+        try
+        {
+            var minifig = await partLookup.CollectMinifigFromSupersetAsync(
+                match.BlMinifigId,
+                bin.Id,
+                vm.BlPartNo,
+                vm.BlColorId,
+                Math.Max(1, vm.Quantity));
+
+            notif.ShowSuccess(
+                $"Figur '{minifig.Name}' angelegt in '{bin.Label}' – Trigger-Teil sofort gesammelt.");
+
+            // Pending ausblenden – Workflow ist abgeschlossen.
+            var scan = GetScanViewModel();
+            if (scan != null) scan.PendingPart = null;
+        }
+        catch (System.Exception ex)
+        {
+            Log.Error(ex, "CollectFromBlCatalog fehlgeschlagen");
+            MessageBox.Show(ex.Message, "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            vm.IsBusy = false;
+        }
+    }
+
     /// <summary>Korrektur-Dropdown: User waehlt eine andere Farbe.</summary>
     private async void Color_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {

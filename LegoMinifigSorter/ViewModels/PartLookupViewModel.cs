@@ -46,6 +46,15 @@ public partial class PartLookupViewModel : ObservableObject
     /// <summary>Treffer in wartenden Figuren.</summary>
     public ObservableCollection<WaitingMinifigMatchViewModel> WaitingMatches { get; } = new();
 
+    /// <summary>
+    /// Treffer im BL-Catalog-Cache (Minifigs deren Subsets schon mal gecached
+    /// wurden) – die der User aber noch NICHT als wartende Figur hat. "Diese
+    /// Figur sammeln"-Aktion legt die Figur an + setzt das Trigger-Teil collected.
+    /// </summary>
+    public ObservableCollection<BlCatalogMatchViewModel> BlCatalogMatches { get; } = new();
+
+    public bool HasBlCatalogMatches => BlCatalogMatches.Count > 0;
+
     /// <summary>Verfuegbare Farben fuer das Korrektur-Dropdown (nur known colors).</summary>
     public ObservableCollection<BlColor> AvailableColors { get; } = new();
 
@@ -96,6 +105,11 @@ public partial class PartLookupViewModel : ObservableObject
         foreach (var m in r.WaitingMatches)
             WaitingMatches.Add(new WaitingMinifigMatchViewModel(m));
         OnPropertyChanged(nameof(HasWaitingMatches));
+
+        BlCatalogMatches.Clear();
+        foreach (var m in r.BlCatalogMatches)
+            BlCatalogMatches.Add(new BlCatalogMatchViewModel(m));
+        OnPropertyChanged(nameof(HasBlCatalogMatches));
     }
 
     private static Brush ParseRgbBrush(string? hex)
@@ -150,6 +164,34 @@ public partial class WaitingMinifigMatchViewModel : ObservableObject
         QuantityNeeded = m.QuantityNeeded;
         QuantityCollected = m.QuantityCollected;
         IsAlternate = m.IsAlternate;
+        _imageUrl = m.MinifigImageUrl;
+    }
+}
+
+/// <summary>
+/// Eine BL-Catalog-Treffer-Karte in der PartLookupView. Wird angezeigt wenn
+/// das gescannte Teil in einer Minifig vorkommt, die der User aber noch nicht
+/// als wartende Figur angelegt hat. "Diese Figur anlegen"-Button triggert
+/// CollectMinifigFromSupersetAsync.
+/// </summary>
+public partial class BlCatalogMatchViewModel : ObservableObject
+{
+    public string BlMinifigId { get; }
+    public string MinifigName { get; }
+    public int QuantityInMinifig { get; }
+
+    [ObservableProperty]
+    private string? _imageUrl;
+
+    public string QuantityLabel => $"x{QuantityInMinifig}";
+
+    public BlCatalogMatchViewModel(BlCatalogMatch m)
+    {
+        BlMinifigId = m.BlMinifigId;
+        // Fallback auf BL-ID wenn der bl_items-Cache den Namen noch nicht hat
+        // (z.B. Eintrag kommt aus einem GetSupersets-Treffer).
+        MinifigName = string.IsNullOrEmpty(m.MinifigName) ? m.BlMinifigId : m.MinifigName;
+        QuantityInMinifig = m.QuantityInMinifig;
         _imageUrl = m.MinifigImageUrl;
     }
 }

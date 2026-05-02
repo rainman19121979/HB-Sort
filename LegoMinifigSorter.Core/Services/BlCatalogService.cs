@@ -508,6 +508,10 @@ public class BlCatalogService : IBlCatalogService
         return subs.Count > 0;
     }
 
+    public Task<List<BlMinifigSubsetMatch>> FindMinifigsContainingPartAsync(
+        string blPartNo, int blColorId, CancellationToken ct = default)
+        => _cache.FindMinifigsContainingPartAsync(blPartNo, blColorId, ct);
+
     public async Task<List<BlColor>> GetKnownColorsAsync(string blPartNo, CancellationToken ct = default)
     {
         // 1) Cache-Hit?

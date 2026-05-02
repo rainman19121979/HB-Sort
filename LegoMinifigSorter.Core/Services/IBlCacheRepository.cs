@@ -43,6 +43,14 @@ public interface IBlCacheRepository
     /// </summary>
     Task<List<string>> FindParentsByItemAsync(string itemType, string itemNo, int colorId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Reverse-Lookup mit Item-Daten: alle Minifig-Parents (parent_type='M') die ein
+    /// Teil in einer Farbe enthalten, mit JOIN auf bl_items fuer Name + Image-URL.
+    /// Sortierung nach Quantity (am haeufigsten zuerst), Limit 50.
+    /// </summary>
+    Task<List<BlMinifigSubsetMatch>> FindMinifigsContainingPartAsync(
+        string blPartNo, int blColorId, CancellationToken ct = default);
+
     // --- Colors ---
 
     Task<List<BlColor>> GetAllColorsAsync(CancellationToken ct = default);

@@ -67,10 +67,21 @@ public class PartLookupService : IPartLookupService
                 IsAlternate: false /* TrackedMinifigPart kennt das nicht; zukuenftig mappen */));
         }
 
-        Log.Debug("PartLookup BL:{No}/C:{C} -> {Count} Treffer in wartenden Figuren",
-            blPartNo, blColorId, matches.Count);
+        // Zusaetzlich: Reverse-Match im BL-Catalog-Cache. Filtert die Wartenden raus,
+        // damit der User nicht doppelt sieht was schon in der oberen Liste steht.
+        var blCandidates = await _catalog.FindMinifigsContainingPartAsync(blPartNo, blColorId, ct);
+        var waitingBlIds = matches.Select(m => m.BlMinifigId).ToHashSet();
+        var blMatches = blCandidates
+            .Where(c => !waitingBlIds.Contains(c.MinifigBlId))
+            .Select(c => new BlCatalogMatch(
+                c.MinifigBlId, c.MinifigName, c.MinifigImageUrl, c.QuantityInMinifig))
+            .ToList();
 
-        return new PartLookupResult(blPartNo, blColorId, partName, colorName, colorRgb, matches);
+        Log.Information("PartLookup BL:{No}/C:{C} -> {W} wartend, {B} im BL-Cache",
+            blPartNo, blColorId, matches.Count, blMatches.Count);
+
+        return new PartLookupResult(blPartNo, blColorId, partName, colorName, colorRgb,
+            matches, blMatches);
     }
 
     public async Task<bool> AssignPartToMinifigAsync(int trackedMinifigPartId, CancellationToken ct = default)

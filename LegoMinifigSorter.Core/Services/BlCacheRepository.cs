@@ -350,6 +350,45 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         return Task.FromResult(result);
     }
 
+    public Task<List<BlMinifigSubsetMatch>> FindMinifigsContainingPartAsync(
+        string blPartNo, int blColorId, CancellationToken ct = default)
+    {
+        var result = new List<BlMinifigSubsetMatch>();
+        lock (_lock)
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT s.parent_no,
+                       i.name,
+                       i.image_url,
+                       SUM(s.quantity) AS total_qty
+                FROM bl_subsets s
+                LEFT JOIN bl_items i
+                    ON i.item_type = 'M' AND i.item_no = s.parent_no
+                WHERE s.parent_type = 'M'
+                  AND s.item_type = 'P'
+                  AND s.item_no = $partNo
+                  AND s.color_id = $colorId
+                GROUP BY s.parent_no, i.name, i.image_url
+                ORDER BY total_qty DESC, s.parent_no
+                LIMIT 50;";
+            cmd.Parameters.AddWithValue("$partNo", blPartNo);
+            cmd.Parameters.AddWithValue("$colorId", blColorId);
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                ct.ThrowIfCancellationRequested();
+                result.Add(new BlMinifigSubsetMatch(
+                    MinifigBlId: reader.GetString(0),
+                    MinifigName: reader.IsDBNull(1) ? null : reader.GetString(1),
+                    MinifigImageUrl: reader.IsDBNull(2) ? null : reader.GetString(2),
+                    QuantityInMinifig: reader.GetInt32(3)));
+            }
+        }
+        return Task.FromResult(result);
+    }
+
     // ========================================================================
     // Colors
     // ========================================================================

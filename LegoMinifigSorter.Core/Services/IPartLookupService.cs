@@ -83,7 +83,18 @@ public record PartLookupResult(
     string PartName,
     string ColorName,
     string? ColorRgb,
-    List<WaitingMinifigMatch> WaitingMatches);
+    List<WaitingMinifigMatch> WaitingMatches,
+    List<BlCatalogMatch> BlCatalogMatches);
+
+/// <summary>
+/// Eine Minifig aus dem BL-Catalog-Cache die das angefragte Teil enthaelt
+/// (aber NICHT in den wartenden Figuren des Users vorkommt).
+/// </summary>
+public record BlCatalogMatch(
+    string BlMinifigId,
+    string? MinifigName,
+    string? MinifigImageUrl,
+    int QuantityInMinifig);
 
 /// <summary>
 /// Eine wartende Figur die das angefragte Teil noch braucht.

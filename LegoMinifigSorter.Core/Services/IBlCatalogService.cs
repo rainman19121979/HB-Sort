@@ -80,4 +80,13 @@ public interface IBlCatalogService
     /// BlColor-Objekte aus bl_colors (Name + RGB) – nicht nur die IDs.
     /// </summary>
     Task<List<BlColor>> GetKnownColorsAsync(string blPartNo, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reverse-Lookup im bl_subsets-Cache: welche Minifigs verwenden dieses Teil
+    /// in dieser Farbe? Reine Cache-Abfrage – kein BL-Call. Daten kommen aus den
+    /// Subsets die schon mal via GetMinifigPartsAsync oder GetSupersetsAsync
+    /// gecached wurden.
+    /// </summary>
+    Task<List<BlMinifigSubsetMatch>> FindMinifigsContainingPartAsync(
+        string blPartNo, int blColorId, CancellationToken ct = default);
 }
