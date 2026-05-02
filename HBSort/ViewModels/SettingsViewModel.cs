@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.IO;
 using System.Net.Http;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -8,7 +7,6 @@ using CommunityToolkit.Mvvm.Input;
 using HBSort.Core.Models;
 using HBSort.Core.Services;
 using HBSort.Services;
-using Microsoft.Win32;
 using Serilog;
 
 namespace HBSort.ViewModels;
@@ -18,14 +16,12 @@ namespace HBSort.ViewModels;
 /// Zeigt die aktuellen Settings an und lässt den User sie ändern.
 /// Änderungen werden erst beim Klick auf "Speichern" übernommen.
 ///
-/// Phase 1.5: Erweitert um den Tab "Katalog" (Anzeige Metadaten + Update).
+/// PROMPT 6 (2026-05-02): Tab "Katalog" (Rebrickable) komplett entfernt.
 /// </summary>
 public partial class SettingsViewModel : ObservableObject
 {
     private readonly ISettingsService _settingsService;
     private readonly ICameraService _cameraService;
-    private readonly ICatalogService _catalogService;
-    private readonly ICatalogImporter _catalogImporter;
     private readonly IPersistentImageCache _imageCache;
     private readonly IBricklinkTokenStorage _bricklinkTokenStorage;
     private readonly IBricklinkClient _bricklinkClient;
@@ -224,54 +220,12 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _rateLimitSaveMessage = string.Empty;
 
-    // --- Katalog (Phase 1.5) ---
-
-    /// <summary>Datum des letzten Imports (formatiert).</summary>
-    [ObservableProperty]
-    private string _catalogImportedAt = "(unbekannt)";
-
-    [ObservableProperty]
-    private int _catalogMinifigCount;
-
-    [ObservableProperty]
-    private int _catalogPartCount;
-
-    [ObservableProperty]
-    private int _catalogColorCount;
-
-    [ObservableProperty]
-    private int _catalogSetCount;
-
-    /// <summary>Liste der zuletzt importierten ZIPs (Pfade, max. 7).</summary>
-    [ObservableProperty]
-    private ObservableCollection<string> _recentCatalogZips = [];
-
-    [ObservableProperty]
-    private bool _hasNoRecentZips = true;
-
-    // Update-Workflow Statusfelder
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsCatalogUpdateIdle))]
-    private bool _isCatalogUpdateRunning;
-
-    [ObservableProperty]
-    private double _catalogUpdateProgress;
-
-    [ObservableProperty]
-    private string _catalogUpdateStatus = string.Empty;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasCatalogUpdateMessage))]
-    private string _catalogUpdateMessage = string.Empty;
-
-    public bool IsCatalogUpdateIdle => !IsCatalogUpdateRunning;
-    public bool HasCatalogUpdateMessage => !string.IsNullOrEmpty(CatalogUpdateMessage);
+    // PROMPT 6 (2026-05-02): Catalog-Properties (Phase 1.5) entfernt.
+    // Stammdaten kommen jetzt aus bl_cache.db (siehe BlCacheStatsText).
 
     public SettingsViewModel(
         ISettingsService settingsService,
         ICameraService cameraService,
-        ICatalogService catalogService,
-        ICatalogImporter catalogImporter,
         IPersistentImageCache imageCache,
         IBricklinkTokenStorage bricklinkTokenStorage,
         IBricklinkClient bricklinkClient,
@@ -283,8 +237,6 @@ public partial class SettingsViewModel : ObservableObject
     {
         _settingsService = settingsService;
         _cameraService = cameraService;
-        _catalogService = catalogService;
-        _catalogImporter = catalogImporter;
         _imageCache = imageCache;
         _bricklinkTokenStorage = bricklinkTokenStorage;
         _bricklinkClient = bricklinkClient;
@@ -311,9 +263,6 @@ public partial class SettingsViewModel : ObservableObject
         // Aktuelle Werte aus den Settings laden
         LoadFromSettings();
 
-        // Catalog-Metadaten asynchron laden (UI nicht blockieren)
-        _ = LoadCatalogMetadataAsync();
-
         // Cache-Stats initial befuellen
         RefreshCacheStats();
     }
@@ -334,41 +283,8 @@ public partial class SettingsViewModel : ObservableObject
         ImageCacheLimitMb = s.ImageCache.LimitMb;
         PriceToolUrl = s.PriceToolUrl;
 
-        // Recent-Liste in eine ObservableCollection kopieren
-        RecentCatalogZips = new ObservableCollection<string>(s.RecentCatalogZips);
-        HasNoRecentZips = RecentCatalogZips.Count == 0;
-
         // Kameras auflisten
         AvailableCameras = _cameraService.GetAvailableCameras();
-    }
-
-    /// <summary>
-    /// Liest die Catalog-Metadaten aus der DB und aktualisiert die Anzeige im Tab.
-    /// </summary>
-    private async Task LoadCatalogMetadataAsync()
-    {
-        var meta = await _catalogService.GetMetadataAsync();
-        if (meta == null)
-        {
-            CatalogImportedAt = "(nicht verfuegbar)";
-            return;
-        }
-
-        // Datum schoener formatieren
-        if (DateTime.TryParse(meta.ImportedAt, CultureInfo.InvariantCulture,
-                DateTimeStyles.RoundtripKind, out var dt))
-        {
-            CatalogImportedAt = dt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
-        }
-        else
-        {
-            CatalogImportedAt = meta.ImportedAt;
-        }
-
-        CatalogMinifigCount = meta.MinifigCount;
-        CatalogPartCount    = meta.PartCount;
-        CatalogColorCount   = meta.ColorCount;
-        CatalogSetCount     = meta.SetCount;
     }
 
     [RelayCommand]
@@ -387,105 +303,8 @@ public partial class SettingsViewModel : ObservableObject
         s.ImageCache.PreloadOnMinifigScan = PreloadOnMinifigScan;
         s.ImageCache.LimitMb = ImageCacheLimitMb;
 
-        // Recent-Liste zurueckschreiben
-        s.RecentCatalogZips = new List<string>(RecentCatalogZips);
-
         await _settingsService.SaveAsync();
         Log.Information("Einstellungen gespeichert");
-    }
-
-    /// <summary>
-    /// Workflow: User klickt "ZIPs auswaehlen und importieren..."
-    /// 1. File-Picker fuer Multi-Select
-    /// 2. Backup der bestehenden catalog.db als catalog.db.bak
-    /// 3. Import in temporaere catalog.db.new
-    /// 4. Bei Erfolg: alte DB ersetzen, Recent-Liste aktualisieren
-    /// 5. Bei Fehler: alte DB bleibt unangetastet, Fehlermeldung anzeigen
-    /// </summary>
-    [RelayCommand]
-    public async Task PickAndImportCatalogAsync()
-    {
-        var dlg = new OpenFileDialog
-        {
-            Title = "Rebrickable-Catalog-ZIPs auswaehlen",
-            Filter = "ZIP-Dateien (*.zip)|*.zip",
-            Multiselect = true
-        };
-
-        if (dlg.ShowDialog() != true) return;
-
-        var zipPaths = dlg.FileNames.ToList();
-        if (zipPaths.Count == 0) return;
-
-        Log.Information("Catalog-Update gestartet mit {Count} ZIPs", zipPaths.Count);
-
-        IsCatalogUpdateRunning = true;
-        CatalogUpdateMessage = string.Empty;
-        CatalogUpdateProgress = 0;
-        CatalogUpdateStatus = "Wird gestartet...";
-
-        // Pfade definieren
-        var appData = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "HBSort");
-        var dbPath  = Path.Combine(appData, "catalog.db");
-        var bakPath = Path.Combine(appData, "catalog.db.bak");
-        var newPath = Path.Combine(appData, "catalog.db.new");
-
-        // Progress an UI weiterreichen
-        var progress = new Progress<CatalogImportProgress>(p =>
-        {
-            CatalogUpdateStatus = p.Message;
-            if (p.TotalSteps > 0)
-            {
-                CatalogUpdateProgress = Math.Min(100, (double)p.CurrentStep / p.TotalSteps * 100.0);
-            }
-        });
-
-        try
-        {
-            // Backup der bestehenden DB anlegen (falls vorhanden)
-            if (File.Exists(dbPath))
-            {
-                File.Copy(dbPath, bakPath, overwrite: true);
-                Log.Information("Backup catalog.db.bak erstellt");
-            }
-
-            // Import in catalog.db.new
-            if (File.Exists(newPath)) File.Delete(newPath);
-
-            await _catalogImporter.ImportFromZipsAsync(zipPaths, newPath, progress);
-
-            // Bei Erfolg: alte DB ersetzen
-            if (File.Exists(dbPath)) File.Delete(dbPath);
-            File.Move(newPath, dbPath);
-            Log.Information("catalog.db erfolgreich aktualisiert");
-
-            // Recent-Liste pflegen (Front-Insert, max 7, doppelte rauswerfen)
-            UpdateRecentList(zipPaths);
-
-            // Settings sofort speichern (ohne dass der User auf Speichern klicken muss –
-            // sonst geht die Recent-Liste verloren wenn er Abbrechen klickt)
-            _settingsService.Current.RecentCatalogZips = new List<string>(RecentCatalogZips);
-            await _settingsService.SaveAsync();
-
-            // Metadaten neu laden
-            await LoadCatalogMetadataAsync();
-
-            CatalogUpdateMessage = "Katalog erfolgreich aktualisiert.";
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Catalog-Update fehlgeschlagen");
-            CatalogUpdateMessage = $"Fehler: {ex.Message}\nDie alte catalog.db wurde nicht veraendert.";
-
-            // Aufraeumen: catalog.db.new loeschen falls noch vorhanden
-            try { if (File.Exists(newPath)) File.Delete(newPath); } catch { /* best effort */ }
-        }
-        finally
-        {
-            IsCatalogUpdateRunning = false;
-        }
     }
 
     // ========================================================================
@@ -841,23 +660,4 @@ public partial class SettingsViewModel : ObservableObject
         return $"{mb:0.#} MB";
     }
 
-    /// <summary>
-    /// Aktualisiert die Recent-Liste der zuletzt importierten ZIPs.
-    /// Neue Pfade werden vorne eingefuegt, doppelte rausgefiltert,
-    /// die Liste auf max. 7 Eintraege begrenzt.
-    /// </summary>
-    private void UpdateRecentList(IEnumerable<string> newPaths)
-    {
-        // Wir packen alle Pfade zusammen in eine Datei – jeder Update-Lauf produziert
-        // typischerweise mehrere Dateien, aber wir merken uns sie alle (so kann der
-        // User mit einem Klick einen alten Stand reproduzieren).
-        var combined = string.Join(" ; ", newPaths.Select(Path.GetFileName));
-        var entry = $"{DateTime.Now:yyyy-MM-dd HH:mm}: {combined}";
-
-        // Alte Eintraege mit gleichem Inhalt rauswerfen
-        var existing = RecentCatalogZips.Where(e => e != entry).Take(6).ToList();
-
-        RecentCatalogZips = new ObservableCollection<string>(new[] { entry }.Concat(existing));
-        HasNoRecentZips = RecentCatalogZips.Count == 0;
-    }
 }

@@ -1,5 +1,18 @@
 # HB-Sort (Klemmbaustein-Sortier-Werkzeug)
 
+## Migrations-Notiz PROMPT 6 (2026-05-02)
+
+Rebrickable komplett entfernt. catalog.db, ICatalogService,
+CatalogService, ICatalogImporter, CatalogImporter, IMinifigLookupService,
+MinifigLookupService und SplashWindow geloescht. seed-data/*.zip und
+HBSort.Core/Resources/CatalogSeed/*.zip raus (~16.6 MB Code-Diet).
+
+Stammdaten kommen jetzt ausschliesslich aus `bl_cache.db`
+(BrickStore-Bulk-Import). Der ColorMatch-Pfad nutzt `bl_colors`
+direkt; Brickognize-Color-id wird als BL-Color-ID interpretiert
+(validiert 2026-05-02). `ColorMapping.cs` bleibt im Code als
+generische RB↔BL-Tabelle, wird aber nicht mehr im Hauptfluss genutzt.
+
 ## Migrations-Notiz (2026-05-02)
 
 Software umbenannt von "LegoMinifigSorter" auf "HBSort" (Code) bzw.
@@ -75,21 +88,25 @@ spaeter den Verkauf auf BL massiv vereinfacht.
 %APPDATA%\HBSort\
 ├── userdata.db         ← Lagerfaecher, wartende Figuren, Scan-Historie
 ├── userdata.db.bak     ← Backup beim App-Start
-├── bl_cache.db         ← BL-API-Antworten gecached (Items, Subsets, Colors)
-├── catalog.db          ← OPTIONAL: Rebrickable-Daten als Fallback (kann
-│                          irgendwann entfernt werden)
+├── bl_cache.db         ← BL-Stammdaten + Subsets + Colors (BrickStore-Bulk-Import + BL-API)
 ├── settings.json       ← Kameraindex, Schwellwerte, BL-Tokens (verschluesselt)
 ├── images\             ← Gecachte Bilder (BL-First, 30-Tage-Refresh)
 ├── scans\              ← Letzte 100 Scan-Bilder (rotiert)
 └── logs\               ← Tageslogs (app-YYYY-MM-DD.log, 30 Tage)
 ```
 
+PROMPT 6 (2026-05-02): `catalog.db` (Rebrickable) entfaellt komplett.
+Beim ersten Start nach dem Update kann die alte Datei manuell geloescht
+werden:
+```
+del "%APPDATA%\HBSort\catalog.db"
+del "%APPDATA%\HBSort\catalog.db.bak"
+```
+
 **Datenfluss:**
 - `userdata.db`: Verwaltet von EF Core (User-Daten)
-- `bl_cache.db`: Direktzugriff via Microsoft.Data.Sqlite, gecached die
-  Antworten der BL-API
-- `catalog.db`: Optional – nur fuer Farb-Lookups (RGB-Werte fuer UI),
-  kann spaeter entfallen wenn ColorMapping.cs ausreicht
+- `bl_cache.db`: Direktzugriff via Microsoft.Data.Sqlite, enthaelt sowohl
+  BL-API-Cache als auch den Bulk-Import aus BrickStore
 
 **Backup-Strategie:**
 - `userdata.db.bak`: Wird beim **App-Start** angelegt (überschreibt sich,
@@ -437,20 +454,21 @@ BSX-Export nutzt BL-ID direkt (keine Konvertierung noetig)
 Phase 8: BL-Price-Tool nutzt BL-ID + BL-Color-ID direkt
 ```
 
-**Rebrickable-IDs sind nur noch:**
-- Optionaler Fallback fuer Farben (RGB-Werte aus catalog.db.colors)
-- Brickognize liefert sie ggf. mit, wir nutzen sie aber nicht primaer
+**Rebrickable-IDs (PROMPT 6, 2026-05-02):**
+Werden nicht mehr aktiv genutzt. ColorMapping bleibt als generische
+RB↔BL-Tabelle im Code (z.B. fuer kuenftige Reverse-Konvertierungen),
+ist aber nicht mehr Teil des Hauptflusses.
 
 URL-Patterns: siehe **`BRICKOGNIZE_API.md`**.
 
 ## ColorMapping.cs
 
-Die generierte `ColorMapping.cs` (Rebrickable ↔ BrickLink) wird beibehalten,
-auch wenn wir BL als Hauptdatenquelle haben:
-- Brickognize liefert Farben oft als Rebrickable-Namen/IDs
-- Wir muessen die in BL-Color-IDs uebersetzen, um BL-API + Bilder korrekt
-  zu nutzen
-- Plus: Sicherheit fuer den Fall dass wir Rebrickable-Daten doch brauchen
+Die generierte `ColorMapping.cs` (Rebrickable ↔ BrickLink) bleibt als
+statische Tabelle im Code, wird aber im Hauptfluss nicht mehr genutzt.
+
+PROMPT 6 (2026-05-02): Validierung hat ergeben, dass Brickognize in der
+"id"-Spalte von `colors[]` BL-Color-IDs direkt liefert (id=5 = Red,
+was BL-ID Red ist). Daher kein RB→BL-Mapping mehr noetig.
 
 ## User-Daten-Schema (in `userdata.db`, via EF Core)
 
@@ -663,8 +681,9 @@ HBSort.sln
 │   │   ├── IBlCacheRepository / BlCacheRepository.cs ★ NEU
 │   │   │     Direkt-SQLite-Zugriff auf bl_cache.db
 │   │   │
-│   │   ├── ICatalogService / CatalogService.cs (DEPRECATED, wird ersetzt)
-│   │   ├── ICatalogImporter / CatalogImporter.cs (DEPRECATED)
+│   │   │ (PROMPT 6 2026-05-02: ICatalogService, CatalogService,
+│   │   │  ICatalogImporter, CatalogImporter, IMinifigLookupService und
+│   │   │  MinifigLookupService entfernt.)
 │   │   │
 │   │   ├── IMatchingService / MatchingService.cs
 │   │   ├── IPriceProvider / DummyPriceProvider.cs
@@ -723,18 +742,21 @@ Wir setzen das Refactoring in 4 Etappen um:
 - **Ziel**: Test mit Arctic-Forscher (arc007), Deathstroke-Minifig sichtbar
   mit Teileliste
 
-### Phase R4 – Cleanup
-- catalog.db.csproj-Embedded-Resources entfernen
-- HBSort.Build-Projekt entfernen oder reduzieren
-- CatalogImporter / CatalogService als deprecated markieren
-- catalog.db kann optional weiter als Fallback bleiben (fuer RGB-Werte
-  bei nicht-erkannten Farben), aber kein Bestandteil des Hauptflusses
-- **Ziel**: Saubere Architektur ohne Rebrickable-Catalog-Abhaengigkeit
+### Phase R4 – Cleanup ✅ (PROMPT 6, 2026-05-02)
+- catalog.db.csproj-Embedded-Resources ENTFERNT
+- ICatalogService / CatalogService / ICatalogImporter / CatalogImporter
+  GELOESCHT
+- IMinifigLookupService / MinifigLookupService GELOESCHT
+- SplashWindow / SplashViewModel (Catalog-Erstinit) GELOESCHT
+- seed-data/ + HBSort.Core/Resources/CatalogSeed/ GELOESCHT (~16.6 MB)
+- ColorMatch nutzt bl_colors statt catalog.db
+- Brickognize-Color-id wird direkt als BL-Color-ID interpretiert
+- HBSort.Build bleibt als 3-Zeilen-Stub (keine Funktion mehr)
 
 ## Bisherige Phasen 1-2.5 (bleiben gueltig)
 
 ✅ Phase 1 - WPF-Grundgeruest, Webcam, Settings, Tray
-✅ Phase 1.5 - Catalog-Import (wird in R4 deprecated)
+✅ Phase 1.5 - Catalog-Import (in PROMPT 6 komplett entfernt)
 ✅ Phase 2 - Brickognize, ID-Resolver, ColorMapping
 ✅ Phase 2.5 - BL-Bilder Hybrid, Persistent Cache, LRU
 

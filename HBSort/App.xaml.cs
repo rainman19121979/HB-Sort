@@ -89,17 +89,10 @@ public partial class App : Application
             // Supersets-Cache vor Einfuehrung von IsFromSupersets).
             await CleanupOnePartCompletesAsync();
 
-            // 7. Catalog-Check: existiert catalog.db?
-            // Falls nicht, Splash mit Erstinitialisierung anzeigen.
-            if (!EnsureCatalogAsync())
-            {
-                // User hat den Import abgebrochen → App beenden
-                Log.Information("App wird beendet (Catalog-Import nicht abgeschlossen)");
-                Shutdown(0);
-                return;
-            }
+            // PROMPT 6 (2026-05-02): catalog.db / Splash-Erstinit komplett entfernt.
+            // Stammdaten kommen jetzt ausschliesslich aus bl_cache.db (BrickStore-Bulk-Import).
 
-            // 8. Hauptfenster anzeigen
+            // 7. Hauptfenster anzeigen
             var mainWindow = Services.GetRequiredService<MainWindow>();
             mainWindow.Show();
 
@@ -156,9 +149,8 @@ public partial class App : Application
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<ICameraService, CameraService>();
 
-        // Catalog-Services (Phase 1.5)
-        services.AddTransient<ICatalogImporter, CatalogImporter>();
-        services.AddSingleton<ICatalogService, CatalogService>();
+        // PROMPT 6 (2026-05-02): catalog.db / ICatalogService / ICatalogImporter
+        // komplett entfernt. Stammdaten kommen ueber bl_cache.db.
 
         // Phase 2: Brickognize + ID-Resolver + Notifications.
         // Wir registrieren einen statischen HttpClient (kein AddHttpClient-Factory,
@@ -178,8 +170,6 @@ public partial class App : Application
         services.AddSingleton<IPersistentImageCache, PersistentImageCache>();
         // PartImageProvider: holt das beste Bild (BL-First, Brickognize-Fallback) ueber den Cache
         services.AddSingleton<IPartImageProvider, BricklinkImageProvider>();
-        // Phase 3: Verkettet Brickognize-Treffer mit Catalog-Stammdaten
-        services.AddSingleton<IMinifigLookupService, MinifigLookupService>();
 
         // Phase R1: BrickLink-Store-API (OAuth1).
         // Token-Storage haengt am SettingsService; der Client-Wrapper laed lazy.
@@ -224,7 +214,6 @@ public partial class App : Application
         services.AddSingleton<ViewModels.MainViewModel>();
         services.AddSingleton<ViewModels.ScanViewModel>();
         services.AddTransient<ViewModels.SettingsViewModel>();
-        services.AddTransient<ViewModels.SplashViewModel>();
         services.AddTransient<ViewModels.BinManagerViewModel>();
         services.AddTransient<ViewModels.BinBulkCreateViewModel>();
         services.AddSingleton<ViewModels.WaitingMinifigsViewModel>();
@@ -236,7 +225,6 @@ public partial class App : Application
 
         // Fenster
         services.AddSingleton<MainWindow>();
-        services.AddTransient<Views.SplashWindow>();
     }
 
     /// <summary>
@@ -411,30 +399,6 @@ public partial class App : Application
         {
             Log.Warning(ex, "Konnte BL-Color-Liste nicht initial laden");
         }
-    }
-
-    /// <summary>
-    /// Prueft ob die catalog.db existiert. Wenn nicht, oeffnet die Splash-View
-    /// mit dem Erstinitialisierungs-Import.
-    /// Gibt true zurueck wenn alles OK ist (entweder existierte schon, oder Import war erfolgreich).
-    /// Gibt false zurueck wenn der User den Import abgebrochen hat.
-    /// </summary>
-    private static bool EnsureCatalogAsync()
-    {
-        var catalogService = Services.GetRequiredService<ICatalogService>();
-        if (catalogService.CatalogExists())
-        {
-            Log.Information("catalog.db existiert, Erstinitialisierung uebersprungen");
-            return true;
-        }
-
-        Log.Information("catalog.db nicht vorhanden, starte Erstinitialisierung");
-
-        // Splash-Fenster modal anzeigen. Es startet den Import im Loaded-Event.
-        var splash = Services.GetRequiredService<Views.SplashWindow>();
-        var result = splash.ShowDialog();
-
-        return result == true;
     }
 
     /// <summary>

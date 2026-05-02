@@ -16,10 +16,12 @@ public interface IPartImageProvider
 {
     /// <summary>
     /// Liefert den lokalen Pfad zur besten verfuegbaren Bilddatei (Brickognize-Pfad).
-    /// Erste Stufe: BL-URL aus item.external_sites + (optional) Rebrickable-Color-ID
-    /// via ColorMapping zu BL-Color-ID. Fallback: Brickognize-Image.
+    /// Erste Stufe: BL-URL aus item.external_sites + (optional) BL-Color-ID direkt.
+    /// Fallback: Brickognize-Image.
     /// </summary>
-    Task<string> GetImageFileAsync(BrickognizeItem item, int? rebrickableColorId, CancellationToken ct = default);
+    /// <param name="bricklinkColorId">BL-Color-ID direkt (Brickognize liefert seit
+    /// PROMPT 6 BL-IDs in der "id"-Spalte); null = generic / color=0.</param>
+    Task<string> GetImageFileAsync(BrickognizeItem item, int? bricklinkColorId, CancellationToken ct = default);
 
     /// <summary>
     /// Phase R3+: Direkt mit BL-IDs bedienen, ohne Brickognize-Item-Wrapper.

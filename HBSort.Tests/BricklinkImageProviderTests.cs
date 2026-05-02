@@ -26,6 +26,9 @@ public class BricklinkImageProviderTests : IDisposable
         catch { /* best effort */ }
     }
 
+    // PROMPT 6 (2026-05-02): Brickognize liefert BL-Color-IDs direkt.
+    // Tests rufen GetImageFileAsync mit BL-Color-ID auf (kein RB->BL-Mapping mehr).
+
     [Fact]
     public async Task Part_with_color_uses_bricklink_color_url()
     {
@@ -38,7 +41,8 @@ public class BricklinkImageProviderTests : IDisposable
         });
 
         var sut = NewProvider(http);
-        var path = await sut.GetImageFileAsync(item, rebrickableColorId: 14);
+        // BL-Color 3 = Yellow, direkt ohne Mapping
+        var path = await sut.GetImageFileAsync(item, bricklinkColorId: 3);
 
         // 1× HEAD + 1× GET fuer dieselbe URL
         Assert.Equal(2, requested.Count);
@@ -59,7 +63,7 @@ public class BricklinkImageProviderTests : IDisposable
         var http = MakeClient(_ => Reply(HttpStatusCode.OK, "x"));
 
         var sut = NewProvider(http);
-        var path = await sut.GetImageFileAsync(item, rebrickableColorId: null);
+        var path = await sut.GetImageFileAsync(item, bricklinkColorId: null);
 
         Assert.EndsWith("part_3001_c0.png", path);
     }
@@ -77,7 +81,7 @@ public class BricklinkImageProviderTests : IDisposable
         });
 
         var sut = NewProvider(http);
-        var path = await sut.GetImageFileAsync(item, rebrickableColorId: 14);
+        var path = await sut.GetImageFileAsync(item, bricklinkColorId: 3);
 
         Assert.EndsWith("part_3001_c0.png", path);
     }
@@ -97,7 +101,7 @@ public class BricklinkImageProviderTests : IDisposable
         });
 
         var sut = NewProvider(http);
-        var path = await sut.GetImageFileAsync(item, rebrickableColorId: 14);
+        var path = await sut.GetImageFileAsync(item, bricklinkColorId: 3);
 
         // Brickognize-Fallback nutzt das bo_<md5>-Schema
         Assert.True(File.Exists(path));
@@ -112,7 +116,7 @@ public class BricklinkImageProviderTests : IDisposable
         var http = MakeClient(_ => Reply(HttpStatusCode.OK, "x"));
 
         var sut = NewProvider(http);
-        var path = await sut.GetImageFileAsync(item, rebrickableColorId: null);
+        var path = await sut.GetImageFileAsync(item, bricklinkColorId: null);
 
         Assert.EndsWith("fig_cty0969.png", path);
     }
@@ -132,7 +136,7 @@ public class BricklinkImageProviderTests : IDisposable
         var http = MakeClient(_ => Reply(HttpStatusCode.OK, "x"));
         var sut = NewProvider(http);
 
-        var path = await sut.GetImageFileAsync(item, rebrickableColorId: null);
+        var path = await sut.GetImageFileAsync(item, bricklinkColorId: null);
 
         Assert.EndsWith("set_75300-1.png", path);
     }
@@ -155,7 +159,7 @@ public class BricklinkImageProviderTests : IDisposable
         });
 
         var sut = NewProvider(http);
-        var path = await sut.GetImageFileAsync(item, rebrickableColorId: null);
+        var path = await sut.GetImageFileAsync(item, bricklinkColorId: null);
 
         // Kein HEAD-Request – direkt GET fuer das Brickognize-Bild
         Assert.DoesNotContain(requested, r => r.StartsWith("HEAD "));
@@ -179,16 +183,16 @@ public class BricklinkImageProviderTests : IDisposable
         var cache = NewCache(http, settings);
         var sut = new BricklinkImageProvider(http, new ExternalIdResolver(), settings, cache);
 
-        var path = await sut.GetImageFileAsync(item, rebrickableColorId: 14);
+        var path = await sut.GetImageFileAsync(item, bricklinkColorId: 3);
 
         Assert.DoesNotContain(requested, r => r.Contains("img.bricklink.com"));
         Assert.Contains("bo_", path);
     }
 
     [Fact]
-    public async Task Color_mapping_uses_correct_bl_id_for_rebrickable_71()
+    public async Task Bricklink_color_id_passed_through_directly()
     {
-        // RB 71 (Light Bluish Gray) -> BL 86
+        // BL 86 (Light Bluish Gray) wird direkt durchgereicht, ohne Mapping-Lookup.
         var item = MakePartItem("3001");
         var requested = new List<string>();
         var http = MakeClient(req =>
@@ -198,30 +202,10 @@ public class BricklinkImageProviderTests : IDisposable
         });
 
         var sut = NewProvider(http);
-        var path = await sut.GetImageFileAsync(item, rebrickableColorId: 71);
+        var path = await sut.GetImageFileAsync(item, bricklinkColorId: 86);
 
         Assert.EndsWith("part_3001_c86.png", path);
         Assert.Contains(requested, r => r.Contains("/PN/86/3001.png"));
-    }
-
-    [Fact]
-    public async Task Unmapped_rebrickable_color_falls_back_to_color_zero()
-    {
-        // RB 1014 (Modulex Light Bluish Gray) hat kein BL-Mapping.
-        var item = MakePartItem("3001");
-        var requested = new List<string>();
-        var http = MakeClient(req =>
-        {
-            requested.Add(req.RequestUri!.AbsoluteUri);
-            return Reply(HttpStatusCode.OK, "x");
-        });
-
-        var sut = NewProvider(http);
-        var path = await sut.GetImageFileAsync(item, rebrickableColorId: 1014);
-
-        // Es darf KEINE farbige URL versucht werden, sondern direkt PN/0
-        Assert.DoesNotContain(requested, r => r.Contains("/PN/1014/") || r.Contains("/PN/86/"));
-        Assert.EndsWith("part_3001_c0.png", path);
     }
 
     [Fact]
@@ -237,11 +221,11 @@ public class BricklinkImageProviderTests : IDisposable
         });
 
         var sut = NewProvider(http);
-        await sut.GetImageFileAsync(item, rebrickableColorId: 14);
+        await sut.GetImageFileAsync(item, bricklinkColorId: 3);
         var firstCount = requested.Count;
 
         // Zweiter Aufruf: aus Cache
-        await sut.GetImageFileAsync(item, rebrickableColorId: 14);
+        await sut.GetImageFileAsync(item, bricklinkColorId: 3);
         Assert.Equal(firstCount, requested.Count);
     }
 

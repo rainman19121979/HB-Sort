@@ -56,7 +56,7 @@ public class BricklinkImageProvider : IPartImageProvider
         _imageCache = imageCache;
     }
 
-    public async Task<string> GetImageFileAsync(BrickognizeItem item, int? rebrickableColorId, CancellationToken ct = default)
+    public async Task<string> GetImageFileAsync(BrickognizeItem item, int? bricklinkColorId, CancellationToken ct = default)
     {
         // Setting "BL-Bilder bevorzugen" aus? -> direkt Brickognize-Fallback (im Cache).
         if (!_settings.Current.ImageCache.PreferBricklinkImages)
@@ -74,17 +74,13 @@ public class BricklinkImageProvider : IPartImageProvider
             return await DownloadFallbackOrEmptyAsync(item, ct);
         }
 
-        // BL-Color-ID via ColorMapping (nur fuer Teile + bekannte RB-Farbe).
-        int? bricklinkColorId = null;
-        if (type == BrickognizeItemType.Part && rebrickableColorId.HasValue && rebrickableColorId.Value >= 0)
-        {
-            if (ColorMapping.TryGetBricklinkId(rebrickableColorId.Value, out var blColor))
-            {
-                bricklinkColorId = blColor;
-            }
-        }
+        // BL-Color-ID nur fuer Teile durchreichen; Minifigs/Sets ignorieren Farbe.
+        // Brickognize liefert seit PROMPT 6 BL-Color-IDs direkt - kein Mapping mehr noetig.
+        int? colorForUrl = (type == BrickognizeItemType.Part && bricklinkColorId.HasValue && bricklinkColorId.Value >= 0)
+            ? bricklinkColorId
+            : null;
 
-        var candidates = BuildCandidateUrls(type, ids.BricklinkId!, bricklinkColorId);
+        var candidates = BuildCandidateUrls(type, ids.BricklinkId!, colorForUrl);
         var fetched = await TryFetchFromCandidatesAsync(candidates, ct);
         if (fetched != null) return fetched;
 

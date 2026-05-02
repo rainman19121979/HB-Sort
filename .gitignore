@@ -49,10 +49,11 @@ secrets.json
 .claude/settings.local.json
 
 # ============================================
-# Seed-Daten (16 MB, werden via tools/download-catalog-seed.ps1 geholt)
+# Rebrickable-Seed-Daten in PROMPT 6 (2026-05-02) entfernt; Eintraege bleiben
+# als Schutz gegen versehentliches Re-Adden, falls jemand die alten ZIPs
+# zurueckkopiert.
 # ============================================
 seed-data/*.zip
-LegoMinifigSorter.Core/Resources/CatalogSeed/*.zip
 HBSort.Core/Resources/CatalogSeed/*.zip
 
 # BrickStore-Datenbank-Download-Cache (~570 MB, wird zur Laufzeit

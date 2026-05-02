@@ -69,9 +69,6 @@ public class AppSettings
 
     /// <summary>Zeitpunkt des letzten Update-Checks (max. 1x pro Tag)</summary>
     public DateTime? LastUpdateCheck { get; set; }
-
-    /// <summary>Liste der zuletzt importierten Katalog-ZIP-Pfade (max. 7)</summary>
-    public List<string> RecentCatalogZips { get; set; } = [];
 }
 
 /// <summary>

@@ -1,31 +1,26 @@
 using System.Globalization;
 using System.Windows.Media;
-using HBSort.Core.Services;
+using HBSort.Core.Models.Bricklink;
 
 namespace HBSort.ViewModels;
 
 /// <summary>
 /// Eine erkannte Farbe (Brickognize-/predict/parts/-Response).
-/// Enthaelt sowohl die rohen Daten als auch das RGB-Swatch fuer die UI,
-/// sowie die ueber ColorMapping aufgeloesten BrickLink-Daten.
+/// Enthaelt sowohl die rohen Daten als auch das RGB-Swatch fuer die UI.
+///
+/// PROMPT 6 (2026-05-02): Umgestellt von Rebrickable-catalog.db auf bl_colors.
+/// Brickognize liefert in der "id"-Spalte BL-Color-IDs direkt – kein Mapping
+/// mehr ueber catalog.db.colors / ColorMapping.
 /// </summary>
 public class ColorMatch
 {
-    /// <summary>Rebrickable-Color-ID (z.B. 71 = Light Bluish Gray). -1 wenn unbekannt.</summary>
-    public int CatalogId { get; init; }
-
     /// <summary>
-    /// BrickLink-Color-ID via ColorMapping. Null wenn keine BL-Entsprechung
-    /// existiert (z.B. Modulex-Farben). Wird beim Speichern in
-    /// TrackedMinifigPart/FloatingPart uebernommen, damit der BSX-Export
-    /// in Phase 7 keine Konvertierungsarbeit hat.
+    /// BrickLink-Color-ID (z.B. 86 = Light Bluish Gray). Null wenn Brickognize
+    /// keine ID lieferte oder die ID ungueltig war.
     /// </summary>
     public int? BricklinkId { get; init; }
 
-    /// <summary>BrickLink-Farbname (aus ColorMapping). Null bei fehlendem Mapping.</summary>
-    public string? BricklinkName { get; init; }
-
-    /// <summary>Anzeige-Name der Farbe (BrickLink-Name vom Brickognize).</summary>
+    /// <summary>Anzeige-Name der Farbe (BrickLink-Name aus bl_colors oder Brickognize-Antwort).</summary>
     public string Name { get; init; } = string.Empty;
 
     /// <summary>Konfidenz als Prozent-String (z.B. "75 %").</summary>
@@ -34,75 +29,52 @@ public class ColorMatch
     /// <summary>Score numerisch fuer Sortierung/Hervorhebung.</summary>
     public double Score { get; init; }
 
-    /// <summary>Brush fuer das Farbquadrat in der UI – auf Basis des Hex-RGB-Werts aus catalog.db.</summary>
+    /// <summary>Brush fuer das Farbquadrat in der UI – auf Basis des Hex-RGB-Werts aus bl_colors.</summary>
     public Brush SwatchBrush { get; init; } = Brushes.Gray;
 
-    /// <summary>True wenn die Farbe lt. Catalog transparent ist (z.B. Trans-Clear).</summary>
+    /// <summary>True wenn die Farbe lt. BL-Type "Transparent" ist.</summary>
     public bool IsTransparent { get; init; }
 
     /// <summary>
-    /// Vorberechnetes Anzeige-Label im Format
-    ///   "Light Bluish Gray (RB:71 / BL:86)"
-    /// oder bei fehlendem BL-Mapping
-    ///   "Modulex Light Bluish Gray (RB:1014 / kein BL-Mapping)".
-    /// Wird direkt im XAML gebunden.
+    /// Vorberechnetes Anzeige-Label im Format "Light Bluish Gray (BL:86)"
+    /// oder "Unbekannte Farbe (BL:?)" wenn keine Color-ID erkannt.
     /// </summary>
     public string DisplayLabel { get; init; } = string.Empty;
 
     /// <summary>
-    /// Erzeugt einen ColorMatch aus den Brickognize-Daten und dem optional aus catalog.db
-    /// gelesenen Eintrag.
-    ///
-    /// Anzeige-Konvention: Wir verwenden ueberall den BrickLink-Namen, weil der User
-    /// auf BrickLink verkauft. Brickognize liefert genau diesen Namen schon mit –
-    /// die catalog.db (Rebrickable) wird nur fuer das RGB-Swatch und die interne
-    /// Rebrickable-Color-ID (fuer Phase-3-Matching) genutzt.
-    /// Zusaetzlich loesen wir via ColorMapping die BL-ID auf, damit wir sie spaeter
-    /// am Teil persistieren und im BSX-Export wiederverwenden koennen.
+    /// Erzeugt einen ColorMatch aus den Brickognize-Daten und dem optional aus bl_colors
+    /// gelesenen Eintrag. Wird mit der direkt von Brickognize gelieferten BL-Color-ID
+    /// (Spalte "id") aufgerufen.
     /// </summary>
-    public static ColorMatch FromCatalogAndScore(int catalogId, string brickognizeName, double score, Core.Models.CatalogColor? catalog)
+    public static ColorMatch FromBlColor(int? blColorId, string brickognizeName, double score, BlColor? blColor)
     {
-        // BL-Lookup ueber die statische Mapping-Tabelle.
-        int? blId = null;
-        string? blName = null;
-        if (catalogId >= 0 && ColorMapping.TryGetBricklinkId(catalogId, out var resolvedBlId))
-        {
-            blId = resolvedBlId;
-            blName = ColorMapping.GetBricklinkColorName(catalogId);
-        }
+        var name = !string.IsNullOrWhiteSpace(blColor?.Name)
+            ? blColor!.Name
+            : brickognizeName;
 
         return new ColorMatch
         {
-            CatalogId = catalogId,
-            BricklinkId = blId,
-            BricklinkName = blName,
-            // Anzeigename: bevorzugt der BL-Name aus dem Mapping (gepflegt + konsistent),
-            // Fallback der Brickognize-Name (auch BL-Konvention, aber u.U. mit Slash etc.).
-            Name = blName ?? brickognizeName,
+            BricklinkId = blColorId,
+            Name = name,
             Score = score,
             ScoreText = score.ToString("P0", CultureInfo.CurrentCulture),
-            SwatchBrush = ParseRgbBrush(catalog?.Rgb),
-            IsTransparent = catalog?.IsTransparent ?? false,
-            DisplayLabel = BuildDisplayLabel(blName ?? brickognizeName, catalogId, blId)
+            SwatchBrush = ParseRgbBrush(blColor?.Rgb),
+            IsTransparent = string.Equals(blColor?.Type, "Transparent", System.StringComparison.OrdinalIgnoreCase),
+            DisplayLabel = BuildDisplayLabel(name, blColorId)
         };
     }
 
     /// <summary>
-    /// Baut das Anzeige-Label "Name (RB:x / BL:y)".
-    /// Bei fehlendem RB-Eintrag: Name (RB:? / BL:y)
-    /// Bei fehlendem BL-Mapping: Name (RB:x / kein BL-Mapping)
+    /// Baut das Anzeige-Label "Name (BL:x)".
+    /// Bei fehlender BL-ID: "Name (BL:?)"
     /// </summary>
-    private static string BuildDisplayLabel(string name, int rebrickableId, int? bricklinkId)
+    private static string BuildDisplayLabel(string name, int? bricklinkId)
     {
-        var rbPart = rebrickableId >= 0
-            ? $"RB:{rebrickableId.ToString(CultureInfo.InvariantCulture)}"
-            : "RB:?";
-
         var blPart = bricklinkId.HasValue
             ? $"BL:{bricklinkId.Value.ToString(CultureInfo.InvariantCulture)}"
-            : "kein BL-Mapping";
+            : "BL:?";
 
-        return $"{name} ({rbPart} / {blPart})";
+        return $"{name} ({blPart})";
     }
 
     /// <summary>

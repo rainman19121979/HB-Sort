@@ -31,7 +31,7 @@ public partial class ScanViewModel : ObservableObject
     private readonly IBrickognizeClient _brickognizeClient;
     private readonly IExternalIdResolver _idResolver;
     private readonly INotificationService _notifications;
-    private readonly ICatalogService _catalogService;     // bleibt fuer Modus-B-Farben (Phase 5), nicht mehr fuer Minifig-Lookup
+    private readonly IBlCacheRepository _blCacheRepo;     // PROMPT 6: bl_colors statt catalog.db fuer Farb-Swatches
     private readonly IPartImageProvider _imageProvider;
     private readonly IPersistentImageCache _persistentCache;
     private readonly IBlCatalogService _blCatalog;
@@ -170,7 +170,7 @@ public partial class ScanViewModel : ObservableObject
         IBrickognizeClient brickognizeClient,
         IExternalIdResolver idResolver,
         INotificationService notifications,
-        ICatalogService catalogService,
+        IBlCacheRepository blCacheRepo,
         IPartImageProvider imageProvider,
         IPersistentImageCache persistentCache,
         IBlCatalogService blCatalog,
@@ -183,7 +183,7 @@ public partial class ScanViewModel : ObservableObject
         _brickognizeClient = brickognizeClient;
         _idResolver = idResolver;
         _notifications = notifications;
-        _catalogService = catalogService;
+        _blCacheRepo = blCacheRepo;
         _imageProvider = imageProvider;
         _persistentCache = persistentCache;
         _blCatalog = blCatalog;
@@ -565,9 +565,8 @@ public partial class ScanViewModel : ObservableObject
 
     /// <summary>
     /// Aktualisiert das Bild der Top-Card mit der gerade erkannten Farbe.
-    /// Brickognize liefert in `colors[]` immer die "globale" Farbe – wir nehmen die mit
-    /// dem hoechsten Score und uebersetzen ueber Catalog-Lookup auf eine Rebrickable-ID,
-    /// die der ImageProvider per ColorMapping auf die BL-Color-ID umrechnet.
+    /// PROMPT 6: Brickognize liefert direkt BL-Color-IDs - wir reichen sie ohne
+    /// Mapping an den ImageProvider durch.
     /// </summary>
     private async Task RefreshAllCardsImagesAsync(BrickognizePrediction prediction)
     {
@@ -579,7 +578,7 @@ public partial class ScanViewModel : ObservableObject
         if (RecognizedColors.Count > 0)
         {
             var top = RecognizedColors[0];
-            if (top.CatalogId >= 0) recognizedColorId = top.CatalogId;
+            if (top.BricklinkId.HasValue) recognizedColorId = top.BricklinkId.Value;
         }
 
         for (int i = 0; i < ResultCards.Count && i < prediction.Items.Count; i++)
@@ -1183,7 +1182,11 @@ public partial class ScanViewModel : ObservableObject
 
     /// <summary>
     /// Wertet die `colors`-Liste der Brickognize-Antwort aus und schlaegt zu jedem
-    /// Eintrag die RGB-Farbe in der catalog.db nach (fuer das Swatch in der UI).
+    /// Eintrag die RGB-Farbe in bl_colors nach (fuer das Swatch in der UI).
+    ///
+    /// PROMPT 6 (2026-05-02): Brickognize liefert in der "id"-Spalte BL-Color-IDs
+    /// direkt (validiert: id=5 = Red, was BL-ID Red ist). Daher kein Name-Lookup
+    /// und keine RB->BL-Konvertierung mehr noetig.
     /// </summary>
     private async Task BuildColorMatchesAsync(BrickognizePrediction prediction)
     {
@@ -1195,24 +1198,33 @@ public partial class ScanViewModel : ObservableObject
             return;
         }
 
+        // bl_colors einmalig laden + in Dictionary fuer O(1)-Lookup. ~250 Eintraege,
+        // also vernachlaessigbar; fuer UI-Live-Anzeige sowieso uneerheblich.
+        Dictionary<int, Core.Models.Bricklink.BlColor> blColorMap;
+        try
+        {
+            var allBlColors = await _blCacheRepo.GetAllColorsAsync();
+            blColorMap = allBlColors.ToDictionary(c => c.ColorId);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "BuildColorMatches: bl_colors Lookup fehlgeschlagen");
+            blColorMap = new Dictionary<int, Core.Models.Bricklink.BlColor>();
+        }
+
         // Top-3 Farben anzeigen (mehr ist normalerweise nicht im Bild).
-        //
-        // WICHTIG (validiert 2026-04-30): Brickognize liefert in der "id"-Spalte
-        // NICHT die Rebrickable-Color-ID, sondern wahrscheinlich BrickLink-IDs
-        // (BL 3 = Yellow != Rebrickable 3 = Dark Turquoise). Wir matchen daher
-        // ueber den NAMEN gegen unsere catalog.db. Brickognize-Name "Yellow" ->
-        // Rebrickable-Eintrag mit name="Yellow" -> korrekte ID + RGB.
         foreach (var raw in prediction.Colors.OrderByDescending(c => c.Score).Take(3))
         {
-            // Catalog-Suche per Name (case-insensitive). Bei Treffer kriegen wir
-            // RGB + die echte Rebrickable-ID (fuer spaetere Matching-Logik).
-            var catalogColor = await _catalogService.GetColorByNameAsync(raw.Name);
+            // Brickognize-id direkt als BL-Color-ID interpretieren.
+            int? blColorId = null;
+            Core.Models.Bricklink.BlColor? blColor = null;
+            if (int.TryParse(raw.Id, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedId))
+            {
+                blColorId = parsedId;
+                blColorMap.TryGetValue(parsedId, out blColor);
+            }
 
-            // Fallback: kein Treffer im Catalog -> Brickognize-Name behalten,
-            // graues Swatch, ID = -1 (markiert "unbekannte Farbe").
-            var resolvedId = catalogColor?.Id ?? -1;
-
-            RecognizedColors.Add(ColorMatch.FromCatalogAndScore(resolvedId, raw.Name, raw.Score, catalogColor));
+            RecognizedColors.Add(ColorMatch.FromBlColor(blColorId, raw.Name, raw.Score, blColor));
         }
 
         HasColors = RecognizedColors.Count > 0;
