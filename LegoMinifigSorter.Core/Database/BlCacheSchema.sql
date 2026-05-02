@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS bl_subsets (
     is_counterpart INTEGER NOT NULL DEFAULT 0,
     match_id INTEGER NOT NULL DEFAULT 0,
     fetched_at TEXT NOT NULL,
+    is_from_supersets INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (parent_type, parent_no, item_type, item_no, color_id, match_id)
 );
 

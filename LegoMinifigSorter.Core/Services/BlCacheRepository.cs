@@ -67,9 +67,44 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
     private void EnsureSchema()
     {
         var schemaSql = LoadEmbeddedResource(SchemaResourceName);
-        using var cmd = _connection.CreateCommand();
-        cmd.CommandText = schemaSql;
-        cmd.ExecuteNonQuery();
+        using (var cmd = _connection.CreateCommand())
+        {
+            cmd.CommandText = schemaSql;
+            cmd.ExecuteNonQuery();
+        }
+
+        // Inkrementelle Migrationen fuer existierende DBs (CREATE TABLE IF NOT EXISTS
+        // legt die Spalte nicht nachtraeglich an).
+        EnsureColumn("bl_subsets", "is_from_supersets", "INTEGER NOT NULL DEFAULT 0");
+    }
+
+    /// <summary>
+    /// Stellt sicher dass eine Spalte in einer Tabelle existiert. Wenn nicht:
+    /// per ALTER TABLE anhaengen. Idempotent, kann bei jedem Start aufgerufen werden.
+    /// </summary>
+    private void EnsureColumn(string table, string column, string columnType)
+    {
+        // PRAGMA table_info liefert (cid, name, type, notnull, default, pk).
+        bool exists = false;
+        using (var checkCmd = _connection.CreateCommand())
+        {
+            checkCmd.CommandText = $"PRAGMA table_info({table});";
+            using var reader = checkCmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                {
+                    exists = true;
+                    break;
+                }
+            }
+        }
+        if (exists) return;
+
+        using var alterCmd = _connection.CreateCommand();
+        alterCmd.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {columnType};";
+        alterCmd.ExecuteNonQuery();
+        Log.Information("BlCache-Migration: Spalte '{Col}' zu '{Table}' hinzugefuegt", column, table);
     }
 
     private static string LoadEmbeddedResource(string resourceName)
@@ -237,7 +272,7 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
             cmd.CommandText = @"
                 SELECT parent_type, parent_no, item_type, item_no, color_id,
                        quantity, extra_quantity, is_alternate, is_counterpart,
-                       match_id, fetched_at
+                       match_id, fetched_at, is_from_supersets
                 FROM bl_subsets
                 WHERE parent_type = $pt AND parent_no = $pn
                 ORDER BY match_id, color_id, item_no;";
@@ -259,7 +294,8 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
                     IsAlternate = reader.GetInt32(7) == 1,
                     IsCounterpart = reader.GetInt32(8) == 1,
                     MatchId = reader.GetInt32(9),
-                    FetchedAt = ParseUtc(reader.GetString(10))
+                    FetchedAt = ParseUtc(reader.GetString(10)),
+                    IsFromSupersets = reader.GetInt32(11) == 1
                 });
             }
         }
@@ -290,9 +326,9 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
                     INSERT INTO bl_subsets
                         (parent_type, parent_no, item_type, item_no, color_id,
                          quantity, extra_quantity, is_alternate, is_counterpart,
-                         match_id, fetched_at)
+                         match_id, fetched_at, is_from_supersets)
                     VALUES
-                        ($pt, $pn, $it, $in, $cid, $qty, $eqty, $alt, $cp, $mid, $fetched);";
+                        ($pt, $pn, $it, $in, $cid, $qty, $eqty, $alt, $cp, $mid, $fetched, $fromSup);";
 
                 var pPt = ins.CreateParameter(); pPt.ParameterName = "$pt"; ins.Parameters.Add(pPt);
                 var pPn = ins.CreateParameter(); pPn.ParameterName = "$pn"; ins.Parameters.Add(pPn);
@@ -305,6 +341,7 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
                 var pCp = ins.CreateParameter(); pCp.ParameterName = "$cp"; ins.Parameters.Add(pCp);
                 var pMid = ins.CreateParameter(); pMid.ParameterName = "$mid"; ins.Parameters.Add(pMid);
                 var pFet = ins.CreateParameter(); pFet.ParameterName = "$fetched"; ins.Parameters.Add(pFet);
+                var pFromSup = ins.CreateParameter(); pFromSup.ParameterName = "$fromSup"; ins.Parameters.Add(pFromSup);
                 ins.Prepare();
 
                 foreach (var s in subsets)
@@ -321,6 +358,7 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
                     pCp.Value = s.IsCounterpart ? 1 : 0;
                     pMid.Value = s.MatchId;
                     pFet.Value = s.FetchedAt.ToString("o", CultureInfo.InvariantCulture);
+                    pFromSup.Value = s.IsFromSupersets ? 1 : 0;
                     ins.ExecuteNonQuery();
                 }
             }

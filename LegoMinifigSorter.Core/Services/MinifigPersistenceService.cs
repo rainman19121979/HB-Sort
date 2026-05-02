@@ -182,6 +182,23 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         return stale.Count;
     }
 
+    public async Task<int> CleanupOnePartCompletesAsync(CancellationToken ct = default)
+    {
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+        var pseudo = await ctx.TrackedMinifigs
+            .Where(m => m.Status == TrackedMinifigStatus.Complete)
+            .Include(m => m.RequiredParts)
+            .ToListAsync(ct);
+        var toDelete = pseudo.Where(m => m.RequiredParts.Count == 1).ToList();
+        if (toDelete.Count == 0) return 0;
+
+        ctx.TrackedMinifigs.RemoveRange(toDelete);
+        await ctx.SaveChangesAsync(ct);
+        Log.Information("Cleanup: {Count} Pseudo-1/1-Figuren geloescht", toDelete.Count);
+        DataChanged?.Invoke(this, EventArgs.Empty);
+        return toDelete.Count;
+    }
+
     public async Task<PersistMinifigResult> PersistAndStoreAsync(
         PersistMinifigInput input,
         CancellationToken ct = default)

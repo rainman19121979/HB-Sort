@@ -118,9 +118,12 @@ public class BlCatalogService : IBlCatalogService
 
     public async Task<List<BlSubset>> GetMinifigPartsAsync(string blMinifigId, CancellationToken ct = default)
     {
-        // Cache-Hit?
+        // Cache-Hit nur wenn mind. ein Eintrag "echt" ist (nicht aus GetSupersets).
+        // Single-Row-Pseudo-Eintraege aus GetSupersets duerfen NICHT als komplette
+        // Teileliste interpretiert werden.
         var cached = await _cache.GetSubsetsAsync("M", blMinifigId, ct);
-        if (cached.Count > 0)
+        var hasRealEntries = cached.Count > 0 && cached.Any(s => !s.IsFromSupersets);
+        if (hasRealEntries)
         {
             var oldest = cached.Min(s => s.FetchedAt);
             var ageDays = (DateTime.UtcNow - oldest).TotalDays;
@@ -131,6 +134,11 @@ public class BlCatalogService : IBlCatalogService
                 return cached;
             }
             Log.Debug("BL-Cache stale Subsets M:{No} ({Days:F1}d) – refresh", blMinifigId, ageDays);
+        }
+        else if (cached.Count > 0)
+        {
+            // Vorhanden, aber alle Eintraege aus GetSupersets -> Liste ist unvollstaendig.
+            Log.Debug("BL-Cache nur Pseudo-Eintraege M:{No} ({Count}) – force-fetch", blMinifigId, cached.Count);
         }
 
         // Cache-Miss oder stale -> BL-Call (durch Rate-Limiter geleitet)
@@ -153,7 +161,8 @@ public class BlCatalogService : IBlCatalogService
                 IsAlternate = d.IsAlternate,
                 IsCounterpart = d.IsCounterpart,
                 MatchId = d.MatchId,
-                FetchedAt = DateTime.UtcNow
+                FetchedAt = DateTime.UtcNow,
+                IsFromSupersets = false  // echte Daten aus GetSubsets
             }).ToList();
 
             await _cache.ReplaceSubsetsAsync("M", blMinifigId, subsets, ct);
@@ -416,10 +425,11 @@ public class BlCatalogService : IBlCatalogService
             {
                 ct.ThrowIfCancellationRequested();
 
-                // Existiert ein 'kompletter' Subsets-Eintrag fuer diesen Parent (mehrere Zeilen)?
-                // Dann nicht ueberschreiben, sonst schreiben wir einen single-row Eintrag rein.
+                // "Komplett" heisst: existiert mind. ein "echter" Eintrag (nicht IsFromSupersets).
+                // Eine Minifig kann auch nur 1 Teil haben, deshalb darf Count==1 NICHT
+                // automatisch als "komplett" interpretiert werden.
                 var existing = await _cache.GetSubsetsAsync("M", entry.ParentNo, ct);
-                bool alreadyComplete = existing.Count > 1;
+                bool alreadyComplete = existing.Count > 0 && existing.Any(s => !s.IsFromSupersets);
                 if (!alreadyComplete)
                 {
                     var single = new BlSubset
@@ -434,7 +444,11 @@ public class BlCatalogService : IBlCatalogService
                         IsAlternate = entry.AppearsAs == "Alternate",
                         IsCounterpart = entry.AppearsAs == "Counterpart",
                         MatchId = 0,
-                        FetchedAt = DateTime.UtcNow
+                        FetchedAt = DateTime.UtcNow,
+                        // WICHTIG: Single-Row-Eintrag aus Supersets ist KEINE komplette
+                        // Teileliste. Beim spaeteren GetMinifigPartsAsync MUSS die echte
+                        // Liste via API geholt werden.
+                        IsFromSupersets = true
                     };
                     await _cache.ReplaceSubsetsAsync("M", entry.ParentNo, new[] { single }, ct);
                 }
@@ -492,16 +506,21 @@ public class BlCatalogService : IBlCatalogService
 
     public async Task<bool> EnsureFullSubsetsAsync(string blMinifigId, CancellationToken ct = default)
     {
-        // Heuristik: wenn der Parent schon mehrere Subsets-Eintraege hat UND nicht stale ist,
-        // gehen wir davon aus dass die Liste vollstaendig ist (sonst muesste GetSubsets
-        // jedes Mal alles erneut holen – unnoetige API-Calls).
+        // Vollstaendigkeit anhand des IsFromSupersets-Flags pruefen, NICHT anhand der
+        // Anzahl. Single-Row-Eintraege aus GetSupersets sind Pseudo-Daten (nur ein Teil)
+        // und duerfen NICHT als komplette Teileliste gelten – sonst wuerde "Diese Figur
+        // anlegen" eine 1/1-Pseudo-Figur produzieren.
         var cached = await _cache.GetSubsetsAsync("M", blMinifigId, ct);
-        if (cached.Count > 1)
+        var allReal = cached.Count > 0 && cached.All(s => !s.IsFromSupersets);
+        if (allReal)
         {
             var oldest = cached.Min(s => s.FetchedAt);
             var ageDays = (DateTime.UtcNow - oldest).TotalDays;
             if (ageDays <= StaleDays) return true;
         }
+
+        Log.Information("EnsureFullSubsets({No}): force-fetch (cached={Count}, allReal={Real})",
+            blMinifigId, cached.Count, allReal);
 
         // Sonst BL-Call (laeuft ueber Rate-Limiter im GetMinifigPartsAsync)
         var subs = await GetMinifigPartsAsync(blMinifigId, ct);

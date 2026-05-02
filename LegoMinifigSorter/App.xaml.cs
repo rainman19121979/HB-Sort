@@ -74,6 +74,11 @@ public partial class App : Application
             // direkt geloescht. Wir raeumen Altbestaende beim Start auf.
             await CleanupOldDismantledMinifigsAsync();
 
+            // 6.7 Cleanup: Pseudo-Figuren aus dem alten BL-Catalog-Collect-Bug loeschen
+            // (Status=COMPLETE mit genau 1 RequiredPart, entstanden durch Single-Row-
+            // Supersets-Cache vor Einfuehrung von IsFromSupersets).
+            await CleanupOnePartCompletesAsync();
+
             // 7. Catalog-Check: existiert catalog.db?
             // Falls nicht, Splash mit Erstinitialisierung anzeigen.
             if (!EnsureCatalogAsync())
@@ -272,6 +277,24 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log.Warning(ex, "Startup-Cleanup DISMANTLED geworfen");
+        }
+    }
+
+    /// <summary>
+    /// Beim Start: Pseudo-Figuren mit Status=COMPLETE und genau 1 RequiredPart loeschen.
+    /// Diese sind durch den alten BL-Catalog-Collect-Bug entstanden, bevor die
+    /// IsFromSupersets-Markierung in bl_subsets eingefuehrt wurde.
+    /// </summary>
+    private static async Task CleanupOnePartCompletesAsync()
+    {
+        try
+        {
+            var persistence = Services.GetRequiredService<IMinifigPersistenceService>();
+            await persistence.CleanupOnePartCompletesAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Startup-Cleanup OnePart-COMPLETE geworfen");
         }
     }
 

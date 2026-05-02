@@ -50,6 +50,13 @@ public interface IMinifigPersistenceService
     /// (alter Code-Pfad). Liefert Anzahl geloeschter Eintraege.
     /// </summary>
     Task<int> CleanupOldDismantledMinifigsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Beim App-Start: Pseudo-Figuren aus dem alten "Diese Figur anlegen"-Bug
+    /// loeschen — Status=COMPLETE mit genau 1 RequiredPart. Diese sind durch den
+    /// Single-Row-Supersets-Cache entstanden, bevor IsFromSupersets eingefuehrt wurde.
+    /// </summary>
+    Task<int> CleanupOnePartCompletesAsync(CancellationToken ct = default);
 }
 
 /// <summary>Eine Part-Wahl im DismantleWizard.</summary>
