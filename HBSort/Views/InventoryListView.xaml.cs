@@ -66,7 +66,9 @@ public partial class InventoryListView : UserControl
         dialog.ShowDialog();
     }
 
-    private void Details_Click(object sender, RoutedEventArgs e)
+    // async void weil wir aus dem Click-Handler einen async DialogService aufrufen.
+    // Synchroner Code-Pfad (Minifig-Detail-Dialog) bleibt unten unveraendert.
+    private async void Details_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button b || b.Tag is not InventoryRowItem row) return;
         var window = Window.GetWindow(this);
@@ -90,15 +92,14 @@ public partial class InventoryListView : UserControl
         }
         else
         {
-            // Einzelteil-Detail-Popup: kompakte Info
-            MessageBox.Show(
-                $"Einzelteil:\n\n" +
-                $"  Beschreibung: {row.Description}\n" +
-                $"  BL-Part-No:   {row.ItemId}\n" +
-                $"  Farbe:        {row.ColorName} (BL:{row.ColorId})\n" +
-                $"  Anzahl:       {row.Quantity}\n" +
-                $"  Lagerfach:    {row.StorageBinLabel}",
-                "Einzelteil-Details", MessageBoxButton.OK, MessageBoxImage.Information);
+            // Einzelteil-Detail-Popup: kompakte Info ueber DialogService.
+            await Service<IDialogService>().ShowInfoAsync(
+                "Einzelteil-Details",
+                $"Beschreibung: {row.Description}\n" +
+                $"BL-Part-No:   {row.ItemId}\n" +
+                $"Farbe:        {row.ColorName} (BL:{row.ColorId})\n" +
+                $"Anzahl:       {row.Quantity}\n" +
+                $"Lagerfach:    {row.StorageBinLabel}");
         }
     }
 
@@ -106,6 +107,7 @@ public partial class InventoryListView : UserControl
     {
         if (sender is not Button b || b.Tag is not InventoryRowItem row) return;
         var notif = Service<INotificationService>();
+        var dialogs = Service<IDialogService>();
 
         try
         {
@@ -120,9 +122,8 @@ public partial class InventoryListView : UserControl
                 };
                 var msg = $"{statusLabel} Figur '{row.Description}' wirklich loeschen?\n\n" +
                           "Diese Aktion kann nicht rueckgaengig gemacht werden.";
-                if (MessageBox.Show(msg, "Figur loeschen?",
-                    MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No)
-                    != MessageBoxResult.Yes) return;
+                // Destruktiv -> "Ja" / "Nein"
+                if (!await dialogs.ShowQuestionAsync("Figur loeschen?", msg)) return;
 
                 var persistence = Service<IMinifigPersistenceService>();
                 await persistence.DeleteAsync(row.UnderlyingMinifigId.Value);
@@ -132,9 +133,8 @@ public partial class InventoryListView : UserControl
             {
                 var msg = $"Einzelteil '{row.Description}' x{row.Quantity} wirklich loeschen?\n\n" +
                           "Diese Aktion kann nicht rueckgaengig gemacht werden.";
-                if (MessageBox.Show(msg, "Einzelteil loeschen?",
-                    MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No)
-                    != MessageBoxResult.Yes) return;
+                // Destruktiv -> "Ja" / "Nein"
+                if (!await dialogs.ShowQuestionAsync("Einzelteil loeschen?", msg)) return;
 
                 var partLookup = Service<IPartLookupService>();
                 await partLookup.DeleteFloatingPartAsync(row.UnderlyingFloatingId.Value);
@@ -144,7 +144,7 @@ public partial class InventoryListView : UserControl
         catch (System.Exception ex)
         {
             Log.Error(ex, "Inventory Delete fehlgeschlagen");
-            MessageBox.Show(ex.Message, "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+            await dialogs.ShowErrorAsync("Fehler", ex.Message);
         }
     }
 }

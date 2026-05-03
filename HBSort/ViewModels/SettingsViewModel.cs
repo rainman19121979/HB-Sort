@@ -30,6 +30,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IUiDensityService _uiDensity;
     private readonly HttpClient _http;
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
+    private readonly IDialogService _dialogs;
 
     /// <summary>Tab "Lagerfaecher" – eigenes ViewModel mit Liste + Commands.</summary>
     public BinManagerViewModel BinManager { get; }
@@ -232,7 +233,8 @@ public partial class SettingsViewModel : ObservableObject
         IUiDensityService uiDensity,
         HttpClient http,
         IDbContextFactory<UserDataContext> ctxFactory,
-        BinManagerViewModel binManager)
+        BinManagerViewModel binManager,
+        IDialogService dialogs)
     {
         _settingsService = settingsService;
         _cameraService = cameraService;
@@ -244,6 +246,7 @@ public partial class SettingsViewModel : ObservableObject
         _uiDensity = uiDensity;
         _http = http;
         _ctxFactory = ctxFactory;
+        _dialogs = dialogs;
         BinManager = binManager;
 
         // Vorhandene BL-Tokens beim Oeffnen der Settings laden, damit der User
@@ -361,7 +364,7 @@ public partial class SettingsViewModel : ObservableObject
 
     /// <summary>Uebernimmt den Wert aus dem Custom-Eingabefeld.</summary>
     [RelayCommand]
-    public void ApplyCustomLimit()
+    public async Task ApplyCustomLimit()
     {
         if (int.TryParse(CustomLimitInput, NumberStyles.Integer, CultureInfo.InvariantCulture, out var mb) && mb > 0)
         {
@@ -370,8 +373,8 @@ public partial class SettingsViewModel : ObservableObject
         }
         else
         {
-            MessageBox.Show("Bitte eine positive Ganzzahl in Megabyte eingeben.",
-                "Ungueltige Eingabe", MessageBoxButton.OK, MessageBoxImage.Warning);
+            await _dialogs.ShowInfoAsync("Ungueltige Eingabe",
+                "Bitte eine positive Ganzzahl in Megabyte eingeben.");
         }
     }
 
@@ -381,8 +384,8 @@ public partial class SettingsViewModel : ObservableObject
     {
         var stats = _imageCache.GetStats();
         var msg = $"{stats.FileCount} Bilder und {FormatMb(stats.TotalSizeBytes)} werden geloescht. Fortfahren?";
-        var result = MessageBox.Show(msg, "Cache leeren", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (result != MessageBoxResult.Yes) return;
+        // Destruktive Aktion -> "Ja" / "Nein"
+        if (!await _dialogs.ShowQuestionAsync("Cache leeren", msg)) return;
 
         var deleted = await _imageCache.ClearAsync();
         Log.Information("Bild-Cache manuell geleert: {Count} Dateien", deleted);
@@ -462,11 +465,10 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     public async Task ClearBricklinkTokensAsync()
     {
-        var result = MessageBox.Show(
-            "BrickLink-Tokens wirklich loeschen? Du musst sie spaeter neu eingeben.",
-            "Tokens loeschen",
-            MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (result != MessageBoxResult.Yes) return;
+        // Destruktive Aktion -> "Ja" / "Nein"
+        if (!await _dialogs.ShowQuestionAsync("Tokens loeschen",
+            "BrickLink-Tokens wirklich loeschen? Du musst sie spaeter neu eingeben."))
+            return;
 
         await _bricklinkTokenStorage.ClearAsync();
         BricklinkConsumerKey = string.Empty;
@@ -644,8 +646,8 @@ public partial class SettingsViewModel : ObservableObject
     {
         var msg = "BL-Cache komplett leeren? Items, Subsets und Colors werden geloescht. " +
                   "Alle zukuenftigen Lookups holen neu von BL.";
-        var result = MessageBox.Show(msg, "Cache leeren", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (result != MessageBoxResult.Yes) return;
+        // Destruktive Aktion -> "Ja" / "Nein"
+        if (!await _dialogs.ShowQuestionAsync("Cache leeren", msg)) return;
 
         try
         {

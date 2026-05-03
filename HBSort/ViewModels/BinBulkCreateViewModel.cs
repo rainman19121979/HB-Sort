@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HBSort.Core.Services;
@@ -16,6 +15,7 @@ public partial class BinBulkCreateViewModel : ObservableObject
 {
     private readonly IStorageBinService _binService;
     private readonly INotificationService _notifications;
+    private readonly IDialogService _dialogs;
 
     [ObservableProperty] private string _prefix = "Box ";
     [ObservableProperty] private string _suffix = string.Empty;
@@ -41,10 +41,14 @@ public partial class BinBulkCreateViewModel : ObservableObject
     /// <summary>Ergebnis fuer den Caller: alle generierten Labels (nach Anlegen).</summary>
     public List<string>? GeneratedLabels { get; private set; }
 
-    public BinBulkCreateViewModel(IStorageBinService binService, INotificationService notifications)
+    public BinBulkCreateViewModel(
+        IStorageBinService binService,
+        INotificationService notifications,
+        IDialogService dialogs)
     {
         _binService = binService;
         _notifications = notifications;
+        _dialogs = dialogs;
         UpdatePreview();
     }
 
@@ -119,13 +123,14 @@ public partial class BinBulkCreateViewModel : ObservableObject
 
         if (labels.Count == 0) return;
 
-        // Bestaetigungs-Dialog bei sehr grossen Bulks
+        // Bestaetigungs-Dialog bei sehr grossen Bulks - hier OK/Abbrechen,
+        // weil das Anlegen selbst nicht destruktiv ist (nur viel Aufwand).
         if (labels.Count > 1000)
         {
-            var confirm = MessageBox.Show(
-                $"Du legst {labels.Count} Lagerfaecher an. Sicher?",
-                "Grosse Bulk-Anlage", MessageBoxButton.YesNo, MessageBoxImage.Question);
-            if (confirm != MessageBoxResult.Yes) return;
+            if (!await _dialogs.ShowConfirmAsync(
+                "Grosse Bulk-Anlage",
+                $"Du legst {labels.Count} Lagerfaecher an. Sicher?"))
+                return;
         }
 
         try
@@ -138,7 +143,7 @@ public partial class BinBulkCreateViewModel : ObservableObject
                 var msg = $"{result.Conflicts.Count} Faecher existieren bereits: {conflictPreview}" +
                           (result.Conflicts.Count > 5 ? $" (und {result.Conflicts.Count - 5} weitere)" : "") +
                           $"\n\nBereits {result.Created.Count} neue Faecher angelegt.";
-                MessageBox.Show(msg, "Anlage mit Konflikten", MessageBoxButton.OK, MessageBoxImage.Information);
+                await _dialogs.ShowInfoAsync("Anlage mit Konflikten", msg);
             }
 
             if (result.Created.Count > 0)
@@ -155,7 +160,7 @@ public partial class BinBulkCreateViewModel : ObservableObject
         catch (Exception ex)
         {
             Log.Error(ex, "Bulk-Create fehlgeschlagen");
-            MessageBox.Show($"Fehler: {ex.Message}", "Bulk-Anlage", MessageBoxButton.OK, MessageBoxImage.Error);
+            await _dialogs.ShowErrorAsync("Bulk-Anlage", $"Fehler: {ex.Message}");
         }
     }
 }

@@ -38,6 +38,7 @@ public partial class ScanViewModel : ObservableObject
     private readonly IStorageBinService _binService;
     private readonly IMinifigPersistenceService _persistenceService;
     private readonly IPartLookupService _partLookup;
+    private readonly IDialogService _dialogs;
 
     private DateTime _lastScanTime = DateTime.MinValue;
     private bool _isFrozen = false;
@@ -176,7 +177,8 @@ public partial class ScanViewModel : ObservableObject
         IBlCatalogService blCatalog,
         IStorageBinService binService,
         IMinifigPersistenceService persistenceService,
-        IPartLookupService partLookup)
+        IPartLookupService partLookup,
+        IDialogService dialogs)
     {
         _cameraService = cameraService;
         _settingsService = settingsService;
@@ -190,6 +192,7 @@ public partial class ScanViewModel : ObservableObject
         _binService = binService;
         _persistenceService = persistenceService;
         _partLookup = partLookup;
+        _dialogs = dialogs;
 
         _cameraService.FrameReceived += OnFrameReceived;
     }
@@ -1075,10 +1078,9 @@ public partial class ScanViewModel : ObservableObject
                 var msg = $"Fach '{pending.SelectedBin.Label}' ist bereits belegt: " +
                           $"{occ.MinifigCount} Figur(en), {occ.FloatingPartCount} Teil(e).\n\n" +
                           "Mehrere Figuren in einem Fach sind erlaubt – willst du fortfahren?";
-                var result = System.Windows.MessageBox.Show(msg, "Lagerfach belegt",
-                    System.Windows.MessageBoxButton.YesNo,
-                    System.Windows.MessageBoxImage.Question);
-                if (result != System.Windows.MessageBoxResult.Yes) return;
+                // Bestaetigung vor dem Mischen - "Ja" / "Nein", weil das Fach
+                // dann eine zusaetzliche Figur bekommt und das schwer rueckgaengig ist.
+                if (!await _dialogs.ShowQuestionAsync("Lagerfach belegt", msg)) return;
             }
         }
         catch (Exception ex)

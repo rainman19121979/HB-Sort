@@ -163,7 +163,8 @@ public partial class SettingsWindow : Window
         catch (System.Exception ex)
         {
             Log.Warning(ex, "Bin-Rename fehlgeschlagen");
-            MessageBox.Show(ex.Message, "Umbenennen", MessageBoxButton.OK, MessageBoxImage.Warning);
+            await App.Services.GetRequiredService<IDialogService>()
+                .ShowErrorAsync("Umbenennen", ex.Message);
         }
     }
 
@@ -171,24 +172,22 @@ public partial class SettingsWindow : Window
     private async void BinEmpty_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button b || b.Tag is not BinRowViewModel row) return;
+        var dialogs = App.Services.GetRequiredService<IDialogService>();
 
         if (row.IsFree)
         {
-            MessageBox.Show("Das Fach ist bereits frei.", "Leeren",
-                MessageBoxButton.OK, MessageBoxImage.Information);
+            await dialogs.ShowInfoAsync("Leeren", "Das Fach ist bereits frei.");
             return;
         }
 
-        // Warnung: was passiert beim Leeren
+        // Warnung: was passiert beim Leeren - destruktive Aktion -> "Ja"/"Nein".
         var msg = $"Fach '{row.Label}' enthaelt {row.MinifigCount} Figur(en) und " +
                   $"{row.FloatingPartCount} Einzelteil(e).\n\n" +
                   "Beim Leeren werden:\n" +
                   "  - Figuren vom Fach geloest (bleiben in der DB)\n" +
                   "  - Einzelteile geloescht\n\n" +
                   "Fortfahren?";
-        var result = MessageBox.Show(msg, "Lagerfach leeren",
-            MessageBoxButton.YesNo, MessageBoxImage.Warning);
-        if (result != MessageBoxResult.Yes) return;
+        if (!await dialogs.ShowQuestionAsync("Lagerfach leeren", msg)) return;
 
         var binService = App.Services.GetRequiredService<IStorageBinService>();
         var notif = App.Services.GetRequiredService<INotificationService>();
@@ -204,7 +203,7 @@ public partial class SettingsWindow : Window
         catch (System.Exception ex)
         {
             Log.Error(ex, "Bin-Empty fehlgeschlagen");
-            MessageBox.Show(ex.Message, "Leeren", MessageBoxButton.OK, MessageBoxImage.Error);
+            await dialogs.ShowErrorAsync("Leeren", ex.Message);
         }
     }
 
@@ -212,21 +211,21 @@ public partial class SettingsWindow : Window
     private async void BinDelete_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button b || b.Tag is not BinRowViewModel row) return;
+        var dialogs = App.Services.GetRequiredService<IDialogService>();
 
         if (!row.IsFree)
         {
-            MessageBox.Show(
-                $"Fach '{row.Label}' enthaelt noch Figuren oder Teile.\n" +
-                "Bitte erst leeren.",
+            await dialogs.ShowInfoAsync(
                 "Loeschen nicht moeglich",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+                $"Fach '{row.Label}' enthaelt noch Figuren oder Teile.\nBitte erst leeren.");
             return;
         }
 
-        var msg = $"Fach '{row.Label}' wirklich endgueltig loeschen?";
-        var result = MessageBox.Show(msg, "Lagerfach loeschen",
-            MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (result != MessageBoxResult.Yes) return;
+        // Destruktive Aktion -> "Ja" / "Nein".
+        if (!await dialogs.ShowQuestionAsync(
+            "Lagerfach loeschen",
+            $"Fach '{row.Label}' wirklich endgueltig loeschen?"))
+            return;
 
         var binService = App.Services.GetRequiredService<IStorageBinService>();
         var notif = App.Services.GetRequiredService<INotificationService>();
@@ -242,7 +241,7 @@ public partial class SettingsWindow : Window
         catch (System.Exception ex)
         {
             Log.Warning(ex, "Bin-Delete fehlgeschlagen");
-            MessageBox.Show(ex.Message, "Loeschen", MessageBoxButton.OK, MessageBoxImage.Warning);
+            await dialogs.ShowErrorAsync("Loeschen", ex.Message);
         }
     }
 
@@ -329,12 +328,11 @@ public partial class SettingsWindow : Window
         // warnen falls ein nicht-mehr-vorhandener Pfad reinkommt.
         if (!System.IO.Directory.Exists(chosen))
         {
-            MessageBox.Show(
+            await App.Services.GetRequiredService<IDialogService>().ShowInfoAsync(
+                "Ordner nicht gefunden",
                 $"Der gewaehlte Ordner existiert nicht:\n\n{chosen}\n\n" +
                 "Der Pfad wird trotzdem gespeichert. Beim Export wird der Ordner " +
-                "bei Bedarf automatisch angelegt.",
-                "Ordner nicht gefunden",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+                "bei Bedarf automatisch angelegt.");
         }
 
         // Sofort speichern (settings.json wird geschrieben, BsxExportDialog

@@ -183,6 +183,9 @@ public partial class App : Application
         services.AddSingleton<NotificationService>();
         services.AddSingleton<INotificationService>(sp => sp.GetRequiredService<NotificationService>());
 
+        // DialogService (UX-Iteration X.4): einheitliche ContentDialogs statt MessageBox.
+        services.AddSingleton<IDialogService, DialogService>();
+
         // UI-Density-Service (Compact/Normal/Comfortable). Wechselt zur Laufzeit
         // das Density-ResourceDictionary in Application.Resources.
         services.AddSingleton<IUiDensityService, UiDensityService>();

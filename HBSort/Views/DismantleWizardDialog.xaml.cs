@@ -1,6 +1,7 @@
 using System.Windows;
 using HBSort.Services;
 using HBSort.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 
 namespace HBSort.Views;
@@ -59,7 +60,8 @@ public partial class DismantleWizardDialog : Window
         catch (System.Exception ex)
         {
             Log.Error(ex, "Dismantle-Confirm fehlgeschlagen");
-            MessageBox.Show(ex.Message, "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+            await App.Services.GetRequiredService<IDialogService>()
+                .ShowErrorAsync("Fehler", ex.Message);
         }
     }
 }

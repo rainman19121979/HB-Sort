@@ -53,13 +53,13 @@ public partial class MinifigSummaryDialog : Window
             _                                            => string.Empty
         };
 
+        var dialogs = App.Services.GetRequiredService<IDialogService>();
         var msg = $"Diese {statusLabel} Figur '{_viewModel.Name}' wirklich komplett LOESCHEN?\n\n" +
                   "Diese Aktion kann nicht rueckgaengig gemacht werden.\n\n" +
                   "Floating-Parts die aus dieser Figur stammen bleiben bestehen, " +
                   "verlieren aber die Origin-Markierung.";
-        var result = MessageBox.Show(msg, "Figur loeschen?",
-            MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
-        if (result != MessageBoxResult.Yes) return;
+        // Destruktiv -> "Ja" / "Nein"
+        if (!await dialogs.ShowQuestionAsync("Figur loeschen?", msg)) return;
 
         try
         {
@@ -74,7 +74,7 @@ public partial class MinifigSummaryDialog : Window
         catch (System.Exception ex)
         {
             Log.Error(ex, "Loeschen fehlgeschlagen");
-            MessageBox.Show(ex.Message, "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+            await dialogs.ShowErrorAsync("Fehler", ex.Message);
         }
     }
 
@@ -149,7 +149,8 @@ public partial class MinifigSummaryDialog : Window
         catch (System.Exception ex)
         {
             Log.Error(ex, "PartCheckBox toggle fehlgeschlagen");
-            MessageBox.Show(ex.Message, "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+            await App.Services.GetRequiredService<IDialogService>()
+                .ShowErrorAsync("Fehler", ex.Message);
             // Visuellen Zustand zurueckdrehen
             cb.IsChecked = !nowChecked;
         }
@@ -173,7 +174,8 @@ public partial class MinifigSummaryDialog : Window
         catch (System.Exception ex)
         {
             Log.Error(ex, "Reopen fehlgeschlagen");
-            MessageBox.Show(ex.Message, "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+            await App.Services.GetRequiredService<IDialogService>()
+                .ShowErrorAsync("Fehler", ex.Message);
         }
     }
 
@@ -200,7 +202,8 @@ public partial class MinifigSummaryDialog : Window
         catch (System.Exception ex)
         {
             Log.Error(ex, "Verschieben fehlgeschlagen");
-            MessageBox.Show(ex.Message, "Verschieben", MessageBoxButton.OK, MessageBoxImage.Error);
+            await App.Services.GetRequiredService<IDialogService>()
+                .ShowErrorAsync("Verschieben", ex.Message);
         }
     }
 }

@@ -7,6 +7,7 @@ using HBSort.Core.Database;
 using HBSort.Core.Services;
 using HBSort.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
 using Serilog;
 
@@ -89,8 +90,8 @@ public partial class BsxExportDialog : Window
         catch (Exception ex)
         {
             Log.Error(ex, "BsxExportDialog: Laden der Figuren fehlgeschlagen");
-            MessageBox.Show(ex.Message, "Fehler",
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            await App.Services.GetRequiredService<IDialogService>()
+                .ShowErrorAsync("Fehler", ex.Message);
         }
     }
 
@@ -177,8 +178,8 @@ public partial class BsxExportDialog : Window
         catch (Exception ex)
         {
             Log.Error(ex, "BSX-Export fehlgeschlagen");
-            MessageBox.Show("Export fehlgeschlagen:\n\n" + ex.Message,
-                "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+            await App.Services.GetRequiredService<IDialogService>()
+                .ShowErrorAsync("Fehler", "Export fehlgeschlagen:\n\n" + ex.Message);
         }
     }
 
@@ -243,8 +244,8 @@ public partial class BsxExportDialog : Window
         catch (Exception ex)
         {
             Log.Error(ex, "BSX-Export-Cleanup fehlgeschlagen");
-            MessageBox.Show("Cleanup fehlgeschlagen:\n\n" + ex.Message,
-                "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+            await App.Services.GetRequiredService<IDialogService>()
+                .ShowErrorAsync("Fehler", "Cleanup fehlgeschlagen:\n\n" + ex.Message);
         }
     }
 

@@ -170,7 +170,8 @@ public partial class PartLookupView : UserControl
         catch (System.Exception ex)
         {
             Log.Error(ex, "CollectFromBlCatalog fehlgeschlagen");
-            MessageBox.Show(ex.Message, "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+            await App.Services.GetRequiredService<IDialogService>()
+                .ShowErrorAsync("Fehler", ex.Message);
         }
         finally
         {

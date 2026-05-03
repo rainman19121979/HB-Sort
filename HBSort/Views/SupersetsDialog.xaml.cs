@@ -1,7 +1,9 @@
 using System.Windows;
 using System.Windows.Controls;
 using HBSort.Core.Models;
+using HBSort.Services;
 using HBSort.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HBSort.Views;
 
@@ -38,14 +40,17 @@ public partial class SupersetsDialog : Window
         if (sender is not Button b || b.Tag is not SupersetItemViewModel item) return;
 
         // Hinweis bei Kategorie 3 (NameOnly) – holt erst noch Subsets ueber BL-API.
+        // Hier "OK" / "Abbrechen", weil das Sammeln selbst nicht destruktiv ist
+        // (die Bestaetigung zaehlt eher als "Hinweis bestaetigen").
         if (item.Category == SupersetCategory.NameOnly)
         {
-            var ok = MessageBox.Show(
+            var dialogs = App.Services.GetRequiredService<IDialogService>();
+            if (!await dialogs.ShowConfirmAsync(
+                "BL-API-Call noetig",
                 $"'{item.MinifigName}' ist nur per Name bekannt.\n" +
                 "Beim Sammeln wird die komplette Teileliste ueber einen BL-API-Call geladen.\n\n" +
-                "Fortfahren?",
-                "BL-API-Call noetig", MessageBoxButton.YesNo, MessageBoxImage.Question);
-            if (ok != MessageBoxResult.Yes) return;
+                "Fortfahren?"))
+                return;
         }
 
         // Lagerfach-Auswahl
