@@ -226,6 +226,11 @@ public partial class App : Application
         services.AddSingleton<IPriceProviderFactory, PriceProviderFactory>();
         services.AddSingleton<IPriceCalculationService, PriceCalculationService>();
 
+        // UX#12: Stale-While-Revalidate-Wrapper ueber den Provider, mit
+        // In-Flight-Schutz. Wird vom MinifigPriceViewModel fuer die Live-
+        // Anzeige in der oberen rechten Box des Sortier-Tabs benutzt.
+        services.AddSingleton<IBlPriceCacheService, BlPriceCacheService>();
+
         // ViewModels
         services.AddSingleton<ViewModels.MainViewModel>();
         services.AddSingleton<ViewModels.ScanViewModel>();

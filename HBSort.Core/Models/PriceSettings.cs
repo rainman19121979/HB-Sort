@@ -40,7 +40,26 @@ public class PriceSettings
     public decimal CorrectionPartsPercent { get; set; } = -15m;
 
     /// <summary>Cache-Lebensdauer in Tagen. Aeltere Eintraege werden neu geholt.</summary>
+    // DEPRECATED ab Phase 8 - wird vom Stale-While-Revalidate-Pfad
+    // (IBlPriceCacheService) nicht mehr genutzt. Stattdessen die zwei
+    // dedizierten TTL-Felder unten verwenden. Kann in einer spaeteren
+    // Iteration entfernt werden.
     public int CacheDays { get; set; } = 7;
+
+    /// <summary>
+    /// Phase 8 / UX#12: TTL fuer Komplett-Figur-Cache-Eintraege in Tagen.
+    /// Default 90 (= 3 Monate) - BL-Preise aendern sich langsam.
+    /// Bei abgelaufener TTL liefert der Cache-Service Stale-Werte sofort
+    /// und triggert im Hintergrund eine Revalidation.
+    /// </summary>
+    public int BlPriceCacheTtlMinifigDays { get; set; } = 90;
+
+    /// <summary>
+    /// Phase 8 / UX#12: TTL fuer Einzelteil-Cache-Eintraege in Tagen.
+    /// Default 90. Getrennt vom Minifig-TTL weil Teile-Preise potenziell
+    /// volatiler sein koennen (Sets-Releases, Saison-Effekte).
+    /// </summary>
+    public int BlPriceCacheTtlPartDays { get; set; } = 90;
 
     /// <summary>Beim Oeffnen einer kompletten Figur Preise sofort laden (sonst Button).</summary>
     public bool AutoLoadOnComplete { get; set; } = true;
