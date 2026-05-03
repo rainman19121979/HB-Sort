@@ -14,12 +14,18 @@
             <RowDefinition Height="35*" x:Name="BottomRow"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
+            <!-- 3 gleich breite Spalten (UX-Iteration X.4):
+                 LeftCol  = Webcam + Brickognize-Vorschlaege
+                 MidCol   = MinifigDetail / PartLookup + Tabs
+                 RightCol = neue freie Boxen (Inhalt kommt spaeter) -->
             <ColumnDefinition Width="*" x:Name="LeftCol"/>
+            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="*" x:Name="MidCol"/>
             <ColumnDefinition Width="5"/>
             <ColumnDefinition Width="*" x:Name="RightCol"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Vertikaler Splitter (zwischen Spalten) -->
+        <!-- Vertikaler Splitter zwischen Col1 und Col2 -->
         <GridSplitter Grid.Row="0" Grid.RowSpan="3" Grid.Column="1"
                       Width="5"
                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
@@ -29,10 +35,20 @@
                       Cursor="SizeWE"
                       DragCompleted="ColumnSplitter_DragCompleted"/>
 
+        <!-- Vertikaler Splitter zwischen Col2 und Col3 -->
+        <GridSplitter Grid.Row="0" Grid.RowSpan="3" Grid.Column="3"
+                      Width="5"
+                      HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                      Background="Transparent"
+                      ShowsPreview="True"
+                      ResizeBehavior="PreviousAndNext"
+                      Cursor="SizeWE"
+                      DragCompleted="ColumnSplitter2_DragCompleted"/>
+
         <!--
             Horizontaler Splitter wurde absichtlich entfernt: das 65/35-Verhaeltnis
-            zwischen oberer und unterer Zeile ist fix. Vertikaler Splitter (Spalten)
-            bleibt aktiv und wird weiter persistiert.
+            zwischen oberer und unterer Zeile ist fix. Vertikale Splitter (Spalten)
+            bleiben aktiv und werden weiter persistiert.
         -->
 
         <!-- ===== OBEN-LINKS (R0,C0): Webcam-Bereich ===== -->
@@ -317,7 +333,7 @@
             </Grid>
         </Border>
 
-        <!-- ===== UNTEN-RECHTS (R2,C2): TabControl mit 5 Ansichten (PROMPT 11) =====
+        <!-- ===== UNTEN-MITTE (R2,C2): TabControl mit 5 Ansichten =====
              Tab-Auswahl wird via MainViewModel.BottomRightSelectedTabIndex an
              AppSettings persistiert; jeder Tab kapselt sein eigenes UserControl
              mit dem zugehoerigen ViewModel als DataContext. -->
@@ -381,5 +397,28 @@
                 </TabItem>
             </TabControl>
         </Border>
+
+        <!-- ===== SPALTE 3 (UX-Iteration X.4) =====
+             Zwei vertikal gestapelte leere Borders. Inhalte kommen spaeter -
+             Layout schon mal vorbereitet. Innerer Grid mit 65*/35* fuer das
+             Verhaeltnis (analog zur Haupt-Zeile). Borders bleiben absichtlich
+             ohne Inhalt und ohne Platzhalter-Text. -->
+        <Grid Grid.Row="0" Grid.RowSpan="3" Grid.Column="4">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="65*"/>
+                <RowDefinition Height="5"/>
+                <RowDefinition Height="35*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Obere Box (groesser) -->
+            <Border Grid.Row="0"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                    BorderThickness="1" CornerRadius="4"/>
+
+            <!-- Untere Box (kleiner) -->
+            <Border Grid.Row="2"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                    BorderThickness="1" CornerRadius="4"/>
+        </Grid>
     </Grid>
 </UserControl>

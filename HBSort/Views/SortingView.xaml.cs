@@ -62,31 +62,57 @@ public partial class SortingView : UserControl
     // GridSplitter Persistierung
     // ====================================================================
 
+    /// <summary>
+    /// Splitter zwischen Col1 (Webcam) und Col2 (Detail). Persistiert das
+    /// Verhaeltnis Col1 / Total in WindowState.SplitterColumnRatio.
+    /// </summary>
     private void ColumnSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
     {
         var settingsService = Service<ISettingsService>();
-        var leftWidth = LeftCol.ActualWidth;
-        var rightWidth = RightCol.ActualWidth;
-        var total = leftWidth + rightWidth;
-        if (total > 0)
-        {
-            settingsService.Current.WindowState.SplitterColumnRatio = leftWidth / total;
-            _ = settingsService.SaveAsync();
-        }
+        var total = LeftCol.ActualWidth + MidCol.ActualWidth + RightCol.ActualWidth;
+        if (total <= 0) return;
+
+        settingsService.Current.WindowState.SplitterColumnRatio =
+            LeftCol.ActualWidth / total;
+        settingsService.Current.WindowState.SplitterColumnRatio2 =
+            MidCol.ActualWidth / total;
+        _ = settingsService.SaveAsync();
     }
 
     /// <summary>
-    /// Stellt das gespeicherte Spalten-Verhaeltnis wieder her. Das Zeilen-
-    /// Verhaeltnis ist fix (65/35 aus XAML-Defaults) und wird nicht mehr
-    /// vom User editierbar gemacht.
+    /// Splitter zwischen Col2 (Detail) und Col3 (neue Boxen). Persistiert
+    /// beide Anteile damit die Wiederherstellung konsistent bleibt.
+    /// </summary>
+    private void ColumnSplitter2_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        var settingsService = Service<ISettingsService>();
+        var total = LeftCol.ActualWidth + MidCol.ActualWidth + RightCol.ActualWidth;
+        if (total <= 0) return;
+
+        settingsService.Current.WindowState.SplitterColumnRatio =
+            LeftCol.ActualWidth / total;
+        settingsService.Current.WindowState.SplitterColumnRatio2 =
+            MidCol.ActualWidth / total;
+        _ = settingsService.SaveAsync();
+    }
+
+    /// <summary>
+    /// Stellt die gespeicherten Spalten-Verhaeltnisse wieder her. Drei Spalten:
+    /// Col1, Col2 explizit, Col3 ergibt sich als Rest. Werte werden auf
+    /// [0.1 .. 0.8] gekappt, damit eine Spalte nicht komplett verschwindet.
+    /// Das Zeilen-Verhaeltnis (65/35) ist fix aus den XAML-Defaults.
     /// </summary>
     private void ApplySplitterRatios()
     {
         var ws = Service<ISettingsService>().Current.WindowState;
-        var col = Math.Clamp(ws.SplitterColumnRatio, 0.1, 0.9);
+        var c1 = Math.Clamp(ws.SplitterColumnRatio, 0.1, 0.8);
+        var c2 = Math.Clamp(ws.SplitterColumnRatio2, 0.1, 0.8);
+        // Sicherstellen dass die Summe < 0.95 ist (sonst Col3 < 5%).
+        if (c1 + c2 > 0.9) { c1 = c2 = 1.0 / 3.0; }
+        var c3 = 1.0 - c1 - c2;
 
-        LeftCol.Width = new GridLength(col, GridUnitType.Star);
-        RightCol.Width = new GridLength(1.0 - col, GridUnitType.Star);
-        // TopRow / BottomRow bleiben auf den 65*/35*-Defaults aus XAML.
+        LeftCol.Width = new GridLength(c1, GridUnitType.Star);
+        MidCol.Width = new GridLength(c2, GridUnitType.Star);
+        RightCol.Width = new GridLength(c3, GridUnitType.Star);
     }
 }

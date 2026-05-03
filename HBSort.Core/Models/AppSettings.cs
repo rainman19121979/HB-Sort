@@ -111,8 +111,16 @@ public class WindowState
     public double Y { get; set; } = 0;
     public bool IsMaximized { get; set; } = true;
 
-    /// <summary>Anteil der linken Spalte am 2x2-Layout (0..1). Default 0.5.</summary>
-    public double SplitterColumnRatio { get; set; } = 0.5;
+    /// <summary>Anteil der ERSTEN Spalte (Webcam) am 3-Spalten-Layout (0..1). Default 0.333.</summary>
+    public double SplitterColumnRatio { get; set; } = 1.0 / 3.0;
+
+    /// <summary>
+    /// Anteil der ZWEITEN Spalte (MinifigDetail/PartLookup) am 3-Spalten-Layout (0..1).
+    /// Default 0.333. Die dritte Spalte ergibt sich automatisch als
+    /// (1 - SplitterColumnRatio - SplitterColumnRatio2).
+    /// (UX-Iteration X.4: Sortier-Tab ist von 2 auf 3 gleich breite Spalten umgebaut.)
+    /// </summary>
+    public double SplitterColumnRatio2 { get; set; } = 1.0 / 3.0;
 
     /// <summary>Anteil der oberen Zeile am 2x2-Layout (0..1). Default 0.6.</summary>
     public double SplitterRowRatio { get; set; } = 0.6;
