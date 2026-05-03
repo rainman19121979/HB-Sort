@@ -31,6 +31,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly HttpClient _http;
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
     private readonly IDialogService _dialogs;
+    private readonly IBlPriceCacheService _priceCache;
 
     /// <summary>Tab "Lagerfaecher" – eigenes ViewModel mit Liste + Commands.</summary>
     public BinManagerViewModel BinManager { get; }
@@ -234,7 +235,8 @@ public partial class SettingsViewModel : ObservableObject
         HttpClient http,
         IDbContextFactory<UserDataContext> ctxFactory,
         BinManagerViewModel binManager,
-        IDialogService dialogs)
+        IDialogService dialogs,
+        IBlPriceCacheService priceCache)
     {
         _settingsService = settingsService;
         _cameraService = cameraService;
@@ -247,6 +249,7 @@ public partial class SettingsViewModel : ObservableObject
         _http = http;
         _ctxFactory = ctxFactory;
         _dialogs = dialogs;
+        _priceCache = priceCache;
         BinManager = binManager;
 
         // Vorhandene BL-Tokens beim Oeffnen der Settings laden, damit der User
@@ -268,6 +271,37 @@ public partial class SettingsViewModel : ObservableObject
 
         // Cache-Stats initial befuellen
         RefreshCacheStats();
+
+        // UX#12: Preis-Cache-Eintraege initial laden.
+        _ = RefreshPriceCacheCountAsync();
+    }
+
+    /// <summary>UX#12: Eintragsanzahl aus dem Preis-Cache holen und in der UI anzeigen.</summary>
+    public async Task RefreshPriceCacheCountAsync()
+    {
+        try
+        {
+            PriceCacheEntryCount = await _priceCache.GetEntryCountAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Preis-Cache-Count-Refresh geworfen");
+        }
+    }
+
+    /// <summary>UX#12: kompletten Preis-Cache leeren (mit Bestaetigung).</summary>
+    [RelayCommand]
+    public async Task ClearPriceCacheAsync()
+    {
+        var ok = await _dialogs.ShowQuestionAsync(
+            "Preis-Cache leeren",
+            "Wirklich alle gespeicherten BL-Preise loeschen? Naechste Lookups gehen " +
+            "live in die BL-API (kann Rate-Limit kosten).");
+        if (!ok) return;
+
+        var deleted = await _priceCache.ClearAllAsync();
+        await RefreshPriceCacheCountAsync();
+        Log.Information("Preis-Cache geleert: {Count} Eintraege entfernt", deleted);
     }
 
     private void LoadFromSettings()
@@ -297,6 +331,8 @@ public partial class SettingsViewModel : ObservableObject
         PriceCorrectionMinifigPercent  = s.Prices.CorrectionMinifigPercent;
         PriceCorrectionPartsPercent    = s.Prices.CorrectionPartsPercent;
         PriceCacheDays                 = s.Prices.CacheDays;
+        PriceCacheTtlMinifigDays       = s.Prices.BlPriceCacheTtlMinifigDays;
+        PriceCacheTtlPartDays          = s.Prices.BlPriceCacheTtlPartDays;
         PriceAutoLoadOnComplete        = s.Prices.AutoLoadOnComplete;
 
         // Kameras auflisten
@@ -330,6 +366,8 @@ public partial class SettingsViewModel : ObservableObject
         s.Prices.CorrectionMinifigPercent  = PriceCorrectionMinifigPercent;
         s.Prices.CorrectionPartsPercent    = PriceCorrectionPartsPercent;
         s.Prices.CacheDays                 = Math.Max(1, PriceCacheDays);
+        s.Prices.BlPriceCacheTtlMinifigDays = Math.Max(1, PriceCacheTtlMinifigDays);
+        s.Prices.BlPriceCacheTtlPartDays    = Math.Max(1, PriceCacheTtlPartDays);
         s.Prices.AutoLoadOnComplete        = PriceAutoLoadOnComplete;
 
         await _settingsService.SaveAsync();
@@ -772,6 +810,22 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty] private int _priceCacheDays = 7;
     [ObservableProperty] private bool _priceAutoLoadOnComplete = true;
+
+    // UX#12: getrennte TTLs fuer Stale-While-Revalidate.
+    [ObservableProperty] private int _priceCacheTtlMinifigDays = 90;
+    [ObservableProperty] private int _priceCacheTtlPartDays = 90;
+
+    /// <summary>Anzahl Eintraege im Preis-Cache (Settings-Anzeige).</summary>
+    [ObservableProperty] private int _priceCacheEntryCount;
+
+    /// <summary>"X Eintraege" als Anzeige-Text.</summary>
+    public string PriceCacheCountText
+        => PriceCacheEntryCount == 0
+            ? "Cache ist leer."
+            : $"Aktuell {PriceCacheEntryCount} Eintraege im Preis-Cache";
+
+    partial void OnPriceCacheEntryCountChanged(int value)
+        => OnPropertyChanged(nameof(PriceCacheCountText));
 
     /// <summary>Live-Vorschau "BL Avg 10.00 EUR -> mein VK 9.00 EUR" fuer Minifig.</summary>
     public string MinifigPreviewLabel

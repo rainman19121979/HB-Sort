@@ -918,24 +918,55 @@
                                        Margin="0,0,0,6"/>
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="240"/>
                                     <ColumnDefinition Width="100"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
 
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Cache-Dauer (Tage):"
+                                <!-- UX#12: getrennte TTLs fuer das Stale-While-Revalidate-
+                                     Cache-System. Defaults 90 Tage. -->
+                                <TextBlock Grid.Row="0" Grid.Column="0"
+                                           Text="Cache-Gueltigkeit komplette Figuren (Tage):"
                                            VerticalAlignment="Center" Margin="0,0,0,4"/>
                                 <TextBox Grid.Row="0" Grid.Column="1" Margin="0,0,0,4"
-                                         Text="{Binding PriceCacheDays, UpdateSourceTrigger=PropertyChanged}"/>
+                                         Text="{Binding PriceCacheTtlMinifigDays, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Wie lange werden Komplett-Figur-Preise als 'frisch' angesehen. Default: 90 Tage."/>
 
-                                <CheckBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                                <TextBlock Grid.Row="1" Grid.Column="0"
+                                           Text="Cache-Gueltigkeit Einzelteile (Tage):"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <TextBox Grid.Row="1" Grid.Column="1" Margin="0,0,0,4"
+                                         Text="{Binding PriceCacheTtlPartDays, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Wie lange werden Einzelteil-Preise als 'frisch' angesehen. Default: 90 Tage."/>
+
+                                <CheckBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3"
                                           Margin="0,8,0,0"
                                           Content="Preise automatisch laden bei kompletten Figuren"
                                           IsChecked="{Binding PriceAutoLoadOnComplete}"/>
+                            </Grid>
+
+                            <Separator Margin="0,12,0,8"/>
+
+                            <!-- UX#12: Cache-Verwaltung -->
+                            <TextBlock Text="Cache-Verwaltung" FontSize="13" FontWeight="SemiBold"
+                                       Margin="0,0,0,6"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding PriceCacheCountText}"
+                                           FontSize="12" Foreground="Gray"
+                                           VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Content="Preis-Cache leeren"
+                                        Command="{Binding ClearPriceCacheCommand}"
+                                        Padding="8,4"/>
                             </Grid>
                         </StackPanel>
 
