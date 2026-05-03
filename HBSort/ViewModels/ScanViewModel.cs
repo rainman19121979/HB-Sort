@@ -31,7 +31,7 @@ public partial class ScanViewModel : ObservableObject
     private readonly IBrickognizeClient _brickognizeClient;
     private readonly IExternalIdResolver _idResolver;
     private readonly INotificationService _notifications;
-    private readonly IBlCacheRepository _blCacheRepo;     // PROMPT 6: bl_colors statt catalog.db fuer Farb-Swatches
+    private readonly IBlCacheRepository _blCacheRepo;     // bl_colors fuer Farb-Swatches
     private readonly IPartImageProvider _imageProvider;
     private readonly IPersistentImageCache _persistentCache;
     private readonly IBlCatalogService _blCatalog;
@@ -564,8 +564,8 @@ public partial class ScanViewModel : ObservableObject
 
     /// <summary>
     /// Aktualisiert das Bild der Top-Card mit der gerade erkannten Farbe.
-    /// PROMPT 6: Brickognize liefert direkt BL-Color-IDs - wir reichen sie ohne
-    /// Mapping an den ImageProvider durch.
+    /// Brickognize liefert direkt BL-Color-IDs - wir reichen sie ohne Mapping
+    /// an den ImageProvider durch.
     /// </summary>
     private async Task RefreshAllCardsImagesAsync(BrickognizePrediction prediction)
     {
@@ -732,9 +732,11 @@ public partial class ScanViewModel : ObservableObject
 
             ct.ThrowIfCancellationRequested();
 
-            var details = detailsTask.Result;
-            var subsets = partsTask.Result;
-            var colors = colorsTask.Result;
+            // Tasks sind nach WhenAll garantiert abgeschlossen – await ist hier
+            // ein billiges Auslesen des bereits berechneten Resultats.
+            var details = await detailsTask;
+            var subsets = await partsTask;
+            var colors = await colorsTask;
             var colorLookup = colors.ToDictionary(c => c.ColorId);
 
             if (details == null)
@@ -1182,10 +1184,8 @@ public partial class ScanViewModel : ObservableObject
     /// <summary>
     /// Wertet die `colors`-Liste der Brickognize-Antwort aus und schlaegt zu jedem
     /// Eintrag die RGB-Farbe in bl_colors nach (fuer das Swatch in der UI).
-    ///
-    /// PROMPT 6 (2026-05-02): Brickognize liefert in der "id"-Spalte BL-Color-IDs
-    /// direkt (validiert: id=5 = Red, was BL-ID Red ist). Daher kein Name-Lookup
-    /// und keine RB->BL-Konvertierung mehr noetig.
+    /// Brickognize liefert in der "id"-Spalte BL-Color-IDs direkt (validiert:
+    /// id=5 = Red = BL-ID Red), daher kein Name-Lookup oder RB->BL-Konvertierung.
     /// </summary>
     private async Task BuildColorMatchesAsync(BrickognizePrediction prediction)
     {

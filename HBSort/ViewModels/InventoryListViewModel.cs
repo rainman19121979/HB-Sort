@@ -392,7 +392,7 @@ public partial class InventoryRowItem : ObservableObject
             Description = fp.PartName,
             ColorSwatch = ParseRgbBrush(rgbHex),
             ColorName = fp.ColorName,
-            ColorId = fp.BricklinkColorId ?? fp.ColorId,
+            ColorId = fp.ColorId,
             Quantity = fp.Quantity,
             StorageBinLabel = fp.StorageBin?.Label ?? "—",
             StorageBinId = fp.StorageBinId,

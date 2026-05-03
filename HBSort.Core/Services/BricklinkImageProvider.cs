@@ -75,7 +75,7 @@ public class BricklinkImageProvider : IPartImageProvider
         }
 
         // BL-Color-ID nur fuer Teile durchreichen; Minifigs/Sets ignorieren Farbe.
-        // Brickognize liefert seit PROMPT 6 BL-Color-IDs direkt - kein Mapping mehr noetig.
+        // Brickognize liefert BL-Color-IDs direkt - kein Mapping noetig.
         int? colorForUrl = (type == BrickognizeItemType.Part && bricklinkColorId.HasValue && bricklinkColorId.Value >= 0)
             ? bricklinkColorId
             : null;

@@ -11,7 +11,7 @@ using Serilog;
 namespace HBSort.ViewModels;
 
 /// <summary>
-/// PROMPT 11: "Was kann ich bauen?" - reverse match aus dem Floating-Pool.
+/// "Was kann ich bauen?" - reverse match aus dem Floating-Pool.
 /// Zeigt komplette/teil-komplette Minifig-Vorschlaege basierend auf den
 /// losen Teilen die der User gerade hat.
 ///
@@ -38,10 +38,6 @@ public partial class BuildSuggestionsViewModel : ObservableObject
     [ObservableProperty]
     private string _summaryText = string.Empty;
 
-    /// <summary>Mindest-Match in Prozent (Slider 10..100, Default 50).</summary>
-    [ObservableProperty]
-    private int _minMatchPercent = 50;
-
     public BuildSuggestionsViewModel(
         IDbContextFactory<UserDataContext> ctxFactory,
         IBlCacheRepository blCache,
@@ -64,8 +60,6 @@ public partial class BuildSuggestionsViewModel : ObservableObject
         _ = RefreshAsync();
     }
 
-    partial void OnMinMatchPercentChanged(int value) => _ = RefreshAsync();
-
     [RelayCommand]
     public async Task RefreshAsync()
     {
@@ -74,11 +68,10 @@ public partial class BuildSuggestionsViewModel : ObservableObject
         {
             await using var ctx = await _ctxFactory.CreateDbContextAsync();
 
-            // 1) Floating-Pool gruppiert. ColorId-Quelle: BricklinkColorId bevorzugt,
-            //    sonst ColorId (LegacyPart).
+            // 1) Floating-Pool gruppiert nach (PartNumber, BL-ColorId).
             var rawFloats = await ctx.FloatingParts.AsNoTracking().ToListAsync();
             var floats = rawFloats
-                .GroupBy(fp => new { fp.PartNumber, ColorId = fp.BricklinkColorId ?? fp.ColorId })
+                .GroupBy(fp => new { fp.PartNumber, fp.ColorId })
                 .Select(g => new
                 {
                     PartNo = g.Key.PartNumber,
@@ -136,7 +129,8 @@ public partial class BuildSuggestionsViewModel : ObservableObject
                 }
 
                 var matchPercent = (int)(100.0 * totalHave / totalNeeded);
-                if (matchPercent < MinMatchPercent) continue;
+                // Kein Mindest-Schwellenwert mehr - alle baubaren Vorschlaege
+                // werden gezeigt, sortiert nach Match-% absteigend.
 
                 var item = await _blCache.GetItemAsync("M", blMinifigId);
                 if (item == null) continue;
@@ -164,8 +158,8 @@ public partial class BuildSuggestionsViewModel : ObservableObject
             foreach (var s in top) Suggestions.Add(s);
 
             SummaryText = top.Count == 0
-                ? $"Keine Vorschlaege ueber {MinMatchPercent}%."
-                : $"{top.Count} Vorschlaege (>= {MinMatchPercent}%)";
+                ? "Keine Bauvorschlaege - keine deiner losen Teile passt zu einer ungetrackten Minifig."
+                : $"{top.Count} Vorschlaege (sortiert nach Match-%)";
 
             _ = LoadImagesAsync();
         }

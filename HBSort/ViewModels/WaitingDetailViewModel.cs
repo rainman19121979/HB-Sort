@@ -11,9 +11,9 @@ using Serilog;
 namespace HBSort.ViewModels;
 
 /// <summary>
-/// PROMPT 11: Wartende-Detail-Tab. Liste aller wartenden Figuren mit den
-/// FEHLENDEN Teilen pro Figur, damit man auf einen Blick sieht "ach,
-/// mir fehlt noch X fuer Box 3".
+/// Wartende-Detail-Tab. Liste aller wartenden Figuren mit den FEHLENDEN
+/// Teilen pro Figur, damit man auf einen Blick sieht "ach, mir fehlt
+/// noch X fuer Box 3".
 /// </summary>
 public partial class WaitingDetailViewModel : ObservableObject
 {

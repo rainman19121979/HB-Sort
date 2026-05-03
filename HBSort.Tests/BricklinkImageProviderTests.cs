@@ -26,8 +26,8 @@ public class BricklinkImageProviderTests : IDisposable
         catch { /* best effort */ }
     }
 
-    // PROMPT 6 (2026-05-02): Brickognize liefert BL-Color-IDs direkt.
-    // Tests rufen GetImageFileAsync mit BL-Color-ID auf (kein RB->BL-Mapping mehr).
+    // Brickognize liefert BL-Color-IDs direkt; Tests rufen
+    // GetImageFileAsync mit BL-Color-ID auf (kein RB->BL-Mapping mehr).
 
     [Fact]
     public async Task Part_with_color_uses_bricklink_color_url()

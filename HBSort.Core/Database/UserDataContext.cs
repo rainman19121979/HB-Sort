@@ -8,7 +8,7 @@ namespace HBSort.Core.Database;
 /// Verwaltet alle Benutzerdaten: gescannte Figuren, Lagerfächer, Floating Parts,
 /// Scan-Historie und Tagesstatistiken.
 ///
-/// Architektur-Hinweis: Die catalog.db wird NICHT über EF Core verwaltet,
+/// Architektur-Hinweis: Die bl_cache.db wird NICHT über EF Core verwaltet,
 /// sondern über direktes ADO.NET (Microsoft.Data.Sqlite) für Performance
 /// beim Bulk-Import. Dieser Context ist nur für userdata.db.
 /// </summary>

@@ -15,8 +15,7 @@
                 <RowDefinition Height="Auto"/>  <!-- Trenner -->
                 <RowDefinition Height="*"/>     <!-- Wartende-Liste -->
                 <RowDefinition Height="Auto"/>  <!-- Trenner + Alternativen-Header -->
-                <RowDefinition Height="Auto"/>  <!-- Floating-Combo + Wo-kommt-vor -->
-                <RowDefinition Height="Auto"/>  <!-- Buttons -->
+                <RowDefinition Height="Auto"/>  <!-- Floating-Combo + Buttons (zusammen in einer Zeile) -->
             </Grid.RowDefinitions>
 
             <!-- ===== HEADER ===== -->
@@ -233,41 +232,40 @@
                            FontSize="{DynamicResource DetailFontSize}" Foreground="Gray"/>
             </StackPanel>
 
-            <!-- ===== FLOATING-COMBO + WO-KOMMT-VOR ===== -->
-            <StackPanel Grid.Row="4" Margin="0,4,0,0">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="80"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <ComboBox Grid.Column="0" MinWidth="200"
-                              ItemsSource="{Binding AvailableBins}"
-                              SelectedItem="{Binding SelectedFloatingBin}"
-                              DisplayMemberPath="Label"/>
-                    <TextBlock Grid.Column="1" Text="Anzahl:"
-                               VerticalAlignment="Center" Margin="12,0,6,0"
-                               Foreground="Gray"
-                               FontSize="{DynamicResource DetailFontSize}"/>
-                    <TextBox Grid.Column="2"
-                             Text="{Binding FloatingQuantity, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="Anzahl"/>
-                    <Button Grid.Column="3" Content="Lagern" Width="100"
-                            Margin="8,0,0,0"
-                            Click="StoreFloating_Click"
-                            Style="{StaticResource AccentButtonStyle}"
-                            ToolTip="Teil als Einzelteil im gewaehlten Fach lagern"/>
-                </Grid>
-
-            </StackPanel>
-
-            <!-- ===== BUTTONS ===== -->
-            <StackPanel Grid.Row="5" Orientation="Horizontal"
-                        HorizontalAlignment="Right" Margin="0,12,0,0">
-                <Button Content="Verwerfen" Width="100"
-                        Click="Discard_Click"/>
-            </StackPanel>
+            <!--
+                Lagern + Verwerfen in einer Zeile, damit beide Buttons
+                immer zusammen sichtbar sind und der User nicht scrollen muss.
+                Grid.Row="5" entfaellt dadurch.
+            -->
+            <Grid Grid.Row="4" Margin="0,4,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ComboBox Grid.Column="0" MinWidth="140"
+                          ItemsSource="{Binding AvailableBins}"
+                          SelectedItem="{Binding SelectedFloatingBin}"
+                          DisplayMemberPath="Label"/>
+                <TextBlock Grid.Column="1" Text="Anzahl:"
+                           VerticalAlignment="Center" Margin="12,0,6,0"
+                           Foreground="Gray"
+                           FontSize="{DynamicResource DetailFontSize}"/>
+                <TextBox Grid.Column="2"
+                         Text="{Binding FloatingQuantity, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Anzahl"/>
+                <Button Grid.Column="3" Content="Lagern" Width="90"
+                        Margin="8,0,0,0"
+                        Click="StoreFloating_Click"
+                        Style="{StaticResource AccentButtonStyle}"
+                        ToolTip="Teil als Einzelteil im gewaehlten Fach lagern"/>
+                <Button Grid.Column="4" Content="Verwerfen" Width="90"
+                        Margin="8,0,0,0"
+                        Click="Discard_Click"
+                        ToolTip="Scan verwerfen ohne zu speichern"/>
+            </Grid>
         </Grid>
     </Border>
 </UserControl>

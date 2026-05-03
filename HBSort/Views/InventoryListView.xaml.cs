@@ -11,8 +11,8 @@ namespace HBSort.Views;
 /// <summary>
 /// Tab "Lagerliste". DataContext = InventoryListViewModel.
 /// Klick auf "Details" oeffnet MinifigSummaryDialog (Figur) bzw. zeigt
-/// Einzelteil-Info (TODO Phase 7). "Loeschen" mit Confirmation entfernt
-/// Figur (DeleteAsync) oder Einzelteil (DeleteFloatingPartAsync).
+/// Einzelteil-Info. "Loeschen" mit Confirmation entfernt Figur
+/// (DeleteAsync) oder Einzelteil (DeleteFloatingPartAsync).
 /// </summary>
 public partial class InventoryListView : UserControl
 {

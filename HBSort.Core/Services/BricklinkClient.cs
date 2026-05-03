@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using BricklinkSharp.Client;
 using HBSort.Core.Models.Exceptions;
 using Serilog;
@@ -70,7 +71,9 @@ public class BricklinkClient : IBricklinkClient
             sw.Stop();
             success = true;
 
-            var name = item?.Name ?? "(no name)";
+            // BL-API liefert Namen HTML-kodiert (z.B. &#40; statt "(") – an dieser
+            // Boundary einmal dekodieren, damit alles dahinter sauber ist.
+            var name = WebUtility.HtmlDecode(item?.Name ?? "(no name)");
             Log.Information("BL TestConnection erfolgreich, ItemName='{Name}' ({Ms} ms)", name, sw.ElapsedMilliseconds);
 
             return new BricklinkTestResult
@@ -152,7 +155,9 @@ public class BricklinkClient : IBricklinkClient
             {
                 ItemType = itemType,
                 ItemNo = item.Number ?? itemNo,
-                Name = item.Name ?? string.Empty,
+                // HTML-Decode: BL liefert Namen mit Numeric-Entities (z.B. &#40;) – einmalig
+                // an der API-Boundary dekodieren, damit Cache und UI sauber sind.
+                Name = WebUtility.HtmlDecode(item.Name ?? string.Empty),
                 YearReleased = item.YearReleased > 0 ? item.YearReleased : null,
                 // BricklinkSharp liefert "https://..." mit ggf. fuehrendem Slash – wir nehmen ImageUrl roh.
                 ImageUrl = item.ImageUrl,
@@ -212,7 +217,8 @@ public class BricklinkClient : IBricklinkClient
                         IsAlternate = !isFirstInGroup || sub.IsAlternate,
                         IsCounterpart = sub.IsCounterpart,
                         MatchId = entry.MatchNo,
-                        ItemName = sub.Item.Name
+                        // HTML-Decode an der API-Boundary (siehe GetItemAsync).
+                        ItemName = WebUtility.HtmlDecode(sub.Item.Name)
                     });
                     isFirstInGroup = false;
                 }
@@ -246,7 +252,8 @@ public class BricklinkClient : IBricklinkClient
                 result.Add(new BricklinkColorDto
                 {
                     ColorId = c.ColorId,
-                    Name = c.Name ?? string.Empty,
+                    // HTML-Decode an der API-Boundary (siehe GetItemAsync).
+                    Name = WebUtility.HtmlDecode(c.Name ?? string.Empty),
                     Rgb = c.HtmlCode,
                     Type = c.Type
                 });
@@ -293,7 +300,8 @@ public class BricklinkClient : IBricklinkClient
                     {
                         ParentType = typeStr,
                         ParentNo = e.Item.Number ?? string.Empty,
-                        ParentName = e.Item.Name,
+                        // HTML-Decode an der API-Boundary (siehe GetItemAsync).
+                        ParentName = WebUtility.HtmlDecode(e.Item.Name),
                         Quantity = e.Quantity,
                         AppearsAs = e.AppearsAs.ToString(),
                         RequestedColorId = sup.ColorId

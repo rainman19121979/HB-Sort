@@ -59,7 +59,7 @@ public interface IBlCacheRepository
         string blPartNo, int blColorId, CancellationToken ct = default);
 
     /// <summary>
-    /// PROMPT 11 (BuildSuggestions): findet alle BL-Minifig-IDs (parent_type='M'),
+    /// Fuer BuildSuggestions: findet alle BL-Minifig-IDs (parent_type='M'),
     /// deren Subsets mindestens eines der uebergebenen (PartNo, ColorId)-Paare
     /// enthalten. Pseudo-Eintraege (is_from_supersets=1) werden ausgefiltert.
     /// Liefert die DISTINCT-Liste der Minifig-Parent-IDs - die Quantity-Berechnung

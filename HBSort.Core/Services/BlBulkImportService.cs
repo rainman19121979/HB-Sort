@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO.Compression;
+using System.Net;
 using System.Net.Http;
 using System.Xml;
 using System.Xml.Linq;
@@ -341,9 +342,12 @@ public class BlBulkImportService : IBlBulkImportService
                 {
                     ItemType = itemType,
                     ItemNo = itemNo,
-                    Name = root.Element("ITEMNAME")?.Value
+                    // HTML-Decode: BrickStore-XML uebernimmt die BL-Namen unveraendert,
+                    // also auch mit Numeric-Entities (&#40; statt "(" usw.).
+                    Name = WebUtility.HtmlDecode(
+                        root.Element("ITEMNAME")?.Value
                         ?? root.Element("NAME")?.Value
-                        ?? string.Empty,
+                        ?? string.Empty),
                     YearReleased = int.TryParse(
                         root.Element("ITEMYEAR")?.Value
                         ?? root.Element("YEAR")?.Value, out var y) ? y : null,

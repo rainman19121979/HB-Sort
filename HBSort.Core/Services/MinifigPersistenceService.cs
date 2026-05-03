@@ -138,7 +138,6 @@ public class MinifigPersistenceService : IMinifigPersistenceService
                 {
                     PartNumber = part.PartNumber,
                     ColorId = part.ColorId,
-                    BricklinkColorId = part.BricklinkColorId ?? part.ColorId,
                     ColorName = part.ColorName,
                     PartName = part.PartName,
                     Quantity = qty,
@@ -348,12 +347,11 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             StorageBinId = input.StorageBinId,
             RequiredParts = input.RequiredParts.Select(p => new TrackedMinifigPart
             {
-                // Wir sind BL-first: BL-Part-No und BL-Color-Id landen in den
-                // "primaeren" Feldern (PartNumber/ColorId). BricklinkColorId
-                // doppeln wir, damit der spaetere BSX-Export ohne Mapping arbeiten kann.
+                // BL-first: BricklinkPartNo + BricklinkColorId aus dem Input
+                // landen direkt als (PartNumber, ColorId) in der Entity. Beides
+                // sind BL-IDs - der spaetere BSX-Export braucht keine Konvertierung.
                 PartNumber = p.BricklinkPartNo,
                 ColorId = p.BricklinkColorId,
-                BricklinkColorId = p.BricklinkColorId,
                 PartName = p.PartName,
                 ColorName = p.ColorName,
                 QuantityNeeded = p.QuantityNeeded,

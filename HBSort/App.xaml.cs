@@ -89,9 +89,6 @@ public partial class App : Application
             // Supersets-Cache vor Einfuehrung von IsFromSupersets).
             await CleanupOnePartCompletesAsync();
 
-            // PROMPT 6 (2026-05-02): catalog.db / Splash-Erstinit komplett entfernt.
-            // Stammdaten kommen jetzt ausschliesslich aus bl_cache.db (BrickStore-Bulk-Import).
-
             // 7. Hauptfenster anzeigen
             var mainWindow = Services.GetRequiredService<MainWindow>();
             mainWindow.Show();
@@ -148,9 +145,6 @@ public partial class App : Application
         // Services als Singleton registrieren (eine Instanz für die gesamte App-Laufzeit)
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<ICameraService, CameraService>();
-
-        // PROMPT 6 (2026-05-02): catalog.db / ICatalogService / ICatalogImporter
-        // komplett entfernt. Stammdaten kommen ueber bl_cache.db.
 
         // Phase 2: Brickognize + ID-Resolver + Notifications.
         // Wir registrieren einen statischen HttpClient (kein AddHttpClient-Factory,
@@ -230,8 +224,8 @@ public partial class App : Application
         services.AddSingleton<ViewModels.WaitingMinifigsViewModel>();
         services.AddSingleton<ViewModels.InventoryListViewModel>();
 
-        // PROMPT 11: Variables Feld unten rechts - Singletons damit die VMs auch
-        // dann live bleiben wenn der User auf einen anderen Tab wechselt und zurueck.
+        // Variables Feld unten rechts - Singletons damit die VMs auch dann live
+        // bleiben wenn der User auf einen anderen Tab wechselt und zurueck.
         services.AddSingleton<ViewModels.BuildSuggestionsViewModel>();
         services.AddSingleton<ViewModels.LiveStatsViewModel>();
         services.AddSingleton<ViewModels.WaitingDetailViewModel>();
@@ -517,18 +511,17 @@ public partial class App : Application
 
     /// <summary>
     /// Wird aufgerufen wenn die App beendet wird.
-    /// Räumt auf: Kamera freigeben, Logging flushen.
+    /// Räumt auf: alle DI-Singletons freigeben, Logging flushen.
     /// </summary>
     protected override void OnExit(ExitEventArgs e)
     {
         Log.Information("=== HB-Sort beendet ===");
 
-        // Kamera sauber freigeben
-        if (Services != null)
-        {
-            var cameraService = Services.GetService<ICameraService>();
-            cameraService?.Dispose();
-        }
+        // ServiceProvider disponieren - das ruft Dispose() auf allen Singleton-
+        // Services die IDisposable implementieren in der korrekten Reihenfolge.
+        // Insbesondere: BlCacheRepository + PersistentImageCache schliessen ihre
+        // SQLite-Connections, CameraService stoppt den Capture-Thread.
+        (Services as IDisposable)?.Dispose();
 
         // Serilog-Puffer leeren (damit der letzte Log-Eintrag noch geschrieben wird)
         Log.CloseAndFlush();

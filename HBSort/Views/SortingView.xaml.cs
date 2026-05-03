@@ -54,8 +54,8 @@ public partial class SortingView : UserControl
         }
     }
 
-    // PROMPT 11: Lagerfach-Click-Handler sind nach BinOverviewView.xaml.cs umgezogen.
-    // Der R2,C2-Bereich ist jetzt ein TabControl - jeder Tab kapselt sein eigenes
+    // Lagerfach-Click-Handler sind nach BinOverviewView.xaml.cs umgezogen:
+    // der R2,C2-Bereich ist ein TabControl, jeder Tab kapselt sein eigenes
     // UserControl mit eigenen Handlern.
 
     // ====================================================================

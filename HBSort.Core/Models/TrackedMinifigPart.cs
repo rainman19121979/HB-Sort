@@ -17,16 +17,8 @@ public class TrackedMinifigPart
     /// <summary>Rebrickable-Teilenummer, z.B. "3001"</summary>
     public string PartNumber { get; set; } = string.Empty;
 
-    /// <summary>Farb-ID aus dem Rebrickable-Katalog</summary>
+    /// <summary>BrickLink-Farb-ID (Brickognize liefert die direkt).</summary>
     public int ColorId { get; set; }
-
-    /// <summary>
-    /// BrickLink-Farb-ID (gemappt aus ColorId via ColorMapping). Optional weil
-    /// nicht jede Rebrickable-Farbe eine BrickLink-Entsprechung hat (z.B.
-    /// Modulex-Farben). Wird beim Speichern gleich befuellt, damit der
-    /// BSX-Export in Phase 7 keine Konvertierungsarbeit mehr braucht.
-    /// </summary>
-    public int? BricklinkColorId { get; set; }
 
     /// <summary>Farbname gecacht, z.B. "Black" – damit wir nicht immer den Katalog fragen müssen</summary>
     public string ColorName { get; set; } = string.Empty;

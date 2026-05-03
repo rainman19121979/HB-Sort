@@ -11,7 +11,7 @@ namespace HBSort.Core.Services;
 ///
 /// Architektur-Hinweis:
 ///   - Bild-Dateien liegen flach im imagesDir.
-///   - Metadaten in einer separaten image_cache.db (NICHT in catalog.db oder userdata.db,
+///   - Metadaten in einer separaten image_cache.db (NICHT in userdata.db oder bl_cache.db,
 ///     damit Cache-Loeschen die DBs nicht beruehrt).
 ///   - Cache-Limit wird ueber ISettingsService abgefragt – LRU-Eviction reduziert den Cache
 ///     auf 90% des Limits, damit nach jedem Add nicht sofort wieder evicted werden muss.
@@ -294,7 +294,7 @@ public class PersistentImageCache : IPersistentImageCache, IDisposable
     // ClearAsync
     // ========================================================================
 
-    public async Task<int> ClearAsync()
+    public Task<int> ClearAsync()
     {
         int deleted = 0;
         List<string> files;
@@ -342,9 +342,10 @@ public class PersistentImageCache : IPersistentImageCache, IDisposable
         catch { /* ignore */ }
 
         StatsChanged?.Invoke(this, EventArgs.Empty);
-        // Async-Signature beibehalten, obwohl wir hier nichts asynchrones tun.
-        await Task.CompletedTask;
-        return deleted;
+        // Async-Signature laut Interface – die Implementierung ist aber synchron
+        // (SQLite + File-IO sind hier ohnehin blockierend). Wrapping mit FromResult
+        // statt async/await spart die State-Machine.
+        return Task.FromResult(deleted);
     }
 
     public void Dispose()

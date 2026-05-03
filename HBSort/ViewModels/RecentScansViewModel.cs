@@ -11,8 +11,8 @@ using Serilog;
 namespace HBSort.ViewModels;
 
 /// <summary>
-/// PROMPT 11: "Letzte Scans"-Tab. Zeigt die juengsten 50 ScanEvents
-/// chronologisch absteigend. Refresht automatisch bei DataChanged.
+/// "Letzte Scans"-Tab. Zeigt die juengsten 50 ScanEvents chronologisch
+/// absteigend. Refresht automatisch bei DataChanged.
 /// </summary>
 public partial class RecentScansViewModel : ObservableObject
 {

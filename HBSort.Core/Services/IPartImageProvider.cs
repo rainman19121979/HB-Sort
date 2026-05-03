@@ -19,8 +19,8 @@ public interface IPartImageProvider
     /// Erste Stufe: BL-URL aus item.external_sites + (optional) BL-Color-ID direkt.
     /// Fallback: Brickognize-Image.
     /// </summary>
-    /// <param name="bricklinkColorId">BL-Color-ID direkt (Brickognize liefert seit
-    /// PROMPT 6 BL-IDs in der "id"-Spalte); null = generic / color=0.</param>
+    /// <param name="bricklinkColorId">BL-Color-ID direkt (Brickognize liefert
+    /// die in der "id"-Spalte); null = generic / color=0.</param>
     Task<string> GetImageFileAsync(BrickognizeItem item, int? bricklinkColorId, CancellationToken ct = default);
 
     /// <summary>

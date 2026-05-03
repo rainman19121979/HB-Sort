@@ -43,10 +43,9 @@ public partial class MainViewModel : ObservableObject
     /// <summary>Lagerliste-Tab (Phase X).</summary>
     public InventoryListViewModel Inventory { get; }
 
-    // PROMPT 11: variables Feld unten rechts (R2,C2) ist jetzt ein TabControl
-    // mit 5 Ansichten. Jede VM ist ein Singleton (siehe DI), refresht sich
-    // selbst per DataChanged-Event - der TabControl muss kein OnSelectedTab-
-    // Refresh triggern.
+    // Variables Feld unten rechts (R2,C2) ist ein TabControl mit 5 Ansichten.
+    // Jede VM ist ein Singleton (siehe DI), refresht sich selbst per
+    // DataChanged-Event - der TabControl muss kein OnSelectedTab-Refresh triggern.
     public BuildSuggestionsViewModel BuildSuggestions { get; }
     public LiveStatsViewModel LiveStats { get; }
     public WaitingDetailViewModel WaitingDetail { get; }
@@ -116,8 +115,8 @@ public partial class MainViewModel : ObservableObject
         _imageCache = imageCache;
         _rateLimiter = rateLimiter;
 
-        // PROMPT 11: letzten Tab-Index aus den Settings laden. Default 0
-        // (= Lagerfaecher). Direkt auf das Backing-Field, damit der
+        // Letzten Tab-Index (variables Feld unten rechts) aus den Settings laden.
+        // Default 0 (= Lagerfaecher). Direkt auf das Backing-Field, damit der
         // OnXxxChanged-Hook nicht direkt beim Laden ein Save triggert.
         var savedTabIndex = settingsService.Current.BottomRightTabIndex ?? 0;
         if (savedTabIndex < 0 || savedTabIndex > 4) savedTabIndex = 0;
@@ -272,9 +271,9 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// PROMPT 11: bei Tab-Wechsel den neuen Index in AppSettings.BottomRightTabIndex
-    /// persistieren. Fire-and-forget: Settings-Save ist async, aber der User wartet
-    /// nicht darauf.
+    /// Bei Tab-Wechsel den neuen Index in AppSettings.BottomRightTabIndex
+    /// persistieren. Fire-and-forget: Settings-Save ist async, aber der User
+    /// wartet nicht darauf.
     /// </summary>
     partial void OnBottomRightSelectedTabIndexChanged(int value)
     {

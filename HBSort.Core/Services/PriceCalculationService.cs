@@ -76,8 +76,11 @@ public class PriceCalculationService : IPriceCalculationService
 
         await Task.WhenAll(new[] { minifigTask }.Concat(partTasks));
 
-        var minifigPrice = minifigTask.Result;
-        var partPrices = partTasks.Select(t => t.Result).ToList();
+        // Nach WhenAll sind alle Tasks abgeschlossen – await liest direkt den
+        // gecachten Wert (kein zweiter Schedule). Lesbarer als .Result.
+        var minifigPrice = await minifigTask;
+        var partPrices = new List<PriceResult?>(partTasks.Count);
+        foreach (var t in partTasks) partPrices.Add(await t);
 
         // Spalte aus Settings ableiten (fuer beide Seiten gleich).
         decimal? PickValue(PriceResult? p) => p == null ? null : cfg.PriceColumn switch

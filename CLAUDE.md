@@ -1,5 +1,77 @@
 # HB-Sort (Klemmbaustein-Sortier-Werkzeug)
 
+## Quick Reference (für Claude Code)
+
+### Häufige Kommandos
+
+```powershell
+# Build (gesamte Solution)
+dotnet build
+
+# Run (WPF-Hauptprojekt)
+dotnet run --project HBSort
+
+# Tests
+dotnet test                                           # alle Tests
+dotnet test --filter "FullyQualifiedName~BlCache"     # einzelne Test-Klasse
+dotnet test --filter "DisplayName=TestMethodName"     # einzelner Test
+
+# EF Core Migrationen (Startup-Projekt = HBSort, DbContext liegt in HBSort.Core)
+dotnet ef migrations add <Name> --project HBSort.Core --startup-project HBSort
+dotnet ef database update --project HBSort.Core --startup-project HBSort
+
+# Release-Build (Single-File-Exe, self-contained)
+dotnet publish HBSort -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
+```
+
+### Projekt-Struktur (3 Projekte in HBSort.slnx)
+
+- **HBSort/** — WPF-Hauptprojekt (Views, ViewModels, App.xaml.cs mit DI-Container).
+  Einstiegspunkt: `App.xaml.cs::Application_Startup`. Services werden dort in
+  `ConfigureServices()` registriert — neue Services müssen dort eingetragen werden.
+- **HBSort.Core/** — Reine Logik (Models, Services, Database). UI-frei, aber
+  TargetFramework `net8.0-windows` wegen OpenCvSharp + DPAPI. Alle Services
+  haben ein `IXxx.cs`-Interface daneben (Pflicht für Testability).
+- **HBSort.Tests/** — xUnit-Tests gegen Core-Services.
+
+### Zwei Datenbanken, zwei Zugriffsarten
+
+- `userdata.db` — User-Daten (TrackedMinifig, StorageBin, FloatingPart, …) via
+  **EF Core** (`UserDataContext`). Schema-Änderungen brauchen Migrations.
+- `bl_cache.db` — BL-Stammdaten + Bulk-Import + Rate-Limiter-Log via
+  **Microsoft.Data.Sqlite** (raw ADO.NET). Schema in
+  `HBSort.Core/Database/BlCacheSchema.sql` (Embedded Resource, beim ersten
+  Start ausgeführt). `CREATE TABLE IF NOT EXISTS`-Style — einfache Erweiterungen
+  brauchen keine separate Migration.
+
+### AppData-Ort (zum Zurücksetzen / Inspizieren)
+
+```
+%APPDATA%\HBSort\
+  userdata.db          ← EF, kann gelöscht werden (App legt neu an)
+  bl_cache.db          ← BL-Cache (löschen erzwingt Bulk-Reimport)
+  settings.json        ← inkl. DPAPI-verschlüsselter BL-Tokens
+  logs\app-*.log       ← Serilog, 30 Tage rolling
+```
+
+Beim App-Start läuft eine Auto-Migration vom alten Pfad
+`%APPDATA%\LegoMinifigSorter\` (siehe `App.xaml.cs::MigrateLegacyAppDataIfNeeded`).
+
+### Konventionen die sich nicht aus dem Code ergeben
+
+- **Service-Pattern**: Jeder neue Service braucht ein `IXxx.cs`-Interface
+  daneben + Registrierung in `App.xaml.cs::ConfigureServices`. Default ist
+  `AddSingleton`; ViewModels für Dialoge sind `AddTransient`.
+- **Persistence-Änderungen**: Methoden in `IMinifigPersistenceService` /
+  `IStorageBinService` müssen `DataChanged` feuern, damit die Live-VMs
+  (BuildSuggestions, LiveStats, WaitingDetail, RecentScans) refreshen.
+- **Async-Pflicht**: Alle DB- und API-Calls sind `async`. UI darf nie blockieren
+  (sonst friert die WPF-Pipeline ein).
+- **Logs sind tabu für Tokens**: Klartext-BL-Tokens dürfen nie in Logs landen,
+  auch nicht auf Debug-Level.
+
+---
+
 ## Migrations-Notiz PROMPT 6 (2026-05-02)
 
 Rebrickable komplett entfernt. catalog.db, ICatalogService,
@@ -463,12 +535,12 @@ URL-Patterns: siehe **`BRICKOGNIZE_API.md`**.
 
 ## ColorMapping.cs
 
-Die generierte `ColorMapping.cs` (Rebrickable ↔ BrickLink) bleibt als
-statische Tabelle im Code, wird aber im Hauptfluss nicht mehr genutzt.
-
-PROMPT 6 (2026-05-02): Validierung hat ergeben, dass Brickognize in der
-"id"-Spalte von `colors[]` BL-Color-IDs direkt liefert (id=5 = Red,
-was BL-ID Red ist). Daher kein RB→BL-Mapping mehr noetig.
+`HBSort.Core/Services/ColorMapping.cs` ist eine statisch generierte
+RB↔BL-Tabelle (271 Eintraege, 178 mit BL-Mapping). Wird im Hauptfluss
+nicht mehr verwendet — Brickognize liefert in der `id`-Spalte von
+`colors[]` BL-Color-IDs direkt (validiert 2026-05-02, id=5 = Red = BL-Red).
+Datei bleibt als Reserve fuer kuenftige Reverse-Konversionen im Code,
+nur noch von `HBSort.Tests/ColorMappingTests.cs` referenziert.
 
 ## User-Daten-Schema (in `userdata.db`, via EF Core)
 
@@ -670,21 +742,15 @@ HBSort.sln
 │   │   ├── ICameraService / CameraService.cs
 │   │   ├── IBrickognizeClient / BrickognizeClient.cs
 │   │   ├── IExternalIdResolver / ExternalIdResolver.cs
-│   │   ├── ColorMapping.cs (statisch generiert)
-│   │   │
-│   │   ├── IBricklinkClient / BricklinkClient.cs ★ NEU
+│   │   ├── ColorMapping.cs (Legacy-Tabelle, im Hauptfluss ungenutzt)
+│   │   ├── IBricklinkClient / BricklinkClient.cs
 │   │   │     OAuth1, BricklinkSharp-Wrapper
-│   │   ├── IBricklinkTokenStorage / BricklinkTokenStorage.cs ★ NEU
+│   │   ├── IBricklinkTokenStorage / BricklinkTokenStorage.cs
 │   │   │     DPAPI-Encrypt/Decrypt der Tokens
-│   │   ├── IBlCatalogService / BlCatalogService.cs ★ NEU
+│   │   ├── IBlCatalogService / BlCatalogService.cs
 │   │   │     Cache-First-Lookup gegen bl_cache.db, Fallback BL-API
-│   │   ├── IBlCacheRepository / BlCacheRepository.cs ★ NEU
+│   │   ├── IBlCacheRepository / BlCacheRepository.cs
 │   │   │     Direkt-SQLite-Zugriff auf bl_cache.db
-│   │   │
-│   │   │ (PROMPT 6 2026-05-02: ICatalogService, CatalogService,
-│   │   │  ICatalogImporter, CatalogImporter, IMinifigLookupService und
-│   │   │  MinifigLookupService entfernt.)
-│   │   │
 │   │   ├── IMatchingService / MatchingService.cs
 │   │   ├── IPriceProvider / DummyPriceProvider.cs
 │   │   ├── IBsxExporter / BsxExporter.cs
@@ -695,63 +761,23 @@ HBSort.sln
 │       ├── UserDataContext.cs (EF Core)
 │       └── Migrations/
 │
-├── HBSort.Build/            (DEPRECATED - wird entfernt)
-│
 └── HBSort.Tests/            (xUnit)
-    ├── BricklinkClientTests.cs ★ NEU
-    ├── BlCatalogServiceTests.cs ★ NEU
-    ├── BlCacheRepositoryTests.cs ★ NEU
-    └── ... (bestehende Tests)
 ```
 
-## Refactoring-Phasen (NEU)
+## Refactoring-Phasen R1-R4 ✅ (abgeschlossen)
 
-Wir setzen das Refactoring in 4 Etappen um:
-
-### Phase R1 – BL-Tokens & Auth (Settings)
-- BricklinkSharp NuGet-Paket einbinden
-- `IBricklinkTokenStorage` mit DPAPI-Encrypt/Decrypt
-- Settings-Tab "BrickLink-API":
-  - 4 PasswordBox-Felder (ConsumerKey, ConsumerSecret, TokenValue, TokenSecret)
-  - "Tokens speichern" Button → DPAPI-Encrypt → settings.json
-  - "Verbindung testen" Button → testet GetItem(Minifig, "arc007")
-  - Status-Anzeige (Tokens-OK + IP-Whitelist OK + Last-Test-Result)
-- `IBricklinkClient` als Wrapper um BricklinkSharp:
-  - Lazy-Init: erst initialisieren wenn Tokens vorhanden
-  - Bei fehlenden Tokens: deutliche Exception "Tokens nicht konfiguriert"
-- **Ziel**: User kann Tokens eingeben + Test-Button funktioniert
-
-### Phase R2 – BL-Cache + BlCatalogService
-- `bl_cache.db` mit Schema anlegen (Microsoft.Data.Sqlite)
-- `IBlCacheRepository`: CRUD auf bl_cache-Tabellen
-- `IBlCatalogService` mit Methoden:
-  - `GetMinifigDetailsAsync(string blMinifigId)` → MinifigDetails (gecached)
-  - `GetMinifigPartsAsync(string blMinifigId)` → List<BlSubset> (gecached)
-  - `GetPartDetailsAsync(string blPartNo)` → PartDetails
-  - `GetColorsAsync()` → komplette BL-Color-Liste (1x holen, lebenslang gecached)
-  - Cache-Strategie: Stale-While-Revalidate
-- **Ziel**: Service kann eine Minifigur lookuppen, Daten landen im Cache,
-  zweiter Call kommt aus Cache
-
-### Phase R3 – Phase 3 final (Modus A komplett)
-- ScanViewModel: Brickognize-BL-ID → BlCatalogService aufrufen
-- MinifigDetailView mit Teileliste aus BL-Subsets
-- Bilder via BricklinkImageProvider (war schon da)
-- Reverse-Match Floating-Parts
-- TrackedMinifig speichert BL-ID
-- **Ziel**: Test mit Arctic-Forscher (arc007), Deathstroke-Minifig sichtbar
-  mit Teileliste
-
-### Phase R4 – Cleanup ✅ (PROMPT 6, 2026-05-02)
-- catalog.db.csproj-Embedded-Resources ENTFERNT
-- ICatalogService / CatalogService / ICatalogImporter / CatalogImporter
-  GELOESCHT
-- IMinifigLookupService / MinifigLookupService GELOESCHT
-- SplashWindow / SplashViewModel (Catalog-Erstinit) GELOESCHT
-- seed-data/ + HBSort.Core/Resources/CatalogSeed/ GELOESCHT (~16.6 MB)
-- ColorMatch nutzt bl_colors statt catalog.db
-- Brickognize-Color-id wird direkt als BL-Color-ID interpretiert
-- HBSort.Build bleibt als 3-Zeilen-Stub (keine Funktion mehr)
+- **R1 – BL-Tokens & Auth** ✅: `IBricklinkTokenStorage` (DPAPI),
+  `IBricklinkClient`-Wrapper (lazy), Settings-Tab "BrickLink-API" mit
+  PasswordBox-Feldern + Test-Button.
+- **R2 – BL-Cache** ✅: `bl_cache.db` + `IBlCacheRepository` (raw SQLite) +
+  `IBlCatalogService` (Cache-First, Stale-While-Revalidate).
+- **R3 – Modus A komplett** ✅: ScanViewModel routet Brickognize-BL-ID
+  durch BlCatalogService, MinifigDetailView zeigt Subsets, Reverse-Match
+  Floating-Parts beim Speichern.
+- **R4 – Cleanup** ✅ (PROMPT 6, 2026-05-02): Rebrickable-Catalog (catalog.db,
+  ICatalogService, CatalogImporter, MinifigLookupService, SplashWindow,
+  seed-data/) komplett entfernt; ColorMatch nutzt jetzt bl_colors;
+  Brickognize-Color-id wird direkt als BL-Color-ID interpretiert.
 
 ## Bisherige Phasen 1-2.5 (bleiben gueltig)
 
@@ -762,183 +788,21 @@ Wir setzen das Refactoring in 4 Etappen um:
 
 ## Phase 4-8 (unveraendert in der Logik, aber mit BL-IDs)
 
-### Phase 4 – Lagerfach-Verwaltung
-
-**Ziel**: User kann Lagerfaecher anlegen, ein Fach pro gescannter
-Minifigur zuweisen und mehrere Figuren + Floating-Parts pro Fach
-verwalten.
-
-#### Datenmodell (bereits in CLAUDE.md User-Daten-Schema)
-
-`StorageBin`:
-- Id (int)
-- Label (string, eindeutig) - z.B. "Box 01", "Schale A", "Box-1-rot"
-- CreatedAt (DateTime)
-- FreedAt (DateTime?) - gesetzt wenn User explizit "Fach leeren" klickt
-- Notes (string?, optional vom User)
-
-#### Bulk-Create-Dialog
-
-Layout:
-```
-+------------------------------------------------+
-|  Lagerfaecher anlegen                          |
-+------------------------------------------------+
-|  Praefix:    [Box ]                            |
-|                                                |
-|  [Erweitert v]                                 |
-|    Suffix (optional): [    ]                   |
-|                                                |
-|  Typ:        (•) Zahlen   ( ) Buchstaben       |
-|                                                |
-|  Bereich:    Start [1   ]  Ende [20  ]         |
-|                                                |
-|  Padding:    [3] Stellen  (nur bei Zahlen)     |
-|              0 = ohne Padding                  |
-|                                                |
-|  ----                                          |
-|  Vorschau (3 von 20 Beispielen):               |
-|  -> Box 001                                    |
-|  -> Box 002                                    |
-|  -> Box 003                                    |
-|  ... 17 weitere bis Box 020                    |
-|                                                |
-|  Es werden 20 Lagerfaecher angelegt.           |
-|                                                |
-|              [Abbrechen]  [Anlegen]            |
-+------------------------------------------------+
-```
-
-**Logik:**
-
-- **Zahlen**: Start/Ende sind Integers. Padding 0 = wie eingegeben,
-  Padding N = mit fuehrenden Nullen auf N Stellen (z.B. Padding 3 →
-  "001", "099", "100"). Padding nicht relevant fuer Zahlen >= Padding-Stellen.
-- **Buchstaben**: Start/Ende sind Strings (A-Z, AA-ZZ, AAA-ZZZ usw.).
-  System erkennt Laenge und zaehlt alphabetisch hoch. Bei
-  unterschiedlich langen Start/Ende (z.B. Start "Z", Ende "BB") wird
-  korrekt fortgesetzt: Z, AA, AB, ..., AZ, BA, BB.
-- **Suffix**: optional, wird einfach hinten angefuegt. "Box-001-rot",
-  "Box-002-rot" usw.
-- **Vorschau**: zeigt erste 3 + Hinweis "X weitere", aktualisiert sich
-  live waehrend der Eingabe.
-- **Validation**:
-  - Start <= Ende
-  - Praefix kann leer sein (rein numerische Bezeichnungen erlaubt)
-  - Bei zu vielen (>1000) Faechern: Bestaetigungs-Dialog
-  - Existierende Labels: Konflikt-Pruefung, Bulk-Anlegen mit Duplikat
-    nicht moeglich, Liste der Konflikte anzeigen
-
-**Implementierung Buchstaben-Increment:**
-```csharp
-// "A" -> "B", "Z" -> "AA", "AZ" -> "BA", "ZZ" -> "AAA"
-public static string IncrementAlpha(string s)
-{
-    if (string.IsNullOrEmpty(s)) return "A";
-    var chars = s.ToUpperInvariant().ToCharArray();
-    for (int i = chars.Length - 1; i >= 0; i--)
-    {
-        if (chars[i] < 'Z')
-        {
-            chars[i]++;
-            return new string(chars);
-        }
-        chars[i] = 'A';
-    }
-    return "A" + new string(chars);
-}
-```
-
-#### Einzeln-Anlegen-Dialog
-
-Einfacher: nur ein Textfeld + OK/Abbrechen. Validation: Label nicht leer,
-nicht bereits vorhanden.
-
-#### BinManagerView (Settings-Tab "Lagerfaecher")
-
-Liste aller Faecher mit:
-- Label
-- Status: Frei (gruen) / Belegt: X Figuren + Y Floating-Parts (orange)
-- CreatedAt
-- Aktionen: "Umbenennen", "Fach leeren" (mit Bestaetigung), "Loeschen"
-  (nur moeglich wenn frei)
-
-Buttons: "+ Bulk anlegen" / "+ Einzeln anlegen"
-
-#### Lagerfach-Auswahl beim Minifigur-Scan
-
-In der MinifigDetailView (statt Phase-4-Platzhalter):
-
-```
-Lagerfach: [Box 03 (frei)         v]   [Verwerfen]  [In Fach legen]
-
-Dropdown-Inhalt:
-  > Box 03 (frei)              ← vorausgewaehlt: naechstes freies
-    Box 04 (frei)
-    Box 05 (frei)
-    ─────────                  ← Trenner
-    Box 01 (Arctic-Forscher)   ← grau, belegt
-    Box 02 (Stormtrooper, 2 F) ← grau, belegt
-```
-
-**Workflow "In Fach legen"-Klick:**
-
-1. Wenn ausgewaehltes Fach FREI: direkt speichern
-2. Wenn ausgewaehltes Fach BELEGT: Bestaetigungs-Dialog
-   ```
-   "Box 01" ist bereits belegt mit:
-   - Arctic-Forscher (3 Teile)
-   
-   Trotzdem die neue Figur (Train-Worker) dort ablegen?
-   [Abbrechen] [Trotzdem ablegen]
-   ```
-3. Bei Bestaetigung: TrackedMinifig + TrackedMinifigPart in userdata.db
-   speichern, mit StorageBinId = ausgewaehltes Fach
-4. Reverse-Match: existierende Floating-Parts mit passenden 
-   BricklinkPartNo + BricklinkColorId werden der neuen Figur 
-   zugeordnet (QuantityCollected hochgezaehlt)
-5. Toast "Figur 'XYZ' in Box 01 abgelegt (2 Teile bereits vorhanden)"
-
-#### Fach-Frei-Status
-
-- Lagerfaecher bleiben **belegt** auch wenn alle Figuren COMPLETE/
-  DISMANTLED/SOLD sind
-- Nur durch expliziten Klick "Fach leeren" werden sie frei
-- Beim Fach-Leeren: alle TrackedMinifigs mit StorageBinId = X werden
-  auf StorageBinId=NULL gesetzt (sie bleiben in der DB, aber ohne Fach)
-- Floating-Parts werden ebenfalls aus dem Fach geloescht
-- StorageBin.FreedAt wird auf jetzt gesetzt
-
-#### Wartende-Figuren-Liste (rechte Spalte des Hauptfensters)
-
-Zeigt alle TrackedMinifig mit Status=WAITING, gruppiert nach Lagerfach:
-
-```
-WARTENDE FIGUREN
-
-▼ Box 01
-  [Bild] Arctic-Forscher      (2 von 3 Teilen)
-  [Bild] Stormtrooper         (1 von 5 Teilen)
-
-▼ Box 03
-  [Bild] Train-Worker         (0 von 5 Teilen)
-
-▼ (ohne Fach)
-  [Bild] Sammler-Figur        (3 von 4 Teilen)
-```
-
-Click auf eine Zeile: oeffnet die Detail-Ansicht der Figur (read-only,
-in Phase 6 spaeter editierbar).
-
-#### Tests
-
-- StorageBin Bulk-Anlegen mit verschiedenen Padding/Praefix/Suffix
-- Buchstaben-Increment: A→B, Z→AA, AZ→BA, ZZ→AAA
-- Konflikt-Pruefung beim Bulk-Anlegen
-- Lagerfach-Auswahl + Speichern eines TrackedMinifig
-- Reverse-Match Floating-Parts beim Speichern
-- Fach-Leeren setzt FreedAt + entfernt Bin-Zuweisung der Minifigs
-- Wartende-Figuren-Liste gruppiert korrekt
+### Phase 4 – Lagerfach-Verwaltung ✅
+- `StorageBin` (Label, FreedAt-Flag) + `IStorageBinService` (Bulk-Anlegen
+  mit Praefix/Suffix/Padding, Buchstaben-Inkrement A→B→…→Z→AA→…, siehe
+  `BinNameGenerator` + Tests).
+- BinManagerView im Settings-Tab "Lagerfaecher": Liste mit Belegt/Frei-
+  Status, Umbenennen, "Fach leeren", Loeschen (nur wenn frei).
+- Lagerfach-Auswahl in MinifigDetailView: Dropdown mit freien Faechern
+  zuerst + Trennlinie + belegten Faechern; bei "Belegt"-Auswahl
+  Bestaetigungs-Dialog. Reverse-Match Floating-Parts laeuft beim
+  Speichern automatisch.
+- **Wichtig**: Faecher bleiben **belegt** auch wenn alle Figuren
+  COMPLETE/DISMANTLED/SOLD sind. Nur expliziter Klick "Fach leeren"
+  setzt `StorageBin.FreedAt` und loest alle Minifig-Zuweisungen.
+- Wartende-Figuren-Liste (rechte Spalte) gruppiert nach Lagerfach;
+  Klick oeffnet Read-Only-Detail.
 
 ### Phase 5 – Matching-Logik (Modus B)
 [wie gehabt, MatchingService nutzt BL-Part-No + BL-Color-ID]
@@ -988,8 +852,16 @@ Umbau der `WaitingMinifigsViewModel`-Klasse.
 - `IStorageBinService.FindEmptyOccupiedBinsAsync` + `ReleaseBinsAsync`
   fuer den Bin-Freigabe-Pfad.
 - `AppSettings.BsxExportFolder` wird beim ersten Export auf den vom User
-  gewaehlten Ordner persistiert; im Statistik-Tab gibt es eine
-  "BSX-Export"-Sektion zum Aendern des Default-Ordners.
+  gewaehlten Ordner persistiert.
+- Der Default-Ordner ist auch in den Einstellungen unter dem eigenen
+  Tab **"Export"** aenderbar (`SettingsWindow.xaml`, neuer TabItem
+  zwischen "Statistik" und "Info"). UI: read-only TextBox + Buttons
+  "Ordner waehlen..." / "Zuruecksetzen". Aenderungen werden ueber
+  `SettingsViewModel.SaveBsxExportFolderImmediatelyAsync(...)` SOFORT
+  in settings.json geschrieben (nicht erst beim "Speichern"-Button) -
+  damit der naechste BsxExportDialog den neuen Pfad sieht. Der
+  Default-Pfad ist als statische Property `DefaultBsxExportFolder`
+  (= Documents\HBSort-Export\) im VM exponiert.
 
 NICHT in Phase 7 (bewusst weggelassen):
 - Status=Sold (Export ist die Uebergabe ans richtige Lagersystem; eine

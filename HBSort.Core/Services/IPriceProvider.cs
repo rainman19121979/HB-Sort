@@ -20,7 +20,7 @@ public interface IPriceProvider
 
     /// <summary>
     /// Holt einen Preis-Datensatz fuer ein Teil. <paramref name="blColorId"/>
-    /// muss die BL-Color-ID sein (PROMPT 6: Brickognize liefert direkt BL-IDs).
+    /// muss die BL-Color-ID sein (Brickognize liefert die direkt).
     /// </summary>
     Task<PriceResult?> GetPartPriceAsync(string blPartNo, int blColorId, CancellationToken ct = default);
 }

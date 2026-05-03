@@ -123,9 +123,9 @@ public partial class WaitingMinifigsViewModel : ObservableObject
 
             IsEmpty = Bins.Count == 0;
 
-            // Footer zeigt Fach-Anzahl + Wartende-Total. Komplette Figuren sind seit
-            // PROMPT 10 nur noch in der Lagerliste sichtbar (klare Trennung Sortier-
-            // Workflow vs. Verwaltung).
+            // Footer zeigt Fach-Anzahl + Wartende-Total. Komplette Figuren sind
+            // nur in der Lagerliste sichtbar (klare Trennung Sortier-Workflow
+            // vs. Verwaltung).
             var totalWaiting = waiting.Count;
             var binText = FilterMode == BinOverviewFilter.OccupiedOnly
                 ? $"{Bins.Count} belegte(s) Fach(/Faecher)"

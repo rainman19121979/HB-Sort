@@ -17,8 +17,6 @@ namespace HBSort.ViewModels;
 /// ViewModel für den Einstellungen-Dialog.
 /// Zeigt die aktuellen Settings an und lässt den User sie ändern.
 /// Änderungen werden erst beim Klick auf "Speichern" übernommen.
-///
-/// PROMPT 6 (2026-05-02): Tab "Katalog" (Rebrickable) komplett entfernt.
 /// </summary>
 public partial class SettingsViewModel : ObservableObject
 {
@@ -222,9 +220,6 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private string _rateLimitSaveMessage = string.Empty;
-
-    // PROMPT 6 (2026-05-02): Catalog-Properties (Phase 1.5) entfernt.
-    // Stammdaten kommen jetzt aus bl_cache.db (siehe BlCacheStatsText).
 
     public SettingsViewModel(
         ISettingsService settingsService,
@@ -711,6 +706,39 @@ public partial class SettingsViewModel : ObservableObject
 
     /// <summary>Phase 7: Default-Ordner fuer den BSX-Export.</summary>
     [ObservableProperty] private string _bsxExportFolder = string.Empty;
+
+    /// <summary>
+    /// Default-Pfad fuer BSX-Exporte (Documents\HBSort-Export\).
+    /// Wird im Export-Tab als Hinweis angezeigt und vom "Zuruecksetzen"-Button
+    /// genutzt. Statisch, weil der Pfad nur vom System-Profil abhaengt.
+    /// </summary>
+    public static string DefaultBsxExportFolder => System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+        "HBSort-Export");
+
+    /// <summary>
+    /// Speichert den BSX-Export-Ordner SOFORT in settings.json (ohne den
+    /// "Speichern"-Button zu druecken). Der Export-Tab nutzt das, damit
+    /// der User die Aenderung direkt in den BsxExportDialog sieht.
+    ///
+    /// Annahme: NULL/leer = "auf Default zuruecksetzen" (loescht den Eintrag
+    /// in settings.json, BsxExportDialog faellt dann auf Documents/HBSort-Export
+    /// zurueck).
+    /// </summary>
+    public async Task SaveBsxExportFolderImmediatelyAsync(string? folder)
+    {
+        var trimmed = string.IsNullOrWhiteSpace(folder) ? null : folder.Trim();
+
+        // VM-Property sofort aktualisieren, damit die UI-TextBox refreshed wird.
+        BsxExportFolder = trimmed ?? string.Empty;
+
+        // In die zentrale Settings-Instanz schreiben und persistieren.
+        // Der BsxExportDialog liest beim Oeffnen direkt aus _settings.Current.BsxExportFolder
+        // - dadurch greift die Aenderung sofort beim naechsten Export.
+        _settingsService.Current.BsxExportFolder = trimmed;
+        await _settingsService.SaveAsync();
+        Log.Information("BSX-Export-Ordner geaendert auf: {Folder}", trimmed ?? "(Default)");
+    }
 
     // ====================================================================
     // Phase 8: Preise-Tab

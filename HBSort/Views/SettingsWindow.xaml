@@ -1044,29 +1044,8 @@
                                        Text="{Binding CurrentBinsUsedCount}" FontWeight="SemiBold"/>
                         </Grid>
 
-                        <!-- Phase 7: BSX-Export-Einstellungen -->
-                        <Separator Margin="0,16,0,8"/>
-                        <TextBlock Text="BSX-Export"
-                                   FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Export-Ordner:"
-                                       VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <TextBox Grid.Column="1"
-                                     Text="{Binding BsxExportFolder, UpdateSourceTrigger=PropertyChanged}"
-                                     VerticalAlignment="Center"
-                                     ToolTip="Leer = Documents\HBSort-Export\"/>
-                            <Button Grid.Column="2" Content="Aendern..."
-                                    Margin="8,0,0,0" Padding="10,2"
-                                    Click="BrowseBsxFolder_Click"/>
-                        </Grid>
-                        <TextBlock Text="Leer lassen fuer Default: Eigene Dateien\HBSort-Export\"
-                                   FontSize="11" Foreground="Gray" FontStyle="Italic"
-                                   Margin="0,4,0,0"/>
+                        <!-- Phase 7: BSX-Export-Einstellungen sind jetzt in einem eigenen
+                             Tab "Export" (besser auffindbar). Hier nur noch der Hinweis. -->
 
                         <!-- Hint -->
                         <Border Background="#E3F2FD" BorderBrush="#1976D2"
@@ -1080,6 +1059,81 @@
                                 waehrend des Sortier-Workflows.
                             </TextBlock>
                         </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ====================================== -->
+            <!-- TAB: EXPORT (BSX-Export-Standard-Ordner)   -->
+            <!-- ====================================== -->
+            <!--
+                Eigener Tab fuer den BSX-Export-Default-Ordner. Wurde aus dem
+                Statistik-Tab herausgezogen, weil er dort schwer zu finden war.
+                Aenderungen werden SOFORT gespeichert (nicht erst beim "Speichern"-
+                Button), damit der naechste Export ohne Umweg den neuen Pfad nutzt.
+            -->
+            <TabItem Header="Export">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                    <StackPanel MaxWidth="700" HorizontalAlignment="Left">
+
+                        <TextBlock Text="BSX-Export"
+                                   FontSize="16" FontWeight="SemiBold"
+                                   Margin="0,0,0,12"/>
+
+                        <!-- Label + read-only TextBox + zwei Buttons -->
+                        <TextBlock Text="Standard-Ordner fuer BSX-Export:"
+                                   Margin="0,0,0,4"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <!-- TextBox absichtlich read-only: Aenderung nur ueber den
+                                 Ordner-Picker, sonst koennte der User einen ungueltigen
+                                 Pfad eintippen ohne dass wir ihn validieren koennen. -->
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding BsxExportFolder, Mode=OneWay}"
+                                     IsReadOnly="True"
+                                     VerticalAlignment="Center"
+                                     ToolTip="Leer = Default-Ordner Documents\HBSort-Export\"/>
+                            <Button Grid.Column="1" Content="Ordner waehlen..."
+                                    Margin="8,0,0,0" Padding="10,4"
+                                    Click="BrowseBsxFolder_Click"/>
+                            <Button Grid.Column="2" Content="Zuruecksetzen"
+                                    Margin="8,0,0,0" Padding="10,4"
+                                    Click="ResetBsxFolder_Click"
+                                    ToolTip="Setzt den Pfad auf den Default zurueck (Documents\HBSort-Export\)"/>
+                        </Grid>
+
+                        <!-- Hilfetext direkt darunter -->
+                        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Gray"
+                                   Margin="0,8,0,0">
+                            Hier werden BSX-Dateien standardmaessig gespeichert. Beim Export
+                            kann der Ordner pro Export auch noch geaendert werden.
+                        </TextBlock>
+
+                        <!-- Anzeige des Default-Pfades, damit der User sieht
+                             worauf "Zuruecksetzen" zurueckspringt. -->
+                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
+                                   FontStyle="Italic" Margin="0,8,0,0">
+                            <Run Text="Default-Ordner: "/>
+                            <Run Text="{Binding Source={x:Static vm:SettingsViewModel.DefaultBsxExportFolder}, Mode=OneTime}"
+                                 FontFamily="Consolas"/>
+                        </TextBlock>
+
+                        <!-- Hint-Box: erklaert wo der Export ausgeloest wird. -->
+                        <Border Background="#E3F2FD" BorderBrush="#1976D2"
+                                BorderThickness="1" CornerRadius="4"
+                                Padding="12" Margin="0,16,0,0">
+                            <TextBlock TextWrapping="Wrap" FontSize="12">
+                                <Run Text="Hinweis:" FontWeight="SemiBold"/>
+                                Komplette Figuren koennen ueber den "Exportieren"-Button
+                                in der Lagerfach-Uebersicht als BSX-Datei in BrickStore
+                                uebertragen werden.
+                            </TextBlock>
+                        </Border>
+
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

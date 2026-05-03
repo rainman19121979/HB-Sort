@@ -38,7 +38,7 @@
         <!-- ===== OBEN-LINKS (R0,C0): Webcam-Bereich ===== -->
         <Border Grid.Row="0" Grid.Column="0"
                 BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                BorderThickness="1" CornerRadius="4">
+                BorderThickness="1" CornerRadius="4" Padding="8">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>
@@ -107,15 +107,20 @@
                                Margin="0,4,0,0"/>
                 </StackPanel>
 
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled"
-                              Padding="6"
-                              Visibility="{Binding ScanViewModel.HasPendingMinifig,
-                                  Converter={StaticResource BoolToVisibility}}">
-                    <ContentControl DataContext="{Binding ScanViewModel.PendingMinifig}">
-                        <views:MinifigDetailView/>
-                    </ContentControl>
-                </ScrollViewer>
+                <!--
+                    Kein aeusserer ScrollViewer hier! MinifigDetailView hat intern
+                    bereits einen ScrollViewer nur fuer die Teileliste (MaxHeight 320).
+                    Ein zweiter ScrollViewer wuerde dazu fuehren dass die Footer-
+                    Buttons (Verwerfen / In-Fach-legen) aus dem sichtbaren Bereich
+                    scrollen.
+                -->
+                <ContentControl Padding="6"
+                                DataContext="{Binding ScanViewModel.PendingMinifig}"
+                                Visibility="{Binding DataContext.ScanViewModel.HasPendingMinifig,
+                                    RelativeSource={RelativeSource AncestorType=Grid},
+                                    Converter={StaticResource BoolToVisibility}}">
+                    <views:MinifigDetailView/>
+                </ContentControl>
 
                 <!-- PartLookupView kein aeusserer ScrollViewer - die View hat intern
                      einen ScrollViewer fuer den Wartende-/BL-Catalog-Block, damit die
@@ -257,7 +262,13 @@
                                     </Border.Style>
                                     <Grid>
                                         <Grid.RowDefinitions>
-                                            <RowDefinition Height="{DynamicResource CardImageHeight}"/>
+                                            <!--
+                                                Bild-Zeile: "*" statt fixer Hoehe, damit das Bild
+                                                mit dem verfuegbaren Platz mitskaliert und nicht
+                                                abgeschnitten wird wenn das Fenster klein ist.
+                                                MaxHeight begrenzt es nach oben auf 200px.
+                                            -->
+                                            <RowDefinition Height="*"/>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
@@ -266,7 +277,9 @@
                                         <Image Grid.Row="0"
                                                Source="{Binding ImageUrl}"
                                                Stretch="Uniform"
-                                               HorizontalAlignment="Center"/>
+                                               MaxHeight="200"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
 
                                         <TextBlock Grid.Row="1"
                                                    Text="{Binding Name}"

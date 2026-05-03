@@ -7,10 +7,8 @@ namespace HBSort.ViewModels;
 /// <summary>
 /// Eine erkannte Farbe (Brickognize-/predict/parts/-Response).
 /// Enthaelt sowohl die rohen Daten als auch das RGB-Swatch fuer die UI.
-///
-/// PROMPT 6 (2026-05-02): Umgestellt von Rebrickable-catalog.db auf bl_colors.
-/// Brickognize liefert in der "id"-Spalte BL-Color-IDs direkt – kein Mapping
-/// mehr ueber catalog.db.colors / ColorMapping.
+/// Brickognize liefert in der "id"-Spalte BL-Color-IDs direkt – RGB kommt
+/// direkt aus bl_colors, kein RB->BL-Mapping noetig.
 /// </summary>
 public class ColorMatch
 {

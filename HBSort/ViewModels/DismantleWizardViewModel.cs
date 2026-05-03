@@ -108,13 +108,11 @@ public partial class DismantleWizardViewModel : ObservableObject
                 {
                     try
                     {
-                        var blColorId = p.BricklinkColorId ?? p.ColorId;
-                        Log.Information("SmartHint-Lookup: PartNo={PartNo}, ColorId={ColorId}, " +
-                                        "BricklinkColorId={BlColorId}, blColorId-effective={Effective}",
-                            p.PartNumber, p.ColorId, p.BricklinkColorId, blColorId);
+                        Log.Information("SmartHint-Lookup: PartNo={PartNo}, ColorId={ColorId}",
+                            p.PartNumber, p.ColorId);
 
                         var locations = await _partLookup.FindFloatingLocationsAsync(
-                            p.PartNumber, blColorId);
+                            p.PartNumber, p.ColorId);
 
                         Log.Information("SmartHint-Lookup result: {Count} Locations gefunden", locations.Count);
                         foreach (var loc in locations)
@@ -302,7 +300,7 @@ public partial class DismantlePartItemViewModel : ObservableObject
         PartName = p.PartName;
         BlPartNo = p.PartNumber;
         ColorName = p.ColorName;
-        BlColorId = p.BricklinkColorId ?? p.ColorId;
+        BlColorId = p.ColorId;
         QuantityNeeded = p.QuantityNeeded;
         QuantityCollected = p.QuantityCollected;
     }

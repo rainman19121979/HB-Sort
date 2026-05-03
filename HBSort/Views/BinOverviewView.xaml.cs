@@ -8,9 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace HBSort.Views;
 
 /// <summary>
-/// PROMPT 11: Lagerfach-Uebersicht als eigenstaendiges UserControl.
-/// Bisheriger Inhalt + Click-Handler aus SortingView extrahiert; jetzt
-/// als Tab im variablen Feld unten rechts eingebunden.
+/// Lagerfach-Uebersicht als eigenstaendiges UserControl. Wird als Tab im
+/// variablen Feld unten rechts (Sortier-View) eingebunden.
 ///
 /// DataContext = WaitingMinifigsViewModel (vom umschliessenden TabItem gesetzt).
 /// </summary>

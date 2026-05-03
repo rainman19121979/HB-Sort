@@ -295,22 +295,63 @@ public partial class SettingsWindow : Window
     private void PriceProviderBricklink_Click(object sender, RoutedEventArgs e)
         => _viewModel.PriceProvider = "BricklinkApi";
 
-    /// <summary>Phase 7: Ordner-Picker fuer den BSX-Export-Default-Folder.</summary>
-    private void BrowseBsxFolder_Click(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// Phase 7: Ordner-Picker fuer den BSX-Export-Default-Folder.
+    ///
+    /// Wichtig: Im Export-Tab wird die Aenderung SOFORT in settings.json
+    /// gespeichert (per SaveBsxExportFolderImmediatelyAsync), nicht erst
+    /// beim "Speichern"-Button. Damit greift der neue Default direkt beim
+    /// naechsten BsxExportDialog.
+    ///
+    /// Validation: existiert der Ordner nicht (kann passieren wenn man
+    /// einen Pfad waehlt der spaeter geloescht wird), warnen wir den User
+    /// einmal - speichern aber trotzdem, weil der Export den Ordner bei
+    /// Bedarf selbst anlegt (Directory.CreateDirectory in BsxExportDialog).
+    /// </summary>
+    private async void BrowseBsxFolder_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new Microsoft.Win32.OpenFolderDialog
         {
             Title = "BSX-Export-Ordner waehlen"
         };
+        // Wenn schon ein gueltiger Pfad gesetzt ist: dort starten.
         if (!string.IsNullOrWhiteSpace(_viewModel.BsxExportFolder)
             && System.IO.Directory.Exists(_viewModel.BsxExportFolder))
         {
             dlg.InitialDirectory = _viewModel.BsxExportFolder;
         }
-        if (dlg.ShowDialog(this) == true)
+        if (dlg.ShowDialog(this) != true) return;
+
+        var chosen = dlg.FolderName;
+
+        // Defensive Pruefung: existiert der gewaehlte Ordner? Der WPF-Picker
+        // sollte das eigentlich garantieren, aber wir wollen den User
+        // warnen falls ein nicht-mehr-vorhandener Pfad reinkommt.
+        if (!System.IO.Directory.Exists(chosen))
         {
-            _viewModel.BsxExportFolder = dlg.FolderName;
+            MessageBox.Show(
+                $"Der gewaehlte Ordner existiert nicht:\n\n{chosen}\n\n" +
+                "Der Pfad wird trotzdem gespeichert. Beim Export wird der Ordner " +
+                "bei Bedarf automatisch angelegt.",
+                "Ordner nicht gefunden",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+
+        // Sofort speichern (settings.json wird geschrieben, BsxExportDialog
+        // sieht den neuen Pfad beim naechsten Oeffnen direkt).
+        await _viewModel.SaveBsxExportFolderImmediatelyAsync(chosen);
+    }
+
+    /// <summary>
+    /// Phase 7: Setzt den BSX-Export-Ordner auf den Default zurueck
+    /// (Documents\HBSort-Export\). Intern wird das als NULL gespeichert
+    /// damit der BsxExportDialog den Default-Pfad selbst zusammenbaut.
+    /// </summary>
+    private async void ResetBsxFolder_Click(object sender, RoutedEventArgs e)
+    {
+        // NULL = Default. Der BsxExportDialog bildet daraus dann
+        // Documents\HBSort-Export\ (siehe BsxExportDialog.BuildDefaultExportPath).
+        await _viewModel.SaveBsxExportFolderImmediatelyAsync(null);
     }
 
     /// <summary>Gemeinsamer Wrapper: Progress, Toast, Stats-Refresh, Fehler-Handling.</summary>

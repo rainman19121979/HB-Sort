@@ -11,16 +11,8 @@ public class FloatingPart
     /// <summary>Rebrickable-Teilenummer</summary>
     public string PartNumber { get; set; } = string.Empty;
 
-    /// <summary>Farb-ID aus dem Rebrickable-Katalog</summary>
+    /// <summary>BrickLink-Farb-ID (Brickognize liefert die direkt).</summary>
     public int ColorId { get; set; }
-
-    /// <summary>
-    /// BrickLink-Farb-ID (gemappt aus ColorId via ColorMapping). Optional, weil
-    /// nicht jede Rebrickable-Farbe eine BrickLink-Entsprechung hat. Wird beim
-    /// Speichern gleich befuellt, damit der BSX-Export in Phase 7 sie direkt
-    /// uebernehmen kann.
-    /// </summary>
-    public int? BricklinkColorId { get; set; }
 
     /// <summary>Farbname gecacht</summary>
     public string ColorName { get; set; } = string.Empty;

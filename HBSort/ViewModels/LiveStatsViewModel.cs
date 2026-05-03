@@ -10,7 +10,7 @@ using Serilog;
 namespace HBSort.ViewModels;
 
 /// <summary>
-/// PROMPT 11: Live-Stats-Tab im variablen Feld unten rechts.
+/// Live-Stats-Tab im variablen Feld unten rechts.
 /// Aggregiert "Heute" (DailyStats) + "Letzte 7 Tage" + aktueller Bestand.
 /// Refresht automatisch bei jedem DataChanged-Event.
 /// </summary>

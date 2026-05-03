@@ -194,7 +194,6 @@ public class PartLookupService : IPartLookupService
             {
                 PartNumber = blPartNo,
                 ColorId = blColorId,
-                BricklinkColorId = blColorId,
                 ColorName = colorName,
                 PartName = partName,
                 Quantity = quantity,
@@ -324,7 +323,6 @@ public class PartLookupService : IPartLookupService
                 {
                     PartNumber = s.ItemNo,
                     ColorId = s.ColorId,
-                    BricklinkColorId = s.ColorId,
                     PartName = string.Empty, // wird noch nicht gecached pro Item-Name; UI laed live
                     ColorName = color?.Name ?? $"Color {s.ColorId}",
                     QuantityNeeded = s.Quantity,

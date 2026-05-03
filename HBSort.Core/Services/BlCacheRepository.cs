@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Reflection;
 using HBSort.Core.Models.Bricklink;
 using Microsoft.Data.Sqlite;
@@ -286,7 +287,10 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         {
             ItemType = r.GetString(0),
             ItemNo = r.GetString(1),
-            Name = r.GetString(2),
+            // Defensive HTML-Decode: deckt Bestandsdaten ab, die vor dem Boundary-Fix
+            // mit Entities (&#40; statt "(") gespeichert wurden. Auf bereits dekodiertem
+            // Text ist HtmlDecode ein No-Op.
+            Name = WebUtility.HtmlDecode(r.GetString(2)),
             YearReleased = r.IsDBNull(3) ? null : r.GetInt32(3),
             ImageUrl = r.IsDBNull(4) ? null : r.GetString(4),
             Weight = r.IsDBNull(5) ? null : r.GetDouble(5),
@@ -556,7 +560,8 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
                 ct.ThrowIfCancellationRequested();
                 result.Add(new BlMinifigSubsetMatch(
                     MinifigBlId: reader.GetString(0),
-                    MinifigName: reader.IsDBNull(1) ? null : reader.GetString(1),
+                    // Defensive HTML-Decode (siehe ReadItem).
+                    MinifigName: reader.IsDBNull(1) ? null : WebUtility.HtmlDecode(reader.GetString(1)),
                     MinifigImageUrl: reader.IsDBNull(2) ? null : reader.GetString(2),
                     QuantityInMinifig: reader.GetInt32(3)));
             }
@@ -582,7 +587,8 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
                 result.Add(new BlColor
                 {
                     ColorId = reader.GetInt32(0),
-                    Name = reader.GetString(1),
+                    // Defensive HTML-Decode (siehe ReadItem).
+                    Name = WebUtility.HtmlDecode(reader.GetString(1)),
                     Rgb = reader.IsDBNull(2) ? null : reader.GetString(2),
                     Type = reader.IsDBNull(3) ? null : reader.GetString(3),
                     FetchedAt = ParseUtc(reader.GetString(4))

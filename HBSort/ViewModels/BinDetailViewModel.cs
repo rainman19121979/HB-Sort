@@ -115,7 +115,11 @@ public partial class BinDetailViewModel : ObservableObject
                     System.Windows.Application.Current?.Dispatcher.Invoke(() => m.ImageUrl = url);
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Best-effort: ohne Bild ist die Liste immer noch nutzbar.
+                Log.Debug(ex, "Bin-Detail: Minifig-Bild konnte nicht geladen werden ({BlId})", m.BricklinkId);
+            }
         }
         // FloatingPart-Bilder mit BL-Color
         foreach (var fp in FloatingParts.ToList())
@@ -128,7 +132,12 @@ public partial class BinDetailViewModel : ObservableObject
                     System.Windows.Application.Current?.Dispatcher.Invoke(() => fp.ImageUrl = url);
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Best-effort: ohne Bild ist die Liste immer noch nutzbar.
+                Log.Debug(ex, "Bin-Detail: Part-Bild konnte nicht geladen werden ({Part}/c={Color})",
+                    fp.BlPartNo, fp.ColorId);
+            }
         }
     }
 }

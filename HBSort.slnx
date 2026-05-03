@@ -1,5 +1,4 @@
 <Solution>
-  <Project Path="HBSort.Build/HBSort.Build.csproj" />
   <Project Path="HBSort.Core/HBSort.Core.csproj" />
   <Project Path="HBSort.Tests/HBSort.Tests.csproj" />
   <Project Path="HBSort/HBSort.csproj" />

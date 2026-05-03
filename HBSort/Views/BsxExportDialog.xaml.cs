@@ -190,8 +190,8 @@ public partial class BsxExportDialog : Window
     {
         try
         {
-            // Vorab-Berechnung ueber den IStorageBinService (saubere Helper-Methode
-            // statt Inline-Loop - PROMPT 10 Schritt 5).
+            // Vorab-Berechnung ueber den IStorageBinService (Helper-Methode
+            // statt Inline-Loop ueber alle Bins).
             var emptyBins = await _binService.FindBinsThatWouldBeEmptyAsync(_minifigIds);
             _emptyBinIdsAfterExport = emptyBins.Select(b => b.Id).ToList();
 
