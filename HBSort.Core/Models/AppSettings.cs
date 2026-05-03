@@ -78,6 +78,14 @@ public class AppSettings
     public string? BsxExportFolder { get; set; }
 
     /// <summary>
+    /// Default-Ordner fuer den BL-Wanted-List-Export. Null = wird auf
+    /// BsxExportFolder zurueckgefallen (oder dessen Default, falls auch null).
+    /// Eigenes Feld weil "Mein Inventar exportieren" und "Was brauche ich noch
+    /// kaufen" konzeptionell verschiedene Workflows sind.
+    /// </summary>
+    public string? WantedListExportFolder { get; set; }
+
+    /// <summary>
     /// Zuletzt gewaehlter Tab im variablen Feld unten rechts (R2,C2)
     /// im Sortier-Tab. 0=Lagerfaecher, 1=Was kann ich bauen?, 2=Live-Stats,
     /// 3=Wartende-Detail, 4=Letzte Scans. Null = noch nie gesetzt -> Default 0.

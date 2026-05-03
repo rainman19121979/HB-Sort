@@ -1,0 +1,97 @@
+<Window x:Class="HBSort.Views.WantedListExportDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.modernwpf.com/2019"
+        ui:WindowHelper.UseModernWindowStyle="True"
+        Title="Wanted-List exportieren"
+        Icon="../Resources/app.ico"
+        Width="560" Height="440"
+        MinWidth="500" MinHeight="380"
+        WindowStartupLocation="CenterOwner">
+    <!--
+        Wanted-List-Export-Dialog: User waehlt Modus (alle Figuren in eine Datei
+        ODER pro Figur eine eigene Datei) und Speicherort. Der eigentliche Export
+        passiert im Code-Behind via IWantedListExportService.
+    -->
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- Headline -->
+            <RowDefinition Height="Auto"/>  <!-- Modus-Auswahl -->
+            <RowDefinition Height="Auto"/>  <!-- Speicherort -->
+            <RowDefinition Height="*"/>     <!-- Status / Vorschau -->
+            <RowDefinition Height="Auto"/>  <!-- Buttons -->
+        </Grid.RowDefinitions>
+
+        <!-- Kopf -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="BrickLink Wanted-List exportieren"
+                       FontSize="18" FontWeight="SemiBold"/>
+            <TextBlock x:Name="SummaryText"
+                       FontSize="12" Foreground="Gray"
+                       Margin="0,2,0,0"
+                       TextWrapping="Wrap"
+                       Text="Wird beim Initialisieren gesetzt."/>
+        </StackPanel>
+
+        <!-- Modus-Auswahl: zwei RadioButtons -->
+        <StackPanel Grid.Row="1" Margin="0,0,0,12">
+            <TextBlock Text="Modus" FontSize="14" FontWeight="SemiBold"
+                       Margin="0,0,0,6"/>
+            <RadioButton x:Name="ModeCombined" Content="Alle wartenden Figuren in eine Datei"
+                         GroupName="ExportMode"
+                         IsChecked="True"
+                         Margin="0,0,0,4"/>
+            <RadioButton x:Name="ModePerMinifig" Content="Pro wartender Figur eine eigene Datei"
+                         GroupName="ExportMode"/>
+        </StackPanel>
+
+        <!-- Speicherort -->
+        <Grid Grid.Row="2" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Grid.ColumnSpan="3"
+                       Text="Speicher-Ordner" FontSize="14" FontWeight="SemiBold"
+                       Margin="0,0,0,6"/>
+
+            <TextBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                     x:Name="FolderBox"
+                     IsReadOnly="True"
+                     VerticalAlignment="Center"
+                     ToolTip="Vorgeschlagener Ordner aus den Einstellungen"/>
+            <Button Grid.Row="1" Grid.Column="2" Content="Aendern..."
+                    Margin="8,0,0,0" Padding="10,4"
+                    Click="BrowseFolder_Click"/>
+        </Grid>
+
+        <!-- Status -->
+        <Border Grid.Row="3"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="1" CornerRadius="4"
+                Padding="10">
+            <TextBlock x:Name="StatusText"
+                       TextWrapping="Wrap"
+                       FontSize="12"/>
+        </Border>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="4" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Abbrechen" IsCancel="True"
+                    Width="100" Margin="0,0,8,0"
+                    Click="Cancel_Click"/>
+            <Button x:Name="ExportButton" Content="Exportieren"
+                    Width="120"
+                    Style="{StaticResource AccentButtonStyle}"
+                    Click="Export_Click"
+                    IsDefault="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -207,6 +207,10 @@ public partial class App : Application
         // Phase 7: BSX-Export
         services.AddSingleton<IBsxExportService, BsxExportService>();
 
+        // BL-Wanted-List-Export (UX-Iteration X.4): generiert Wanted-List-XMLs
+        // aus den fehlenden Teilen wartender Figuren.
+        services.AddSingleton<IWantedListExportService, WantedListExportService>();
+
         // Phase 8: Preise. Beide Provider als Singleton damit der ProviderFactory
         // bei jedem Settings-Wechsel einfach den passenden zurueckgibt - die
         // VMs muessen nichts neu instanziieren.
@@ -237,6 +241,10 @@ public partial class App : Application
 
         // Phase 7: BSX-Export-Dialog
         services.AddTransient<Views.BsxExportDialog>();
+
+        // UX-Iteration X.4: Wanted-List-Export-Dialog (transient – pro Klick eine
+        // neue Instanz, damit Status/Inputs frisch sind).
+        services.AddTransient<Views.WantedListExportDialog>();
 
         // Fenster
         services.AddSingleton<MainWindow>();

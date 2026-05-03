@@ -29,6 +29,17 @@ public partial class InventoryListView : UserControl
     }
 
     /// <summary>
+    /// Wanted-List-Export-Button: oeffnet den Export-Dialog. Der Dialog kuemmert
+    /// sich um Modus-Auswahl, Ordner-Picker und das tatsaechliche Schreiben.
+    /// </summary>
+    private void WantedListExport_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = Service<WantedListExportDialog>();
+        dialog.Owner = Window.GetWindow(this);
+        dialog.ShowDialog();
+    }
+
+    /// <summary>
     /// Phase 7: nach jedem Klick auf eine Komplett-Checkbox den globalen
     /// Counter (SelectedCompleteCount) im VM neu berechnen.
     /// </summary>

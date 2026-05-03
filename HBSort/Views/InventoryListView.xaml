@@ -16,15 +16,20 @@
             <RowDefinition Height="Auto"/>     <!-- 4: Footer -->
         </Grid.RowDefinitions>
 
-        <!-- Header -->
+        <!-- Header: Titel + Wanted-List-Export + Aktualisieren -->
         <Grid Grid.Row="0" Margin="0,0,0,8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock Text="LAGERLISTE"
                        FontSize="18" FontWeight="SemiBold"/>
-            <Button Grid.Column="1" Content="Aktualisieren"
+            <Button Grid.Column="1" Content="Wanted-List exportieren"
+                    Click="WantedListExport_Click"
+                    Padding="8,2" Margin="0,0,8,0"
+                    ToolTip="BrickLink-Wanted-List-XML aus den fehlenden Teilen aller wartenden Figuren erzeugen"/>
+            <Button Grid.Column="2" Content="Aktualisieren"
                     Command="{Binding LoadCommand}" Padding="8,2"/>
         </Grid>
 
