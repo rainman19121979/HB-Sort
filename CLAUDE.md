@@ -872,6 +872,36 @@ Umbau der `WaitingMinifigsViewModel`-Klasse.
   Default-Pfad ist als statische Property `DefaultBsxExportFolder`
   (= Documents\HBSort-Export\) im VM exponiert.
 
+#### Phase 7-Erweiterung: Einzelteile-Export (UX-Iteration X.6, 2026-05-03)
+
+Neben kompletten Figuren koennen jetzt auch lose Einzelteile (FloatingParts)
+exportiert werden. Beides landet in einer einzigen BSX-Datei.
+
+- `IBsxExportService.GenerateBsxAsync` nimmt jetzt zwei ID-Listen
+  (`minifigIds`, `floatingPartIds`). Mindestens eine muss befuellt sein.
+  XML schreibt zuerst die Minifigs (ItemTypeID=M), dann die Einzelteile
+  (ItemTypeID=P, ColorID=blColorId, Qty=fp.Quantity, ColorName aus
+  bl_colors-Cache mit Fallback auf `FloatingPart.ColorName`).
+- `InventoryListView`: Auswahl-Checkbox jetzt auch bei Einzelteilen
+  sichtbar (DataTrigger `Status=Floating`). Wartende bleiben bewusst
+  ohne Checkbox - klare Optik signalisiert "kann nicht exportiert
+  werden". `SelectAllExportable` markiert beide Typen, `Wartend` wird
+  ignoriert.
+- `BsxExportDialog`: zwei getrennte Sektionen "Komplette Figuren (X)"
+  und "Einzelteile (Y)"; leere Sektion wird ausgeblendet. Ein Export
+  + ein Cleanup-Pfad fuer beide.
+- `IMinifigPersistenceService.RemoveExportedFloatingPartsAsync` loescht
+  die FloatingParts und schreibt pro Eintrag einen ScanEvent vom Typ
+  `FloatingPartExported`. ResultDescription enthaelt **Quell-Bin-Label,
+  Part-No, Color-Id und Quantity** als Audit-Trail - damit man die
+  Herkunft auch nach spaeterer Bin-Freigabe nachvollziehen kann.
+- `IStorageBinService.FindBinsThatWouldBeEmptyAsync` bekam optionalen
+  zweiten Parameter `floatingPartIdsToBeRemoved`. Bin gilt als "wird
+  leer" nur wenn alle drin liegenden Minifigs UND alle drin liegenden
+  FloatingParts in den jeweiligen Removal-Listen stehen.
+- Neuer `ScanType.FloatingPartExported` (HasConversion&lt;string&gt;,
+  keine DB-Migration noetig).
+
 NICHT in Phase 7 (bewusst weggelassen):
 - Status=Sold (Export ist die Uebergabe ans richtige Lagersystem; eine
   parallele Sold-Markierung waere doppelte Buchhaltung).
