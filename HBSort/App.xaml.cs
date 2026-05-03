@@ -207,6 +207,10 @@ public partial class App : Application
         // Phase 5: PartLookup (Modus B)
         services.AddSingleton<IPartLookupService, PartLookupService>();
 
+        // UX-Iteration X.4+: FloatingPart->Pending-Minifig-Transfer
+        // (Button "Aus Fach uebernehmen" in der MinifigDetailView).
+        services.AddSingleton<IFloatingPartTransferService, FloatingPartTransferService>();
+
         // Phase 7: BSX-Export
         services.AddSingleton<IBsxExportService, BsxExportService>();
 

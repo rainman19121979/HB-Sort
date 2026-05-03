@@ -30,10 +30,17 @@ public class ScanEvent
 }
 
 /// <summary>
-/// Typ des Scans: Minifigur oder Einzelteil.
+/// Typ des ScanEvents:
+///   MinifigScan / PartScan        - klassische Brickognize-Scans
+///   FloatingPartTransfer          - User uebernimmt ein Teil aus einem
+///                                   Lagerfach in eine wartende oder gerade
+///                                   gescannte Pending-Minifigur (UX X.4+).
+/// HasConversion&lt;string&gt;() in UserDataContext - neue Werte sind ohne
+/// DB-Migration moeglich (TEXT-Spalte).
 /// </summary>
 public enum ScanType
 {
     MinifigScan,
-    PartScan
+    PartScan,
+    FloatingPartTransfer
 }
