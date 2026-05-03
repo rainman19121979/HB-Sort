@@ -150,15 +150,16 @@
                     </ContentControl>
                 </ScrollViewer>
 
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled"
-                              Padding="6"
-                              Visibility="{Binding ScanViewModel.HasPendingPart,
-                                  Converter={StaticResource BoolToVisibility}}">
-                    <ContentControl DataContext="{Binding ScanViewModel.PendingPart}">
-                        <views:PartLookupView/>
-                    </ContentControl>
-                </ScrollViewer>
+                <!-- PartLookupView kein aeusserer ScrollViewer mehr - die View hat
+                     intern einen ScrollViewer fuer den Wartende-/BL-Catalog-Block
+                     (siehe vorheriges Commit), damit die Aktion-Buttons unten
+                     immer sichtbar bleiben. -->
+                <ContentControl DataContext="{Binding ScanViewModel.PendingPart}"
+                                Visibility="{Binding DataContext.ScanViewModel.HasPendingPart,
+                                    RelativeSource={RelativeSource AncestorType=UserControl},
+                                    Converter={StaticResource BoolToVisibility}}">
+                    <views:PartLookupView/>
+                </ContentControl>
             </Grid>
         </Border>
 
