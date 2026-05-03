@@ -92,9 +92,15 @@
                 <ItemsControl ItemsSource="{Binding Parts}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
+                            <!--
+                                Padding-Right=18 reserviert Platz neben der vertikalen
+                                ScrollBar (System-Default ~17px, skaliert mit UI-Density)
+                                damit die Quantity-Spalte rechts nicht mehr darunter
+                                verschwindet. Untere Trenn-Linie laeuft trotzdem durch.
+                            -->
                             <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
                                     BorderThickness="0,0,0,1"
-                                    Padding="6,6,0,6">
+                                    Padding="6,6,18,6">
                                 <Border.Style>
                                     <Style TargetType="Border">
                                         <Setter Property="BorderBrush"
