@@ -73,6 +73,18 @@ public interface IMinifigPersistenceService
     /// (der Tag, an dem die Figur komplett war, bleibt korrekt gezaehlt).
     /// </summary>
     Task<bool> ReopenAsync(int trackedMinifigId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Phase 7: BSX-Export-Cleanup. Entfernt alle uebergebenen Figuren
+    /// aus der DB (RequiredParts via Cascade). FloatingParts mit
+    /// OriginMinifigId in der ID-Liste werden auf null gesetzt (sie
+    /// bleiben als lose Teile bestehen). Schreibt einen ScanEvent als
+    /// Audit-Trail ("BSX-Export: N Figur(en) entfernt"). Liefert die
+    /// Anzahl tatsaechlich entfernter Figuren.
+    /// </summary>
+    Task<int> RemoveExportedMinifigsAsync(
+        IEnumerable<int> minifigIds,
+        CancellationToken ct = default);
 }
 
 /// <summary>Eine Part-Wahl im DismantleWizard.</summary>

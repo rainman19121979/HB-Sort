@@ -210,6 +210,9 @@ public partial class App : Application
         // Phase 5: PartLookup (Modus B)
         services.AddSingleton<IPartLookupService, PartLookupService>();
 
+        // Phase 7: BSX-Export
+        services.AddSingleton<IBsxExportService, BsxExportService>();
+
         // ViewModels
         services.AddSingleton<ViewModels.MainViewModel>();
         services.AddSingleton<ViewModels.ScanViewModel>();
@@ -222,6 +225,9 @@ public partial class App : Application
         // Phase 4: Bin-Dialoge (transient – pro Aufruf eine neue Instanz).
         services.AddTransient<Views.BinCreateDialog>();
         services.AddTransient<Views.BinBulkCreateDialog>();
+
+        // Phase 7: BSX-Export-Dialog
+        services.AddTransient<Views.BsxExportDialog>();
 
         // Fenster
         services.AddSingleton<MainWindow>();

@@ -969,8 +969,33 @@ gruener Markierung) statt als globale Top-Level-Liste. Das passt zur
 existierenden BinOverview-Architektur und vermeidet einen kompletten
 Umbau der `WaitingMinifigsViewModel`-Klasse.
 
-### Phase 7 – Polish, BSX-Export, Build
-[BSX-Export ist jetzt einfacher, da BL-IDs schon da sind]
+### Phase 7 – BSX-Export ✅ (PROMPT 8, 2026-05-03)
+- `IBsxExportService` (HBSort.Core/Services) generiert pro Figur eine
+  ITEM-Zeile (ItemTypeID=M, Qty=1, Status=I/X, Condition=U/N, optionaler
+  Remark). CategoryId wird best-effort aus dem BL-Cache gezogen,
+  Default 65 (Minifig).
+- Multi-Select-Checkbox in der Komplett-Sektion der Lagerfach-Uebersicht;
+  globale Action-Bar mit "Alle Komplette / Keine / Exportieren (n)".
+- `BsxExportDialog` zeigt die Auswahl + Optionen + Speicherort
+  (Default: Documents/HBSort-Export/HBSort-Export-{Datum}.bsx, oder der
+  Ordner aus `AppSettings.BsxExportFolder`).
+- Nach erfolgreichem Schreiben: gruener Cleanup-Block mit Vorab-Berechnung
+  wieviele Faecher leer waeren. User kann waehlen ob Figuren entfernt und
+  ob leere Faecher freigegeben werden sollen.
+- `IMinifigPersistenceService.RemoveExportedMinifigsAsync` loescht die
+  Figuren (FloatingParts mit Origin werden entkoppelt, nicht geloescht)
+  und schreibt einen ScanEvent als Audit-Trail.
+- `IStorageBinService.FindEmptyOccupiedBinsAsync` + `ReleaseBinsAsync`
+  fuer den Bin-Freigabe-Pfad.
+- `AppSettings.BsxExportFolder` wird beim ersten Export auf den vom User
+  gewaehlten Ordner persistiert; im Statistik-Tab gibt es eine
+  "BSX-Export"-Sektion zum Aendern des Default-Ordners.
+
+NICHT in Phase 7 (bewusst weggelassen):
+- Status=Sold (Export ist die Uebergabe ans richtige Lagersystem; eine
+  parallele Sold-Markierung waere doppelte Buchhaltung).
+- Eigene Verlauf-Ansicht (ScanEvents reichen als Audit-Trail; kann
+  spaeter ueber eine Read-only-View sichtbar gemacht werden).
 
 ### Phase 8 – BL-Price-Tracker-Anbindung
 [siehe vorige Doku]

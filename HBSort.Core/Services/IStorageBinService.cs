@@ -56,6 +56,21 @@ public interface IStorageBinService
     /// Liefert die Anzahl ab-gekoppelter Figuren.
     /// </summary>
     Task<int> CleanupStaleBinAssignmentsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Phase 7: liefert alle Faecher die JETZT effektiv leer sind, aber noch nicht
+    /// freigegeben wurden (FreedAt is null + keine Figuren + keine FloatingParts).
+    /// Wird vom BSX-Export-Cleanup benutzt um dem User vorzuschlagen welche Faecher
+    /// freigegeben werden koennen.
+    /// </summary>
+    Task<List<StorageBin>> FindEmptyOccupiedBinsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Phase 7: setzt FreedAt=now fuer die uebergebenen Faecher.
+    /// Pruefen ob die Faecher wirklich leer sind macht der Aufrufer.
+    /// Liefert die Anzahl freigegebener Faecher.
+    /// </summary>
+    Task<int> ReleaseBinsAsync(IEnumerable<int> binIds, CancellationToken ct = default);
 }
 
 /// <summary>Daten-Struktur fuer den BinDetailDialog.</summary>

@@ -287,6 +287,24 @@ public partial class SettingsWindow : Window
         }
     }
 
+    /// <summary>Phase 7: Ordner-Picker fuer den BSX-Export-Default-Folder.</summary>
+    private void BrowseBsxFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "BSX-Export-Ordner waehlen"
+        };
+        if (!string.IsNullOrWhiteSpace(_viewModel.BsxExportFolder)
+            && System.IO.Directory.Exists(_viewModel.BsxExportFolder))
+        {
+            dlg.InitialDirectory = _viewModel.BsxExportFolder;
+        }
+        if (dlg.ShowDialog(this) == true)
+        {
+            _viewModel.BsxExportFolder = dlg.FolderName;
+        }
+    }
+
     /// <summary>Gemeinsamer Wrapper: Progress, Toast, Stats-Refresh, Fehler-Handling.</summary>
     private async Task RunImportAsync(
         INotificationService notif,

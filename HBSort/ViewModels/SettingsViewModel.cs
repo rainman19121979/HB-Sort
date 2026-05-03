@@ -287,6 +287,7 @@ public partial class SettingsViewModel : ObservableObject
         PreloadOnMinifigScan = s.ImageCache.PreloadOnMinifigScan;
         ImageCacheLimitMb = s.ImageCache.LimitMb;
         PriceToolUrl = s.PriceToolUrl;
+        BsxExportFolder = s.BsxExportFolder ?? string.Empty;
 
         // Kameras auflisten
         AvailableCameras = _cameraService.GetAvailableCameras();
@@ -307,6 +308,7 @@ public partial class SettingsViewModel : ObservableObject
         s.ImageCache.PreferBricklinkImages = PreferBricklinkImages;
         s.ImageCache.PreloadOnMinifigScan = PreloadOnMinifigScan;
         s.ImageCache.LimitMb = ImageCacheLimitMb;
+        s.BsxExportFolder = string.IsNullOrWhiteSpace(BsxExportFolder) ? null : BsxExportFolder.Trim();
 
         await _settingsService.SaveAsync();
         Log.Information("Einstellungen gespeichert");
@@ -682,6 +684,9 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private int _currentCompleteCount;
     [ObservableProperty] private int _currentFloatingCount;
     [ObservableProperty] private int _currentBinsUsedCount;
+
+    /// <summary>Phase 7: Default-Ordner fuer den BSX-Export.</summary>
+    [ObservableProperty] private string _bsxExportFolder = string.Empty;
 
     // Bei Wechsel des aktiven Radio-Buttons direkt nachladen.
     partial void OnStatsRangeTodayChanged(bool value)   { if (value) _ = LoadStatsAsync(); }

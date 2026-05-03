@@ -222,6 +222,40 @@ public class StorageBinService : IStorageBinService
         return true;
     }
 
+    public async Task<List<StorageBin>> FindEmptyOccupiedBinsAsync(CancellationToken ct = default)
+    {
+        // Faecher die noch als "in Verwendung" gelten (FreedAt is null), aber
+        // jetzt keine wartenden Figuren UND keine FloatingParts mehr haben.
+        // COMPLETE/DISMANTLED-Figuren blockieren das Fach lt. CLAUDE.md nicht.
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+        return await ctx.StorageBins.AsNoTracking()
+            .Where(b => b.FreedAt == null
+                     && !b.TrackedMinifigs.Any(m => m.Status == TrackedMinifigStatus.Waiting)
+                     && !b.FloatingParts.Any())
+            .OrderBy(b => b.Label)
+            .ToListAsync(ct);
+    }
+
+    public async Task<int> ReleaseBinsAsync(IEnumerable<int> binIds, CancellationToken ct = default)
+    {
+        var ids = binIds?.ToList() ?? new List<int>();
+        if (ids.Count == 0) return 0;
+
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+        var bins = await ctx.StorageBins
+            .Where(b => ids.Contains(b.Id) && b.FreedAt == null)
+            .ToListAsync(ct);
+        if (bins.Count == 0) return 0;
+
+        var now = DateTime.UtcNow;
+        foreach (var b in bins) b.FreedAt = now;
+        await ctx.SaveChangesAsync(ct);
+
+        Log.Information("Lagerfaecher freigegeben: {Count} ({Labels})",
+            bins.Count, string.Join(", ", bins.Select(b => b.Label)));
+        return bins.Count;
+    }
+
     public async Task<int> CleanupStaleBinAssignmentsAsync(CancellationToken ct = default)
     {
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);

@@ -221,6 +221,53 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         return toDelete.Count;
     }
 
+    public async Task<int> RemoveExportedMinifigsAsync(
+        IEnumerable<int> minifigIds, CancellationToken ct = default)
+    {
+        var ids = minifigIds?.ToList() ?? new List<int>();
+        if (ids.Count == 0) return 0;
+
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+
+        // FloatingParts mit Origin auf den zu loeschenden Figuren entkoppeln.
+        // Sie bleiben als lose Teile im Pool bestehen.
+        var origins = await ctx.FloatingParts
+            .Where(fp => fp.OriginMinifigId != null
+                      && ids.Contains(fp.OriginMinifigId.Value))
+            .ToListAsync(ct);
+        foreach (var fp in origins) fp.OriginMinifigId = null;
+
+        var minifigs = await ctx.TrackedMinifigs
+            .Where(m => ids.Contains(m.Id))
+            .ToListAsync(ct);
+
+        var removed = minifigs.Count;
+        if (removed == 0)
+        {
+            // Trotzdem Floating-Origins committen falls welche entkoppelt wurden.
+            if (origins.Count > 0) await ctx.SaveChangesAsync(ct);
+            return 0;
+        }
+
+        ctx.TrackedMinifigs.RemoveRange(minifigs);
+
+        // Audit-Trail (ScanEvent ist die einzige Event-Tabelle die wir haben).
+        ctx.ScanEvents.Add(new ScanEvent
+        {
+            Timestamp = DateTime.UtcNow,
+            Type = ScanType.MinifigScan,
+            ResultDescription = $"BSX-Export: {removed} Figur(en) entfernt",
+            WasUndone = false
+        });
+
+        await ctx.SaveChangesAsync(ct);
+        Log.Information(
+            "BSX-Export-Cleanup: {Count} Figuren geloescht, {Origins} Floating-Parts entkoppelt",
+            removed, origins.Count);
+        DataChanged?.Invoke(this, EventArgs.Empty);
+        return removed;
+    }
+
     public async Task<bool> CheckAndMarkCompleteAsync(int minifigId,
         CancellationToken ct = default)
     {

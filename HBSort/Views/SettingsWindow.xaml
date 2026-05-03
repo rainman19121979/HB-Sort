@@ -872,15 +872,40 @@
                                        Text="{Binding CurrentBinsUsedCount}" FontWeight="SemiBold"/>
                         </Grid>
 
-                        <!-- Hint zum Export -->
+                        <!-- Phase 7: BSX-Export-Einstellungen -->
+                        <Separator Margin="0,16,0,8"/>
+                        <TextBlock Text="BSX-Export"
+                                   FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Export-Ordner:"
+                                       VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding BsxExportFolder, UpdateSourceTrigger=PropertyChanged}"
+                                     VerticalAlignment="Center"
+                                     ToolTip="Leer = Documents\HBSort-Export\"/>
+                            <Button Grid.Column="2" Content="Aendern..."
+                                    Margin="8,0,0,0" Padding="10,2"
+                                    Click="BrowseBsxFolder_Click"/>
+                        </Grid>
+                        <TextBlock Text="Leer lassen fuer Default: Eigene Dateien\HBSort-Export\"
+                                   FontSize="11" Foreground="Gray" FontStyle="Italic"
+                                   Margin="0,4,0,0"/>
+
+                        <!-- Hint -->
                         <Border Background="#E3F2FD" BorderBrush="#1976D2"
                                 BorderThickness="1" CornerRadius="4"
                                 Padding="12" Margin="0,16,0,0">
                             <TextBlock TextWrapping="Wrap" FontSize="12">
                                 <Run Text="Hinweis:" FontWeight="SemiBold"/>
-                                Komplette Figuren koennen spaeter (Phase 7) per BSX-Export
-                                in das eigentliche Lagersystem uebertragen werden. Die App-Faecher
-                                sind nur temporaer waehrend des Sortier-Workflows.
+                                Komplette Figuren koennen ueber den "Exportieren"-Button
+                                in der Lagerfach-Uebersicht als BSX-Datei in BrickStore
+                                uebertragen werden. Die App-Faecher sind nur temporaer
+                                waehrend des Sortier-Workflows.
                             </TextBlock>
                         </Border>
                     </StackPanel>

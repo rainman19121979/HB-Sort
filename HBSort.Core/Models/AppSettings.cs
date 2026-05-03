@@ -69,6 +69,13 @@ public class AppSettings
 
     /// <summary>Zeitpunkt des letzten Update-Checks (max. 1x pro Tag)</summary>
     public DateTime? LastUpdateCheck { get; set; }
+
+    /// <summary>
+    /// Phase 7: Default-Ordner fuer den BSX-Export. Null = Documents/HBSort-Export/.
+    /// Wird beim ersten Export auf den vom User gewaehlten Ordner gesetzt und
+    /// danach als Default fuer kuenftige Exporte vorgeschlagen.
+    /// </summary>
+    public string? BsxExportFolder { get; set; }
 }
 
 /// <summary>
