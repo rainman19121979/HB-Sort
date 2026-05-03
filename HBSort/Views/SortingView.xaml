@@ -412,12 +412,24 @@
                 <RowDefinition Height="35*"/>
             </Grid.RowDefinitions>
 
-            <!-- Obere Box (groesser) -->
+            <!-- Obere Box (groesser) - UX#12: BL-Preise wenn eine Minifig gerade
+                 gescannt ist. Bei Pending-Part oder kein Pending: Box bleibt leer. -->
             <Border Grid.Row="0"
                     BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                    BorderThickness="1" CornerRadius="4"/>
+                    BorderThickness="1" CornerRadius="4"
+                    Padding="8">
+                <ContentControl Content="{Binding ScanViewModel.PriceInfo}"
+                                Visibility="{Binding ScanViewModel.HasMinifigPriceInfo,
+                                    Converter={StaticResource BoolToVisibility}}">
+                    <ContentControl.ContentTemplate>
+                        <DataTemplate>
+                            <views:MinifigPriceView/>
+                        </DataTemplate>
+                    </ContentControl.ContentTemplate>
+                </ContentControl>
+            </Border>
 
-            <!-- Untere Box (kleiner) -->
+            <!-- Untere Box (kleiner) - aktuell leer, Inhalt folgt spaeter -->
             <Border Grid.Row="2"
                     BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                     BorderThickness="1" CornerRadius="4"/>

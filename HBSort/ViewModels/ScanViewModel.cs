@@ -40,6 +40,7 @@ public partial class ScanViewModel : ObservableObject
     private readonly IPartLookupService _partLookup;
     private readonly IDialogService _dialogs;
     private readonly IFloatingPartTransferService _floatingTransfer;
+    private readonly IBlPriceCacheService _priceCache;
 
     private DateTime _lastScanTime = DateTime.MinValue;
     private bool _isFrozen = false;
@@ -149,6 +150,27 @@ public partial class ScanViewModel : ObservableObject
 
     public bool HasPendingMinifig => PendingMinifig != null;
 
+    /// <summary>
+    /// UX#12: Preis-VM fuer die obere rechte Box. Wird beim Pending-Aufbau
+    /// erzeugt und beim Verwerfen/Speichern auf null gesetzt. Visibility in
+    /// der View ueber das Vorhandensein gebunden.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMinifigPriceInfo))]
+    private MinifigPriceViewModel? _priceInfo;
+
+    public bool HasMinifigPriceInfo => PriceInfo != null;
+
+    /// <summary>
+    /// Wenn die Pending-Minifig auf null wechselt (Verwerfen/Persistieren),
+    /// raeumen wir auch die Preis-Anzeige weg. Der "Aufbau" findet beim
+    /// PendingMinifig-Setzen explizit statt - hier nur das Cleanup.
+    /// </summary>
+    partial void OnPendingMinifigChanged(PendingMinifigViewModel? value)
+    {
+        if (value == null) PriceInfo = null;
+    }
+
     /// <summary>Hinweis-Text bei Minifig-Erkennung ohne Catalog-Treffer.</summary>
     [ObservableProperty]
     private string _minifigStatusText = string.Empty;
@@ -180,7 +202,8 @@ public partial class ScanViewModel : ObservableObject
         IMinifigPersistenceService persistenceService,
         IPartLookupService partLookup,
         IDialogService dialogs,
-        IFloatingPartTransferService floatingTransfer)
+        IFloatingPartTransferService floatingTransfer,
+        IBlPriceCacheService priceCache)
     {
         _cameraService = cameraService;
         _settingsService = settingsService;
@@ -196,6 +219,7 @@ public partial class ScanViewModel : ObservableObject
         _partLookup = partLookup;
         _dialogs = dialogs;
         _floatingTransfer = floatingTransfer;
+        _priceCache = priceCache;
 
         _cameraService.FrameReceived += OnFrameReceived;
     }
@@ -772,6 +796,20 @@ public partial class ScanViewModel : ObservableObject
             if (ct.IsCancellationRequested) return;
 
             PendingMinifig = pending;
+
+            // UX#12: Preis-VM fuer die obere rechte Box anlegen + Load starten.
+            // Sub-Tupel mit (PartNo, ColorId, QuantityNeeded, PartName) aus den
+            // BL-Subsets bauen - das VM nutzt das fuer die parallel-Lookups.
+            var priceSubsets = pending.Parts
+                .Select(p => (
+                    PartNo: p.BricklinkPartNo,
+                    ColorId: p.BricklinkColorId,
+                    QuantityNeeded: p.Quantity,
+                    PartName: p.PartName))
+                .ToList();
+            PriceInfo = new MinifigPriceViewModel(_priceCache, bricklinkId, priceSubsets);
+            // Fire-and-forget; das VM hat eigene IsLoading-Flags.
+            _ = PriceInfo.LoadAsync();
 
             if (subsets.Count == 0)
             {
