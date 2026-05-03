@@ -188,42 +188,12 @@ public partial class BsxExportDialog : Window
     /// </summary>
     private async Task ShowCleanupBlockAsync()
     {
-        // Vor dem Cleanup pruefen welche Faecher LEER WAEREN nachdem die Figuren raus sind.
-        // Wir nutzen FindEmptyOccupiedBinsAsync NACH dem Loeschen - aber hier wollen wir
-        // dem User vorab sagen wieviele Faecher leer wuerden. Einfachste Heuristik:
-        // alle Bins mit FreedAt=null die NUR noch unsere Figuren enthalten + keine
-        // FloatingParts haben. Da das in einer einfachen LINQ-Abfrage knifflig ist,
-        // querysn wir einfach nach: Bins die genau die Figuren in der Cleanup-Liste
-        // beherbergen und keine anderen wartenden Figuren / FloatingParts haben.
         try
         {
-            await using var ctx = await _ctxFactory.CreateDbContextAsync();
-            var binIds = await ctx.TrackedMinifigs.AsNoTracking()
-                .Where(m => _minifigIds.Contains(m.Id) && m.StorageBinId != null)
-                .Select(m => m.StorageBinId!.Value)
-                .Distinct()
-                .ToListAsync();
-
-            var candidateBins = await ctx.StorageBins.AsNoTracking()
-                .Where(b => binIds.Contains(b.Id) && b.FreedAt == null)
-                .ToListAsync();
-
-            // Pro Kandidat zaehlen: gibt es nach Loeschung andere wartende Figuren oder
-            // FloatingParts? -> wenn nein, geht der Bin in die "wuerde leer"-Liste.
-            _emptyBinIdsAfterExport = new List<int>();
-            foreach (var b in candidateBins)
-            {
-                var otherWaiting = await ctx.TrackedMinifigs.AsNoTracking()
-                    .Where(m => m.StorageBinId == b.Id
-                             && m.Status == HBSort.Core.Models.TrackedMinifigStatus.Waiting
-                             && !_minifigIds.Contains(m.Id))
-                    .AnyAsync();
-                var hasFloating = await ctx.FloatingParts.AsNoTracking()
-                    .Where(fp => fp.StorageBinId == b.Id)
-                    .AnyAsync();
-                if (!otherWaiting && !hasFloating)
-                    _emptyBinIdsAfterExport.Add(b.Id);
-            }
+            // Vorab-Berechnung ueber den IStorageBinService (saubere Helper-Methode
+            // statt Inline-Loop - PROMPT 10 Schritt 5).
+            var emptyBins = await _binService.FindBinsThatWouldBeEmptyAsync(_minifigIds);
+            _emptyBinIdsAfterExport = emptyBins.Select(b => b.Id).ToList();
 
             CleanupHeader.Text =
                 $"Export erfolgreich ({_minifigIds.Count} Figur(en) -> {Path.GetFileName(_writtenPath)}).";

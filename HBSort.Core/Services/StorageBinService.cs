@@ -222,18 +222,36 @@ public class StorageBinService : IStorageBinService
         return true;
     }
 
-    public async Task<List<StorageBin>> FindEmptyOccupiedBinsAsync(CancellationToken ct = default)
+    public async Task<List<StorageBin>> FindBinsThatWouldBeEmptyAsync(
+        IEnumerable<int> minifigIdsToBeRemoved, CancellationToken ct = default)
     {
-        // Faecher die noch als "in Verwendung" gelten (FreedAt is null), aber
-        // jetzt keine wartenden Figuren UND keine FloatingParts mehr haben.
-        // COMPLETE/DISMANTLED-Figuren blockieren das Fach lt. CLAUDE.md nicht.
+        var idsToRemove = (minifigIdsToBeRemoved ?? Enumerable.Empty<int>()).ToHashSet();
+        if (idsToRemove.Count == 0) return new List<StorageBin>();
+
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
-        return await ctx.StorageBins.AsNoTracking()
-            .Where(b => b.FreedAt == null
-                     && !b.TrackedMinifigs.Any(m => m.Status == TrackedMinifigStatus.Waiting)
-                     && !b.FloatingParts.Any())
-            .OrderBy(b => b.Label)
+
+        // Wir betrachten nur Faecher die ueberhaupt eine der zu loeschenden Figuren
+        // beherbergen UND noch nicht freigegeben sind. Dann pruefen wir, ob nach
+        // dem Cleanup keine Figuren (jeglichen Status) und keine FloatingParts mehr
+        // uebrig waeren.
+        var candidateBinIds = await ctx.TrackedMinifigs.AsNoTracking()
+            .Where(m => idsToRemove.Contains(m.Id) && m.StorageBinId != null)
+            .Select(m => m.StorageBinId!.Value)
+            .Distinct()
             .ToListAsync(ct);
+
+        if (candidateBinIds.Count == 0) return new List<StorageBin>();
+
+        var bins = await ctx.StorageBins.AsNoTracking()
+            .Include(b => b.TrackedMinifigs)
+            .Include(b => b.FloatingParts)
+            .Where(b => b.FreedAt == null && candidateBinIds.Contains(b.Id))
+            .ToListAsync(ct);
+
+        return bins.Where(b =>
+            b.FloatingParts.Count == 0
+            && b.TrackedMinifigs.All(m => idsToRemove.Contains(m.Id))
+        ).OrderBy(b => b.Label).ToList();
     }
 
     public async Task<int> ReleaseBinsAsync(IEnumerable<int> binIds, CancellationToken ct = default)

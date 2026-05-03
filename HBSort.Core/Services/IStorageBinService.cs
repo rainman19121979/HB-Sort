@@ -58,12 +58,13 @@ public interface IStorageBinService
     Task<int> CleanupStaleBinAssignmentsAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// Phase 7: liefert alle Faecher die JETZT effektiv leer sind, aber noch nicht
-    /// freigegeben wurden (FreedAt is null + keine Figuren + keine FloatingParts).
-    /// Wird vom BSX-Export-Cleanup benutzt um dem User vorzuschlagen welche Faecher
-    /// freigegeben werden koennen.
+    /// Phase 7: Vorab-Berechnung fuer den BSX-Export-Cleanup. Liefert die Faecher
+    /// die NACH dem Loeschen der uebergebenen Minifig-IDs leer waeren (FreedAt=null,
+    /// keine wartenden Figuren ausser den uebergebenen, keine FloatingParts).
+    /// Setzt FreedAt NICHT - der Aufrufer entscheidet ob die Faecher freigegeben werden.
     /// </summary>
-    Task<List<StorageBin>> FindEmptyOccupiedBinsAsync(CancellationToken ct = default);
+    Task<List<StorageBin>> FindBinsThatWouldBeEmptyAsync(
+        IEnumerable<int> minifigIdsToBeRemoved, CancellationToken ct = default);
 
     /// <summary>
     /// Phase 7: setzt FreedAt=now fuer die uebergebenen Faecher.

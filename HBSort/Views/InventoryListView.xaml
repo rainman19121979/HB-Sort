@@ -9,44 +9,22 @@
 
     <Grid Margin="12">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>     <!-- 0: Header (Titel + Aktualisieren) -->
+            <RowDefinition Height="Auto"/>     <!-- 1: Filter-Zeile -->
+            <RowDefinition Height="Auto"/>     <!-- 2: Phase 7 Multi-Select-Action-Bar -->
+            <RowDefinition Height="*"/>        <!-- 3: DataGrid -->
+            <RowDefinition Height="Auto"/>     <!-- 4: Footer -->
         </Grid.RowDefinitions>
 
-        <!-- Header + Phase 7: BSX-Export-Aktionen -->
+        <!-- Header -->
         <Grid Grid.Row="0" Margin="0,0,0,8">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Text="LAGERLISTE"
-                       FontSize="18" FontWeight="SemiBold"
-                       VerticalAlignment="Center"/>
-
-            <!-- Mitte: BSX-Export-Aktionen (nur sichtbar wenn es komplette Figuren gibt) -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right"
-                        Margin="0,0,12,0"
-                        Visibility="{Binding HasAnyCompletes, Converter={StaticResource BoolToVisibility}}">
-                <Button Content="Alle Komplette" Padding="6,2" Margin="0,0,4,0"
-                        Command="{Binding SelectAllCompleteCommand}"
-                        ToolTip="Alle komplette Figuren in der aktuellen Sicht auswaehlen"/>
-                <Button Content="Keine" Padding="6,2" Margin="0,0,4,0"
-                        Command="{Binding DeselectAllCompleteCommand}"
-                        ToolTip="Auswahl aufheben"/>
-                <Button Click="ExportSelected_Click" Padding="8,2"
-                        Style="{StaticResource AccentButtonStyle}"
-                        IsEnabled="{Binding HasSelectedCompletes}"
-                        ToolTip="Ausgewaehlte komplette Figuren als BSX exportieren">
-                    <TextBlock>
-                        <Run Text="Exportieren ("/><Run Text="{Binding SelectedCompleteCount, Mode=OneWay}"/><Run Text=")"/>
-                    </TextBlock>
-                </Button>
-            </StackPanel>
-
-            <Button Grid.Column="2" Content="Aktualisieren"
+            <TextBlock Text="LAGERLISTE"
+                       FontSize="18" FontWeight="SemiBold"/>
+            <Button Grid.Column="1" Content="Aktualisieren"
                     Command="{Binding LoadCommand}" Padding="8,2"/>
         </Grid>
 
@@ -89,8 +67,47 @@
             <Button Grid.Column="9" Content="Reset" Click="Reset_Click" Padding="8,2"/>
         </Grid>
 
+        <!-- Phase 7: BSX-Export Multi-Select-Action-Bar (nur sichtbar wenn komplette Figuren existieren) -->
+        <Border Grid.Row="2"
+                Background="#F1F8E9" BorderBrush="#558B2F"
+                BorderThickness="1" CornerRadius="3"
+                Padding="8,6" Margin="0,0,0,8"
+                Visibility="{Binding HasAnyCompletes, Converter={StaticResource BoolToVisibility}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" VerticalAlignment="Center">
+                    <Run Text="Komplette Figuren bereit zum Export."
+                         Foreground="#33691E"/>
+                    <Run Text="Auswahl:" Foreground="#33691E"/>
+                    <Run Text="{Binding SelectedCompleteCount, Mode=OneWay}"
+                         FontWeight="SemiBold" Foreground="#33691E"/>
+                    <Run Text="markiert" Foreground="#33691E"/>
+                </TextBlock>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Content="Alle"
+                            Command="{Binding SelectAllCompleteCommand}"
+                            Padding="8,2" Margin="0,0,4,0"
+                            ToolTip="Alle sichtbaren kompletten Figuren auswaehlen"/>
+                    <Button Content="Keine"
+                            Command="{Binding DeselectAllCompleteCommand}"
+                            Padding="8,2" Margin="0,0,8,0"
+                            ToolTip="Auswahl aufheben"/>
+                    <Button Content="Exportieren"
+                            Click="ExportSelected_Click"
+                            IsEnabled="{Binding HasSelectedCompletes}"
+                            Padding="12,2"
+                            Background="#558B2F" Foreground="White"
+                            FontWeight="SemiBold"
+                            ToolTip="Markierte Figuren als BSX-XML exportieren"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <!-- DataGrid -->
-        <DataGrid Grid.Row="2"
+        <DataGrid Grid.Row="3"
                   ItemsSource="{Binding ItemsView}"
                   AutoGenerateColumns="False"
                   CanUserAddRows="False" CanUserDeleteRows="False"
@@ -213,7 +230,7 @@
         </DataGrid>
 
         <!-- Footer -->
-        <Border Grid.Row="3" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+        <Border Grid.Row="4" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
                 Padding="8,4" CornerRadius="3" Margin="0,8,0,0">
             <TextBlock Text="{Binding SummaryText}" FontSize="12" FontWeight="SemiBold"/>
         </Border>
