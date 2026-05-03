@@ -483,6 +483,48 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         return Task.FromResult(result);
     }
 
+    public Task<List<string>> FindMinifigsContainingPartsAsync(
+        IReadOnlyList<(string PartNo, int ColorId)> parts,
+        CancellationToken ct = default)
+    {
+        if (parts == null || parts.Count == 0)
+            return Task.FromResult(new List<string>());
+
+        // Wir bauen eine OR-Liste mit benannten Parametern. Der Index
+        // idx_bl_subsets_item (item_type, item_no, color_id) traegt jede
+        // einzelne Bedingung; bei vielen Teilen kann das langsam werden,
+        // aber bei realistischen Floating-Pool-Groessen (<100 verschiedene
+        // Teile) ist das vernachlaessigbar.
+        var clauses = new List<string>(parts.Count);
+        for (int i = 0; i < parts.Count; i++)
+            clauses.Add($"(item_no = $p{i} AND color_id = $c{i})");
+
+        var sql = "SELECT DISTINCT parent_no FROM bl_subsets " +
+                  "WHERE parent_type = 'M' AND item_type = 'P' " +
+                  "  AND is_from_supersets = 0 " +
+                  $"  AND ({string.Join(" OR ", clauses)});";
+
+        var result = new List<string>();
+        lock (_lock)
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = sql;
+            for (int i = 0; i < parts.Count; i++)
+            {
+                cmd.Parameters.AddWithValue($"$p{i}", parts[i].PartNo);
+                cmd.Parameters.AddWithValue($"$c{i}", parts[i].ColorId);
+            }
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                ct.ThrowIfCancellationRequested();
+                result.Add(reader.GetString(0));
+            }
+        }
+        return Task.FromResult(result);
+    }
+
     public Task<List<BlMinifigSubsetMatch>> FindMinifigsContainingPartAsync(
         string blPartNo, int blColorId, CancellationToken ct = default)
     {

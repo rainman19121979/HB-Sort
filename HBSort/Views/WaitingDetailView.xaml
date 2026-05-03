@@ -1,0 +1,71 @@
+<UserControl x:Class="HBSort.Views.WaitingDetailView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+        PROMPT 11: Wartende-Detail-Tab. DataContext = WaitingDetailViewModel.
+    -->
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="WARTENDE-DETAIL"
+                   FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Items}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                BorderThickness="1" CornerRadius="4"
+                                Padding="6" Margin="0,2">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="40"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <Image Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+                                       Source="{Binding ImageUrl}"
+                                       Width="36" Height="36" Stretch="Uniform"
+                                       VerticalAlignment="Top"/>
+
+                                <StackPanel Grid.Row="0" Grid.Column="1" Margin="6,0">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                               FontSize="11"/>
+                                    <TextBlock FontSize="10" Foreground="Gray">
+                                        <Run Text="{Binding BinLabel, Mode=OneWay}"/>
+                                        <Run Text=" • "/>
+                                        <Run Text="{Binding MissingCount, Mode=OneWay}"/>
+                                        <Run Text=" Teile fehlen"/>
+                                    </TextBlock>
+                                </StackPanel>
+
+                                <ItemsControl Grid.Row="1" Grid.Column="1"
+                                              ItemsSource="{Binding MissingParts}"
+                                              Margin="6,4,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Label}"
+                                                       FontSize="10" Foreground="#E65100"
+                                                       Margin="0,1"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <TextBlock Grid.Row="2" Text="{Binding SummaryText}"
+                   Foreground="Gray" FontSize="11" Margin="0,4,0,0"/>
+    </Grid>
+</UserControl>

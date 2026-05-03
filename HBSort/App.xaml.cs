@@ -222,6 +222,13 @@ public partial class App : Application
         services.AddSingleton<ViewModels.WaitingMinifigsViewModel>();
         services.AddSingleton<ViewModels.InventoryListViewModel>();
 
+        // PROMPT 11: Variables Feld unten rechts - Singletons damit die VMs auch
+        // dann live bleiben wenn der User auf einen anderen Tab wechselt und zurueck.
+        services.AddSingleton<ViewModels.BuildSuggestionsViewModel>();
+        services.AddSingleton<ViewModels.LiveStatsViewModel>();
+        services.AddSingleton<ViewModels.WaitingDetailViewModel>();
+        services.AddSingleton<ViewModels.RecentScansViewModel>();
+
         // Phase 4: Bin-Dialoge (transient – pro Aufruf eine neue Instanz).
         services.AddTransient<Views.BinCreateDialog>();
         services.AddTransient<Views.BinBulkCreateDialog>();

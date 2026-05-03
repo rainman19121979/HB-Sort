@@ -76,6 +76,13 @@ public class AppSettings
     /// danach als Default fuer kuenftige Exporte vorgeschlagen.
     /// </summary>
     public string? BsxExportFolder { get; set; }
+
+    /// <summary>
+    /// PROMPT 11: zuletzt gewaehlter Tab im variablen Feld unten rechts (R2,C2)
+    /// im Sortier-Tab. 0=Lagerfaecher, 1=Was kann ich bauen?, 2=Live-Stats,
+    /// 3=Wartende-Detail, 4=Letzte Scans. Null = noch nie gesetzt -> Default 0.
+    /// </summary>
+    public int? BottomRightTabIndex { get; set; }
 }
 
 /// <summary>

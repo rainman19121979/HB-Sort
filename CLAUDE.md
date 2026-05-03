@@ -997,6 +997,23 @@ NICHT in Phase 7 (bewusst weggelassen):
 - Eigene Verlauf-Ansicht (ScanEvents reichen als Audit-Trail; kann
   spaeter ueber eine Read-only-View sichtbar gemacht werden).
 
+### Phase X.3 – Variables Feld unten rechts ✅ (PROMPT 11, 2026-05-03)
+- Sortier-Tab unten rechts (R2,C2) ist jetzt ein TabControl mit 5 Ansichten:
+  - **Lagerfaecher** (Default, alte Funktionalitaet als BinOverviewView extrahiert)
+  - **Was kann ich bauen?** - Reverse-Match aus dem Floating-Pool, zeigt
+    BL-Minifigs deren Subsets durch die losen Teile (mind. N% Match) abgedeckt
+    waeren. Slider fuer Min-Match (10..100, Default 50). Bereits getrackte
+    Figuren werden ausgefiltert.
+  - **Live-Stats** - Heute / Letzte 7 Tage / Aktueller Bestand + Streak-Tage.
+  - **Wartende-Detail** - Liste aller wartenden Figuren mit den FEHLENDEN
+    Teilen pro Figur ("3x Helm (Black) [BL:88284]").
+  - **Letzte Scans** - Top-50 ScanEvents chronologisch absteigend.
+- Tab-Auswahl persistiert in `AppSettings.BottomRightTabIndex`.
+- Alle 4 neuen ViewModels sind Singletons + lauschen auf
+  `IMinifigPersistenceService.DataChanged` -> Live-Refresh.
+- Neue Repository-Method `IBlCacheRepository.FindMinifigsContainingPartsAsync`
+  fuer den BuildSuggestions-Reverse-Match (filtert `is_from_supersets=0`).
+
 ### Phase 8 – BL-Price-Tracker-Anbindung
 [siehe vorige Doku]
 

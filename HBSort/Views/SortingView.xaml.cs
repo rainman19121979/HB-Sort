@@ -58,49 +58,9 @@ public partial class SortingView : UserControl
         }
     }
 
-    // ====================================================================
-    // Lagerfach-Uebersicht (R2,C2)
-    // ====================================================================
-
-    private void BinFilterOccupied_Click(object sender, RoutedEventArgs e)
-        => VM?.WaitingMinifigs.SetFilter(BinOverviewFilter.OccupiedOnly);
-
-    private void BinFilterAll_Click(object sender, RoutedEventArgs e)
-        => VM?.WaitingMinifigs.SetFilter(BinOverviewFilter.All);
-
-    private void BinHeader_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button b && b.Tag is BinOverviewItemViewModel item)
-            item.Toggle();
-    }
-
-    private void BinShowDetailFromOverview_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button b || b.Tag is not BinOverviewItemViewModel item) return;
-
-        var binService = Service<IStorageBinService>();
-        var catalog = Service<IBlCatalogService>();
-        var imgProvider = Service<IPartImageProvider>();
-        var vm = new BinDetailViewModel(item.Id, binService, catalog, imgProvider);
-        var dialog = new BinDetailDialog(vm) { Owner = Window.GetWindow(this) };
-        dialog.ShowDialog();
-    }
-
-    private void WaitingMinifig_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button b || b.Tag is not WaitingMinifigViewModel row) return;
-
-        var ctxFactory = Service<Microsoft.EntityFrameworkCore.IDbContextFactory<Core.Database.UserDataContext>>();
-        var binService = Service<IStorageBinService>();
-        var notif = Service<INotificationService>();
-        var persistence = Service<IMinifigPersistenceService>();
-        var imgProvider = Service<IPartImageProvider>();
-        var catalog = Service<IBlCatalogService>();
-
-        var vm = new MinifigSummaryViewModel(row.Id, ctxFactory, binService, imgProvider, catalog);
-        var dialog = new MinifigSummaryDialog(vm, notif, persistence) { Owner = Window.GetWindow(this) };
-        dialog.ShowDialog();
-    }
+    // PROMPT 11: Lagerfach-Click-Handler sind nach BinOverviewView.xaml.cs umgezogen.
+    // Der R2,C2-Bereich ist jetzt ein TabControl - jeder Tab kapselt sein eigenes
+    // UserControl mit eigenen Handlern.
 
     // ====================================================================
     // GridSplitter Persistierung
