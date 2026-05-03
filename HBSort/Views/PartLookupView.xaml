@@ -118,13 +118,14 @@
 
             <Separator Grid.Row="1" Margin="0,8"/>
 
-            <!-- ===== WARTENDE FIGUREN ===== -->
-            <StackPanel Grid.Row="2">
-                <TextBlock FontSize="{DynamicResource DetailFontSize}" FontWeight="SemiBold"
-                           Margin="0,0,0,6">
-                    <Run Text="PASSENDE WARTENDE FIGUREN"/>
-                    <Run Text="("/><Run Text="{Binding WaitingMatches.Count, Mode=OneWay}"/><Run Text=")"/>
-                </TextBlock>
+            <!-- ===== WARTENDE FIGUREN + BL-CATALOG (scrollbar damit Buttons unten immer sichtbar) ===== -->
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock FontSize="{DynamicResource DetailFontSize}" FontWeight="SemiBold"
+                               Margin="0,0,0,6">
+                        <Run Text="PASSENDE WARTENDE FIGUREN"/>
+                        <Run Text="("/><Run Text="{Binding WaitingMatches.Count, Mode=OneWay}"/><Run Text=")"/>
+                    </TextBlock>
 
                 <TextBlock Text="Keine wartende Figur braucht dieses Teil in dieser Farbe."
                            Foreground="Gray" FontStyle="Italic"
@@ -220,7 +221,8 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-            </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
 
             <!-- ===== ALTERNATIVEN-HEADER ===== -->
             <StackPanel Grid.Row="3" Margin="0,12,0,0">
