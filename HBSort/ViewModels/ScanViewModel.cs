@@ -354,8 +354,9 @@ public partial class ScanViewModel : ObservableObject
         // Bild im scans-Ordner archivieren
         await SaveScanImageAsync(snapshot);
 
-        // Freeze-Anzeige (1 Sek) parallel zur API-Anfrage
-        var freezeTask = Task.Delay(_settingsService.Current.FreezeFrameMs);
+        // Kein paralleles Freeze-Delay mehr - die Kamera geht direkt nach der
+        // API-Antwort wieder live (UX-1 FIX 4). Doppelscans werden weiterhin
+        // durch _isFrozen + ScanCooldownMs verhindert.
 
         BrickognizePrediction? prediction = null;
         try
@@ -407,8 +408,6 @@ public partial class ScanViewModel : ObservableObject
             Log.Error(ex, "Brickognize-Aufruf fehlgeschlagen");
             _notifications.ShowError($"Brickognize-Fehler: {ex.Message}");
         }
-
-        await freezeTask;
 
         if (prediction != null)
         {

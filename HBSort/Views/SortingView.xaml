@@ -117,15 +117,21 @@
                     </ContentControl>
                 </ScrollViewer>
 
-                <!-- PartLookupView kein aeusserer ScrollViewer mehr - die View hat
-                     intern einen ScrollViewer fuer den Wartende-/BL-Catalog-Block
-                     (siehe vorheriges Commit), damit die Aktion-Buttons unten
-                     immer sichtbar bleiben. -->
-                <ContentControl DataContext="{Binding ScanViewModel.PendingPart}"
-                                Visibility="{Binding DataContext.ScanViewModel.HasPendingPart,
-                                    RelativeSource={RelativeSource AncestorType=UserControl},
+                <!-- PartLookupView kein aeusserer ScrollViewer - die View hat intern
+                     einen ScrollViewer fuer den Wartende-/BL-Catalog-Block, damit die
+                     Aktion-Buttons unten immer sichtbar bleiben.
+                     Content (statt DataContext) damit Visibility weiter im MainViewModel-
+                     Kontext gebunden bleibt; ContentTemplate setzt den DataContext fuer
+                     die PartLookupView dann ueber den Content auf PendingPart. -->
+                <ContentControl Content="{Binding ScanViewModel.PendingPart}"
+                                Padding="6"
+                                Visibility="{Binding ScanViewModel.HasPendingPart,
                                     Converter={StaticResource BoolToVisibility}}">
-                    <views:PartLookupView/>
+                    <ContentControl.ContentTemplate>
+                        <DataTemplate>
+                            <views:PartLookupView/>
+                        </DataTemplate>
+                    </ContentControl.ContentTemplate>
                 </ContentControl>
             </Grid>
         </Border>
