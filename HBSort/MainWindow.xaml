@@ -4,6 +4,7 @@
         xmlns:ui="http://schemas.modernwpf.com/2019"
         xmlns:tb="http://www.hardcodet.net/taskbar"
         xmlns:views="clr-namespace:HBSort.Views"
+        xmlns:behaviors="clr-namespace:HBSort.Behaviors"
         ui:WindowHelper.UseModernWindowStyle="True"
         Title="HB-Sort"
         Icon="Resources/app.ico"
@@ -158,6 +159,15 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
+
+        <!-- === IMAGE-ZOOM-OVERLAY ===
+             Liegt als oberste Schicht ueber allem (Grid.Row=0..2) damit das
+             Overlay den ganzen Fensterinhalt ueberdeckt. Wird vom
+             ImageZoom-Behavior aktiviert wenn der User auf ein Bild klickt
+             das mit b:ImageZoom.IsEnabled=True markiert ist. -->
+        <behaviors:ZoomOverlayHost x:Name="ZoomOverlay"
+                                   Grid.Row="0" Grid.RowSpan="3"
+                                   Panel.ZIndex="1000"/>
 
         <!-- === TRAY-ICON === -->
         <tb:TaskbarIcon x:Name="TrayIcon"

@@ -1,6 +1,7 @@
 <UserControl x:Class="HBSort.Views.MinifigDetailView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:b="clr-namespace:HBSort.Behaviors">
     <!--
         Phase R3: Detailansicht der erkannten Minifigur (Daten aus BlCatalogService).
         Header mit Bild + Name + BL-ID + Jahr + Anzahl Teile,
@@ -33,6 +34,7 @@
                 </Grid.ColumnDefinitions>
 
                 <Image Grid.Column="0"
+                       b:ImageZoom.IsEnabled="True"
                        Source="{Binding ImageUrl}"
                        Stretch="Uniform"
                        Width="{DynamicResource MinifigImageSize}"
@@ -138,7 +140,8 @@
                                            Stretch="Uniform"
                                            Width="{DynamicResource PartImageSize}"
                                            Height="{DynamicResource PartImageSize}"
-                                           Margin="8,0"/>
+                                           Margin="8,0"
+                                           b:ImageZoom.IsEnabled="True"/>
 
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding PartName}"

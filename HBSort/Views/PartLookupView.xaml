@@ -1,6 +1,7 @@
 <UserControl x:Class="HBSort.Views.PartLookupView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:b="clr-namespace:HBSort.Behaviors">
     <!--
         Phase 5: Detailansicht eines erkannten Teils (Modus B).
         DataContext = PartLookupViewModel.
@@ -29,7 +30,8 @@
                        Source="{Binding ImageUrl}"
                        Stretch="Uniform"
                        Width="100" Height="100"
-                       HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                       HorizontalAlignment="Left" VerticalAlignment="Top"
+                       b:ImageZoom.IsEnabled="True"/>
 
                 <StackPanel Grid.Column="1" Margin="12,0,0,0">
                     <TextBlock Text="ERKANNTES TEIL"
@@ -147,7 +149,8 @@
                                     </Grid.ColumnDefinitions>
 
                                     <Image Grid.Column="0" Source="{Binding ImageUrl}"
-                                           Width="60" Height="60" Stretch="Uniform"/>
+                                           Width="60" Height="60" Stretch="Uniform"
+                                           b:ImageZoom.IsEnabled="True"/>
 
                                     <StackPanel Grid.Column="1" Margin="8,0,8,0" VerticalAlignment="Center">
                                         <TextBlock FontSize="{DynamicResource BodyFontSize}"
