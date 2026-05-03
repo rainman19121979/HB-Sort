@@ -82,6 +82,14 @@ public partial class MainWindow : Window
         Application.Current.Shutdown();
     }
 
+    /// <summary>Header-Tab "Sortieren" geklickt -> MainTabIndex=0.</summary>
+    private void MainTabSorting_Click(object sender, RoutedEventArgs e)
+        => _viewModel.MainTabIndex = 0;
+
+    /// <summary>Header-Tab "Lagerliste" geklickt -> MainTabIndex=1.</summary>
+    private void MainTabInventory_Click(object sender, RoutedEventArgs e)
+        => _viewModel.MainTabIndex = 1;
+
     private void OpenSettings_Click(object sender, RoutedEventArgs e)
     {
         var settingsVm = App.Services.GetRequiredService<SettingsViewModel>();

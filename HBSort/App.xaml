@@ -24,6 +24,53 @@
             <converters:ToastKindToBrushConverter x:Key="ToastKindToBrush"/>
             <converters:BrickognizeStatusToBrushConverter x:Key="BrickognizeStatusToBrush"/>
             <converters:RateLimitStateToBrushConverter x:Key="RateLimitStateToBrush"/>
+
+            <!--
+                MainTabRadioStyle (UX-Iteration X.4): Pivot-/NavigationView-Optik
+                fuer die Haupt-Tabs ("Sortieren" / "Lagerliste") im modernisierten
+                Header. RadioButton wird als grosser Tab-Button ohne Bullet
+                dargestellt; aktiver Tab bekommt einen 3px-Indikator-Balken unten
+                und die Akzent-Farbe.
+            -->
+            <Style x:Key="MainTabRadioStyle" TargetType="RadioButton">
+                <Setter Property="FontSize" Value="16"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Padding" Value="12,8"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderBrush" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="RadioButton">
+                            <Border x:Name="OuterBorder"
+                                    Background="{TemplateBinding Background}"
+                                    Padding="{TemplateBinding Padding}"
+                                    BorderBrush="Transparent" BorderThickness="0,0,0,3"
+                                    CornerRadius="4">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  TextElement.Foreground="{TemplateBinding Foreground}"
+                                                  TextElement.FontWeight="{TemplateBinding FontWeight}"
+                                                  TextElement.FontSize="{TemplateBinding FontSize}"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="OuterBorder" Property="Background"
+                                            Value="{DynamicResource SystemControlBackgroundChromeMediumBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="OuterBorder" Property="BorderBrush"
+                                            Value="{DynamicResource SystemAccentColorBrush}"/>
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource SystemControlForegroundBaseHighBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

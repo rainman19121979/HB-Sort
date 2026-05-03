@@ -54,46 +54,81 @@
                         Width="0" Height="0"
                         HorizontalAlignment="Left" VerticalAlignment="Top"/>
 
-        <!-- === TITELLEISTE === -->
-        <Grid Grid.Row="0" Margin="16,8">
+        <!-- === MODERNER HEADER (UX-Iteration X.4) ===
+             Eine einzige Zeile: Logo+Version (links), Pivot-Tabs (Mitte),
+             Settings-Button (rechts). Inspiriert vom Win11-Settings-/Photos-
+             App-Header. Tabs sind RadioButtons mit dem ToggleSwitchButtonStyle
+             aus ModernWpf - ein dezenter Indikator unter dem aktiven Tab. -->
+        <Grid Grid.Row="0" Margin="16,12,16,4">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Logo links -->
-            <Image Grid.Column="0"
-                   Source="Resources/logo.png"
-                   Width="40" Height="40"
-                   Margin="0,0,12,0"
-                   VerticalAlignment="Center"
-                   ToolTip="HB-Sort - HB-Bricks"/>
-
-            <!-- Titel mit Version -->
-            <TextBlock Grid.Column="1"
-                       FontSize="18" FontWeight="SemiBold"
-                       VerticalAlignment="Center">
-                <Run Text="HB-Sort"/>
-                <Run Text="{Binding VersionText, Mode=OneWay}"
-                     FontSize="12" Foreground="Gray"/>
-            </TextBlock>
-
-            <StackPanel Grid.Column="2" Orientation="Horizontal">
-                <Button Content="Einstellungen" Click="OpenSettings_Click"
-                        ToolTip="Kamera, Schwellwerte und andere Einstellungen"/>
+            <!-- Links: Logo + Titel + Version -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <Image Source="Resources/logo.png"
+                       Width="36" Height="36"
+                       Margin="0,0,12,0"
+                       VerticalAlignment="Center"
+                       ToolTip="HB-Sort - HB-Bricks"/>
+                <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold">
+                    <Run Text="HB-Sort"/>
+                </TextBlock>
+                <TextBlock Text="{Binding VersionText, Mode=OneWay}"
+                           VerticalAlignment="Center"
+                           Margin="8,4,0,0"
+                           FontSize="12" Foreground="Gray"/>
             </StackPanel>
+
+            <!-- Mitte: Pivot-Tabs -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal"
+                        HorizontalAlignment="Center" VerticalAlignment="Bottom">
+                <RadioButton x:Name="TabSortingButton" GroupName="MainTabs"
+                             Style="{StaticResource MainTabRadioStyle}"
+                             IsChecked="{Binding IsMainTabSorting, Mode=OneWay}"
+                             Click="MainTabSorting_Click"
+                             Content="Sortieren"
+                             Margin="0,0,8,0"/>
+                <RadioButton x:Name="TabInventoryButton" GroupName="MainTabs"
+                             Style="{StaticResource MainTabRadioStyle}"
+                             IsChecked="{Binding IsMainTabInventory, Mode=OneWay}"
+                             Click="MainTabInventory_Click"
+                             Content="Lagerliste"/>
+            </StackPanel>
+
+            <!-- Rechts: Settings-Button als Icon + Text -->
+            <Button Grid.Column="2"
+                    VerticalAlignment="Center"
+                    Click="OpenSettings_Click"
+                    Padding="10,6"
+                    ToolTip="Kamera, Schwellwerte und andere Einstellungen">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets"
+                               FontSize="16" VerticalAlignment="Center"
+                               Margin="0,0,6,0"/>
+                    <TextBlock Text="Einstellungen" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
         </Grid>
 
-        <!-- === HAUPTBEREICH: TabControl (Phase X) === -->
-        <TabControl Grid.Row="1" Margin="16,0,16,8">
-            <TabItem Header="Sortieren">
-                <views:SortingView/>
-            </TabItem>
-            <TabItem Header="Lagerliste">
-                <views:InventoryListView DataContext="{Binding Inventory}"/>
-            </TabItem>
-        </TabControl>
+        <!-- Trenn-Linie zwischen Header und Inhalt -->
+        <Border Grid.Row="0" VerticalAlignment="Bottom"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="0,0,0,1"/>
+
+        <!-- === HAUPTBEREICH: ContentControl mit Tab-Inhalten ===
+             Statt eines TabControl nutzen wir ContentControl + DataTrigger,
+             damit die Tab-Optik komplett im modernen Header oben sitzt
+             (TabControl wuerde sonst seinen eigenen Header zeigen). -->
+        <Grid Grid.Row="1" Margin="16,8,16,8">
+            <views:SortingView Visibility="{Binding IsMainTabSorting, Converter={StaticResource BoolToVisibility}}"/>
+            <views:InventoryListView DataContext="{Binding Inventory}"
+                                     Visibility="{Binding DataContext.IsMainTabInventory,
+                                         RelativeSource={RelativeSource AncestorType=Window},
+                                         Converter={StaticResource BoolToVisibility}}"/>
+        </Grid>
 
 
         <!-- === STATUS-LEISTE === -->

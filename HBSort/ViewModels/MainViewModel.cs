@@ -59,6 +59,19 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private int _bottomRightSelectedTabIndex;
 
+    /// <summary>
+    /// Aktuell gewaehlter Haupt-Tab-Index (UX-Iteration X.4): 0=Sortieren, 1=Lagerliste.
+    /// Wird vom modernisierten Header (RadioButton-Pivot) gesteuert. Nicht persistiert -
+    /// beim App-Start beginnen wir immer auf "Sortieren".
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsMainTabSorting))]
+    [NotifyPropertyChangedFor(nameof(IsMainTabInventory))]
+    private int _mainTabIndex = 0;
+
+    public bool IsMainTabSorting   => MainTabIndex == 0;
+    public bool IsMainTabInventory => MainTabIndex == 1;
+
     /// <summary>Toast-Liste fuer das XAML-Binding (ItemsControl).</summary>
     public ObservableCollection<ToastItem> ActiveToasts => _notificationService.ActiveToasts;
 
