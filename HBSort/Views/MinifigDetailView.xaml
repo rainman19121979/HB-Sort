@@ -171,11 +171,50 @@
                                                    Visibility="{Binding IsAlternate, Converter={StaticResource BoolToVisibility}}"/>
                                     </StackPanel>
 
-                                    <TextBlock Grid.Column="3"
-                                               Text="{Binding QuantityLabel}"
-                                               FontSize="{DynamicResource BodyFontSize}"
-                                               VerticalAlignment="Center"
-                                               FontWeight="SemiBold"/>
+                                    <!--
+                                        Quantity-Spalte: zeigt das benoetigte "x N",
+                                        einen Fortschritt "(2/3)" wenn schon teilweise
+                                        gesammelt, und den "Aus Fach uebernehmen"-Button
+                                        falls ein passender FloatingPart existiert.
+                                    -->
+                                    <StackPanel Grid.Column="3" VerticalAlignment="Center"
+                                                HorizontalAlignment="Right">
+                                        <StackPanel Orientation="Horizontal"
+                                                    HorizontalAlignment="Right">
+                                            <TextBlock Text="{Binding QuantityLabel}"
+                                                       FontSize="{DynamicResource BodyFontSize}"
+                                                       FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding QuantityProgressLabel}"
+                                                       FontSize="{DynamicResource DetailFontSize}"
+                                                       Foreground="#2E7D32"
+                                                       FontWeight="SemiBold"
+                                                       Margin="6,0,0,0"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
+
+                                        <!-- "Aus Fach uebernehmen"-Button - nur sichtbar
+                                             wenn FloatingPart vorhanden UND noch was gebraucht wird. -->
+                                        <Button Content="📦 Aus Fach"
+                                                Click="TakeFromBin_Click"
+                                                Tag="{Binding}"
+                                                Margin="0,4,0,0"
+                                                Padding="6,2"
+                                                FontSize="11"
+                                                HorizontalAlignment="Right"
+                                                ToolTip="Ein Exemplar aus dem Lagerfach in diese Figur uebernehmen"
+                                                Visibility="{Binding IsTransferButtonVisible,
+                                                             Converter={StaticResource BoolToVisibility}}"/>
+
+                                        <!-- Bin-Label-Hinweis: "📦 Box 003 (3x)" -->
+                                        <TextBlock FontSize="10" Foreground="Gray"
+                                                   HorizontalAlignment="Right"
+                                                   Margin="0,2,0,0"
+                                                   Visibility="{Binding IsTransferButtonVisible,
+                                                                Converter={StaticResource BoolToVisibility}}">
+                                            <Run Text="{Binding MatchingFloatingPartBinLabel, Mode=OneWay}"/>
+                                            <Run Text=" ("/><Run Text="{Binding MatchingFloatingPartQuantity, Mode=OneWay}"/><Run Text="x)"/>
+                                        </TextBlock>
+                                    </StackPanel>
                                 </Grid>
                             </Border>
                         </DataTemplate>

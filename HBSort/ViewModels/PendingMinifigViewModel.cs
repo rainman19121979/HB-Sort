@@ -155,12 +155,61 @@ public partial class PendingPartViewModel : ObservableObject
     private string? _imageUrl;
 
     /// <summary>
-    /// Phase-3-Anzeige: ob das Teil bereits "abgehakt" ist (gesammelt).
-    /// In Phase R3 nur read-only, in Phase 5 wird das aktivierbar via Reverse-Match
-    /// und Modus-B-Workflow.
+    /// Wieviele Exemplare dieser Sorte hat der User bereits gesammelt
+    /// (manuell angehakt ODER per "Aus Fach uebernehmen"). 0..Quantity.
     /// </summary>
     [ObservableProperty]
-    private bool _isCollected;
+    [NotifyPropertyChangedFor(nameof(IsCollected))]
+    [NotifyPropertyChangedFor(nameof(IsTransferButtonVisible))]
+    [NotifyPropertyChangedFor(nameof(QuantityProgressLabel))]
+    private int _quantityCollected;
+
+    /// <summary>
+    /// "Komplett gesammelt"-Helper. Klick auf die Anhaken-Checkbox setzt
+    /// QuantityCollected entweder auf Quantity (alles markiert) oder auf 0.
+    /// </summary>
+    public bool IsCollected
+    {
+        get => Quantity > 0 && QuantityCollected >= Quantity;
+        set
+        {
+            QuantityCollected = value ? Quantity : 0;
+            // QuantityCollected hat den Notify-Hook auf IsCollected drauf,
+            // also kein extra OnPropertyChanged hier.
+        }
+    }
+
+    /// <summary>
+    /// UX X.4+: Existiert ein passender FloatingPart in irgendeinem Lagerfach?
+    /// Wird beim Laden der Pending-Minifigur einmalig befuellt und nach jedem
+    /// erfolgreichen Transfer neu evaluiert.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsTransferButtonVisible))]
+    private bool _hasMatchingFloatingPart;
+
+    /// <summary>Anzeige-Label "Box 003" fuer den Hinweis neben dem Transfer-Button.</summary>
+    [ObservableProperty]
+    private string? _matchingFloatingPartBinLabel;
+
+    /// <summary>Wieviel Exemplare im Pool liegen (Anzeige-Hinweis, kein Limit).</summary>
+    [ObservableProperty]
+    private int _matchingFloatingPartQuantity;
+
+    /// <summary>
+    /// Visibility-Helper fuer den "Aus Fach uebernehmen"-Button.
+    /// Sichtbar wenn:
+    ///   - Pool hat noch Exemplare verfuegbar (HasMatchingFloatingPart) UND
+    ///   - die Pending-Figur braucht noch (QuantityCollected &lt; Quantity).
+    /// </summary>
+    public bool IsTransferButtonVisible
+        => HasMatchingFloatingPart && QuantityCollected < Quantity;
+
+    /// <summary>"2 / 3"-Label neben Quantity wenn Teil-gesammelt.</summary>
+    public string QuantityProgressLabel
+        => QuantityCollected == 0
+            ? string.Empty
+            : $"({QuantityCollected}/{Quantity})";
 
     /// <summary>"BL-Part: 3024" – fuer die UI-Zeile.</summary>
     public string PartDisplayLabel => $"BL-Part: {BricklinkPartNo}";

@@ -46,4 +46,17 @@ public partial class MinifigDetailView : UserControl
         if (vm == null) return;
         await vm.PersistPendingAsync();
     }
+
+    /// <summary>
+    /// UX-Iteration X.4+: "Aus Fach uebernehmen" pro Teilezeile. Tag der
+    /// Button-Sender ist das PendingPartViewModel. Der Service-Aufruf laeuft
+    /// im ScanViewModel; der Refresh der UI passiert dort auch.
+    /// </summary>
+    private async void TakeFromBin_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button b || b.Tag is not PendingPartViewModel part) return;
+        var vm = GetScanViewModel();
+        if (vm == null) return;
+        await vm.TransferFloatingPartToPendingAsync(part);
+    }
 }

@@ -39,6 +39,7 @@ public partial class ScanViewModel : ObservableObject
     private readonly IMinifigPersistenceService _persistenceService;
     private readonly IPartLookupService _partLookup;
     private readonly IDialogService _dialogs;
+    private readonly IFloatingPartTransferService _floatingTransfer;
 
     private DateTime _lastScanTime = DateTime.MinValue;
     private bool _isFrozen = false;
@@ -178,7 +179,8 @@ public partial class ScanViewModel : ObservableObject
         IStorageBinService binService,
         IMinifigPersistenceService persistenceService,
         IPartLookupService partLookup,
-        IDialogService dialogs)
+        IDialogService dialogs,
+        IFloatingPartTransferService floatingTransfer)
     {
         _cameraService = cameraService;
         _settingsService = settingsService;
@@ -193,6 +195,7 @@ public partial class ScanViewModel : ObservableObject
         _persistenceService = persistenceService;
         _partLookup = partLookup;
         _dialogs = dialogs;
+        _floatingTransfer = floatingTransfer;
 
         _cameraService.FrameReceived += OnFrameReceived;
     }
@@ -790,6 +793,10 @@ public partial class ScanViewModel : ObservableObject
 
             // Phase 4: Lagerfach-Liste fuer die ComboBox laden + Default setzen.
             _ = LoadAvailableBinsForPendingAsync(pending);
+
+            // UX X.4+: pro Teil pruefen ob ein passender FloatingPart existiert
+            // -> Button "Aus Fach uebernehmen" einblenden.
+            _ = RefreshFloatingMatchesForPendingAsync(pending);
         }
         catch (OperationCanceledException)
         {
@@ -1109,7 +1116,10 @@ public partial class ScanViewModel : ObservableObject
                     QuantityNeeded = p.Quantity,
                     // Manuelle Markierung im Pending: "Habe ich" -> alle Teile dieser
                     // Sorte als gesammelt. Reverse-Match laeuft danach (skipt volle Eintraege).
-                    QuantityCollected = p.IsCollected ? p.Quantity : 0
+                    // QuantityCollected kommt direkt aus dem Pending-VM:
+                    // entweder via Anhaken-Checkbox (= Quantity) oder via
+                    // "Aus Fach uebernehmen"-Button (= 1..Quantity).
+                    QuantityCollected = p.QuantityCollected
                 }).ToList()
             };
 
@@ -1181,6 +1191,102 @@ public partial class ScanViewModel : ObservableObject
 
         await Task.WhenAll(tasks);
         Log.Information("Vorab-Cache abgeschlossen ({Count} Teile)", pending.Parts.Count);
+    }
+
+    /// <summary>
+    /// UX-Iteration X.4+: pro Teil in der Pending-Minifig pruefen, ob ein
+    /// passender FloatingPart in irgendeinem Lagerfach existiert. Befuellt
+    /// HasMatchingFloatingPart + MatchingFloatingPartBinLabel + Quantity.
+    /// Wird beim ersten Laden der Pending-Figur aufgerufen + nach jedem
+    /// erfolgreichen Transfer.
+    /// </summary>
+    private async Task RefreshFloatingMatchesForPendingAsync(PendingMinifigViewModel pending)
+    {
+        foreach (var part in pending.Parts.ToList())
+        {
+            try
+            {
+                var match = await _floatingTransfer.FindFirstMatchAsync(
+                    part.BricklinkPartNo, part.BricklinkColorId);
+
+                // Update auf dem UI-Thread (ObservableObject-Properties)
+                System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+                {
+                    if (match != null)
+                    {
+                        part.HasMatchingFloatingPart = true;
+                        part.MatchingFloatingPartBinLabel = match.StorageBinLabel;
+                        part.MatchingFloatingPartQuantity = match.QuantityAvailable;
+                    }
+                    else
+                    {
+                        part.HasMatchingFloatingPart = false;
+                        part.MatchingFloatingPartBinLabel = null;
+                        part.MatchingFloatingPartQuantity = 0;
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "FloatingMatch-Lookup fuer {Part}/{Color} fehlgeschlagen",
+                    part.BricklinkPartNo, part.BricklinkColorId);
+            }
+        }
+    }
+
+    /// <summary>
+    /// UX-Iteration X.4+: User klickt "Aus Fach uebernehmen" an einem Pending-Part.
+    /// Reduziert den FloatingPart in der DB sofort um 1, erhoeht
+    /// QuantityCollected des Pending-Parts und feuert einen Toast.
+    ///
+    /// Wichtig: Die Buchung passiert SOFORT, nicht erst beim "In Fach legen"
+    /// - das Teil ist physisch beim User. Wenn der User die Pending-Figur
+    /// danach verwirft, bleibt der FloatingPart trotzdem reduziert (Spec).
+    /// </summary>
+    public async Task TransferFloatingPartToPendingAsync(PendingPartViewModel part)
+    {
+        if (part.QuantityCollected >= part.Quantity) return; // schon komplett
+
+        try
+        {
+            var pendingDesc = PendingMinifig != null
+                ? $"{PendingMinifig.Name} ({PendingMinifig.BricklinkId}) - Pending"
+                : $"Pending ({part.BricklinkPartNo})";
+
+            var result = await _floatingTransfer.TransferOneAsync(
+                part.BricklinkPartNo, part.BricklinkColorId, pendingDesc);
+
+            if (!result.Success)
+            {
+                _notifications.ShowWarning(
+                    result.ErrorMessage ?? "Teil nicht mehr im Fach verfuegbar.");
+                // UI-Refresh trotzdem - vielleicht ist das Match-Flag jetzt aus.
+                if (PendingMinifig != null)
+                    await RefreshFloatingMatchesForPendingAsync(PendingMinifig);
+                return;
+            }
+
+            // Im Pending-VM hochzaehlen.
+            part.QuantityCollected = Math.Min(part.QuantityCollected + 1, part.Quantity);
+
+            var toastMsg = result.BinFreedAfterTransfer
+                ? $"Teil aus '{result.SourceBinLabel}' uebernommen (Fach jetzt frei)."
+                : $"Teil aus '{result.SourceBinLabel}' uebernommen.";
+            _notifications.ShowSuccess(toastMsg);
+
+            // Match-Flag fuer alle Pending-Parts neu evaluieren (das soeben
+            // entnommene Teil koennte jetzt gar nicht mehr im Pool sein, oder
+            // andere Teile haben sich nicht geaendert - egal, ein voller
+            // Refresh ist die einfachere und korrektere Variante).
+            if (PendingMinifig != null)
+                await RefreshFloatingMatchesForPendingAsync(PendingMinifig);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "FloatingPart-Transfer fehlgeschlagen ({Part}/{Color})",
+                part.BricklinkPartNo, part.BricklinkColorId);
+            _notifications.ShowError($"Fehler: {ex.Message}");
+        }
     }
 
     /// <summary>
