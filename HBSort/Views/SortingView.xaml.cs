@@ -35,13 +35,9 @@ public partial class SortingView : UserControl
         ApplySplitterRatios();
     }
 
-    // ====================================================================
-    // Modus-Buttons
-    // ====================================================================
-
-    private void ModeAuto_Click(object sender, RoutedEventArgs e) => VM?.ScanViewModel.SetMode("auto");
-    private void ModeMinifig_Click(object sender, RoutedEventArgs e) => VM?.ScanViewModel.SetMode("minifig");
-    private void ModePart_Click(object sender, RoutedEventArgs e) => VM?.ScanViewModel.SetMode("part");
+    // (Kamera-/Modus-Auswahl-Handler entfernt: Kamera nur noch in Settings,
+    //  ScanMode fest auf Auto. SwitchCameraAsync-Command bleibt im VM fuer
+    //  die Settings-UI; IsModeAuto/Minifig/Part-Properties auch.)
 
     /// <summary>Such-Fallback (in Phase 5+ implementiert).</summary>
     private void SearchFallback_Click(object sender, RoutedEventArgs e)
