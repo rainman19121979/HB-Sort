@@ -989,6 +989,34 @@ Acht UX-Verbesserungen quer durch die App:
    Neuer `MainViewModel.MainTabIndex` (0=Sortieren, 1=Lagerliste); nicht
    persistiert.
 
+### UX-Iteration X.5 ✅ (2026-05-03) — Floating-zu-Pending-Transfer
+
+Pro Teil in der `MinifigDetailView` (Pending-Minifig vor "In Fach legen")
+gibt es jetzt einen Button **"📦 Aus Fach"** + Bin-Label-Hinweis, sobald
+ein passender FloatingPart im Pool existiert. Klick reduziert den
+FloatingPart sofort um 1 (loescht wenn 0), erhoeht `QuantityCollected`
+am Pending-Part und triggert einen Toast.
+
+- Neuer `IFloatingPartTransferService` (HBSort.Core/Services):
+  `FindFirstMatchAsync(blPartNo, blColorId)` und
+  `TransferOneAsync(blPartNo, blColorId, targetMinifigDescription)`.
+  FIFO-Auswahl nach `AddedAt`. Bin-Freigabe-Check (analog zu
+  `IStorageBinService.GetFreeAsync`: leer = keine FloatingParts und
+  keine wartenden Minifigs). Schreibt `ScanEvent` mit neuem Type
+  `FloatingPartTransfer`. Race-Condition-sicher via TransferResult.
+- `PendingPartViewModel` erweitert um `QuantityCollected` (int statt
+  nur `IsCollected` bool), `HasMatchingFloatingPart`,
+  `MatchingFloatingPartBinLabel`, `MatchingFloatingPartQuantity`,
+  `IsTransferButtonVisible` (computed), `QuantityProgressLabel` "(2/3)".
+- `ScanViewModel` ruft `RefreshFloatingMatchesForPendingAsync` beim
+  Aufbau der Pending-Figur und nach jedem Transfer auf.
+- Audit-Trail: jeder Transfer schreibt einen ScanEvent
+  (`Type=FloatingPartTransfer`, `RecognizedId=BL-Part-No`,
+  `ResultDescription` mit Quell-Fach + Ziel-Beschreibung).
+- **Bewusste Spec-Entscheidung**: Wenn der User nach Transfer die
+  Pending-Figur verwirft, bleibt der FloatingPart trotzdem reduziert -
+  das Teil ist physisch beim User. Kein Rollback.
+
 ## Wichtige Hinweise
 
 ### Async-First
