@@ -5,6 +5,7 @@
         xmlns:b="clr-namespace:HBSort.Behaviors"
         ui:WindowHelper.UseModernWindowStyle="True"
         Title="Inhalt eines Faches"
+        ToolTipService.IsEnabled="{DynamicResource TooltipsEnabled}"
         Icon="../Resources/app.ico"
         Width="600" Height="700"
         MinWidth="400" MinHeight="400"

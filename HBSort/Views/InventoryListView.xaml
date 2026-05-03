@@ -31,7 +31,8 @@
                     Padding="8,2" Margin="0,0,8,0"
                     ToolTip="BrickLink-Wanted-List-XML aus den fehlenden Teilen aller wartenden Figuren erzeugen"/>
             <Button Grid.Column="2" Content="Aktualisieren"
-                    Command="{Binding LoadCommand}" Padding="8,2"/>
+                    Command="{Binding LoadCommand}" Padding="8,2"
+                    ToolTip="Liest Lagerliste aus der DB neu ein."/>
         </Grid>
 
         <!-- Filter -->
@@ -51,26 +52,32 @@
             <TextBlock Text="Suche:" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="Gray"/>
             <TextBox Grid.Column="1"
                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                     ui:ControlHelper.PlaceholderText="Name, BL-ID oder Farbe..."/>
+                     ui:ControlHelper.PlaceholderText="Name, BL-ID oder Farbe..."
+                     ToolTip="Filtert live nach Name, BL-ID, Farbe oder Lagerfach-Label."/>
             <TextBlock Grid.Column="2" Text="Fach:" VerticalAlignment="Center" Margin="12,0,6,0"
                        Foreground="Gray"/>
             <ComboBox Grid.Column="3"
                       ItemsSource="{Binding AvailableBins}"
                       SelectedItem="{Binding FilterByBin, Mode=TwoWay}"
                       DisplayMemberPath="Label"
-                      ui:ControlHelper.PlaceholderText="(alle Faecher)"/>
+                      ui:ControlHelper.PlaceholderText="(alle Faecher)"
+                      ToolTip="Beschraenkt die Liste auf ein einzelnes Lagerfach."/>
             <TextBlock Grid.Column="5" Text="Status:" VerticalAlignment="Center" Margin="0,0,8,0"
                        Foreground="Gray"/>
             <CheckBox Grid.Column="6" Content="Komplett"
                       IsChecked="{Binding ShowComplete, Mode=TwoWay}"
-                      VerticalAlignment="Center" Margin="0,0,12,0"/>
+                      VerticalAlignment="Center" Margin="0,0,12,0"
+                      ToolTip="Zeigt alle Figuren mit Status Komplett."/>
             <CheckBox Grid.Column="7" Content="Wartend"
                       IsChecked="{Binding ShowWaiting, Mode=TwoWay}"
-                      VerticalAlignment="Center" Margin="0,0,12,0"/>
+                      VerticalAlignment="Center" Margin="0,0,12,0"
+                      ToolTip="Zeigt alle Figuren denen noch Teile fehlen."/>
             <CheckBox Grid.Column="8" Content="Einzelteile"
                       IsChecked="{Binding ShowFloating, Mode=TwoWay}"
-                      VerticalAlignment="Center" Margin="0,0,12,0"/>
-            <Button Grid.Column="9" Content="Reset" Click="Reset_Click" Padding="8,2"/>
+                      VerticalAlignment="Center" Margin="0,0,12,0"
+                      ToolTip="Zeigt alle Floating-Parts (Einzelteile ohne Figur-Zuordnung)."/>
+            <Button Grid.Column="9" Content="Reset" Click="Reset_Click" Padding="8,2"
+                    ToolTip="Setzt Suche und Filter zurueck."/>
         </Grid>
 
         <!-- Phase 7 + UX X.6: BSX-Export Multi-Select-Action-Bar.
@@ -166,7 +173,8 @@
                             <Border Background="{Binding StatusBrush}"
                                     CornerRadius="3" Padding="6,2"
                                     HorizontalAlignment="Left"
-                                    VerticalAlignment="Center">
+                                    VerticalAlignment="Center"
+                                    ToolTip="{Binding StatusTooltip}">
                                 <TextBlock Text="{Binding StatusLabel}"
                                            Foreground="White" FontWeight="SemiBold"
                                            FontSize="11"/>
@@ -200,7 +208,8 @@
                                 <Border Width="14" Height="14"
                                         Background="{Binding ColorSwatch}"
                                         BorderBrush="Black" BorderThickness="1"
-                                        Margin="0,0,6,0">
+                                        Margin="0,0,6,0"
+                                        ToolTip="{Binding ColorName}">
                                     <Border.Style>
                                         <Style TargetType="Border">
                                             <Setter Property="Visibility" Value="Visible"/>
@@ -220,7 +229,15 @@
 
                 <DataGridTextColumn Header="Anzahl" Binding="{Binding Quantity}" Width="70"/>
                 <DataGridTextColumn Header="Lagerfach" Binding="{Binding StorageBinLabel}" Width="120"/>
-                <DataGridTextColumn Header="Fortschritt" Binding="{Binding ProgressLabel}" Width="90"/>
+                <DataGridTemplateColumn Header="Fortschritt" Width="90" SortMemberPath="ProgressLabel">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding ProgressLabel}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="{Binding ProgressTooltip}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTextColumn Header="Teiletyp" Binding="{Binding ItemTypeLabel}" Width="100"/>
 
                 <!-- Aktionen -->
@@ -230,11 +247,13 @@
                             <StackPanel Orientation="Horizontal">
                                 <Button Content="Details"
                                         Click="Details_Click" Tag="{Binding}"
-                                        Padding="6,2" Margin="0,0,4,0"/>
+                                        Padding="6,2" Margin="0,0,4,0"
+                                        ToolTip="Oeffnet die Detail-Ansicht dieses Eintrags."/>
                                 <Button Content="Loeschen"
                                         Click="Delete_Click" Tag="{Binding}"
                                         Padding="6,2"
-                                        Background="#D32F2F" Foreground="White"/>
+                                        Background="#D32F2F" Foreground="White"
+                                        ToolTip="Entfernt diesen Eintrag dauerhaft (mit Bestaetigung)."/>
                             </StackPanel>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>

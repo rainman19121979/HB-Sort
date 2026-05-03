@@ -69,6 +69,11 @@ public partial class App : Application
             // alle DynamicResource-Lookups direkt den richtigen Wert haben.
             await ApplyStoredUiDensityAsync(settingsService);
 
+            // 4.6 Tooltips-Schalter anwenden (UX-Iteration X.9). Schreibt den
+            // gespeicherten ShowTooltips-Wert in die Application-Resource,
+            // bevor das erste Fenster gezeigt wird.
+            await Services.GetRequiredService<ITooltipsService>().ApplyAsync();
+
             // 5. Datenbank erstellen/migrieren
             await InitializeDatabaseAsync();
 
@@ -189,6 +194,9 @@ public partial class App : Application
         // UI-Density-Service (Compact/Normal/Comfortable). Wechselt zur Laufzeit
         // das Density-ResourceDictionary in Application.Resources.
         services.AddSingleton<IUiDensityService, UiDensityService>();
+
+        // UX-Iteration X.9: globaler Tooltips-Schalter (Default: an).
+        services.AddSingleton<ITooltipsService, TooltipsService>();
 
         // EF Core DbContext für userdata.db.
         // Wir registrieren beide Wege: AddDbContext (fuer Migrationen) und

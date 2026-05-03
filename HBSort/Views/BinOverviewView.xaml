@@ -25,7 +25,7 @@
             <TextBlock Text="LAGERFAECHER"
                        FontSize="{DynamicResource HeaderFontSize}" FontWeight="SemiBold"/>
             <Button Grid.Column="1" Content="↻" Width="28" Padding="0"
-                    ToolTip="Liste neu laden"
+                    ToolTip="Laed die Lagerfach-Liste aus der DB neu."
                     Command="{Binding RefreshCommand}"/>
         </Grid>
 
@@ -37,12 +37,14 @@
                          IsChecked="{Binding IsFilterOccupiedOnly, Mode=OneWay}"
                          Click="BinFilterOccupied_Click"
                          GroupName="BinOverviewFilter" Margin="0,0,12,0"
-                         VerticalAlignment="Center"/>
+                         VerticalAlignment="Center"
+                         ToolTip="Zeigt nur Faecher mit Inhalt (mind. eine Figur oder ein Floating-Part)."/>
             <RadioButton Content="Alle"
                          IsChecked="{Binding IsFilterAll, Mode=OneWay}"
                          Click="BinFilterAll_Click"
                          GroupName="BinOverviewFilter"
-                         VerticalAlignment="Center"/>
+                         VerticalAlignment="Center"
+                         ToolTip="Zeigt alle Faecher inkl. der freien."/>
         </StackPanel>
 
         <TextBlock Grid.Row="2"
@@ -64,7 +66,7 @@
                                         BorderBrush="Transparent"
                                         HorizontalContentAlignment="Stretch"
                                         Padding="6,4" Cursor="Hand"
-                                        ToolTip="Klicken zum Auf-/Zuklappen">
+                                        ToolTip="Klick zum Auf-/Zuklappen dieses Fachs.">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -85,11 +87,12 @@
                                         <TextBlock Grid.Column="3" Text="{Binding StatusText}"
                                                    FontSize="{DynamicResource MicroFontSize}"
                                                    Foreground="Gray"
-                                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                   VerticalAlignment="Center" Margin="0,0,8,0"
+                                                   ToolTip="Inhalt dieses Fachs (wartend / komplett / Einzelteile)."/>
                                         <Button Grid.Column="4" Content="📋" Width="28" Padding="0"
                                                 Click="BinShowDetailFromOverview_Click"
                                                 Tag="{Binding}"
-                                                ToolTip="Inhalt anzeigen"/>
+                                                ToolTip="Oeffnet die Detail-Ansicht mit allen Figuren und Einzelteilen in diesem Fach."/>
                                     </Grid>
                                 </Button>
 
@@ -105,7 +108,7 @@
                                                         Click="WaitingMinifig_Click"
                                                         Tag="{Binding}"
                                                         Padding="4" Margin="0,1"
-                                                        ToolTip="Klicken fuer Details">
+                                                        ToolTip="Oeffnet die Figur-Detail-Ansicht (Status, Teileliste, Verschieben/Zerlegen).">
                                                     <Grid>
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="40"/>

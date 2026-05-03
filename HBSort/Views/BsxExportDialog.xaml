@@ -5,6 +5,7 @@
         xmlns:b="clr-namespace:HBSort.Behaviors"
         ui:WindowHelper.UseModernWindowStyle="True"
         Title="BSX-Export"
+        ToolTipService.IsEnabled="{DynamicResource TooltipsEnabled}"
         Icon="../Resources/app.ico"
         Width="680" Height="700"
         MinWidth="520" MinHeight="540"

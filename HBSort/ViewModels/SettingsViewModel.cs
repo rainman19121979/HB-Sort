@@ -32,6 +32,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
     private readonly IDialogService _dialogs;
     private readonly IBlPriceCacheService _priceCache;
+    private readonly ITooltipsService _tooltips;
 
     /// <summary>Tab "Lagerfaecher" – eigenes ViewModel mit Liste + Commands.</summary>
     public BinManagerViewModel BinManager { get; }
@@ -69,6 +70,24 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _soundEnabled;
+
+    /// <summary>UX-Iteration X.9: globaler Tooltips-Schalter.</summary>
+    [ObservableProperty]
+    private bool _showTooltips;
+
+    /// <summary>
+    /// Live-Reaktion auf den Toggle: TooltipsService updated die
+    /// Application-Resource sofort - der User sieht die Aenderung beim
+    /// naechsten Hover, ohne Neustart und ohne "Speichern". Persistierung
+    /// in settings.json passiert erst beim Save-Command.
+    /// </summary>
+    partial void OnShowTooltipsChanged(bool value)
+    {
+        // _tooltips ist null wenn Property aus dem ObservableProperty-Init
+        // _vor_ dem Konstruktor-Body lebendig wird (Default-Wert false).
+        // Eigentlich nicht der Fall hier, aber defensive Pruefung schadet nichts.
+        _tooltips?.SetEnabled(value);
+    }
 
     /// <summary>BrickLink-Bilder bevorzugen statt Brickognize-Graustufen-Renderings.</summary>
     [ObservableProperty]
@@ -236,7 +255,8 @@ public partial class SettingsViewModel : ObservableObject
         IDbContextFactory<UserDataContext> ctxFactory,
         BinManagerViewModel binManager,
         IDialogService dialogs,
-        IBlPriceCacheService priceCache)
+        IBlPriceCacheService priceCache,
+        ITooltipsService tooltips)
     {
         _settingsService = settingsService;
         _cameraService = cameraService;
@@ -249,6 +269,7 @@ public partial class SettingsViewModel : ObservableObject
         _http = http;
         _ctxFactory = ctxFactory;
         _dialogs = dialogs;
+        _tooltips = tooltips;
         _priceCache = priceCache;
         BinManager = binManager;
 
@@ -315,6 +336,7 @@ public partial class SettingsViewModel : ObservableObject
         ScanCooldownMs = s.ScanCooldownMs;
         FreezeFrameMs = s.FreezeFrameMs;
         SoundEnabled = s.SoundEnabled;
+        ShowTooltips = s.ShowTooltips;
         PreferBricklinkImages = s.ImageCache.PreferBricklinkImages;
         PreloadOnMinifigScan = s.ImageCache.PreloadOnMinifigScan;
         ImageCacheLimitMb = s.ImageCache.LimitMb;
@@ -351,6 +373,7 @@ public partial class SettingsViewModel : ObservableObject
         s.ScanCooldownMs = ScanCooldownMs;
         s.FreezeFrameMs = FreezeFrameMs;
         s.SoundEnabled = SoundEnabled;
+        s.ShowTooltips = ShowTooltips;
         s.ImageCache.PreferBricklinkImages = PreferBricklinkImages;
         s.ImageCache.PreloadOnMinifigScan = PreloadOnMinifigScan;
         s.ImageCache.LimitMb = ImageCacheLimitMb;

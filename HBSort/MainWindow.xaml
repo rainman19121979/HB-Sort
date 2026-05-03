@@ -11,7 +11,8 @@
         Height="900" Width="1400"
         WindowState="Maximized"
         Closing="Window_Closing"
-        Loaded="Window_Loaded">
+        Loaded="Window_Loaded"
+        ToolTipService.IsEnabled="{DynamicResource TooltipsEnabled}">
 
     <!--
         Window-weite KeyBindings: feuern unabhaengig vom Fokus eines einzelnen
@@ -90,18 +91,21 @@
                              IsChecked="{Binding IsMainTabSorting, Mode=OneWay}"
                              Click="MainTabSorting_Click"
                              Content="Sortieren"
+                             ToolTip="Webcam-Scan + Pending-Bereich + variable Felder. Hier passiert die eigentliche Arbeit."
                              Margin="0,0,8,0"/>
                 <RadioButton x:Name="TabInventoryButton" GroupName="MainTabs"
                              Style="{StaticResource MainTabRadioStyle}"
                              IsChecked="{Binding IsMainTabInventory, Mode=OneWay}"
                              Click="MainTabInventory_Click"
                              Content="Lagerliste"
+                             ToolTip="Zeigt deinen kompletten Bestand: wartende Figuren, komplette Figuren, Einzelteile."
                              Margin="0,0,8,0"/>
                 <RadioButton x:Name="TabHelpButton" GroupName="MainTabs"
                              Style="{StaticResource MainTabRadioStyle}"
                              IsChecked="{Binding IsMainTabHelp, Mode=OneWay}"
                              Click="MainTabHelp_Click"
-                             Content="Hilfe"/>
+                             Content="Hilfe"
+                             ToolTip="Integrierte Doku zu Workflow, Lagerverwaltung, Export. (F1)"/>
             </StackPanel>
 
             <!-- Rechts: Settings-Button als Icon + Text -->
@@ -109,7 +113,7 @@
                     VerticalAlignment="Center"
                     Click="OpenSettings_Click"
                     Padding="10,6"
-                    ToolTip="Kamera, Schwellwerte und andere Einstellungen">
+                    ToolTip="Oeffnet die Einstellungen (Kamera, BL-Tokens, Cache, Preise, Lagerfaecher).">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets"
                                FontSize="16" VerticalAlignment="Center"
@@ -170,10 +174,12 @@
                 <TextBlock Grid.Column="2" Text="{Binding CacheStatusText}"
                            FontSize="{DynamicResource DetailFontSize}" VerticalAlignment="Center"
                            Margin="0,0,16,0"
-                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                           ToolTip="Aktuelle Belegung des Bild-Caches. Limit aenderst du in den Einstellungen."/>
 
                 <!-- Brickognize-Status mit LED -->
-                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center"
+                            ToolTip="Erkennungs-Service. Gruen = ok, Rot = nicht erreichbar.">
                     <Ellipse Width="10" Height="10" Margin="0,0,6,0"
                              Fill="{Binding ScanViewModel.BrickognizeStatus,
                                  Converter={StaticResource BrickognizeStatusToBrush}}"/>

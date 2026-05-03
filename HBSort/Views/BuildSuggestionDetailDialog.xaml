@@ -5,6 +5,7 @@
         xmlns:b="clr-namespace:HBSort.Behaviors"
         ui:WindowHelper.UseModernWindowStyle="True"
         Title="Bauvorschlag - Figur anlegen"
+        ToolTipService.IsEnabled="{DynamicResource TooltipsEnabled}"
         Icon="../Resources/app.ico"
         Width="720" Height="700"
         MinWidth="600" MinHeight="500"

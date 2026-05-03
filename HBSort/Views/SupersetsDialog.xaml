@@ -5,6 +5,7 @@
         xmlns:b="clr-namespace:HBSort.Behaviors"
         ui:WindowHelper.UseModernWindowStyle="True"
         Title="Wo kommt das Teil vor?"
+        ToolTipService.IsEnabled="{DynamicResource TooltipsEnabled}"
         Icon="../Resources/app.ico"
         Width="720" Height="640"
         WindowStartupLocation="CenterOwner">

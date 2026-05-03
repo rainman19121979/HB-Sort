@@ -343,6 +343,39 @@ public partial class InventoryRowItem : ObservableObject
     /// <summary>Fortschritt fuer wartende Figuren ("3/7"); leer fuer andere.</summary>
     public string ProgressLabel { get; init; } = string.Empty;
 
+    /// <summary>
+    /// UX-Iteration X.9: ausfuehrlicher Tooltip-Text zum Status-Badge.
+    /// Wird im DataGrid an die Status-Zelle gehaengt - der User kriegt
+    /// dadurch eine klare Erlaeuterung, was die jeweilige Markierung
+    /// bedeutet, ohne in die Hilfe wechseln zu muessen.
+    /// </summary>
+    public string StatusTooltip => Status switch
+    {
+        StatusKind.Complete => "Alle Teile vorhanden. Du kannst die Figur via BSX exportieren.",
+        StatusKind.Waiting  => "Mindestens ein Teil fehlt noch. Sammle weiter.",
+        StatusKind.Floating => "Loses Einzelteil im Pool. Wird beim Reverse-Match automatisch aufgegriffen.",
+        StatusKind.Sold     => "Bereits verkauft.",
+        _ => string.Empty
+    };
+
+    /// <summary>
+    /// UX-Iteration X.9: Tooltip fuer die Fortschritts-Spalte ("3/7" -&gt;
+    /// "3 von 7 Teilen vorhanden"). Leer wenn ProgressLabel leer ist.
+    /// </summary>
+    public string ProgressTooltip
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(ProgressLabel)) return string.Empty;
+            var parts = ProgressLabel.Split('/');
+            if (parts.Length == 2)
+            {
+                return $"{parts[0]} von {parts[1]} Teilen vorhanden.";
+            }
+            return ProgressLabel;
+        }
+    }
+
     [ObservableProperty]
     private string? _imageUrl;
 

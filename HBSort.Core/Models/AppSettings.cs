@@ -42,6 +42,15 @@ public class AppSettings
     public bool SoundEnabled { get; set; } = false;
 
     /// <summary>
+    /// UX-Iteration X.9: Tooltips global an/ausschalten. Der TooltipsService
+    /// schreibt diesen Wert in eine Application-Resource, die als
+    /// DynamicResource an ToolTipService.IsEnabled der Wurzel-Windows gebunden
+    /// ist - dadurch wirkt das Toggle live ohne Neustart und ohne dass jeder
+    /// einzelne Tooltip-Konsument davon wissen muss. Default: an.
+    /// </summary>
+    public bool ShowTooltips { get; set; } = true;
+
+    /// <summary>
     /// Bild-Cache-Einstellungen (Limit, BL-Bevorzugung, Vorab-Cache).
     /// Subobjekt damit cache-relevante Felder gruppiert in der settings.json stehen.
     /// </summary>

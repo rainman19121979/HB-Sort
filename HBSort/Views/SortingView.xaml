@@ -66,7 +66,8 @@
                        Source="{Binding ScanViewModel.CurrentFrame}"
                        Stretch="Uniform"
                        MinHeight="240" MaxHeight="600"
-                       RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                       RenderOptions.BitmapScalingMode="NearestNeighbor"
+                       ToolTip="Live-Bild deiner USB-Webcam. Halte hier Teile oder Figuren rein."/>
 
                 <TextBlock Grid.Row="0"
                            Text="Kein Kamerabild verfügbar"
@@ -84,7 +85,7 @@
                             IsEnabled="{Binding ScanViewModel.CanScan}"
                             HorizontalAlignment="Stretch"
                             Margin="0,0,0,4"
-                            ToolTip="Leertaste drücken oder hier klicken zum Scannen"/>
+                            ToolTip="Druecke die Leertaste oder klick hier, um zu scannen."/>
 
                     <TextBlock Text="{Binding ScanViewModel.ScanStatusText}"
                                Foreground="Gray" FontSize="12"
@@ -200,7 +201,8 @@
                         <Button Grid.Column="1"
                                 Content="Manuelle Suche..."
                                 Visibility="{Binding ScanViewModel.ShowSearchFallback, Converter={StaticResource BoolToVisibility}}"
-                                Click="SearchFallback_Click"/>
+                                Click="SearchFallback_Click"
+                                ToolTip="Oeffnet eine manuelle Suche fuer den Fall, dass Brickognize nichts erkannt hat."/>
                     </Grid>
 
                     <Border Grid.Row="1" Margin="0,0,0,8"
@@ -262,7 +264,8 @@
                                         Background="Transparent"
                                         Cursor="Hand"
                                         Tag="{Binding Rank}"
-                                        MouseLeftButtonUp="ResultCard_MouseLeftButtonUp">
+                                        MouseLeftButtonUp="ResultCard_MouseLeftButtonUp"
+                                        ToolTip="Klick um diesen Vorschlag zu uebernehmen. Stammdaten werden geladen.">
                                     <Border.Style>
                                         <Style TargetType="Border">
                                             <Style.Triggers>
@@ -348,7 +351,8 @@
                         BorderThickness="0"
                         Background="Transparent">
 
-                <TabItem Header="Lagerfaecher">
+                <TabItem Header="Lagerfaecher"
+                         ToolTip="Live-Liste deiner Faecher mit Inhalt und Fortschritt.">
                     <ContentControl Content="{Binding WaitingMinifigs}">
                         <ContentControl.ContentTemplate>
                             <DataTemplate>
@@ -358,7 +362,8 @@
                     </ContentControl>
                 </TabItem>
 
-                <TabItem Header="Was kann ich bauen?">
+                <TabItem Header="Was kann ich bauen?"
+                         ToolTip="Reverse-Match aus dem Floating-Pool: welche Figuren koenntest du bauen?">
                     <ContentControl Content="{Binding BuildSuggestions}">
                         <ContentControl.ContentTemplate>
                             <DataTemplate>
@@ -368,7 +373,8 @@
                     </ContentControl>
                 </TabItem>
 
-                <TabItem Header="Live-Stats">
+                <TabItem Header="Live-Stats"
+                         ToolTip="Heutige + 7-Tage-Stats + aktueller Bestand + Streak.">
                     <ContentControl Content="{Binding LiveStats}">
                         <ContentControl.ContentTemplate>
                             <DataTemplate>
@@ -378,7 +384,8 @@
                     </ContentControl>
                 </TabItem>
 
-                <TabItem Header="Wartende-Detail">
+                <TabItem Header="Wartende-Detail"
+                         ToolTip="Liste aller wartenden Figuren mit den fehlenden Teilen pro Figur.">
                     <ContentControl Content="{Binding WaitingDetail}">
                         <ContentControl.ContentTemplate>
                             <DataTemplate>
@@ -388,7 +395,8 @@
                     </ContentControl>
                 </TabItem>
 
-                <TabItem Header="Letzte Scans">
+                <TabItem Header="Letzte Scans"
+                         ToolTip="Top-50 Scan-Events chronologisch absteigend.">
                     <ContentControl Content="{Binding RecentScans}">
                         <ContentControl.ContentTemplate>
                             <DataTemplate>

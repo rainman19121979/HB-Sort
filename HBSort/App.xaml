@@ -1,6 +1,7 @@
 <Application x:Class="HBSort.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              xmlns:ui="http://schemas.modernwpf.com/2019"
              xmlns:converters="clr-namespace:HBSort.Converters"
              Startup="Application_Startup"
@@ -17,6 +18,15 @@
                 <ui:ThemeResources />
                 <ui:XamlControlsResources />
             </ResourceDictionary.MergedDictionaries>
+
+            <!--
+                UX-Iteration X.9: globaler Tooltips-Schalter. Wurzel-Windows
+                binden ToolTipService.IsEnabled per DynamicResource an diesen
+                Wert. Initial True; der TooltipsService ueberschreibt den Wert
+                beim App-Start mit AppSettings.ShowTooltips und live bei jedem
+                Toggle in den Einstellungen.
+            -->
+            <sys:Boolean x:Key="TooltipsEnabled">True</sys:Boolean>
 
             <!-- Converter für Datenbindung (z.B. bool → Visibility umkehren) -->
             <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>
