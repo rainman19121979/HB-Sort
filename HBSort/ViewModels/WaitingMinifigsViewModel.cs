@@ -38,46 +38,6 @@ public partial class WaitingMinifigsViewModel : ObservableObject
     [ObservableProperty] private string _summaryText = string.Empty;
     [ObservableProperty] private bool _isEmpty = true;
 
-    // Phase 7: aggregierte Selektion ueber alle Bins fuer den BSX-Export.
-    [ObservableProperty] private int _selectedCompleteCount;
-    public bool HasSelectedCompletes => SelectedCompleteCount > 0;
-    partial void OnSelectedCompleteCountChanged(int value) =>
-        OnPropertyChanged(nameof(HasSelectedCompletes));
-
-    /// <summary>Liefert alle aktuell selektierten kompletten Figuren ueber alle Bins.</summary>
-    public IEnumerable<WaitingMinifigViewModel> SelectedCompletes =>
-        Bins.SelectMany(b => b.CompleteMinifigs).Where(c => c.IsSelected);
-
-    /// <summary>True wenn mindestens eine komplette Figur in irgendeinem Bin existiert.</summary>
-    public bool HasAnyCompletes => Bins.Any(b => b.HasCompletes);
-
-    /// <summary>"Alle auswaehlen" - selektiert alle kompletten Figuren in allen Bins.</summary>
-    [RelayCommand]
-    public void SelectAllComplete()
-    {
-        foreach (var c in Bins.SelectMany(b => b.CompleteMinifigs))
-            c.IsSelected = true;
-        RecalculateSelection();
-    }
-
-    /// <summary>"Keine" - hebt die Selektion aller kompletten Figuren auf.</summary>
-    [RelayCommand]
-    public void DeselectAllComplete()
-    {
-        foreach (var c in Bins.SelectMany(b => b.CompleteMinifigs))
-            c.IsSelected = false;
-        RecalculateSelection();
-    }
-
-    /// <summary>
-    /// Wird vom Code-Behind nach jedem CheckBox-Click aufgerufen, weil wir die
-    /// IsSelected-PropertyChanged nicht pro Item zentral abonnieren.
-    /// </summary>
-    public void RecalculateSelection()
-    {
-        SelectedCompleteCount = SelectedCompletes.Count();
-    }
-
     public WaitingMinifigsViewModel(
         IDbContextFactory<UserDataContext> ctxFactory,
         IMinifigPersistenceService persistenceService)
@@ -176,11 +136,6 @@ public partial class WaitingMinifigsViewModel : ObservableObject
             }
 
             IsEmpty = Bins.Count == 0;
-
-            // Phase 7: nach Refresh ist die Selektion immer leer (neue Items sind
-            // standardmaessig unselektiert) - Counter zuruecksetzen.
-            SelectedCompleteCount = 0;
-            OnPropertyChanged(nameof(HasAnyCompletes));
 
             // Phase 6: Footer zeigt Fach-Anzahl + Total-Counts der Figuren.
             var totalWaiting = waiting.Count;
@@ -294,13 +249,6 @@ public partial class WaitingMinifigViewModel : ObservableObject
     public int CompletedParts { get; }
     public double ProgressFraction => TotalParts == 0 ? 0 : (double)CompletedParts / TotalParts;
     public string ProgressLabel => $"{CompletedParts}/{TotalParts} Teile";
-
-    /// <summary>
-    /// Phase 7: Multi-Select-Flag fuer den BSX-Export. Nur in der Komplett-Sektion
-    /// sichtbar - die XAML-DataTemplate fuer wartende Figuren ignoriert dieses Property.
-    /// </summary>
-    [ObservableProperty]
-    private bool _isSelected;
 
     public WaitingMinifigViewModel(TrackedMinifig m)
     {

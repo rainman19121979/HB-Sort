@@ -15,15 +15,38 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Header -->
+        <!-- Header + Phase 7: BSX-Export-Aktionen -->
         <Grid Grid.Row="0" Margin="0,0,0,8">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Text="LAGERLISTE"
-                       FontSize="18" FontWeight="SemiBold"/>
-            <Button Grid.Column="1" Content="Aktualisieren"
+            <TextBlock Grid.Column="0" Text="LAGERLISTE"
+                       FontSize="18" FontWeight="SemiBold"
+                       VerticalAlignment="Center"/>
+
+            <!-- Mitte: BSX-Export-Aktionen (nur sichtbar wenn es komplette Figuren gibt) -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right"
+                        Margin="0,0,12,0"
+                        Visibility="{Binding HasAnyCompletes, Converter={StaticResource BoolToVisibility}}">
+                <Button Content="Alle Komplette" Padding="6,2" Margin="0,0,4,0"
+                        Command="{Binding SelectAllCompleteCommand}"
+                        ToolTip="Alle komplette Figuren in der aktuellen Sicht auswaehlen"/>
+                <Button Content="Keine" Padding="6,2" Margin="0,0,4,0"
+                        Command="{Binding DeselectAllCompleteCommand}"
+                        ToolTip="Auswahl aufheben"/>
+                <Button Click="ExportSelected_Click" Padding="8,2"
+                        Style="{StaticResource AccentButtonStyle}"
+                        IsEnabled="{Binding HasSelectedCompletes}"
+                        ToolTip="Ausgewaehlte komplette Figuren als BSX exportieren">
+                    <TextBlock>
+                        <Run Text="Exportieren ("/><Run Text="{Binding SelectedCompleteCount, Mode=OneWay}"/><Run Text=")"/>
+                    </TextBlock>
+                </Button>
+            </StackPanel>
+
+            <Button Grid.Column="2" Content="Aktualisieren"
                     Command="{Binding LoadCommand}" Padding="8,2"/>
         </Grid>
 
@@ -78,6 +101,32 @@
                   SelectionMode="Single"
                   RowHeight="48">
             <DataGrid.Columns>
+                <!-- Phase 7: Multi-Select-Checkbox fuer BSX-Export. Nur fuer komplette
+                     Minifigs sichtbar; andere Zeilen (Wartend / Einzelteil) zeigen die
+                     Checkbox per DataTrigger versteckt. -->
+                <DataGridTemplateColumn Header="Auswahl" Width="60" CanUserSort="False">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                      Click="CompleteSelect_Click"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      ToolTip="Fuer BSX-Export auswaehlen">
+                                <CheckBox.Style>
+                                    <Style TargetType="CheckBox">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Status}" Value="Complete">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </CheckBox.Style>
+                            </CheckBox>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
                 <DataGridTextColumn Header="#" Binding="{Binding RowNumber}" Width="40"
                                     IsReadOnly="True"/>
 

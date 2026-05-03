@@ -356,48 +356,21 @@
                             Command="{Binding RefreshCommand}"/>
                 </Grid>
 
-                <Grid Grid.Row="1" Margin="0,0,0,6">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Filter-Radios links -->
-                    <StackPanel Grid.Column="0" Orientation="Horizontal">
-                        <TextBlock Text="Anzeigen:" Foreground="Gray"
-                                   VerticalAlignment="Center" Margin="0,0,8,0"
-                                   FontSize="{DynamicResource MicroFontSize}"/>
-                        <RadioButton Content="Nur belegt"
-                                     IsChecked="{Binding IsFilterOccupiedOnly, Mode=OneWay}"
-                                     Click="BinFilterOccupied_Click"
-                                     GroupName="BinOverviewFilter" Margin="0,0,12,0"
-                                     VerticalAlignment="Center"/>
-                        <RadioButton Content="Alle"
-                                     IsChecked="{Binding IsFilterAll, Mode=OneWay}"
-                                     Click="BinFilterAll_Click"
-                                     GroupName="BinOverviewFilter"
-                                     VerticalAlignment="Center"/>
-                    </StackPanel>
-
-                    <!-- Phase 7: BSX-Export-Aktionen rechts (nur sichtbar wenn es komplette Figuren gibt) -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal"
-                                Visibility="{Binding HasAnyCompletes, Converter={StaticResource BoolToVisibility}}">
-                        <Button Content="Alle Komplette" Padding="6,2" Margin="0,0,4,0"
-                                Command="{Binding SelectAllCompleteCommand}"
-                                ToolTip="Alle kompletten Figuren ueber alle Faecher auswaehlen"/>
-                        <Button Content="Keine" Padding="6,2" Margin="0,0,4,0"
-                                Command="{Binding DeselectAllCompleteCommand}"
-                                ToolTip="Auswahl aufheben"/>
-                        <Button Click="ExportSelected_Click" Padding="8,2"
-                                Style="{StaticResource AccentButtonStyle}"
-                                IsEnabled="{Binding HasSelectedCompletes}"
-                                ToolTip="Ausgewaehlte komplette Figuren als BSX exportieren">
-                            <TextBlock>
-                                <Run Text="Exportieren ("/><Run Text="{Binding SelectedCompleteCount, Mode=OneWay}"/><Run Text=")"/>
-                            </TextBlock>
-                        </Button>
-                    </StackPanel>
-                </Grid>
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,6">
+                    <TextBlock Text="Anzeigen:" Foreground="Gray"
+                               VerticalAlignment="Center" Margin="0,0,8,0"
+                               FontSize="{DynamicResource MicroFontSize}"/>
+                    <RadioButton Content="Nur belegt"
+                                 IsChecked="{Binding IsFilterOccupiedOnly, Mode=OneWay}"
+                                 Click="BinFilterOccupied_Click"
+                                 GroupName="BinOverviewFilter" Margin="0,0,12,0"
+                                 VerticalAlignment="Center"/>
+                    <RadioButton Content="Alle"
+                                 IsChecked="{Binding IsFilterAll, Mode=OneWay}"
+                                 Click="BinFilterAll_Click"
+                                 GroupName="BinOverviewFilter"
+                                 VerticalAlignment="Center"/>
+                </StackPanel>
 
                 <TextBlock Grid.Row="2"
                            Text="Keine Faecher zur Anzeige. Wechsle auf 'Alle' oder lege Faecher in den Einstellungen an."
@@ -519,56 +492,40 @@
                                                 <ItemsControl ItemsSource="{Binding CompleteMinifigs}">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
-                                                            <Grid Margin="0,1">
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="Auto"/>
-                                                                    <ColumnDefinition Width="*"/>
-                                                                </Grid.ColumnDefinitions>
-
-                                                                <!-- Phase 7: Multi-Select-Checkbox fuer BSX-Export -->
-                                                                <CheckBox Grid.Column="0"
-                                                                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                                                          Click="CompleteSelect_Click"
-                                                                          VerticalAlignment="Center"
-                                                                          Margin="2,0,4,0"
-                                                                          ToolTip="Fuer BSX-Export auswaehlen"/>
-
-                                                                <Button Grid.Column="1"
-                                                                        Background="Transparent" BorderBrush="Transparent"
-                                                                        HorizontalContentAlignment="Stretch"
-                                                                        Click="WaitingMinifig_Click"
-                                                                        Tag="{Binding}"
-                                                                        Padding="4"
-                                                                        ToolTip="Komplette Figur - Klicken fuer Details (z.B. wieder oeffnen)">
-                                                                    <Grid>
-                                                                        <Grid.ColumnDefinitions>
-                                                                            <ColumnDefinition Width="40"/>
-                                                                            <ColumnDefinition Width="*"/>
-                                                                            <ColumnDefinition Width="Auto"/>
-                                                                        </Grid.ColumnDefinitions>
-                                                                        <Image Grid.Column="0"
-                                                                               Source="{Binding ImageUrl}"
-                                                                               Width="36" Height="36"
-                                                                               Stretch="Uniform"/>
-                                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center"
-                                                                                    Margin="6,0">
-                                                                            <TextBlock Text="{Binding Name}"
-                                                                                       FontSize="{DynamicResource MicroFontSize}"
-                                                                                       FontWeight="SemiBold"
-                                                                                       TextTrimming="CharacterEllipsis"/>
-                                                                            <TextBlock Text="{Binding BricklinkId}"
-                                                                                       FontFamily="Consolas"
-                                                                                       FontSize="{DynamicResource MicroFontSize}"
-                                                                                       Foreground="Gray"/>
-                                                                        </StackPanel>
-                                                                        <TextBlock Grid.Column="2" Text="✓"
-                                                                                   FontSize="16" FontWeight="Bold"
-                                                                                   Foreground="#2E7D32"
-                                                                                   VerticalAlignment="Center"
-                                                                                   Margin="6,0"/>
-                                                                    </Grid>
-                                                                </Button>
-                                                            </Grid>
+                                                            <Button Background="Transparent" BorderBrush="Transparent"
+                                                                    HorizontalContentAlignment="Stretch"
+                                                                    Click="WaitingMinifig_Click"
+                                                                    Tag="{Binding}"
+                                                                    Padding="4" Margin="0,1"
+                                                                    ToolTip="Komplette Figur - Klicken fuer Details (z.B. wieder oeffnen)">
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="40"/>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <Image Grid.Column="0"
+                                                                           Source="{Binding ImageUrl}"
+                                                                           Width="36" Height="36"
+                                                                           Stretch="Uniform"/>
+                                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center"
+                                                                                Margin="6,0">
+                                                                        <TextBlock Text="{Binding Name}"
+                                                                                   FontSize="{DynamicResource MicroFontSize}"
+                                                                                   FontWeight="SemiBold"
+                                                                                   TextTrimming="CharacterEllipsis"/>
+                                                                        <TextBlock Text="{Binding BricklinkId}"
+                                                                                   FontFamily="Consolas"
+                                                                                   FontSize="{DynamicResource MicroFontSize}"
+                                                                                   Foreground="Gray"/>
+                                                                    </StackPanel>
+                                                                    <TextBlock Grid.Column="2" Text="✓"
+                                                                               FontSize="16" FontWeight="Bold"
+                                                                               Foreground="#2E7D32"
+                                                                               VerticalAlignment="Center"
+                                                                               Margin="6,0"/>
+                                                                </Grid>
+                                                            </Button>
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
                                                 </ItemsControl>

@@ -102,31 +102,6 @@ public partial class SortingView : UserControl
         dialog.ShowDialog();
     }
 
-    /// <summary>
-    /// Phase 7: nach jedem Klick auf eine Komplett-Checkbox den globalen
-    /// Counter (SelectedCompleteCount) im VM neu berechnen.
-    /// </summary>
-    private void CompleteSelect_Click(object sender, RoutedEventArgs e)
-    {
-        VM?.WaitingMinifigs.RecalculateSelection();
-    }
-
-    /// <summary>
-    /// Phase 7: oeffnet den BSX-Export-Dialog mit den aktuell selektierten
-    /// kompletten Figuren.
-    /// </summary>
-    private void ExportSelected_Click(object sender, RoutedEventArgs e)
-    {
-        if (VM == null) return;
-        var ids = VM.WaitingMinifigs.SelectedCompletes.Select(c => c.Id).ToList();
-        if (ids.Count == 0) return;
-
-        var dialog = Service<BsxExportDialog>();
-        dialog.Initialize(ids);
-        dialog.Owner = Window.GetWindow(this);
-        dialog.ShowDialog();
-    }
-
     // ====================================================================
     // GridSplitter Persistierung
     // ====================================================================

@@ -28,6 +28,33 @@ public partial class InventoryListView : UserControl
         if (DataContext is InventoryListViewModel vm) vm.ClearFilters();
     }
 
+    /// <summary>
+    /// Phase 7: nach jedem Klick auf eine Komplett-Checkbox den globalen
+    /// Counter (SelectedCompleteCount) im VM neu berechnen.
+    /// </summary>
+    private void CompleteSelect_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is InventoryListViewModel vm) vm.RecalculateSelection();
+    }
+
+    /// <summary>
+    /// Phase 7: oeffnet den BSX-Export-Dialog mit den aktuell selektierten
+    /// kompletten Figuren.
+    /// </summary>
+    private void ExportSelected_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not InventoryListViewModel vm) return;
+        var ids = vm.SelectedCompletes
+            .Select(r => r.UnderlyingMinifigId!.Value)
+            .ToList();
+        if (ids.Count == 0) return;
+
+        var dialog = Service<BsxExportDialog>();
+        dialog.Initialize(ids);
+        dialog.Owner = Window.GetWindow(this);
+        dialog.ShowDialog();
+    }
+
     private void Details_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button b || b.Tag is not InventoryRowItem row) return;

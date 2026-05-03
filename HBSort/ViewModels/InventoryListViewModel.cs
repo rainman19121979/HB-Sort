@@ -65,6 +65,54 @@ public partial class InventoryListViewModel : ObservableObject
     [ObservableProperty]
     private string _summaryText = string.Empty;
 
+    // Phase 7: Multi-Select fuer BSX-Export (nur komplette Figuren).
+    [ObservableProperty]
+    private int _selectedCompleteCount;
+
+    public bool HasSelectedCompletes => SelectedCompleteCount > 0;
+    partial void OnSelectedCompleteCountChanged(int value)
+        => OnPropertyChanged(nameof(HasSelectedCompletes));
+
+    /// <summary>True wenn mindestens eine komplette Figur in der aktuellen DataGrid-Sicht ist.</summary>
+    public bool HasAnyCompletes =>
+        Items.Any(r => r.Status == StatusKind.Complete && r.UnderlyingMinifigId.HasValue);
+
+    /// <summary>Aktuell selektierte komplette Figuren (gefiltert/ungefiltert ist egal -
+    /// IsSelected wird nur durch User-Click gesetzt, also nur sichtbare).</summary>
+    public IEnumerable<InventoryRowItem> SelectedCompletes =>
+        Items.Where(r => r.IsSelected
+                      && r.Status == StatusKind.Complete
+                      && r.UnderlyingMinifigId.HasValue);
+
+    [RelayCommand]
+    public void SelectAllComplete()
+    {
+        // Selektiert alle aktuell SICHTBAREN kompletten Figuren (respektiert Filter).
+        foreach (var r in ItemsView.Cast<object>().Cast<InventoryRowItem>().ToList())
+        {
+            if (r.Status == StatusKind.Complete && r.UnderlyingMinifigId.HasValue)
+                r.IsSelected = true;
+        }
+        RecalculateSelection();
+    }
+
+    [RelayCommand]
+    public void DeselectAllComplete()
+    {
+        foreach (var r in Items.ToList())
+            r.IsSelected = false;
+        RecalculateSelection();
+    }
+
+    /// <summary>
+    /// Wird vom Code-Behind nach jedem CheckBox-Click gerufen, um den globalen
+    /// Counter (SelectedCompleteCount) und HasSelectedCompletes zu refreshen.
+    /// </summary>
+    public void RecalculateSelection()
+    {
+        SelectedCompleteCount = SelectedCompletes.Count();
+    }
+
     public InventoryListViewModel(
         IDbContextFactory<UserDataContext> ctxFactory,
         IBlCatalogService catalog,
@@ -198,6 +246,12 @@ public partial class InventoryListViewModel : ObservableObject
             }
 
             UpdateSummary();
+
+            // Phase 7: nach Refresh ist die Selektion immer leer (neue Items sind
+            // standardmaessig unselektiert). Anzeige der Action-Bar updaten.
+            SelectedCompleteCount = 0;
+            OnPropertyChanged(nameof(HasAnyCompletes));
+
             _ = LoadImagesAsync();
         }
         catch (Exception ex)
@@ -276,6 +330,14 @@ public partial class InventoryRowItem : ObservableObject
 
     [ObservableProperty]
     private string? _imageUrl;
+
+    /// <summary>
+    /// Phase 7: Multi-Select-Flag fuer den BSX-Export. Im DataGrid wird die
+    /// Checkbox ueber einen Visibility-Trigger nur fuer komplette Figuren
+    /// angezeigt; andere Zeilen ignorieren das Property.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isSelected;
 
     public static InventoryRowItem FromMinifig(TrackedMinifig m, int rowNum)
     {
