@@ -112,14 +112,26 @@ public partial class MinifigPriceViewModel : ObservableObject
     public bool HasRecommendation => !string.IsNullOrEmpty(RecommendationText);
 
     /// <summary>
-    /// Globaler Fehler (z.B. "Provider nicht konfiguriert"). Wenn gesetzt:
-    /// Box zeigt nur diesen Text statt der Preise.
+    /// Echter Fehler (rotes Banner): API nicht erreichbar, Token abgelaufen,
+    /// Exception im Provider. Plan B (Bugfix): wird aus dem Outcome
+    /// hochgehoben falls Source=None mit Notice=Error.
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasError))]
     private string? _errorMessage;
 
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
+
+    /// <summary>
+    /// Konfigurations-Hinweis (oranges Banner): Provider="None", BL-Token
+    /// fehlt. Plan B+C (Bugfix): andere Optik als der rote Fehler-Banner -
+    /// das ist kein Drama, der User muss nur noch zur Settings.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasConfigurationHint))]
+    private string? _configurationHint;
+
+    public bool HasConfigurationHint => !string.IsNullOrEmpty(ConfigurationHint);
 
     public MinifigPriceViewModel(
         IBlPriceCacheService cache,
@@ -152,6 +164,7 @@ public partial class MinifigPriceViewModel : ObservableObject
     public async Task LoadAsync(CancellationToken ct = default)
     {
         ErrorMessage = null;
+        ConfigurationHint = null;
         IsCompleteLoading = true;
         IsPartsLoading = true;
 
@@ -161,7 +174,36 @@ public partial class MinifigPriceViewModel : ObservableObject
         var partsTask = LoadPartsAsync(ct);
         await Task.WhenAll(completeTask, partsTask);
 
+        // Plan B: Outcome-Probleme an die UI durchreichen, damit der User
+        // weiss WARUM nichts kommt. Wir gucken auf den Komplett-Outcome -
+        // er ist der Hauptanker; wenn der "Provider not configured" hat,
+        // gilt das fuer alle Parts genauso.
+        PromoteOutcomeNoticeToBanner(CompleteOutcome);
+
         UpdateRecommendation();
+    }
+
+    /// <summary>
+    /// Hebt eine Notice aus dem Outcome auf das passende View-Property.
+    /// - NotConfigured -&gt; ConfigurationHint (orange)
+    /// - Error         -&gt; ErrorMessage      (rot)
+    /// - None          -&gt; nichts tun
+    /// Plan B (Bugfix): bisher blieb der Outcome-ErrorMessage stumm,
+    /// dadurch sah der User nur eine leere Box.
+    /// </summary>
+    private void PromoteOutcomeNoticeToBanner(PriceLookupOutcome? outcome)
+    {
+        if (outcome == null) return;
+        if (outcome.HasPrice) return; // Preis vorhanden -&gt; kein Banner.
+
+        if (outcome.IsConfigurationHint)
+        {
+            ConfigurationHint = outcome.ErrorMessage;
+        }
+        else if (outcome.HasError)
+        {
+            ErrorMessage = outcome.ErrorMessage;
+        }
     }
 
     private async Task LoadCompleteAsync(CancellationToken ct)

@@ -98,6 +98,66 @@ public class BlPriceCacheServiceTests : IDisposable
         Assert.Equal(PriceLookupSource.None, outcome.Source);
         Assert.Null(outcome.Price);
         Assert.NotNull(outcome.ErrorMessage);
+        Assert.Equal(PriceLookupNotice.Error, outcome.Notice);
+    }
+
+    [Fact]
+    public async Task GetMinifigPrice_returns_NotConfigured_when_provider_is_None()
+    {
+        // Plan C (Bugfix): bei Provider="None" darf der Service GAR KEINEN
+        // Provider-Aufruf machen, sondern liefert direkt eine Notice mit
+        // Anleitung wo der User klicken muss.
+        _settings.Current.Prices.Provider = "None";
+
+        var outcome = await _sut.GetMinifigPriceAsync("arc007");
+
+        Assert.Equal(PriceLookupSource.None, outcome.Source);
+        Assert.Equal(PriceLookupNotice.NotConfigured, outcome.Notice);
+        Assert.True(outcome.IsConfigurationHint);
+        Assert.Contains("Provider", outcome.ErrorMessage); // enthaelt den User-Hinweis
+        Assert.Equal(0, _provider.MinifigCallCount);       // Provider NICHT aufgerufen
+    }
+
+    [Fact]
+    public async Task GetMinifigPrice_uses_fresh_cache_even_when_provider_switched_to_None()
+    {
+        // Plan C: ein bestehender frischer Cache-Eintrag bleibt nutzbar auch
+        // wenn der Provider gerade auf "None" steht. Erst wenn der Cache leer
+        // ist, kommt der NotConfigured-Hinweis.
+        await SeedCacheAsync("M", "arc007", 0, avg: 7m,
+            fetchedAt: DateTime.UtcNow.AddDays(-1));
+        _settings.Current.Prices.Provider = "None";
+
+        var outcome = await _sut.GetMinifigPriceAsync("arc007");
+
+        Assert.Equal(PriceLookupSource.Cache, outcome.Source);
+        Assert.Equal(7m, outcome.Price!.AvgPrice);
+        Assert.Equal(0, _provider.MinifigCallCount);
+    }
+
+    [Fact]
+    public async Task Provider_switch_in_settings_takes_effect_without_recreating_service()
+    {
+        // Plan D (Bugfix): der Service cached den Provider NICHT mehr im
+        // Konstruktor - er fragt die Factory bei jedem Live-Call neu.
+        // Damit greift ein User-Wechsel im Settings-Dialog sofort.
+        _settings.Current.Prices.Provider = "None";
+
+        // 1. Lookup mit None -> NotConfigured.
+        var first = await _sut.GetMinifigPriceAsync("arc007");
+        Assert.Equal(PriceLookupNotice.NotConfigured, first.Notice);
+
+        // User wechselt im Dialog auf "BricklinkApi" - keine neue Service-Instanz.
+        _settings.Current.Prices.Provider = "BricklinkApi";
+        _provider.NextMinifigPrice = new PriceResult
+        {
+            AvgPrice = 42m, Currency = "EUR", FetchedAt = DateTime.UtcNow
+        };
+
+        // 2. Lookup mit BricklinkApi -> Live mit Preis.
+        var second = await _sut.GetMinifigPriceAsync("arc007");
+        Assert.Equal(PriceLookupSource.Live, second.Source);
+        Assert.Equal(42m, second.Price!.AvgPrice);
     }
 
     [Fact]

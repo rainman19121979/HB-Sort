@@ -12,11 +12,29 @@ namespace HBSort.Core.Services;
 /// Cache-Read. Da wir den Provider hier ohne Bypass aufrufen, gibt es einen
 /// "Doppel-Read" pro Live-Lookup (~1ms Overhead). Das ist bewusst akzeptiert
 /// - kein Risiko, kein Refactor des Providers noetig (siehe UX#12-Plan).
+///
+/// Plan D (Bugfix): Wir cachen den Provider NICHT mehr im Konstruktor,
+/// sondern fragen die Factory bei jedem Live-Aufruf neu. Damit greift ein
+/// User-Wechsel des Providers im Settings-Dialog sofort, ohne App-Neustart.
+/// TTL- und Currency-Settings werden ebenfalls bei jedem Aufruf live aus
+/// _settings.Current.Prices gelesen.
 /// </summary>
 public class BlPriceCacheService : IBlPriceCacheService
 {
+    /// <summary>
+    /// User-sichtbarer Hinweis-Text wenn der Provider in den Settings noch
+    /// auf "None" steht (Default fuer Neuinstallationen). Plan C.
+    /// TODO (spaetere Iteration): klickbarer "Einstellungen oeffnen"-Button
+    /// in der MinifigPriceView, der den Settings-Dialog auf den Preise-Tab
+    /// vorgewaehlt oeffnet. Dafuer waere ein INavigationService noetig - im
+    /// aktuellen Bugfix-Scope absichtlich weggelassen.
+    /// </summary>
+    public const string ProviderNotConfiguredMessage =
+        "Preise nicht verfuegbar - Provider noch nicht eingerichtet. " +
+        "Oeffne Einstellungen → Preise und waehle 'BL-API'.";
+
     private readonly IBlCacheRepository _repo;
-    private readonly IPriceProvider _provider;
+    private readonly IPriceProviderFactory _providerFactory;
     private readonly ISettingsService _settings;
 
     /// <summary>
@@ -32,8 +50,20 @@ public class BlPriceCacheService : IBlPriceCacheService
         ISettingsService settings)
     {
         _repo = repo;
-        _provider = providerFactory.GetActiveProvider();
+        _providerFactory = providerFactory;
         _settings = settings;
+    }
+
+    /// <summary>
+    /// Prueft ob ein "echter" Provider hinterlegt ist (nicht "None"). Wird
+    /// beim Live-Pfad geprueft; auf den Cache-Pfad wirkt das nicht - alte
+    /// Cache-Eintraege bleiben gueltig auch wenn der Provider gerade auf
+    /// "None" steht.
+    /// </summary>
+    private bool IsProviderConfigured()
+    {
+        var name = _settings.Current.Prices?.Provider;
+        return !string.IsNullOrWhiteSpace(name) && name != "None";
     }
 
     public Task<PriceLookupOutcome> GetMinifigPriceAsync(
@@ -107,8 +137,26 @@ public class BlPriceCacheService : IBlPriceCacheService
                 ErrorMessage: null);
         }
 
-        // 4) Miss -> Provider live aufrufen, Cache schreiben (Provider macht das selbst),
-        //    mit In-Flight-Schutz damit parallele Aufrufe nur 1x in die API gehen.
+        // 4) Plan C: Wenn der Provider gar nicht eingerichtet ist, brauchen wir
+        //    weder Live-Call noch In-Flight-Guard. Wichtig: dieser Check MUSS
+        //    vor GetLiveWithInFlightGuardAsync stattfinden - die GetOrAdd-
+        //    Factory wuerde sonst einen synchron-fertigen Task im
+        //    In-Flight-Dict hinterlassen (das finally-TryRemove laeuft VOR
+        //    dem Add), was den naechsten Aufruf den alten NotConfigured-
+        //    Wert erneut sehen lassen wuerde.
+        if (!IsProviderConfigured())
+        {
+            return new PriceLookupOutcome(
+                Price: null,
+                Source: PriceLookupSource.None,
+                FetchedAt: null,
+                ErrorMessage: ProviderNotConfiguredMessage,
+                Notice: PriceLookupNotice.NotConfigured);
+        }
+
+        // 5) Miss + Provider konfiguriert -> Provider live aufrufen, Cache
+        //    schreiben (Provider macht das selbst), mit In-Flight-Schutz
+        //    damit parallele Aufrufe nur 1x in die API gehen.
         return await GetLiveWithInFlightGuardAsync(itemType, itemNo, colorId, ct);
     }
 
@@ -131,13 +179,19 @@ public class BlPriceCacheService : IBlPriceCacheService
     {
         try
         {
+            // Plan D: Provider live aus der Factory, kein gecachter _provider mehr.
+            // Damit greift ein Settings-Wechsel sofort. Der NotConfigured-Check
+            // ist bewusst eine Ebene hoeher (GetPriceCoreAsync), siehe Kommentar
+            // dort warum.
+            var provider = _providerFactory.GetActiveProvider();
+
             // Provider hat seinen eigenen internen Cache-Lookup - wir akzeptieren
             // den Doppel-Read (~1ms). Bei Cache-Miss (was hier der Fall ist) macht
             // der Provider den BL-API-Call und schreibt das Ergebnis selbst in
             // den Cache.
             var price = itemType == "M"
-                ? await _provider.GetMinifigPriceAsync(itemNo)
-                : await _provider.GetPartPriceAsync(itemNo, colorId);
+                ? await provider.GetMinifigPriceAsync(itemNo)
+                : await provider.GetPartPriceAsync(itemNo, colorId);
 
             if (price != null)
             {
@@ -152,7 +206,8 @@ public class BlPriceCacheService : IBlPriceCacheService
                 Price: null,
                 Source: PriceLookupSource.None,
                 FetchedAt: null,
-                ErrorMessage: "Kein Preis verfuegbar (Provider lieferte null).");
+                ErrorMessage: "Kein Preis verfuegbar (Provider lieferte null).",
+                Notice: PriceLookupNotice.Error);
         }
         catch (Exception ex)
         {
@@ -162,7 +217,8 @@ public class BlPriceCacheService : IBlPriceCacheService
                 Price: null,
                 Source: PriceLookupSource.None,
                 FetchedAt: null,
-                ErrorMessage: $"Preis-Lookup fehlgeschlagen: {ex.Message}");
+                ErrorMessage: $"Preis-Lookup fehlgeschlagen: {ex.Message}",
+                Notice: PriceLookupNotice.Error);
         }
         finally
         {

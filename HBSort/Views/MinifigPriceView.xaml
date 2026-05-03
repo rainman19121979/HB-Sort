@@ -14,10 +14,11 @@
     -->
     <Grid Margin="6">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>  <!-- Header + Refresh -->
-            <RowDefinition Height="*"/>     <!-- Inhalt 50/50 -->
-            <RowDefinition Height="Auto"/>  <!-- Empfehlung -->
-            <RowDefinition Height="Auto"/>  <!-- Error-Banner (falls noetig) -->
+            <RowDefinition Height="Auto"/>  <!-- 0: Header + Refresh -->
+            <RowDefinition Height="*"/>     <!-- 1: Inhalt 50/50 -->
+            <RowDefinition Height="Auto"/>  <!-- 2: Empfehlung (gruen) -->
+            <RowDefinition Height="Auto"/>  <!-- 3: Konfigurations-Hinweis (orange) -->
+            <RowDefinition Height="Auto"/>  <!-- 4: Echter Fehler (rot) -->
         </Grid.RowDefinitions>
 
         <!-- ===== Header mit Refresh-Icon ===== -->
@@ -167,8 +168,26 @@
                        TextWrapping="Wrap"/>
         </Border>
 
-        <!-- ===== Globaler Fehler (rotes Banner) ===== -->
+        <!--
+            ===== Konfigurations-Hinweis (oranges Banner) =====
+            Plan C: erscheint wenn der Preis-Provider in den Settings auf
+            "None" steht. Andere Optik als der rote Fehler-Banner damit
+            klar ist: das ist kein Drama, sondern nur eine fehlende
+            Einstellung.
+        -->
         <Border Grid.Row="3" Margin="0,4,0,0"
+                Background="#FFF3E0" BorderBrush="#E65100"
+                BorderThickness="1" CornerRadius="4"
+                Padding="8,4"
+                Visibility="{Binding HasConfigurationHint,
+                    Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="{Binding ConfigurationHint}"
+                       FontSize="11" Foreground="#E65100"
+                       TextWrapping="Wrap"/>
+        </Border>
+
+        <!-- ===== Globaler Fehler (rotes Banner) ===== -->
+        <Border Grid.Row="4" Margin="0,4,0,0"
                 Background="#FFEBEE" BorderBrush="#C62828"
                 BorderThickness="1" CornerRadius="4"
                 Padding="8,4"
