@@ -117,7 +117,8 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <Image Grid.Column="0" Source="{Binding ImageUrl}"
-                                               Width="50" Height="50" Stretch="Uniform"/>
+                                               Width="50" Height="50" Stretch="Uniform"
+                                               b:ImageZoom.IsEnabled="True"/>
                                         <Border Grid.Column="1" Width="20" Height="20"
                                                 Background="{Binding ColorSwatch}"
                                                 BorderBrush="Black" BorderThickness="1"

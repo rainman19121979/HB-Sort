@@ -199,7 +199,8 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <Image Grid.Column="0" Source="{Binding ImageUrl}"
-                                           Width="48" Height="48" Stretch="Uniform"/>
+                                           Width="48" Height="48" Stretch="Uniform"
+                                           b:ImageZoom.IsEnabled="True"/>
                                     <StackPanel Grid.Column="1" Margin="8,0" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding MinifigName}"
                                                    FontSize="{DynamicResource BodyFontSize}"

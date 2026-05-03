@@ -1017,6 +1017,19 @@ am Pending-Part und triggert einen Toast.
   Pending-Figur verwirft, bleibt der FloatingPart trotzdem reduziert -
   das Teil ist physisch beim User. Kein Rollback.
 
+### UX-Iteration X.5b ✅ (2026-05-03) — ImageZoom-Lueckenschluss
+
+Drei Image-Stellen die in UX#6 uebersehen waren bekamen
+`b:ImageZoom.IsEnabled="True"` nachgereicht:
+- `BinDetailDialog.xaml` zweite Bild-Stelle (FloatingParts-Liste, 50px)
+- `BuildSuggestionsView.xaml` Bauvorschlag-Karten (Bild = Zoom, Rest =
+  Detail-Dialog via Border-Click)
+- `PartLookupView.xaml` "Moegliche BL-Figuren"-Liste (48px)
+
+Stand: **17 von 21** sichtbaren `<Image>`-Elementen sind zoombar.
+Bewusst ohne Zoom: Logo (MainWindow, SettingsWindow), Webcam-Live-Frame
+(SortingView), Overlay-Bild (ZoomOverlayHost selbst).
+
 ## Wichtige Hinweise
 
 ### Async-First
