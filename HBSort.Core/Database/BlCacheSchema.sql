@@ -68,3 +68,24 @@ CREATE TABLE IF NOT EXISTS api_call_log (
     success INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_api_call_log_timestamp ON api_call_log(timestamp);
+
+-- Phase 8: Preis-Cache. PRIMARY KEY ueber alle Filter-Felder, damit
+-- verschiedene Region/Currency/Condition-Kombis nebeneinander gecached werden.
+CREATE TABLE IF NOT EXISTS bl_prices (
+    item_type TEXT NOT NULL,
+    item_no TEXT NOT NULL,
+    color_id INTEGER NOT NULL DEFAULT 0,
+    guide_type TEXT NOT NULL,        -- 'sold' | 'stock'
+    new_or_used TEXT NOT NULL,       -- 'N' | 'U'
+    region TEXT NOT NULL DEFAULT '',
+    currency TEXT NOT NULL DEFAULT 'EUR',
+    min_price REAL,
+    avg_price REAL,
+    qty_avg_price REAL,
+    max_price REAL,
+    unit_quantity INTEGER DEFAULT 0,
+    total_quantity INTEGER DEFAULT 0,
+    fetched_at TEXT NOT NULL,
+    PRIMARY KEY (item_type, item_no, color_id, guide_type, new_or_used, region, currency)
+);
+CREATE INDEX IF NOT EXISTS idx_bl_prices_fetched ON bl_prices(fetched_at);

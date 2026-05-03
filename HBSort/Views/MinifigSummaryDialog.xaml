@@ -9,11 +9,12 @@
         WindowStartupLocation="CenterOwner">
     <Grid Margin="16">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>     <!-- 0: Header -->
+            <RowDefinition Height="Auto"/>     <!-- 1: Notizen -->
+            <RowDefinition Height="*"/>        <!-- 2: Teileliste -->
+            <RowDefinition Height="Auto"/>     <!-- 3: Verschieben-Combo (nur Waiting) -->
+            <RowDefinition Height="Auto"/>     <!-- 4: Phase 8 - Verkaufsempfehlung (nur Complete + Provider!=None) -->
+            <RowDefinition Height="Auto"/>     <!-- 5: Buttons -->
         </Grid.RowDefinitions>
 
         <!-- Header: Bild + Name + BL-ID + Bin -->
@@ -131,8 +132,51 @@
                       SelectedItem="{Binding MoveTarget}"/>
         </Grid>
 
+        <!-- Phase 8: Verkaufsempfehlung (nur sichtbar wenn Status=Complete + Provider!=None) -->
+        <Border Grid.Row="4" Margin="0,12,0,0"
+                Background="#F5F5F5" BorderBrush="#BDBDBD"
+                BorderThickness="1" CornerRadius="4"
+                Padding="12"
+                Visibility="{Binding ShowSalesRecommendation, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Verkaufsempfehlung"
+                               FontWeight="SemiBold" FontSize="13"
+                               VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Content="Neu laden"
+                            Padding="8,2"
+                            Command="{Binding ReloadPricesCommand}"
+                            IsEnabled="{Binding IsLoadingPrices, Converter={StaticResource InverseBoolToVisibility}, ConverterParameter=true}"/>
+                </Grid>
+
+                <!-- Lade-Anzeige -->
+                <TextBlock Text="Lade Preise..." Foreground="Gray" FontStyle="Italic" FontSize="11"
+                           Visibility="{Binding IsLoadingPrices, Converter={StaticResource BoolToVisibility}}"/>
+
+                <!-- Fehler-Anzeige -->
+                <TextBlock Text="{Binding PriceErrorText}" Foreground="#C62828" FontSize="11"
+                           TextWrapping="Wrap" Margin="0,0,0,4"/>
+
+                <!-- Daten-Anzeige -->
+                <StackPanel Visibility="{Binding HasSalesRecommendation, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="{Binding SalesRecommendation.ProviderInfo}"
+                               Foreground="Gray" FontSize="11" Margin="0,0,0,6"/>
+                    <TextBlock Text="{Binding MinifigPriceLabel}" FontFamily="Consolas" FontSize="12"/>
+                    <TextBlock Text="{Binding PartsPriceLabel}" FontFamily="Consolas" FontSize="12"/>
+                    <TextBlock Text="{Binding SalesAdviceText}"
+                               FontWeight="SemiBold" FontSize="13"
+                               Margin="0,8,0,0"
+                               Foreground="{Binding SalesAdviceBrush}"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
         <!-- Buttons -->
-        <StackPanel Grid.Row="4" Orientation="Horizontal"
+        <StackPanel Grid.Row="5" Orientation="Horizontal"
                     HorizontalAlignment="Right" Margin="0,12,0,0">
 
             <!-- Loeschen: immer sichtbar -->

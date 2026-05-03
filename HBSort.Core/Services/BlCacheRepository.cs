@@ -884,6 +884,102 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
     }
 
     // ========================================================================
+    // Phase 8: Preis-Cache
+    // ========================================================================
+
+    public Task<Models.Pricing.PriceResult?> GetCachedPriceAsync(
+        string itemType, string itemNo, int colorId,
+        string guideType, string newOrUsed,
+        string region, string currency,
+        int staleDays,
+        CancellationToken ct = default)
+    {
+        Models.Pricing.PriceResult? result = null;
+        lock (_lock)
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT min_price, avg_price, qty_avg_price, max_price,
+                       unit_quantity, total_quantity, fetched_at
+                FROM bl_prices
+                WHERE item_type = $it AND item_no = $in AND color_id = $cid
+                  AND guide_type = $gt AND new_or_used = $nu
+                  AND region = $rg AND currency = $cu;";
+            cmd.Parameters.AddWithValue("$it", itemType);
+            cmd.Parameters.AddWithValue("$in", itemNo);
+            cmd.Parameters.AddWithValue("$cid", colorId);
+            cmd.Parameters.AddWithValue("$gt", guideType);
+            cmd.Parameters.AddWithValue("$nu", newOrUsed);
+            cmd.Parameters.AddWithValue("$rg", region ?? string.Empty);
+            cmd.Parameters.AddWithValue("$cu", currency);
+
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read()) return Task.FromResult<Models.Pricing.PriceResult?>(null);
+
+            var fetchedAt = ParseUtc(reader.GetString(6));
+
+            // Stale-Check: bei staleDays>0 verwerfen wenn aelter (Aufrufer holt neu).
+            if (staleDays > 0)
+            {
+                var ageDays = (DateTime.UtcNow - fetchedAt).TotalDays;
+                if (ageDays > staleDays) return Task.FromResult<Models.Pricing.PriceResult?>(null);
+            }
+
+            result = new Models.Pricing.PriceResult
+            {
+                MinPrice      = reader.IsDBNull(0) ? null : (decimal?)reader.GetDouble(0),
+                AvgPrice      = reader.IsDBNull(1) ? null : (decimal?)reader.GetDouble(1),
+                QtyAvgPrice   = reader.IsDBNull(2) ? null : (decimal?)reader.GetDouble(2),
+                MaxPrice      = reader.IsDBNull(3) ? null : (decimal?)reader.GetDouble(3),
+                UnitQuantity  = reader.IsDBNull(4) ? 0 : reader.GetInt32(4),
+                TotalQuantity = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
+                Currency      = currency,
+                FetchedAt     = fetchedAt
+            };
+        }
+        return Task.FromResult<Models.Pricing.PriceResult?>(result);
+    }
+
+    public Task UpsertPriceAsync(
+        string itemType, string itemNo, int colorId,
+        string guideType, string newOrUsed,
+        string region, string currency,
+        Models.Pricing.PriceResult price,
+        CancellationToken ct = default)
+    {
+        lock (_lock)
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = @"
+                INSERT OR REPLACE INTO bl_prices
+                    (item_type, item_no, color_id, guide_type, new_or_used,
+                     region, currency,
+                     min_price, avg_price, qty_avg_price, max_price,
+                     unit_quantity, total_quantity, fetched_at)
+                VALUES
+                    ($it, $in, $cid, $gt, $nu, $rg, $cu,
+                     $min, $avg, $qty, $max, $uq, $tq, $fet);";
+            cmd.Parameters.AddWithValue("$it", itemType);
+            cmd.Parameters.AddWithValue("$in", itemNo);
+            cmd.Parameters.AddWithValue("$cid", colorId);
+            cmd.Parameters.AddWithValue("$gt", guideType);
+            cmd.Parameters.AddWithValue("$nu", newOrUsed);
+            cmd.Parameters.AddWithValue("$rg", region ?? string.Empty);
+            cmd.Parameters.AddWithValue("$cu", currency);
+            cmd.Parameters.AddWithValue("$min", (object?)(double?)price.MinPrice ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$avg", (object?)(double?)price.AvgPrice ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$qty", (object?)(double?)price.QtyAvgPrice ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$max", (object?)(double?)price.MaxPrice ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$uq", price.UnitQuantity);
+            cmd.Parameters.AddWithValue("$tq", price.TotalQuantity);
+            cmd.Parameters.AddWithValue("$fet",
+                DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+            cmd.ExecuteNonQuery();
+        }
+        return Task.CompletedTask;
+    }
+
+    // ========================================================================
     // Helpers
     // ========================================================================
 

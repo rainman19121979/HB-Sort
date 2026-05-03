@@ -289,6 +289,18 @@ public partial class SettingsViewModel : ObservableObject
         PriceToolUrl = s.PriceToolUrl;
         BsxExportFolder = s.BsxExportFolder ?? string.Empty;
 
+        // Phase 8: Preise-Tab
+        PriceProvider                  = string.IsNullOrWhiteSpace(s.Prices.Provider) ? "None" : s.Prices.Provider;
+        PriceGuideType                 = s.Prices.GuideType;
+        PricePriceColumn               = s.Prices.PriceColumn;
+        PriceRegion                    = s.Prices.Region;
+        PriceCountryCode               = s.Prices.CountryCode;
+        PriceCurrency                  = s.Prices.Currency;
+        PriceCorrectionMinifigPercent  = s.Prices.CorrectionMinifigPercent;
+        PriceCorrectionPartsPercent    = s.Prices.CorrectionPartsPercent;
+        PriceCacheDays                 = s.Prices.CacheDays;
+        PriceAutoLoadOnComplete        = s.Prices.AutoLoadOnComplete;
+
         // Kameras auflisten
         AvailableCameras = _cameraService.GetAvailableCameras();
     }
@@ -309,6 +321,18 @@ public partial class SettingsViewModel : ObservableObject
         s.ImageCache.PreloadOnMinifigScan = PreloadOnMinifigScan;
         s.ImageCache.LimitMb = ImageCacheLimitMb;
         s.BsxExportFolder = string.IsNullOrWhiteSpace(BsxExportFolder) ? null : BsxExportFolder.Trim();
+
+        // Phase 8: Preise
+        s.Prices.Provider                  = PriceProvider;
+        s.Prices.GuideType                 = PriceGuideType;
+        s.Prices.PriceColumn               = PricePriceColumn;
+        s.Prices.Region                    = PriceRegion ?? string.Empty;
+        s.Prices.CountryCode               = PriceCountryCode ?? string.Empty;
+        s.Prices.Currency                  = string.IsNullOrWhiteSpace(PriceCurrency) ? "EUR" : PriceCurrency;
+        s.Prices.CorrectionMinifigPercent  = PriceCorrectionMinifigPercent;
+        s.Prices.CorrectionPartsPercent    = PriceCorrectionPartsPercent;
+        s.Prices.CacheDays                 = Math.Max(1, PriceCacheDays);
+        s.Prices.AutoLoadOnComplete        = PriceAutoLoadOnComplete;
 
         await _settingsService.SaveAsync();
         Log.Information("Einstellungen gespeichert");
@@ -687,6 +711,66 @@ public partial class SettingsViewModel : ObservableObject
 
     /// <summary>Phase 7: Default-Ordner fuer den BSX-Export.</summary>
     [ObservableProperty] private string _bsxExportFolder = string.Empty;
+
+    // ====================================================================
+    // Phase 8: Preise-Tab
+    // ====================================================================
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsPriceProviderNone))]
+    [NotifyPropertyChangedFor(nameof(IsPriceProviderBricklink))]
+    [NotifyPropertyChangedFor(nameof(MinifigPreviewLabel))]
+    [NotifyPropertyChangedFor(nameof(PartsPreviewLabel))]
+    private string _priceProvider = "None";
+
+    public bool IsPriceProviderNone       => PriceProvider == "None";
+    public bool IsPriceProviderBricklink  => PriceProvider == "BricklinkApi";
+
+    [ObservableProperty] private string _priceGuideType = "sold";       // "sold" | "stock"
+    [ObservableProperty] private string _pricePriceColumn = "qty_avg";  // "min"|"avg"|"qty_avg"|"max"
+    [ObservableProperty] private string _priceRegion = "europe";
+    [ObservableProperty] private string _priceCountryCode = "DE";
+    [ObservableProperty] private string _priceCurrency = "EUR";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MinifigPreviewLabel))]
+    private decimal _priceCorrectionMinifigPercent = -10m;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PartsPreviewLabel))]
+    private decimal _priceCorrectionPartsPercent = -15m;
+
+    [ObservableProperty] private int _priceCacheDays = 7;
+    [ObservableProperty] private bool _priceAutoLoadOnComplete = true;
+
+    /// <summary>Live-Vorschau "BL Avg 10.00 EUR -> mein VK 9.00 EUR" fuer Minifig.</summary>
+    public string MinifigPreviewLabel
+    {
+        get
+        {
+            const decimal demoBl = 10.00m;
+            var corrected = Math.Round(demoBl * (1m + PriceCorrectionMinifigPercent / 100m), 2);
+            return $"Beispiel Minifig: BL {demoBl:F2} {PriceCurrency} -> mein VK {corrected:F2} {PriceCurrency}";
+        }
+    }
+
+    /// <summary>Live-Vorschau fuer Einzelteile-Summe.</summary>
+    public string PartsPreviewLabel
+    {
+        get
+        {
+            const decimal demoBl = 6.00m;
+            var corrected = Math.Round(demoBl * (1m + PriceCorrectionPartsPercent / 100m), 2);
+            return $"Beispiel Teile-Summe: BL {demoBl:F2} {PriceCurrency} -> mein VK {corrected:F2} {PriceCurrency}";
+        }
+    }
+
+    /// <summary>Wird beim Tippen in PriceCurrency aufgerufen, damit Vorschau-Labels triggern.</summary>
+    partial void OnPriceCurrencyChanged(string value)
+    {
+        OnPropertyChanged(nameof(MinifigPreviewLabel));
+        OnPropertyChanged(nameof(PartsPreviewLabel));
+    }
 
     // Bei Wechsel des aktiven Radio-Buttons direkt nachladen.
     partial void OnStatsRangeTodayChanged(bool value)   { if (value) _ = LoadStatsAsync(); }

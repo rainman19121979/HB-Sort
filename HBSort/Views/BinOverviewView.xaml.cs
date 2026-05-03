@@ -58,8 +58,11 @@ public partial class BinOverviewView : UserControl
         var persistence = Service<IMinifigPersistenceService>();
         var imgProvider = Service<IPartImageProvider>();
         var catalog = Service<IBlCatalogService>();
+        var priceCalc = Service<IPriceCalculationService>();
+        var settings = Service<ISettingsService>();
 
-        var vm = new MinifigSummaryViewModel(row.Id, ctxFactory, binService, imgProvider, catalog);
+        var vm = new MinifigSummaryViewModel(
+            row.Id, ctxFactory, binService, imgProvider, catalog, priceCalc, settings);
         var dialog = new MinifigSummaryDialog(vm, notif, persistence) { Owner = Window.GetWindow(this) };
         dialog.ShowDialog();
     }

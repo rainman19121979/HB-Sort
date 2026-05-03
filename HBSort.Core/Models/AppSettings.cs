@@ -83,6 +83,12 @@ public class AppSettings
     /// 3=Wartende-Detail, 4=Letzte Scans. Null = noch nie gesetzt -> Default 0.
     /// </summary>
     public int? BottomRightTabIndex { get; set; }
+
+    /// <summary>
+    /// Phase 8: Preis-Lookup-Konfiguration (Provider, Korrekturen, Cache).
+    /// Default: Provider=None -> keine Preise sichtbar.
+    /// </summary>
+    public PriceSettings Prices { get; set; } = new();
 }
 
 /// <summary>

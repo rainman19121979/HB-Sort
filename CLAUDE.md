@@ -1014,8 +1014,35 @@ NICHT in Phase 7 (bewusst weggelassen):
 - Neue Repository-Method `IBlCacheRepository.FindMinifigsContainingPartsAsync`
   fuer den BuildSuggestions-Reverse-Match (filtert `is_from_supersets=0`).
 
-### Phase 8 – BL-Price-Tracker-Anbindung
-[siehe vorige Doku]
+### Phase 8 – BL-Preise + Verkaufsempfehlung ✅ (PROMPT 12, 2026-05-03)
+- Provider-Pattern: `IPriceProvider` + `IPriceProviderFactory` + zwei
+  Implementierungen (`DummyPriceProvider`, `BricklinkApiPriceProvider`).
+  Factory liest Settings.Prices.Provider und liefert die passende
+  Implementierung; alle Provider sind Singletons - Wechsel ist live.
+- `BricklinkApiPriceProvider` nutzt `BricklinkSharp.GetPriceGuideAsync`
+  mit Filtern fuer GuideType (sold/stock), Condition (Used Default),
+  Region, Country, Currency. Cache-First: bl_prices in bl_cache.db
+  (PRIMARY KEY ueber alle Filter-Felder). Stale-Fallback bei API-Fehler
+  oder Rate-Limit-Block.
+- `PriceCalculationService` aggregiert Minifig-Preis + Sum aller
+  Required-Parts (qty * preis), wendet Korrekturen aus Settings an
+  (-10% Minifig / -15% Parts Default), leitet `SalesAdvice` ab
+  (CompleteWorthIt / PartsWorthIt / Equal / NoData; 10% Diff-Schwelle).
+- `MinifigSummaryDialog` (Status=Complete + Provider!=None):
+  neuer Verkaufsempfehlung-Block VOR den Buttons mit
+  Provider-Info, Minifig-Preis, Teile-Summe, farbiger Empfehlung
+  und "Neu laden"-Button. Auto-Load wenn Settings.Prices.AutoLoadOnComplete.
+- `AppSettings.Prices` (PriceSettings) mit Defaults Provider=None.
+- Neuer Settings-Tab "Preise" zwischen "BL-Catalog-Daten" und
+  "Statistik" mit RadioButtons fuer Provider, Filter-Dropdowns,
+  Korrektur-Inputs (mit Live-Vorschau), Cache-Tage, Auto-Load-Checkbox.
+- Schema-Erweiterung: `bl_prices`-Tabelle in BlCacheSchema.sql
+  (CREATE TABLE IF NOT EXISTS - automatische Migration).
+
+NICHT in dieser Phase:
+- HBPriceToolProvider (kommt wenn das eigene Tool dokumentiert ist).
+- Provider-Mocks fuer Unit-Tests (zu aufwaendig fuer den Erstwurf).
+- Bulk-Preis-Update fuer alle wartenden Figuren.
 
 ## Wichtige Hinweise
 

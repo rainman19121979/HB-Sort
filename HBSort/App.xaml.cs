@@ -213,6 +213,14 @@ public partial class App : Application
         // Phase 7: BSX-Export
         services.AddSingleton<IBsxExportService, BsxExportService>();
 
+        // Phase 8: Preise. Beide Provider als Singleton damit der ProviderFactory
+        // bei jedem Settings-Wechsel einfach den passenden zurueckgibt - die
+        // VMs muessen nichts neu instanziieren.
+        services.AddSingleton<DummyPriceProvider>();
+        services.AddSingleton<BricklinkApiPriceProvider>();
+        services.AddSingleton<IPriceProviderFactory, PriceProviderFactory>();
+        services.AddSingleton<IPriceCalculationService, PriceCalculationService>();
+
         // ViewModels
         services.AddSingleton<ViewModels.MainViewModel>();
         services.AddSingleton<ViewModels.ScanViewModel>();

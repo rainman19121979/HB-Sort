@@ -783,6 +783,178 @@
             </TabItem>
 
             <!-- ====================================== -->
+            <!-- TAB: PREISE (Phase 8 / PROMPT 12)      -->
+            <!-- ====================================== -->
+            <TabItem Header="Preise">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                    <StackPanel MaxWidth="700" HorizontalAlignment="Left">
+
+                        <TextBlock Text="Preis-Quelle" FontSize="14" FontWeight="SemiBold"
+                                   Margin="0,0,0,8"/>
+                        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Gray"
+                                   Margin="0,0,0,8"
+                                   Text="Bestimmt, woher die Preise fuer die Verkaufsempfehlung im Detail-Dialog kommen."/>
+
+                        <RadioButton Content="Keine Preise"
+                                     GroupName="PriceProvider"
+                                     IsChecked="{Binding IsPriceProviderNone, Mode=OneWay}"
+                                     Click="PriceProviderNone_Click"
+                                     Margin="0,0,0,4"/>
+                        <RadioButton Content="BrickLink-API (benoetigt BL-Tokens, siehe BrickLink-API-Tab)"
+                                     GroupName="PriceProvider"
+                                     IsChecked="{Binding IsPriceProviderBricklink, Mode=OneWay}"
+                                     Click="PriceProviderBricklink_Click"
+                                     Margin="0,0,0,12"/>
+
+                        <!-- Detail-Felder nur wenn BL-Provider gewaehlt -->
+                        <StackPanel Visibility="{Binding IsPriceProviderBricklink, Converter={StaticResource BoolToVisibility}}">
+
+                            <Separator Margin="0,4,0,8"/>
+
+                            <TextBlock Text="BL-API-Filter" FontSize="13" FontWeight="SemiBold"
+                                       Margin="0,0,0,6"/>
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Guide-Typ:"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <ComboBox Grid.Row="0" Grid.Column="1" Margin="0,0,0,4"
+                                          SelectedValue="{Binding PriceGuideType, Mode=TwoWay}"
+                                          SelectedValuePath="Tag">
+                                    <ComboBoxItem Content="Sold (was wirklich verkauft wurde)" Tag="sold"/>
+                                    <ComboBoxItem Content="Stock (aktuelle Angebote)" Tag="stock"/>
+                                </ComboBox>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Spalte:"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <ComboBox Grid.Row="1" Grid.Column="1" Margin="0,0,0,4"
+                                          SelectedValue="{Binding PricePriceColumn, Mode=TwoWay}"
+                                          SelectedValuePath="Tag">
+                                    <ComboBoxItem Content="Min" Tag="min"/>
+                                    <ComboBoxItem Content="Avg" Tag="avg"/>
+                                    <ComboBoxItem Content="Qty-Avg (Default)" Tag="qty_avg"/>
+                                    <ComboBoxItem Content="Max" Tag="max"/>
+                                </ComboBox>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Region:"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <ComboBox Grid.Row="2" Grid.Column="1" Margin="0,0,0,4"
+                                          SelectedValue="{Binding PriceRegion, Mode=TwoWay}"
+                                          SelectedValuePath="Tag">
+                                    <ComboBoxItem Content="(global, keine Filterung)" Tag=""/>
+                                    <ComboBoxItem Content="europe" Tag="europe"/>
+                                    <ComboBoxItem Content="north_america" Tag="north_america"/>
+                                    <ComboBoxItem Content="asia" Tag="asia"/>
+                                    <ComboBoxItem Content="south_america" Tag="south_america"/>
+                                    <ComboBoxItem Content="africa" Tag="africa"/>
+                                </ComboBox>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Country-Code (z.B. DE):"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <TextBox Grid.Row="3" Grid.Column="1" Margin="0,0,0,4"
+                                         MaxLength="2"
+                                         Text="{Binding PriceCountryCode, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Leer = kein Country-Filter"/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Waehrung:"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <TextBox Grid.Row="4" Grid.Column="1" Margin="0,0,0,4"
+                                         MaxLength="3"
+                                         Text="{Binding PriceCurrency, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+
+                            <Separator Margin="0,4,0,8"/>
+
+                            <TextBlock Text="Korrekturfaktoren" FontSize="13" FontWeight="SemiBold"
+                                       Margin="0,0,0,6"/>
+                            <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Gray"
+                                       Margin="0,0,0,6"
+                                       Text="Negative Werte = Abschlag vom BL-Preis (z.B. -10 = 10% weniger)."/>
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Komplett-Figur (%):"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <TextBox Grid.Row="0" Grid.Column="1" Margin="0,0,8,4"
+                                         Text="{Binding PriceCorrectionMinifigPercent, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                                           Text="{Binding MinifigPreviewLabel}"
+                                           Foreground="#1976D2" FontStyle="Italic"
+                                           FontSize="11" Margin="0,0,0,8"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Einzelteile-Summe (%):"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <TextBox Grid.Row="2" Grid.Column="1" Margin="0,0,8,4"
+                                         Text="{Binding PriceCorrectionPartsPercent, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2"
+                                           Text="{Binding PartsPreviewLabel}"
+                                           Foreground="#1976D2" FontStyle="Italic"
+                                           FontSize="11"/>
+                            </Grid>
+
+                            <Separator Margin="0,4,0,8"/>
+
+                            <TextBlock Text="Cache + Verhalten" FontSize="13" FontWeight="SemiBold"
+                                       Margin="0,0,0,6"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Cache-Dauer (Tage):"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <TextBox Grid.Row="0" Grid.Column="1" Margin="0,0,0,4"
+                                         Text="{Binding PriceCacheDays, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <CheckBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                                          Margin="0,8,0,0"
+                                          Content="Preise automatisch laden bei kompletten Figuren"
+                                          IsChecked="{Binding PriceAutoLoadOnComplete}"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <Border Background="#E3F2FD" BorderBrush="#1976D2"
+                                BorderThickness="1" CornerRadius="4"
+                                Padding="12" Margin="0,16,0,0"
+                                Visibility="{Binding IsPriceProviderNone, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock TextWrapping="Wrap" FontSize="12">
+                                <Run Text="Hinweis:" FontWeight="SemiBold"/>
+                                Bei "Keine Preise" wird im Detail-Dialog kompletter Figuren keine
+                                Verkaufsempfehlung angezeigt. Alle anderen Funktionen bleiben
+                                unveraendert.
+                            </TextBlock>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ====================================== -->
             <!-- TAB: STATISTIK (Phase 6 / PROMPT 7)    -->
             <!-- ====================================== -->
             <TabItem Header="Statistik">

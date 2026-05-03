@@ -287,6 +287,14 @@ public partial class SettingsWindow : Window
         }
     }
 
+    /// <summary>Phase 8: Provider=None ausgewaehlt -> Detail-Felder kollabieren via Visibility-Trigger.</summary>
+    private void PriceProviderNone_Click(object sender, RoutedEventArgs e)
+        => _viewModel.PriceProvider = "None";
+
+    /// <summary>Phase 8: Provider=BL ausgewaehlt -> Detail-Felder werden sichtbar.</summary>
+    private void PriceProviderBricklink_Click(object sender, RoutedEventArgs e)
+        => _viewModel.PriceProvider = "BricklinkApi";
+
     /// <summary>Phase 7: Ordner-Picker fuer den BSX-Export-Default-Folder.</summary>
     private void BrowseBsxFolder_Click(object sender, RoutedEventArgs e)
     {

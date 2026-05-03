@@ -113,4 +113,30 @@ public interface IBlCacheRepository
 
     /// <summary>Loescht api_call_log-Eintraege aelter als N Tage (Wartung beim App-Start).</summary>
     Task<int> PruneApiCallLogAsync(int olderThanDays = 7, CancellationToken ct = default);
+
+    // --- Phase 8: Preis-Cache ---
+
+    /// <summary>
+    /// Holt einen gecachten Preis-Eintrag. Liefert null wenn keiner existiert ODER
+    /// wenn der Eintrag aelter als <paramref name="staleDays"/> ist (Aufrufer holt
+    /// dann neu vom Provider). Bei staleDays=0 wird auch ein stale Eintrag
+    /// zurueckgegeben (Fallback-Pfad bei API-Fehler).
+    /// </summary>
+    Task<Models.Pricing.PriceResult?> GetCachedPriceAsync(
+        string itemType, string itemNo, int colorId,
+        string guideType, string newOrUsed,
+        string region, string currency,
+        int staleDays,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Speichert oder aktualisiert einen Preis-Eintrag (INSERT OR REPLACE auf
+    /// dem PRIMARY KEY). FetchedAt wird auf jetzt gesetzt.
+    /// </summary>
+    Task UpsertPriceAsync(
+        string itemType, string itemNo, int colorId,
+        string guideType, string newOrUsed,
+        string region, string currency,
+        Models.Pricing.PriceResult price,
+        CancellationToken ct = default);
 }
