@@ -4,73 +4,125 @@
         xmlns:ui="http://schemas.modernwpf.com/2019"
         xmlns:b="clr-namespace:HBSort.Behaviors"
         ui:WindowHelper.UseModernWindowStyle="True"
-        Title="Figuren exportieren"
+        Title="BSX-Export"
         Icon="../Resources/app.ico"
-        Width="640" Height="640"
-        MinWidth="500" MinHeight="500"
+        Width="680" Height="700"
+        MinWidth="520" MinHeight="540"
         WindowStartupLocation="CenterOwner">
     <!--
-        Phase 7: BSX-Export-Dialog. Zeigt die ausgewaehlten Figuren, laesst den User
-        Condition/Status/Remark + Speicherort waehlen und triggert dann den Export.
-        Nach erfolgreichem Export folgt der Cleanup-Bereich (Figuren entfernen +
-        leere Faecher freigeben).
+        Phase 7 + UX X.6: BSX-Export-Dialog. Zeigt zwei getrennte Listen
+        (Komplette Figuren + Einzelteile) und exportiert beide in eine
+        gemeinsame BSX-Datei. Cleanup-Block laesst beide entfernen.
     -->
     <Grid Margin="16">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>  <!-- Headline -->
-            <RowDefinition Height="*"/>     <!-- Liste der Figuren -->
-            <RowDefinition Height="Auto"/>  <!-- Optionen -->
-            <RowDefinition Height="Auto"/>  <!-- Speicherort -->
-            <RowDefinition Height="Auto"/>  <!-- Cleanup-Block (nach Export) -->
-            <RowDefinition Height="Auto"/>  <!-- Buttons -->
+            <RowDefinition Height="Auto"/>  <!-- 0: Headline -->
+            <RowDefinition Height="*"/>     <!-- 1: Listen (Komplett + Einzelteile) -->
+            <RowDefinition Height="Auto"/>  <!-- 2: Optionen -->
+            <RowDefinition Height="Auto"/>  <!-- 3: Speicherort -->
+            <RowDefinition Height="Auto"/>  <!-- 4: Cleanup-Block (nach Export) -->
+            <RowDefinition Height="Auto"/>  <!-- 5: Buttons -->
         </Grid.RowDefinitions>
 
         <!-- Kopf -->
         <StackPanel Grid.Row="0" Margin="0,0,0,8">
             <TextBlock x:Name="HeaderText"
                        FontSize="18" FontWeight="SemiBold"
-                       Text="Figuren exportieren"/>
+                       Text="BSX-Export"/>
             <TextBlock x:Name="SubText"
                        FontSize="12" Foreground="Gray"
                        Margin="0,2,0,0"
                        Text="Wird beim Initialisieren gesetzt."/>
         </StackPanel>
 
-        <!-- Liste der Figuren -->
+        <!-- Zwei Listen untereinander, mit Headern. ScrollViewer drumherum. -->
         <Border Grid.Row="1"
                 BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
                 BorderThickness="1" CornerRadius="4">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <ItemsControl x:Name="ItemList">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                                    BorderThickness="0,0,0,1" Padding="8,4">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="40"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Image Grid.Column="0" Source="{Binding ImageUrl}"
-                                           Width="36" Height="36" Stretch="Uniform"
-                                           b:ImageZoom.IsEnabled="True"/>
-                                    <StackPanel Grid.Column="1" Margin="6,0" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Name}"
-                                                   FontSize="13" FontWeight="SemiBold"
-                                                   TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock FontSize="11" Foreground="Gray">
-                                            <Run Text="BL:"/>
-                                            <Run Text="{Binding BricklinkId, Mode=OneWay}" FontFamily="Consolas"/>
-                                            <Run Text=" • Fach:"/>
-                                            <Run Text="{Binding BinLabel, Mode=OneWay}"/>
-                                        </TextBlock>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <StackPanel>
+
+                    <!-- Sektion: Komplette Figuren (nur sichtbar wenn welche da sind) -->
+                    <Border x:Name="MinifigSectionHeader"
+                            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                            Padding="8,4">
+                        <TextBlock x:Name="MinifigSectionTitle"
+                                   FontWeight="SemiBold" FontSize="12"
+                                   Text="Komplette Figuren"/>
+                    </Border>
+                    <ItemsControl x:Name="MinifigList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                        BorderThickness="0,0,0,1" Padding="8,4">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Image Grid.Column="0" Source="{Binding ImageUrl}"
+                                               Width="36" Height="36" Stretch="Uniform"
+                                               b:ImageZoom.IsEnabled="True"/>
+                                        <StackPanel Grid.Column="1" Margin="6,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}"
+                                                       FontSize="13" FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock FontSize="11" Foreground="Gray">
+                                                <Run Text="BL:"/>
+                                                <Run Text="{Binding BricklinkId, Mode=OneWay}" FontFamily="Consolas"/>
+                                                <Run Text=" • Fach:"/>
+                                                <Run Text="{Binding BinLabel, Mode=OneWay}"/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Sektion: Einzelteile -->
+                    <Border x:Name="FloatingSectionHeader"
+                            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                            Padding="8,4" Margin="0,4,0,0">
+                        <TextBlock x:Name="FloatingSectionTitle"
+                                   FontWeight="SemiBold" FontSize="12"
+                                   Text="Einzelteile"/>
+                    </Border>
+                    <ItemsControl x:Name="FloatingList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                        BorderThickness="0,0,0,1" Padding="8,4">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Image Grid.Column="0" Source="{Binding ImageUrl}"
+                                               Width="36" Height="36" Stretch="Uniform"
+                                               b:ImageZoom.IsEnabled="True"/>
+                                        <StackPanel Grid.Column="1" Margin="6,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}"
+                                                       FontSize="13" FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock FontSize="11" Foreground="Gray">
+                                                <Run Text="BL:"/>
+                                                <Run Text="{Binding BricklinkId, Mode=OneWay}" FontFamily="Consolas"/>
+                                                <Run Text=" • Farbe:"/>
+                                                <Run Text="{Binding ColorLabel, Mode=OneWay}"/>
+                                                <Run Text=" • Anzahl:"/>
+                                                <Run Text="{Binding Quantity, Mode=OneWay}" FontWeight="SemiBold"/>
+                                                <Run Text=" • Fach:"/>
+                                                <Run Text="{Binding BinLabel, Mode=OneWay}"/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                </StackPanel>
             </ScrollViewer>
         </Border>
 
@@ -136,9 +188,9 @@
                 <TextBlock x:Name="CleanupHeader"
                            FontWeight="SemiBold" FontSize="13"
                            Margin="0,0,0,4"/>
-                <TextBlock TextWrapping="Wrap" FontSize="12"
-                           Margin="0,0,0,8"
-                           Text="Sollen die exportierten Figuren jetzt aus HB-Sort entfernt werden? Floating-Parts mit Origin-Verbindung bleiben als lose Teile bestehen."/>
+                <TextBlock x:Name="CleanupBody"
+                           TextWrapping="Wrap" FontSize="12"
+                           Margin="0,0,0,8"/>
                 <CheckBox x:Name="ReleaseBinsCheckbox"
                           IsChecked="True"
                           Margin="0,0,0,8">

@@ -73,41 +73,43 @@
             <Button Grid.Column="9" Content="Reset" Click="Reset_Click" Padding="8,2"/>
         </Grid>
 
-        <!-- Phase 7: BSX-Export Multi-Select-Action-Bar (nur sichtbar wenn komplette Figuren existieren) -->
+        <!-- Phase 7 + UX X.6: BSX-Export Multi-Select-Action-Bar.
+             Sichtbar wenn entweder komplette Figuren ODER Einzelteile da sind.
+             "Alle" markiert beide Typen; Wartende bleiben ignoriert. -->
         <Border Grid.Row="2"
                 Background="#F1F8E9" BorderBrush="#558B2F"
                 BorderThickness="1" CornerRadius="3"
                 Padding="8,6" Margin="0,0,0,8"
-                Visibility="{Binding HasAnyCompletes, Converter={StaticResource BoolToVisibility}}">
+                Visibility="{Binding HasAnyExportable, Converter={StaticResource BoolToVisibility}}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" VerticalAlignment="Center">
-                    <Run Text="Komplette Figuren bereit zum Export."
+                    <Run Text="Komplette Figuren und Einzelteile bereit zum Export."
                          Foreground="#33691E"/>
                     <Run Text="Auswahl:" Foreground="#33691E"/>
-                    <Run Text="{Binding SelectedCompleteCount, Mode=OneWay}"
+                    <Run Text="{Binding SelectedExportableCount, Mode=OneWay}"
                          FontWeight="SemiBold" Foreground="#33691E"/>
                     <Run Text="markiert" Foreground="#33691E"/>
                 </TextBlock>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <Button Content="Alle"
-                            Command="{Binding SelectAllCompleteCommand}"
+                            Command="{Binding SelectAllExportableCommand}"
                             Padding="8,2" Margin="0,0,4,0"
-                            ToolTip="Alle sichtbaren kompletten Figuren auswaehlen"/>
+                            ToolTip="Alle sichtbaren kompletten Figuren UND Einzelteile auswaehlen"/>
                     <Button Content="Keine"
-                            Command="{Binding DeselectAllCompleteCommand}"
+                            Command="{Binding DeselectAllExportableCommand}"
                             Padding="8,2" Margin="0,0,8,0"
                             ToolTip="Auswahl aufheben"/>
                     <Button Content="Exportieren"
                             Click="ExportSelected_Click"
-                            IsEnabled="{Binding HasSelectedCompletes}"
+                            IsEnabled="{Binding HasSelectedExportables}"
                             Padding="12,2"
                             Background="#558B2F" Foreground="White"
                             FontWeight="SemiBold"
-                            ToolTip="Markierte Figuren als BSX-XML exportieren"/>
+                            ToolTip="Markierte Figuren + Einzelteile als BSX-XML exportieren"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -124,10 +126,11 @@
                   SelectionMode="Single"
                   RowHeight="48">
             <DataGrid.Columns>
-                <!-- Phase 7: Multi-Select-Checkbox fuer BSX-Export. Nur fuer komplette
-                     Minifigs sichtbar; andere Zeilen (Wartend / Einzelteil) zeigen die
-                     Checkbox per DataTrigger versteckt. -->
-                <DataGridTemplateColumn Header="Auswahl" Width="60" CanUserSort="False">
+                <!-- Phase 7 + UX X.6: Multi-Select-Checkbox fuer BSX-Export.
+                     Sichtbar bei Komplett-Figuren UND Einzelteilen; Wartende
+                     bleiben bewusst ohne Checkbox (saubere Optik - "kann nicht
+                     exportiert werden weil unkomplett"). -->
+                <DataGridTemplateColumn Header="Aus..." Width="60" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
@@ -140,6 +143,9 @@
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding Status}" Value="Complete">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Status}" Value="Floating">
                                                 <Setter Property="Visibility" Value="Visible"/>
                                             </DataTrigger>
                                         </Style.Triggers>

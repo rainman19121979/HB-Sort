@@ -65,39 +65,53 @@ public partial class InventoryListViewModel : ObservableObject
     [ObservableProperty]
     private string _summaryText = string.Empty;
 
-    // Phase 7: Multi-Select fuer BSX-Export (nur komplette Figuren).
+    // Phase 7 + UX X.6: Multi-Select fuer BSX-Export. Komplette Figuren UND
+    // Einzelteile sind auswaehlbar. Counter zeigt Summe beider.
     [ObservableProperty]
-    private int _selectedCompleteCount;
+    private int _selectedExportableCount;
 
-    public bool HasSelectedCompletes => SelectedCompleteCount > 0;
-    partial void OnSelectedCompleteCountChanged(int value)
-        => OnPropertyChanged(nameof(HasSelectedCompletes));
+    public bool HasSelectedExportables => SelectedExportableCount > 0;
+    partial void OnSelectedExportableCountChanged(int value)
+        => OnPropertyChanged(nameof(HasSelectedExportables));
 
-    /// <summary>True wenn mindestens eine komplette Figur in der aktuellen DataGrid-Sicht ist.</summary>
-    public bool HasAnyCompletes =>
-        Items.Any(r => r.Status == StatusKind.Complete && r.UnderlyingMinifigId.HasValue);
+    /// <summary>
+    /// True wenn mindestens eine komplette Figur ODER ein Einzelteil in der
+    /// aktuellen DataGrid-Sicht ist (steuert Sichtbarkeit der Action-Bar).
+    /// </summary>
+    public bool HasAnyExportable =>
+        Items.Any(r =>
+            (r.Status == StatusKind.Complete && r.UnderlyingMinifigId.HasValue)
+            || (r.Status == StatusKind.Floating && r.UnderlyingFloatingId.HasValue));
 
-    /// <summary>Aktuell selektierte komplette Figuren (gefiltert/ungefiltert ist egal -
-    /// IsSelected wird nur durch User-Click gesetzt, also nur sichtbare).</summary>
+    /// <summary>Aktuell selektierte komplette Figuren.</summary>
     public IEnumerable<InventoryRowItem> SelectedCompletes =>
         Items.Where(r => r.IsSelected
                       && r.Status == StatusKind.Complete
                       && r.UnderlyingMinifigId.HasValue);
 
+    /// <summary>Aktuell selektierte Einzelteile (FloatingParts).</summary>
+    public IEnumerable<InventoryRowItem> SelectedFloatings =>
+        Items.Where(r => r.IsSelected
+                      && r.Status == StatusKind.Floating
+                      && r.UnderlyingFloatingId.HasValue);
+
     [RelayCommand]
-    public void SelectAllComplete()
+    public void SelectAllExportable()
     {
-        // Selektiert alle aktuell SICHTBAREN kompletten Figuren (respektiert Filter).
+        // Selektiert alle aktuell SICHTBAREN kompletten Figuren UND Einzelteile
+        // (respektiert die Filter). Wartende werden ignoriert.
         foreach (var r in ItemsView.Cast<object>().Cast<InventoryRowItem>().ToList())
         {
             if (r.Status == StatusKind.Complete && r.UnderlyingMinifigId.HasValue)
+                r.IsSelected = true;
+            else if (r.Status == StatusKind.Floating && r.UnderlyingFloatingId.HasValue)
                 r.IsSelected = true;
         }
         RecalculateSelection();
     }
 
     [RelayCommand]
-    public void DeselectAllComplete()
+    public void DeselectAllExportable()
     {
         foreach (var r in Items.ToList())
             r.IsSelected = false;
@@ -106,11 +120,11 @@ public partial class InventoryListViewModel : ObservableObject
 
     /// <summary>
     /// Wird vom Code-Behind nach jedem CheckBox-Click gerufen, um den globalen
-    /// Counter (SelectedCompleteCount) und HasSelectedCompletes zu refreshen.
+    /// Counter (SelectedExportableCount) zu refreshen.
     /// </summary>
     public void RecalculateSelection()
     {
-        SelectedCompleteCount = SelectedCompletes.Count();
+        SelectedExportableCount = SelectedCompletes.Count() + SelectedFloatings.Count();
     }
 
     public InventoryListViewModel(
@@ -247,10 +261,11 @@ public partial class InventoryListViewModel : ObservableObject
 
             UpdateSummary();
 
-            // Phase 7: nach Refresh ist die Selektion immer leer (neue Items sind
-            // standardmaessig unselektiert). Anzeige der Action-Bar updaten.
-            SelectedCompleteCount = 0;
-            OnPropertyChanged(nameof(HasAnyCompletes));
+            // Phase 7 + UX X.6: nach Refresh ist die Selektion immer leer
+            // (neue Items sind standardmaessig unselektiert). Anzeige der
+            // Action-Bar updaten.
+            SelectedExportableCount = 0;
+            OnPropertyChanged(nameof(HasAnyExportable));
 
             _ = LoadImagesAsync();
         }

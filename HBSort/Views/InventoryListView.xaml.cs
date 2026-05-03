@@ -40,8 +40,8 @@ public partial class InventoryListView : UserControl
     }
 
     /// <summary>
-    /// Phase 7: nach jedem Klick auf eine Komplett-Checkbox den globalen
-    /// Counter (SelectedCompleteCount) im VM neu berechnen.
+    /// Nach jedem Klick auf eine Auswahl-Checkbox (Komplett-Figur ODER Einzelteil)
+    /// den globalen Counter (SelectedExportableCount) im VM neu berechnen.
     /// </summary>
     private void CompleteSelect_Click(object sender, RoutedEventArgs e)
     {
@@ -49,19 +49,24 @@ public partial class InventoryListView : UserControl
     }
 
     /// <summary>
-    /// Phase 7: oeffnet den BSX-Export-Dialog mit den aktuell selektierten
-    /// kompletten Figuren.
+    /// Phase 7 + UX X.6: oeffnet den BSX-Export-Dialog mit den aktuell selektierten
+    /// kompletten Figuren UND Einzelteilen. Beide Listen werden separat an den
+    /// Dialog uebergeben - der zeigt sie in zwei Sektionen an und exportiert beides
+    /// in dieselbe BSX-Datei.
     /// </summary>
     private void ExportSelected_Click(object sender, RoutedEventArgs e)
     {
         if (DataContext is not InventoryListViewModel vm) return;
-        var ids = vm.SelectedCompletes
+        var minifigIds = vm.SelectedCompletes
             .Select(r => r.UnderlyingMinifigId!.Value)
             .ToList();
-        if (ids.Count == 0) return;
+        var floatingIds = vm.SelectedFloatings
+            .Select(r => r.UnderlyingFloatingId!.Value)
+            .ToList();
+        if (minifigIds.Count == 0 && floatingIds.Count == 0) return;
 
         var dialog = Service<BsxExportDialog>();
-        dialog.Initialize(ids);
+        dialog.Initialize(minifigIds, floatingIds);
         dialog.Owner = Window.GetWindow(this);
         dialog.ShowDialog();
     }
