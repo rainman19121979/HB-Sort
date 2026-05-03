@@ -988,6 +988,67 @@ NICHT in dieser Phase:
 - Provider-Mocks fuer Unit-Tests (zu aufwaendig fuer den Erstwurf).
 - Bulk-Preis-Update fuer alle wartenden Figuren.
 
+#### Phase 8-Erweiterung: Preise im Sortier-Tab (UX-Iteration X.8, 2026-05-03)
+
+Bisher hat der `PriceCalculationService` nur fuer **persistierte** Figuren
+funktioniert (`MinifigSummaryDialog`). Mit X.8 sind die Preise auch fuer
+gerade gescannte **Pending**-Minifigs sichtbar - in der oberen rechten Box
+des Sortier-Tabs (3-Spalten-Layout aus UX#5).
+
+**Cache-Architektur:**
+- Bestehende Tabelle `bl_prices` wird wiederverwendet (kein paralleles
+  Schema). Repository `IBlCacheRepository` um vier Operationen erweitert:
+  `GetCachedPriceWithStaleFlagAsync` (liefert IMMER Eintrag + IsStale-Flag),
+  `DeletePriceAsync`, `ClearAllPricesAsync`, `GetPriceCacheCountAsync`.
+- Neuer schmaler Service `IBlPriceCacheService` kapselt **Stale-While-
+  Revalidate**:
+  - Cache-Hit + frisch -> `Source=Cache` sofort.
+  - Cache-Hit + stale  -> `Source=Stale` sofort + Hintergrund-Revalidate
+    via `Task.Run` (fire-and-forget).
+  - Cache-Miss         -> Provider live (`Source=Live`) + Cache-Write.
+- **In-Flight-Schutz** ueber `ConcurrentDictionary<key, Task>`:
+  parallele Aufrufe fuer denselben Key kollabieren auf einen einzigen
+  API-Call. Auch der Refresh-Button ↻ kann beliebig oft geklickt werden
+  ohne Doppel-Calls auszuloesen.
+- Provider-Doppel-Read (`BricklinkApiPriceProvider` macht intern auch
+  Cache-Lookup) ist bewusst akzeptiert - ~1ms Overhead, kein
+  Provider-Refactor noetig.
+
+**Settings-Erweiterung:**
+- `AppSettings.Prices.BlPriceCacheTtlMinifigDays` (Default 90)
+- `AppSettings.Prices.BlPriceCacheTtlPartDays` (Default 90)
+- Bestehendes `CacheDays=7` mit `// DEPRECATED ab Phase 8`-Inline-Kommentar
+  - wird vom neuen Pfad ignoriert, kann in spaeterer Iteration entfernt
+  werden.
+- Im "Preise"-Tab der Settings: zwei TTL-Inputs + neuer Cache-Verwaltungs-
+  Block mit "Aktuell X Eintraege" + "Preis-Cache leeren"-Button (mit
+  IDialogService-Bestaetigung).
+
+**UI-Anbindung (obere rechte Box):**
+- Neues `MinifigPriceViewModel` in `HBSort/ViewModels`. Wird vom
+  `ScanViewModel` beim Pending-Minifig-Aufbau instanziiert; bei
+  `PendingMinifig=null` (Verwerfen/Persistieren) automatisch geleert.
+- Layout in `MinifigPriceView.xaml`: 50/50-Split.
+  - LINKS: Komplett-Figur (grosser Avg + Min/Max + Listings + "Daten vom
+    DD.MM.YYYY"; bei Stale: oranger Hinweis "↻ Update laeuft im Hintergrund").
+  - RECHTS: Liste der Subsets als `{Quantity}× {Name}` + Subtotal-Spalte;
+    Trennstrich + Summe; bei missing: "{N} Teile ohne Preis".
+  - UNTEN: gruener Empfehlungs-Banner ("Komplett verkaufen lohnt sich
+    mehr (+X,XX €)" / "Einzelteile lohnen sich mehr" / "etwa gleich");
+    10% Schwelle.
+- Refresh-Button (↻) oben rechts: ruft
+  `IBlPriceCacheService.DeleteForMinifigAsync(blMinifigId, subsetSpecs)`
+  und triggert `LoadAsync` neu. Wird waehrend laufendem Load disabled
+  (zusaetzlich zum In-Flight-Schutz im Service).
+- Sichtbarkeit der Box: nur wenn `HasMinifigPriceInfo=true` (Pending-Minifig
+  aktiv). Bei Pending-Part oder kein Pending: Box bleibt leer.
+- Untere rechte Box: aktuell leer, Inhalt folgt in spaeterer Iteration.
+
+**Neue Models:**
+- `CachedPriceLookup(Price, IsStale)` - Repo-Rueckgabe.
+- `PriceLookupOutcome(Price, Source, FetchedAt, ErrorMessage)` +
+  `PriceLookupSource` enum (Cache/Stale/Live/None).
+
 ### UX-Iteration X.4 ✅ (2026-05-03)
 
 Acht UX-Verbesserungen quer durch die App:
