@@ -938,21 +938,54 @@ public partial class ScanViewModel : ObservableObject
         {
             var allBins = await _binService.GetAllAsync();
             var firstFree = await _binService.GetNextFreeAsync();
+
+            // UX-Iteration X.7: Smart-Storage-Suggestion. Vor der Default-Auswahl
+            // pruefen ob das Teil bereits in einem Fach liegt - dann dieses Fach
+            // statt "naechstes freies" vorauswaehlen, damit Stapel weiter wachsen
+            // statt sich zu zerstreuen.
+            var suggestion = await _floatingTransfer.FindBestStorageBinSuggestionAsync(
+                pending.BlPartNo, pending.BlColorId);
+
             System.Windows.Application.Current?.Dispatcher.Invoke(() =>
             {
                 pending.AvailableBins.Clear();
                 foreach (var b in allBins) pending.AvailableBins.Add(b);
 
-                // WICHTIG: Bin-Objekt aus AvailableBins holen (gleiche Id),
-                // nicht das separate firstFree-Objekt verwenden, sonst findet
-                // die ComboBox den Eintrag nicht in ItemsSource (Reference-Equality).
-                pending.SelectedFloatingBin = firstFree != null
-                    ? pending.AvailableBins.FirstOrDefault(b => b.Id == firstFree.Id)
-                      ?? pending.AvailableBins.FirstOrDefault()
-                    : pending.AvailableBins.FirstOrDefault();
+                // WICHTIG: Bin-Objekt aus AvailableBins holen (Reference-Equality),
+                // sonst findet die ComboBox den Eintrag nicht in ItemsSource.
+                StorageBin? defaultBin;
+                if (suggestion != null)
+                {
+                    defaultBin = pending.AvailableBins.FirstOrDefault(b => b.Id == suggestion.BinId);
 
-                Log.Information("PartLookup-Bins: {Count} Faecher, FirstFree.Id={Free}, Selected.Id={Sel}",
-                    pending.AvailableBins.Count, firstFree?.Id, pending.SelectedFloatingBin?.Id);
+                    // Hint-Properties setzen -> TextBlock unter dem Dropdown
+                    // wird via Binding sichtbar.
+                    pending.HasMatchingFloatingBin = true;
+                    pending.MatchingFloatingBinLabel = suggestion.BinLabel;
+                    pending.MatchingFloatingBinQuantity = suggestion.QuantityInThisBin;
+                    pending.MatchingFloatingBinCount = suggestion.TotalMatchingBinsCount;
+                }
+                else
+                {
+                    // Kein Match -> bisheriges Verhalten: naechstes freies Fach.
+                    defaultBin = firstFree != null
+                        ? pending.AvailableBins.FirstOrDefault(b => b.Id == firstFree.Id)
+                        : null;
+
+                    pending.HasMatchingFloatingBin = false;
+                    pending.MatchingFloatingBinLabel = null;
+                    pending.MatchingFloatingBinQuantity = 0;
+                    pending.MatchingFloatingBinCount = 0;
+                }
+
+                pending.SelectedFloatingBin = defaultBin
+                    ?? pending.AvailableBins.FirstOrDefault();
+
+                Log.Information(
+                    "PartLookup-Bins: {Count} Faecher, Suggestion={Sug}, Selected.Id={Sel}",
+                    pending.AvailableBins.Count,
+                    suggestion?.BinLabel ?? "(kein Match)",
+                    pending.SelectedFloatingBin?.Id);
             });
         }
         catch (Exception ex)

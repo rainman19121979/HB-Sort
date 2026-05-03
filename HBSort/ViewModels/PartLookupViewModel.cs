@@ -76,6 +76,59 @@ public partial class PartLookupViewModel : ObservableObject
     [ObservableProperty]
     private int _floatingQuantity = 1;
 
+    // ====================================================================
+    // UX-Iteration X.7: Smart-Storage-Suggestion fuer "Als Einzelteil lagern"
+    // ====================================================================
+
+    /// <summary>
+    /// True wenn das Teil bereits in mind. einem Lagerfach mit gleicher
+    /// Farbe vorhanden ist. Steuert Visibility des Hint-TextBlocks unter
+    /// dem "Als Einzelteil lagern"-Dropdown.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MatchingFloatingBinHintText))]
+    private bool _hasMatchingFloatingBin;
+
+    /// <summary>Bin-Label des besten Vorschlags ("Box 003").</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MatchingFloatingBinHintText))]
+    private string? _matchingFloatingBinLabel;
+
+    /// <summary>Wieviele Teile bereits im vorgeschlagenen Fach liegen.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MatchingFloatingBinHintText))]
+    private int _matchingFloatingBinQuantity;
+
+    /// <summary>
+    /// Anzahl der Faecher mit Treffern (1..n). Bei &gt;1 wird der Hint-Text
+    /// um "und N weiteren Faechern" erweitert.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MatchingFloatingBinHintText))]
+    private int _matchingFloatingBinCount;
+
+    /// <summary>
+    /// Anzeige-Text "📦 Liegt schon in Box XXX (3x)" oder
+    /// "📦 Liegt schon in Box XXX (3x) und 2 weiteren Faechern".
+    /// Leer wenn kein Match.
+    /// </summary>
+    public string MatchingFloatingBinHintText
+    {
+        get
+        {
+            if (!HasMatchingFloatingBin || string.IsNullOrEmpty(MatchingFloatingBinLabel))
+                return string.Empty;
+
+            var basis = $"📦 Liegt schon in {MatchingFloatingBinLabel} ({MatchingFloatingBinQuantity}x)";
+            if (MatchingFloatingBinCount <= 1) return basis;
+
+            var extra = MatchingFloatingBinCount - 1;
+            return extra == 1
+                ? basis + " und 1 weiterem Fach"
+                : basis + $" und {extra} weiteren Faechern";
+        }
+    }
+
     /// <summary>True waehrend irgendeine Aktion laeuft (greyout aller Buttons).</summary>
     [ObservableProperty]
     private bool _isBusy;

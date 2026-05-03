@@ -234,6 +234,18 @@
                            FontSize="{DynamicResource DetailFontSize}" FontWeight="SemiBold"/>
                 <TextBlock Text="Als Einzelteil lagern in:"
                            FontSize="{DynamicResource DetailFontSize}" Foreground="Gray"/>
+                <!--
+                    UX-Iteration X.7: Smart-Storage-Hint. Erscheint nur wenn das
+                    Teil bereits in einem Fach mit gleicher Farbe liegt - der
+                    User soll wissen warum gerade dieses Fach vorgewaehlt ist.
+                -->
+                <TextBlock Text="{Binding MatchingFloatingBinHintText}"
+                           FontSize="{DynamicResource MicroFontSize}"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                           FontStyle="Italic"
+                           Margin="0,2,0,0"
+                           Visibility="{Binding HasMatchingFloatingBin,
+                                Converter={StaticResource BoolToVisibility}}"/>
             </StackPanel>
 
             <!--
