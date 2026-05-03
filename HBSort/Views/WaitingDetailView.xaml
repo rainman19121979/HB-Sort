@@ -33,7 +33,7 @@
                                 </Grid.RowDefinitions>
 
                                 <Image Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
-                                       Source="{Binding ImageUrl}"
+                                       Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
                                        Width="36" Height="36" Stretch="Uniform"
                                        VerticalAlignment="Top"
                                        b:ImageZoom.IsEnabled="True"/>

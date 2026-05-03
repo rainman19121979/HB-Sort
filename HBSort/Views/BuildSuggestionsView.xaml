@@ -51,7 +51,7 @@
                                     Rest der Karte oeffnet weiterhin den Dialog,
                                     nur das Bild ist zoombar.
                                 -->
-                                <Image Grid.Column="0" Source="{Binding ImageUrl}"
+                                <Image Grid.Column="0" Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
                                        Width="44" Height="44" Stretch="Uniform"
                                        b:ImageZoom.IsEnabled="True"/>
                                 <StackPanel Grid.Column="1" Margin="6,0">

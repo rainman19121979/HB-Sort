@@ -31,6 +31,12 @@
             <!-- Converter für Datenbindung (z.B. bool → Visibility umkehren) -->
             <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
+            <!--
+                Schuetzt alle <Image Source="{Binding ...}"/>-Bindings vor
+                null/leerem Strings. Verhindert die Trace-Warnung
+                "Cannot convert '<null>' to ImageSource".
+            -->
+            <converters:NullToImageSourceConverter x:Key="NullToImageSource"/>
             <converters:ToastKindToBrushConverter x:Key="ToastKindToBrush"/>
             <converters:BrickognizeStatusToBrushConverter x:Key="BrickognizeStatusToBrush"/>
             <converters:RateLimitStateToBrushConverter x:Key="RateLimitStateToBrush"/>

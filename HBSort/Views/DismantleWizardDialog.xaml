@@ -63,7 +63,7 @@
                                               IsChecked="{Binding IsKept, Mode=TwoWay}"
                                               VerticalAlignment="Center"
                                               ToolTip="Markieren: Teil als Einzelteil uebernehmen. Unmarkiert: Teil verwerfen."/>
-                                    <Image Grid.Column="1" Source="{Binding ImageUrl}"
+                                    <Image Grid.Column="1" Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
                                            Width="40" Height="40" Stretch="Uniform"
                                            Margin="8,0,0,0"
                                            b:ImageZoom.IsEnabled="True"/>

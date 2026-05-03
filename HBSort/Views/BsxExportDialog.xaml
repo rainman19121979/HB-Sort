@@ -61,7 +61,7 @@
                                             <ColumnDefinition Width="40"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
-                                        <Image Grid.Column="0" Source="{Binding ImageUrl}"
+                                        <Image Grid.Column="0" Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
                                                Width="36" Height="36" Stretch="Uniform"
                                                b:ImageZoom.IsEnabled="True"/>
                                         <StackPanel Grid.Column="1" Margin="6,0" VerticalAlignment="Center">
@@ -99,7 +99,7 @@
                                             <ColumnDefinition Width="40"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
-                                        <Image Grid.Column="0" Source="{Binding ImageUrl}"
+                                        <Image Grid.Column="0" Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
                                                Width="36" Height="36" Stretch="Uniform"
                                                b:ImageZoom.IsEnabled="True"/>
                                         <StackPanel Grid.Column="1" Margin="6,0" VerticalAlignment="Center">

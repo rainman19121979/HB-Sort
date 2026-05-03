@@ -26,7 +26,7 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <Image Grid.Column="0" Source="{Binding ImageUrl}"
+            <Image Grid.Column="0" Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
                    Width="100" Height="100" Stretch="Uniform"
                    VerticalAlignment="Top"
                    b:ImageZoom.IsEnabled="True"/>
@@ -89,7 +89,7 @@
                                               Tag="{Binding}"
                                               Click="PartCheckBox_Click"
                                               ToolTip="Klick: Teil als gefunden markieren / Markierung aufheben."/>
-                                    <Image Grid.Column="1" Source="{Binding ImageUrl}"
+                                    <Image Grid.Column="1" Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
                                            Width="40" Height="40" Stretch="Uniform"
                                            Margin="8,0,0,0"
                                            b:ImageZoom.IsEnabled="True"/>

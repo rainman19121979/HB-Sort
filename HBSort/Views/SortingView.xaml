@@ -295,7 +295,7 @@
                                         </Grid.RowDefinitions>
 
                                         <Image Grid.Row="0"
-                                               Source="{Binding ImageUrl}"
+                                               Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
                                                Stretch="Uniform"
                                                MaxHeight="200"
                                                HorizontalAlignment="Center"

@@ -37,7 +37,7 @@
                     BorderThickness="1" CornerRadius="4"
                     Width="110" Height="110"
                     HorizontalAlignment="Left">
-                <Image Source="{Binding ImageUrl}" Stretch="Uniform" Margin="4"
+                <Image Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}" Stretch="Uniform" Margin="4"
                        b:ImageZoom.IsEnabled="True"/>
             </Border>
             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">

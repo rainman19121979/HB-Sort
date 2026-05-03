@@ -35,7 +35,7 @@
 
                 <Image Grid.Column="0"
                        b:ImageZoom.IsEnabled="True"
-                       Source="{Binding ImageUrl}"
+                       Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
                        Stretch="Uniform"
                        Width="{DynamicResource MinifigImageSize}"
                        Height="{DynamicResource MinifigImageSize}"
@@ -136,7 +136,7 @@
                                               ToolTip="Markieren wenn du dieses Teil bereits hast — beim &quot;In Fach legen&quot; wird es als &quot;gesammelt&quot; uebernommen."/>
 
                                     <Image Grid.Column="1"
-                                           Source="{Binding ImageUrl}"
+                                           Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
                                            Stretch="Uniform"
                                            Width="{DynamicResource PartImageSize}"
                                            Height="{DynamicResource PartImageSize}"

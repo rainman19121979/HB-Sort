@@ -187,7 +187,7 @@
                 <DataGridTemplateColumn Header="Bild" Width="60">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <Image Source="{Binding ImageUrl}"
+                            <Image Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
                                    Width="40" Height="40" Stretch="Uniform"
                                    b:ImageZoom.IsEnabled="True"/>
                         </DataTemplate>

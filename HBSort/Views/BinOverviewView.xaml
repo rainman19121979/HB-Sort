@@ -116,7 +116,7 @@
                                                             <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
                                                         <Image Grid.Column="0"
-                                                               Source="{Binding ImageUrl}"
+                                                               Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
                                                                Width="36" Height="36"
                                                                Stretch="Uniform"
                                                                b:ImageZoom.IsEnabled="True"/>
