@@ -48,6 +48,36 @@ public class FloatingPartTransferService : IFloatingPartTransferService
             QuantityAvailable: fp.Quantity);
     }
 
+    public async Task<FloatingPartLocationSuggestion?> FindBestStorageBinSuggestionAsync(
+        string blPartNo, int blColorId, CancellationToken ct = default)
+    {
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+
+        // Alle FloatingParts laden die zum Teil + zur Farbe passen.
+        var matches = await ctx.FloatingParts.AsNoTracking()
+            .Include(p => p.StorageBin)
+            .Where(p => p.PartNumber == blPartNo
+                     && p.ColorId == blColorId
+                     && p.Quantity > 0)
+            // Sortierung: groesste Quantity zuerst, bei Gleichstand aelteste
+            // AddedAt zuerst (FIFO) - macht die Wahl reproduzierbar.
+            .OrderByDescending(p => p.Quantity)
+            .ThenBy(p => p.AddedAt)
+            .ToListAsync(ct);
+
+        if (matches.Count == 0) return null;
+
+        var best = matches[0];
+        var totalQty = matches.Sum(p => p.Quantity);
+
+        return new FloatingPartLocationSuggestion(
+            BinId: best.StorageBinId,
+            BinLabel: best.StorageBin?.Label ?? "?",
+            QuantityInThisBin: best.Quantity,
+            TotalMatchingBinsCount: matches.Count,
+            TotalQuantityAcrossAllBins: totalQty);
+    }
+
     public async Task<FloatingPartTransferResult> TransferOneAsync(
         string blPartNo, int blColorId,
         string targetMinifigDescription,

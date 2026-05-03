@@ -40,6 +40,18 @@ public interface IFloatingPartTransferService
         string blPartNo, int blColorId,
         string targetMinifigDescription,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// UX-Iteration X.7: schlaegt das beste Lagerfach vor, in dem der User
+    /// ein gerade gescanntes Einzelteil ablegen sollte. "Best" heisst: das
+    /// Fach in dem das Teil mit gleicher Farbe bereits in der groessten
+    /// Stueckzahl liegt - so wachsen Stapel weiter statt sich zu zerstreuen.
+    ///
+    /// Liefert null wenn das Teil noch nirgends gelagert ist (-> Aufrufer
+    /// faellt auf "naechstes freies Fach" zurueck wie bisher).
+    /// </summary>
+    Task<FloatingPartLocationSuggestion?> FindBestStorageBinSuggestionAsync(
+        string blPartNo, int blColorId, CancellationToken ct = default);
 }
 
 /// <summary>Match-Info fuer die UI - "wo liegt das Teil und wieviel ist da?".</summary>
@@ -55,3 +67,20 @@ public record FloatingPartTransferResult(
     string? SourceBinLabel,
     bool BinFreedAfterTransfer,
     string? ErrorMessage);
+
+/// <summary>
+/// UX-Iteration X.7: Vorschlag wo ein gerade gescanntes Einzelteil hingehoert.
+/// "Best" = Fach mit der groessten vorhandenen Quantity desselben Teils in
+/// derselben Farbe (FIFO bei Gleichstand: aelteste AddedAt zuerst).
+/// </summary>
+/// <param name="BinId">Id des vorgeschlagenen StorageBins.</param>
+/// <param name="BinLabel">Anzeigename des Fachs (z.B. "Box 003").</param>
+/// <param name="QuantityInThisBin">Wieviele Exemplare bereits im vorgeschlagenen Fach liegen.</param>
+/// <param name="TotalMatchingBinsCount">Gesamtzahl der Faecher die das Teil enthalten (1..n).</param>
+/// <param name="TotalQuantityAcrossAllBins">Summe ueber alle matchenden Faecher.</param>
+public record FloatingPartLocationSuggestion(
+    int BinId,
+    string BinLabel,
+    int QuantityInThisBin,
+    int TotalMatchingBinsCount,
+    int TotalQuantityAcrossAllBins);

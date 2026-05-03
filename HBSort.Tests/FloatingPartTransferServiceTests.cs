@@ -168,6 +168,81 @@ public class FloatingPartTransferServiceTests : IDisposable
         Assert.Contains("Arctic-Forscher", ev.ResultDescription);
     }
 
+    // ====================================================================
+    // FindBestStorageBinSuggestionAsync (UX-Iteration X.7)
+    // ====================================================================
+
+    [Fact]
+    public async Task FindBestStorageBin_returns_null_when_part_not_stored_anywhere()
+    {
+        await SeedBinAsync("Box 01");
+        var s = await _sut.FindBestStorageBinSuggestionAsync("3001", 0);
+        Assert.Null(s);
+    }
+
+    [Fact]
+    public async Task FindBestStorageBin_returns_the_only_match_when_one_bin_has_the_part()
+    {
+        var b1 = await SeedBinAsync("Box 01");
+        await SeedFloatingAsync(b1, "3001", 11, qty: 4);
+
+        var s = await _sut.FindBestStorageBinSuggestionAsync("3001", 11);
+
+        Assert.NotNull(s);
+        Assert.Equal("Box 01", s!.BinLabel);
+        Assert.Equal(4, s.QuantityInThisBin);
+        Assert.Equal(1, s.TotalMatchingBinsCount);
+        Assert.Equal(4, s.TotalQuantityAcrossAllBins);
+    }
+
+    [Fact]
+    public async Task FindBestStorageBin_prefers_bin_with_largest_quantity()
+    {
+        // Drei Faecher mit demselben Teil in derselben Farbe;
+        // groesste Stueckzahl gewinnt.
+        var b1 = await SeedBinAsync("Box 01");
+        var b2 = await SeedBinAsync("Box 02");
+        var b3 = await SeedBinAsync("Box 03");
+        await SeedFloatingAsync(b1, "3001", 0, qty: 2);
+        await SeedFloatingAsync(b2, "3001", 0, qty: 7);   // <-- best
+        await SeedFloatingAsync(b3, "3001", 0, qty: 3);
+
+        var s = await _sut.FindBestStorageBinSuggestionAsync("3001", 0);
+
+        Assert.NotNull(s);
+        Assert.Equal("Box 02", s!.BinLabel);
+        Assert.Equal(7, s.QuantityInThisBin);
+        Assert.Equal(3, s.TotalMatchingBinsCount);
+        Assert.Equal(12, s.TotalQuantityAcrossAllBins);
+    }
+
+    [Fact]
+    public async Task FindBestStorageBin_breaks_ties_by_oldest_addedAt()
+    {
+        // Beide Faecher haben dieselbe Quantity; aelteres AddedAt gewinnt
+        // (FIFO, reproduzierbare Wahl).
+        var older = await SeedBinAsync("Box 01");
+        var newer = await SeedBinAsync("Box 02");
+        await SeedFloatingAsync(newer, "3001", 0, qty: 3, addedAt: DateTime.UtcNow);
+        await SeedFloatingAsync(older, "3001", 0, qty: 3, addedAt: DateTime.UtcNow.AddDays(-1));
+
+        var s = await _sut.FindBestStorageBinSuggestionAsync("3001", 0);
+
+        Assert.NotNull(s);
+        Assert.Equal("Box 01", s!.BinLabel);
+    }
+
+    [Fact]
+    public async Task FindBestStorageBin_ignores_different_color()
+    {
+        // Gleiche PartNo aber andere Farbe - darf nicht matchen.
+        var b1 = await SeedBinAsync("Box 01");
+        await SeedFloatingAsync(b1, "3001", 11, qty: 5);  // Black
+
+        var s = await _sut.FindBestStorageBinSuggestionAsync("3001", 0);  // White
+        Assert.Null(s);
+    }
+
     [Fact]
     public async Task TransferOne_raises_DataChanged_via_persistence_service()
     {
