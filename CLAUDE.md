@@ -943,8 +943,31 @@ in Phase 6 spaeter editierbar).
 ### Phase 5 – Matching-Logik (Modus B)
 [wie gehabt, MatchingService nutzt BL-Part-No + BL-Color-ID]
 
-### Phase 6 – Komplettierung & Statistik
-[wie gehabt]
+### Phase 6 – Komplettierung & Statistik ✅ (PROMPT 7, 2026-05-03)
+- DailyStats wird automatisch hochgezaehlt:
+  - Scan + ggf. Komplettierung in `PersistAndStoreAsync` (Reverse-Match-Pfad)
+  - Komplettierung in `CheckAndMarkCompleteAsync` (manueller Pfad ueber
+    den Pending-Klick im Summary-Dialog)
+  - Zerlegen in `DismantleAsync`
+- Status=Complete loest Toast aus ("Figur 'X' ist komplett!")
+- Komplette Figuren werden in der Lagerfach-Uebersicht in einer eigenen
+  gruenen Sektion pro Bin angezeigt (statt Fortschrittsbalken: gruener Haken).
+- "Wieder oeffnen"-Button im Summary-Dialog setzt eine komplette Figur
+  zurueck auf Waiting (`ReopenAsync`); DailyStats wird absichtlich NICHT
+  rueckgaengig gemacht.
+- Bei Status=Complete sind die Buttons "Zerlegen" und "Verschieben"
+  ausgeblendet (sind nur fuer wartende Figuren sinnvoll).
+- Settings-Tab "Statistik" mit Heute/7T/30T/Insgesamt-Filter, drei
+  Stat-Cards (Scans / Komplettiert / Zerlegt) und einer Bestand-Sektion
+  (wartende, komplette, Floating-Parts, belegte Faecher).
+- Status=Sold wird **nicht** eingefuehrt - der BSX-Export in Phase 7
+  uebernimmt die Uebergabe ans richtige Lagersystem.
+
+Abweichung von der Spec: Die "Komplette Figuren"-Sektion wurde in die
+bestehende Bin-Overview integriert (pro Bin eine eigene Sub-Sektion mit
+gruener Markierung) statt als globale Top-Level-Liste. Das passt zur
+existierenden BinOverview-Architektur und vermeidet einen kompletten
+Umbau der `WaitingMinifigsViewModel`-Klasse.
 
 ### Phase 7 – Polish, BSX-Export, Build
 [BSX-Export ist jetzt einfacher, da BL-IDs schon da sind]

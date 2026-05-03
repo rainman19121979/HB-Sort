@@ -99,6 +99,18 @@ public partial class WaitingMinifigsViewModel : ObservableObject
                 .GroupBy(m => m.StorageBinId!.Value)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
+            // Phase 6: zusaetzlich Komplette Figuren pro Fach (analog zu Waiting).
+            var complete = await ctx.TrackedMinifigs.AsNoTracking()
+                .Where(m => m.StorageBinId != null
+                         && m.Status == TrackedMinifigStatus.Complete)
+                .Include(m => m.RequiredParts)
+                .Include(m => m.StorageBin)
+                .OrderByDescending(m => m.CompletedAt)
+                .ToListAsync();
+            var completeByBin = complete
+                .GroupBy(m => m.StorageBinId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
             // VMs bauen, dabei nach Filter filtern
             // Bestehende IsExpanded-Werte erhalten beim Refresh, damit nichts zuklappt.
             var prevExpanded = Bins.ToDictionary(b => b.Id, b => b.IsExpanded);
@@ -113,7 +125,10 @@ public partial class WaitingMinifigsViewModel : ObservableObject
                 if (FilterMode == BinOverviewFilter.OccupiedOnly && isFree) continue;
 
                 waitingByBin.TryGetValue(b.Id, out var waitingList);
-                var item = new BinOverviewItemViewModel(b, mfg, fp, waitingList ?? new List<TrackedMinifig>())
+                completeByBin.TryGetValue(b.Id, out var completeList);
+                var item = new BinOverviewItemViewModel(b, mfg, fp,
+                    waitingList ?? new List<TrackedMinifig>(),
+                    completeList ?? new List<TrackedMinifig>())
                 {
                     IsExpanded = prevExpanded.TryGetValue(b.Id, out var exp) ? exp : !isFree
                 };
@@ -121,9 +136,16 @@ public partial class WaitingMinifigsViewModel : ObservableObject
             }
 
             IsEmpty = Bins.Count == 0;
-            SummaryText = FilterMode == BinOverviewFilter.OccupiedOnly
+
+            // Phase 6: Footer zeigt Fach-Anzahl + Total-Counts der Figuren.
+            var totalWaiting = waiting.Count;
+            var totalComplete = complete.Count;
+            var binText = FilterMode == BinOverviewFilter.OccupiedOnly
                 ? $"{Bins.Count} belegte(s) Fach(/Faecher)"
                 : $"{Bins.Count} Fach(/Faecher) gesamt";
+            SummaryText = totalComplete > 0
+                ? $"{binText} • Wartende: {totalWaiting} • Komplett: {totalComplete}"
+                : $"{binText} • Wartende: {totalWaiting}";
         }
         catch (Exception ex)
         {
@@ -155,10 +177,36 @@ public partial class BinOverviewItemViewModel : ObservableObject
     /// <summary>Bis zu 5 wartende Figuren fuer Inline-Anzeige.</summary>
     public ObservableCollection<WaitingMinifigViewModel> WaitingMinifigs { get; } = new();
 
+    /// <summary>
+    /// Phase 6: bis zu 5 komplette Figuren in diesem Fach. Eigene Sektion in
+    /// der UI, mit gruener Markierung. Bei 0 Eintraegen blendet die View die
+    /// Sektion via HasCompletes-Binding aus.
+    /// </summary>
+    public ObservableCollection<WaitingMinifigViewModel> CompleteMinifigs { get; } = new();
+
+    /// <summary>True wenn mind. eine komplette Figur in diesem Fach liegt.</summary>
+    public bool HasCompletes => CompleteMinifigs.Count > 0;
+
+    /// <summary>True wenn mind. eine wartende Figur in diesem Fach liegt.</summary>
+    public bool HasWaitings => WaitingMinifigs.Count > 0;
+
     /// <summary>Wenn mehr als 5 wartende Figuren existieren – Hinweis-Zahl.</summary>
     public int MoreCount { get; }
     public bool HasMore => MoreCount > 0;
     public string MoreLabel => $"+ {MoreCount} weitere wartende Figur(en)";
+
+    /// <summary>Wenn mehr als 5 komplette Figuren existieren – Hinweis-Zahl.</summary>
+    public int MoreCompleteCount { get; }
+    public bool HasMoreCompletes => MoreCompleteCount > 0;
+    public string MoreCompleteLabel => $"+ {MoreCompleteCount} weitere komplette Figur(en)";
+
+    /// <summary>
+    /// Header-Text der Komplett-Sektion (mit Anzahl), z.B. "✓ Komplett (3)".
+    /// </summary>
+    public string CompleteHeader => $"✓ Komplett ({CompleteMinifigs.Count}{(MoreCompleteCount > 0 ? "+" : "")})";
+
+    /// <summary>Header-Text der Waiting-Sektion (mit Anzahl), z.B. "Wartend (2)".</summary>
+    public string WaitingHeader => $"Wartend ({WaitingMinifigs.Count}{(MoreCount > 0 ? "+" : "")})";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ExpandIcon))]
@@ -167,7 +215,8 @@ public partial class BinOverviewItemViewModel : ObservableObject
     public string ExpandIcon => IsExpanded ? "▼" : "▶";
 
     public BinOverviewItemViewModel(StorageBin bin, int minifigCount, int floatingPartCount,
-        IReadOnlyList<TrackedMinifig> waitingMinifigs)
+        IReadOnlyList<TrackedMinifig> waitingMinifigs,
+        IReadOnlyList<TrackedMinifig> completeMinifigs)
     {
         Id = bin.Id;
         Label = bin.Label;
@@ -177,6 +226,10 @@ public partial class BinOverviewItemViewModel : ObservableObject
         var take = waitingMinifigs.Take(MaxWaitingShown).ToList();
         foreach (var m in take) WaitingMinifigs.Add(new WaitingMinifigViewModel(m));
         MoreCount = Math.Max(0, waitingMinifigs.Count - take.Count);
+
+        var takeC = completeMinifigs.Take(MaxWaitingShown).ToList();
+        foreach (var m in takeC) CompleteMinifigs.Add(new WaitingMinifigViewModel(m));
+        MoreCompleteCount = Math.Max(0, completeMinifigs.Count - takeC.Count);
     }
 
     public void Toggle() => IsExpanded = !IsExpanded;

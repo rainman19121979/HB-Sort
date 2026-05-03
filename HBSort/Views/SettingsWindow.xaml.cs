@@ -31,6 +31,9 @@ public partial class SettingsWindow : Window
         {
             AboutVersionText.Text = $"v{version.Major}.{version.Minor}.{version.Build}";
         }
+
+        // Phase 6: Statistik-Daten initial laden (best-effort, blockt nicht).
+        Loaded += async (_, _) => await _viewModel.LoadStatsAsync();
     }
 
     /// <summary>Speichern-Button: Settings übernehmen und Fenster schließen</summary>

@@ -57,6 +57,22 @@ public interface IMinifigPersistenceService
     /// Single-Row-Supersets-Cache entstanden, bevor IsFromSupersets eingefuehrt wurde.
     /// </summary>
     Task<int> CleanupOnePartCompletesAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Phase 6: pruefen ob eine wartende Figur nach manueller Quantity-Aenderung
+    /// (z.B. Pending-Klick im Summary-Dialog) jetzt komplett ist. Wenn ja:
+    /// Status=Complete, CompletedAt=jetzt, DailyStats.Completed +1.
+    /// Liefert true wenn die Figur in diesem Aufruf erst komplettiert wurde.
+    /// </summary>
+    Task<bool> CheckAndMarkCompleteAsync(int trackedMinifigId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Phase 6: eine als Complete markierte Figur wieder auf Waiting setzen
+    /// (User-Korrektur, "Wieder oeffnen"-Button im Summary-Dialog).
+    /// CompletedAt wird auf null gesetzt; DailyStats wird NICHT veraendert
+    /// (der Tag, an dem die Figur komplett war, bleibt korrekt gezaehlt).
+    /// </summary>
+    Task<bool> ReopenAsync(int trackedMinifigId, CancellationToken ct = default);
 }
 
 /// <summary>Eine Part-Wahl im DismantleWizard.</summary>

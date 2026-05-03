@@ -783,6 +783,111 @@
             </TabItem>
 
             <!-- ====================================== -->
+            <!-- TAB: STATISTIK (Phase 6 / PROMPT 7)    -->
+            <!-- ====================================== -->
+            <TabItem Header="Statistik">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                    <StackPanel>
+
+                        <!-- Zeitraum-Auswahl -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                            <RadioButton GroupName="StatsRange" Content="Heute"
+                                         IsChecked="{Binding StatsRangeToday}"
+                                         Margin="0,0,8,0" Padding="12,4"/>
+                            <RadioButton GroupName="StatsRange" Content="7 Tage"
+                                         IsChecked="{Binding StatsRange7Days}"
+                                         Margin="0,0,8,0" Padding="12,4"/>
+                            <RadioButton GroupName="StatsRange" Content="30 Tage"
+                                         IsChecked="{Binding StatsRange30Days}"
+                                         Margin="0,0,8,0" Padding="12,4"/>
+                            <RadioButton GroupName="StatsRange" Content="Insgesamt"
+                                         IsChecked="{Binding StatsRangeAllTime}"
+                                         Padding="12,4"/>
+                        </StackPanel>
+
+                        <!-- 3 Stats-Cards nebeneinander -->
+                        <UniformGrid Columns="3" Margin="0,0,0,16">
+                            <Border BorderBrush="Gray" BorderThickness="1"
+                                    CornerRadius="4" Padding="16" Margin="0,0,8,0">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <TextBlock Text="Scans" Foreground="Gray" FontSize="12"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding StatsScanCount}"
+                                               FontSize="32" FontWeight="SemiBold"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+                            <Border BorderBrush="Gray" BorderThickness="1"
+                                    CornerRadius="4" Padding="16" Margin="4,0">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <TextBlock Text="Komplettiert" Foreground="Gray" FontSize="12"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding StatsCompletedCount}"
+                                               FontSize="32" FontWeight="SemiBold"
+                                               Foreground="#2E7D32"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+                            <Border BorderBrush="Gray" BorderThickness="1"
+                                    CornerRadius="4" Padding="16" Margin="8,0,0,0">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <TextBlock Text="Zerlegt" Foreground="Gray" FontSize="12"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding StatsDismantledCount}"
+                                               FontSize="32" FontWeight="SemiBold"
+                                               Foreground="#E65100"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+
+                        <!-- Aktueller Bestand -->
+                        <Separator Margin="0,8"/>
+                        <TextBlock Text="Aktueller Bestand"
+                                   FontSize="14" FontWeight="SemiBold" Margin="0,8,0,8"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Wartende Figuren"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1"
+                                       Text="{Binding CurrentWaitingCount}" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Komplette Figuren"
+                                       Foreground="#2E7D32"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1"
+                                       Text="{Binding CurrentCompleteCount}" FontWeight="SemiBold"
+                                       Foreground="#2E7D32"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Floating-Parts (lose)"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1"
+                                       Text="{Binding CurrentFloatingCount}" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Belegte Lagerfaecher"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1"
+                                       Text="{Binding CurrentBinsUsedCount}" FontWeight="SemiBold"/>
+                        </Grid>
+
+                        <!-- Hint zum Export -->
+                        <Border Background="#E3F2FD" BorderBrush="#1976D2"
+                                BorderThickness="1" CornerRadius="4"
+                                Padding="12" Margin="0,16,0,0">
+                            <TextBlock TextWrapping="Wrap" FontSize="12">
+                                <Run Text="Hinweis:" FontWeight="SemiBold"/>
+                                Komplette Figuren koennen spaeter (Phase 7) per BSX-Export
+                                in das eigentliche Lagersystem uebertragen werden. Die App-Faecher
+                                sind nur temporaer waehrend des Sortier-Workflows.
+                            </TextBlock>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ====================================== -->
             <!-- TAB: INFO (Logo, Beschreibung, Disclaimer) -->
             <!-- ====================================== -->
             <TabItem Header="Info">

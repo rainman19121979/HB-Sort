@@ -33,6 +33,10 @@ public partial class MinifigSummaryViewModel : ObservableObject
     /// <summary>Status der Figur (fuer Loeschen-Confirmation und UI-Logik).</summary>
     public TrackedMinifigStatus Status { get; private set; } = TrackedMinifigStatus.Waiting;
 
+    /// <summary>Phase 6: Visibility-Helper fuer Buttons im Summary-Dialog.</summary>
+    public bool IsWaiting  => Status == TrackedMinifigStatus.Waiting;
+    public bool IsComplete => Status == TrackedMinifigStatus.Complete;
+
     public string? Notes { get; private set; }
     public bool HasNotes => !string.IsNullOrWhiteSpace(Notes);
     public string NotesDisplay => string.IsNullOrWhiteSpace(Notes) ? string.Empty : $"📝 {Notes}";
@@ -117,6 +121,8 @@ public partial class MinifigSummaryViewModel : ObservableObject
         OnPropertyChanged(nameof(ImageUrl));
         OnPropertyChanged(nameof(BinLabel));
         OnPropertyChanged(nameof(Status));
+        OnPropertyChanged(nameof(IsWaiting));
+        OnPropertyChanged(nameof(IsComplete));
         OnPropertyChanged(nameof(Notes));
         OnPropertyChanged(nameof(NotesDisplay));
         OnPropertyChanged(nameof(HasNotes));

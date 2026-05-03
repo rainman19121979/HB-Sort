@@ -4,9 +4,11 @@ using System.Net.Http;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using HBSort.Core.Database;
 using HBSort.Core.Models;
 using HBSort.Core.Services;
 using HBSort.Services;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 
 namespace HBSort.ViewModels;
@@ -29,6 +31,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IBricklinkRateLimiter _rateLimiter;
     private readonly IUiDensityService _uiDensity;
     private readonly HttpClient _http;
+    private readonly IDbContextFactory<UserDataContext> _ctxFactory;
 
     /// <summary>Tab "Lagerfaecher" – eigenes ViewModel mit Liste + Commands.</summary>
     public BinManagerViewModel BinManager { get; }
@@ -233,6 +236,7 @@ public partial class SettingsViewModel : ObservableObject
         IBricklinkRateLimiter rateLimiter,
         IUiDensityService uiDensity,
         HttpClient http,
+        IDbContextFactory<UserDataContext> ctxFactory,
         BinManagerViewModel binManager)
     {
         _settingsService = settingsService;
@@ -244,6 +248,7 @@ public partial class SettingsViewModel : ObservableObject
         _rateLimiter = rateLimiter;
         _uiDensity = uiDensity;
         _http = http;
+        _ctxFactory = ctxFactory;
         BinManager = binManager;
 
         // Vorhandene BL-Tokens beim Oeffnen der Settings laden, damit der User
@@ -658,6 +663,69 @@ public partial class SettingsViewModel : ObservableObject
         double mb = bytes / 1024.0 / 1024.0;
         if (mb >= 1024) return $"{mb / 1024:0.#} GB";
         return $"{mb:0.#} MB";
+    }
+
+    // ========================================================================
+    // Phase 6: Statistik-Tab
+    // ========================================================================
+
+    [ObservableProperty] private bool _statsRangeToday = true;
+    [ObservableProperty] private bool _statsRange7Days;
+    [ObservableProperty] private bool _statsRange30Days;
+    [ObservableProperty] private bool _statsRangeAllTime;
+
+    [ObservableProperty] private int _statsScanCount;
+    [ObservableProperty] private int _statsCompletedCount;
+    [ObservableProperty] private int _statsDismantledCount;
+
+    [ObservableProperty] private int _currentWaitingCount;
+    [ObservableProperty] private int _currentCompleteCount;
+    [ObservableProperty] private int _currentFloatingCount;
+    [ObservableProperty] private int _currentBinsUsedCount;
+
+    // Bei Wechsel des aktiven Radio-Buttons direkt nachladen.
+    partial void OnStatsRangeTodayChanged(bool value)   { if (value) _ = LoadStatsAsync(); }
+    partial void OnStatsRange7DaysChanged(bool value)   { if (value) _ = LoadStatsAsync(); }
+    partial void OnStatsRange30DaysChanged(bool value)  { if (value) _ = LoadStatsAsync(); }
+    partial void OnStatsRangeAllTimeChanged(bool value) { if (value) _ = LoadStatsAsync(); }
+
+    /// <summary>
+    /// Aggregiert die DailyStats fuer den gewaehlten Zeitraum + ermittelt den
+    /// aktuellen Bestand (Wartende, Komplette, Floating, belegte Faecher).
+    /// </summary>
+    public async Task LoadStatsAsync()
+    {
+        try
+        {
+            await using var ctx = await _ctxFactory.CreateDbContextAsync();
+
+            DateTime? since = StatsRangeToday   ? DateTime.Today
+                            : StatsRange7Days   ? DateTime.Today.AddDays(-6)   // inkl. heute
+                            : StatsRange30Days  ? DateTime.Today.AddDays(-29)  // inkl. heute
+                            : (DateTime?)null;                                  // AllTime
+
+            var query = ctx.DailyStats.AsNoTracking().AsQueryable();
+            if (since.HasValue) query = query.Where(s => s.Date >= since.Value);
+
+            var rows = await query.ToListAsync();
+            StatsScanCount       = rows.Sum(s => s.ScanCount);
+            StatsCompletedCount  = rows.Sum(s => s.MinifigsCompletedCount);
+            StatsDismantledCount = rows.Sum(s => s.MinifigsDismantledCount);
+
+            // Aktueller Bestand
+            CurrentWaitingCount = await ctx.TrackedMinifigs.AsNoTracking()
+                .CountAsync(m => m.Status == TrackedMinifigStatus.Waiting);
+            CurrentCompleteCount = await ctx.TrackedMinifigs.AsNoTracking()
+                .CountAsync(m => m.Status == TrackedMinifigStatus.Complete);
+            CurrentFloatingCount = await ctx.FloatingParts.AsNoTracking()
+                .SumAsync(f => (int?)f.Quantity) ?? 0;
+            CurrentBinsUsedCount = await ctx.StorageBins.AsNoTracking()
+                .CountAsync(b => b.FreedAt == null);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "LoadStatsAsync fehlgeschlagen");
+        }
     }
 
 }

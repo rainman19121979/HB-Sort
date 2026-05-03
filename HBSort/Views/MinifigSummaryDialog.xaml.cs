@@ -136,6 +136,15 @@ public partial class MinifigSummaryDialog : Window
             }
             // Dialog-Daten neu laden, damit auch ProgressLabel/CompletedParts stimmen.
             await _viewModel.LoadAsync();
+
+            // Phase 6: nach manueller Mengen-Aenderung pruefen ob die Figur jetzt
+            // erst komplett ist - dann Status setzen + Toast + UI nachladen.
+            var nowComplete = await _persistence.CheckAndMarkCompleteAsync(_viewModel.MinifigId);
+            if (nowComplete)
+            {
+                _notifications.ShowSuccess($"Figur '{_viewModel.Name}' ist komplett!");
+                await _viewModel.LoadAsync();
+            }
         }
         catch (System.Exception ex)
         {
@@ -143,6 +152,28 @@ public partial class MinifigSummaryDialog : Window
             MessageBox.Show(ex.Message, "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
             // Visuellen Zustand zurueckdrehen
             cb.IsChecked = !nowChecked;
+        }
+    }
+
+    /// <summary>
+    /// Phase 6: "Wieder oeffnen" – setzt eine komplette Figur zurueck auf Waiting.
+    /// </summary>
+    private async void Reopen_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var ok = await _persistence.ReopenAsync(_viewModel.MinifigId);
+            if (ok)
+            {
+                _notifications.ShowInfo($"Figur '{_viewModel.Name}' wieder als wartend markiert.");
+                DialogResult = true;
+                Close();
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Log.Error(ex, "Reopen fehlgeschlagen");
+            MessageBox.Show(ex.Message, "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

@@ -45,6 +45,12 @@
                 <ProgressBar Margin="0,4,0,0" Height="8"
                              Minimum="0" Maximum="1"
                              Value="{Binding ProgressFraction, Mode=OneWay}"/>
+
+                <!-- Phase 6: KOMPLETT-Badge bei Status=Complete -->
+                <TextBlock Text="✓ KOMPLETT"
+                           Foreground="#2E7D32" FontWeight="Bold" FontSize="14"
+                           Visibility="{Binding IsComplete, Converter={StaticResource BoolToVisibility}}"
+                           Margin="0,4,0,0"/>
             </StackPanel>
         </Grid>
 
@@ -110,8 +116,9 @@
             </ScrollViewer>
         </Border>
 
-        <!-- Verschieben: Lagerfach-Auswahl -->
-        <Grid Grid.Row="3" Margin="0,12,0,0">
+        <!-- Verschieben: Lagerfach-Auswahl (Phase 6: nur fuer wartende Figuren) -->
+        <Grid Grid.Row="3" Margin="0,12,0,0"
+              Visibility="{Binding IsWaiting, Converter={StaticResource BoolToVisibility}}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -127,16 +134,32 @@
         <!-- Buttons -->
         <StackPanel Grid.Row="4" Orientation="Horizontal"
                     HorizontalAlignment="Right" Margin="0,12,0,0">
+
+            <!-- Loeschen: immer sichtbar -->
             <Button Content="Loeschen" Width="120" Margin="0,0,8,0"
                     Click="Delete_Click"
                     Background="#D32F2F" Foreground="White"
                     ToolTip="Figur komplett aus der DB entfernen. Floating-Parts mit Origin-Verbindung bleiben erhalten."/>
+
+            <!-- Zerlegen: nur bei Status=Waiting -->
             <Button Content="Zerlegen" Width="120" Margin="0,0,8,0"
                     Click="GiveUp_Click"
+                    Visibility="{Binding IsWaiting, Converter={StaticResource BoolToVisibility}}"
                     ToolTip="Figur zerlegen: gesammelte Teile wandern als Einzelteile in den Pool, die Figur selbst wird geloescht."/>
+
+            <!-- Wieder oeffnen: nur bei Status=Complete (Phase 6) -->
+            <Button Content="Wieder oeffnen" Width="130" Margin="0,0,8,0"
+                    Click="Reopen_Click"
+                    Visibility="{Binding IsComplete, Converter={StaticResource BoolToVisibility}}"
+                    ToolTip="Status zurueck auf Wartend setzen, falls man sich vertan hat."/>
+
+            <!-- Verschieben: nur bei Status=Waiting -->
             <Button Content="Verschieben" Width="120" Margin="0,0,8,0"
                     Click="Move_Click"
+                    Visibility="{Binding IsWaiting, Converter={StaticResource BoolToVisibility}}"
                     ToolTip="Figur in das oben gewaehlte Fach verschieben."/>
+
+            <!-- Schliessen: immer sichtbar -->
             <Button Content="Schliessen" IsCancel="True" Width="120"
                     Style="{StaticResource AccentButtonStyle}"
                     Click="Close_Click"/>

@@ -1112,11 +1112,11 @@ public partial class ScanViewModel : ObservableObject
 
             var result = await _persistenceService.PersistAndStoreAsync(input);
 
-            // Toast je nach Ergebnis
+            // Toast je nach Ergebnis (Phase 6: Komplettierungs-Toast einheitlich).
             if (result.IsFullyComplete)
             {
                 _notifications.ShowSuccess(
-                    $"Figur '{pending.Name}' direkt komplett (alle Teile bereits im Pool).");
+                    $"Figur '{pending.Name}' ist komplett!");
             }
             else if (result.ReverseMatchedFloating > 0)
             {

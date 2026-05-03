@@ -34,6 +34,25 @@ public class MinifigPersistenceService : IMinifigPersistenceService
 
     public void RaiseDataChanged() => DataChanged?.Invoke(this, EventArgs.Empty);
 
+    /// <summary>
+    /// Phase 6: hochzaehlen einer DailyStats-Spalte fuer "heute".
+    /// Legt den Tageseintrag an wenn er noch nicht existiert.
+    /// Aufrufer muss SaveChangesAsync selbst triggern (wir haengen uns in den
+    /// vorhandenen Save am Ende der Operation ein).
+    /// </summary>
+    private static async Task IncrementDailyStatAsync(UserDataContext ctx,
+        Action<DailyStats> mutate, CancellationToken ct)
+    {
+        var today = DateTime.Today;
+        var stat = await ctx.DailyStats.FirstOrDefaultAsync(s => s.Date == today, ct);
+        if (stat == null)
+        {
+            stat = new DailyStats { Date = today };
+            ctx.DailyStats.Add(stat);
+        }
+        mutate(stat);
+    }
+
     public async Task<bool> DeleteAsync(int trackedMinifigId, CancellationToken ct = default)
     {
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
@@ -149,6 +168,9 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             WasUndone = false
         });
 
+        // Phase 6: Tagesstatistik fuer "zerlegt" hochzaehlen.
+        await IncrementDailyStatAsync(ctx, s => s.MinifigsDismantledCount++, ct);
+
         // Figur und ihre RequiredParts loeschen (Cascade entfernt RequiredParts).
         ctx.TrackedMinifigs.Remove(minifig);
         await ctx.SaveChangesAsync(ct);
@@ -197,6 +219,53 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         Log.Information("Cleanup: {Count} Pseudo-1/1-Figuren geloescht", toDelete.Count);
         DataChanged?.Invoke(this, EventArgs.Empty);
         return toDelete.Count;
+    }
+
+    public async Task<bool> CheckAndMarkCompleteAsync(int minifigId,
+        CancellationToken ct = default)
+    {
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+        var m = await ctx.TrackedMinifigs
+            .Include(x => x.RequiredParts)
+            .FirstOrDefaultAsync(x => x.Id == minifigId, ct);
+        if (m == null) return false;
+        if (m.Status != TrackedMinifigStatus.Waiting) return false;
+        if (m.RequiredParts.Count == 0) return false;
+
+        var allComplete = m.RequiredParts
+            .All(p => p.QuantityCollected >= p.QuantityNeeded);
+        if (!allComplete) return false;
+
+        m.Status = TrackedMinifigStatus.Complete;
+        m.CompletedAt = DateTime.UtcNow;
+
+        await IncrementDailyStatAsync(ctx, s => s.MinifigsCompletedCount++, ct);
+        await ctx.SaveChangesAsync(ct);
+
+        Log.Information("Figur '{Name}' (Id={Id}) als COMPLETE markiert",
+            m.Name, m.Id);
+        DataChanged?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
+
+    public async Task<bool> ReopenAsync(int minifigId, CancellationToken ct = default)
+    {
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+        var m = await ctx.TrackedMinifigs
+            .FirstOrDefaultAsync(x => x.Id == minifigId, ct);
+        if (m == null) return false;
+        if (m.Status != TrackedMinifigStatus.Complete) return false;
+
+        m.Status = TrackedMinifigStatus.Waiting;
+        m.CompletedAt = null;
+        // DailyStats absichtlich NICHT veraendern - der Tag der Komplettierung
+        // bleibt historisch korrekt gezaehlt.
+        await ctx.SaveChangesAsync(ct);
+
+        Log.Information("Figur '{Name}' (Id={Id}) wieder auf Waiting gesetzt",
+            m.Name, m.Id);
+        DataChanged?.Invoke(this, EventArgs.Empty);
+        return true;
     }
 
     public async Task<PersistMinifigResult> PersistAndStoreAsync(
@@ -305,6 +374,16 @@ public class MinifigPersistenceService : IMinifigPersistenceService
                 : $"Minifigur '{input.Name}' im Fach '{bin.Label}' angelegt",
             WasUndone = false
         });
+
+        // Phase 6: DailyStats hochzaehlen.
+        // Scan zaehlt immer; Komplettierung nur wenn die Figur durch Reverse-Match
+        // bei Speicherung schon komplett ist (CheckAndMarkCompleteAsync zaehlt
+        // den manuellen Pfad ueber den Pending-Klick).
+        await IncrementDailyStatAsync(ctx, s =>
+        {
+            s.ScanCount++;
+            if (isComplete) s.MinifigsCompletedCount++;
+        }, ct);
 
         await ctx.SaveChangesAsync(ct);
 
