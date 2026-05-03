@@ -1154,7 +1154,116 @@ Stand: **17 von 21** sichtbaren `<Image>`-Elementen sind zoombar.
 Bewusst ohne Zoom: Logo (MainWindow, SettingsWindow), Webcam-Live-Frame
 (SortingView), Overlay-Bild (ZoomOverlayHost selbst).
 
+### UX-Iteration X.9 ✅ (2026-05-03) — Integrierte Hilfe + Tooltips global
+
+Zwei zusammenhaengende Ergaenzungen fuer User-Onboarding:
+
+**Hilfe-Tab als dritter Haupt-Tab.** F1 oeffnet jetzt die Hilfe statt
+einen Toast zu zeigen. Implementierung:
+- `Markdig` + `Markdig.Wpf` als NuGet-Pakete; rendern Markdown direkt
+  in ein `FlowDocument`, das in einem `FlowDocumentScrollViewer` in
+  `HelpView` haengt.
+- `HBSort/Resources/Help/index.json` listet alle Kapitel
+  (Title/FileName/Order); 7 Markdown-Dateien (`01-erste-schritte.md`
+  bis `07-faq.md`) liefern den Inhalt.
+- Resources sind als WPF-Resource (Build-Action `Resource`) eingebettet
+  und ueber `pack://application:,,,/Resources/Help/...` adressierbar -
+  damit kann Markdig.Wpf relative Bild-Pfade aus den Markdown-Dateien
+  direkt aufloesen.
+- `IHelpContentService` / `HelpContentService` kapseln das Resource-
+  Laden; bei Fehler wird ein Markdown-Fehler-Hinweis statt Crash
+  zurueckgegeben.
+- `HelpViewModel` haelt Kapitelliste + SelectedChapter; bei Auswahl-
+  Wechsel wird das FlowDocument neu gebaut. Auto-Select des ersten
+  Kapitels beim Tab-Wechsel.
+- Layout in `HelpView.xaml`: 240px-Sidebar links (ListBox) + Flow-
+  DocumentScrollViewer rechts. Hyperlink-RequestNavigate-Handler im
+  Code-Behind oeffnet Links via `Process.Start` im OS-Browser.
+- Such-Funktion absichtlich weggelassen (TODO im VM); kommt in einer
+  spaeteren Iteration falls gewuenscht.
+
+**Tooltips global an/ausschaltbar.** Implementierung als DynamicResource-
+Anker, ohne `OverrideMetadata`-Hack:
+- `AppSettings.ShowTooltips` (bool, Default true).
+- `ITooltipsService` schreibt den bool in
+  `Application.Current.Resources["TooltipsEnabled"]`. `App.xaml` deklariert
+  den Resource-Key als `<sys:Boolean>True</sys:Boolean>`.
+- Alle 11 Wurzel-Windows (MainWindow + 10 Dialoge) haben am Window-
+  Element `ToolTipService.IsEnabled="{DynamicResource TooltipsEnabled}"`.
+  WPFs ToolTipService.IsEnabled ist `Inheritable` - Aenderung am
+  Window-Root propagiert ueber den ganzen Visual-Tree, also auch in
+  alle UserControls und ContentDialogs.
+- `SettingsWindow` Allgemein-Tab hat eine CheckBox "Tooltips anzeigen".
+  Der Toggle wirkt sofort (live), ohne Speichern-Klick und ohne
+  Neustart - persistiert wird beim regulaeren Save.
+- Bestehende ~12 inkonsistente Tooltips harmonisiert (Du-Form, ASCII-
+  Umlaute, vollstaendige Saetze).
+- ~30 neue Tooltips ergaenzt: Tab-Header, Status-Badges (per
+  `StatusTooltip`/`ProgressTooltip`-Properties am InventoryRowItem),
+  Color-Swatches (per `ColorName`), Filter-Optionen, Bin-Details,
+  Webcam-Bild, Brickognize-Karten, Bottom-Right-TabItems im Sortier-Tab.
+
 ## Wichtige Hinweise
+
+### Hilfe-System (UX X.9)
+
+Alle Hilfe-Inhalte liegen unter `HBSort/Resources/Help/`:
+
+```
+HBSort/Resources/Help/
+├── index.json              ← Kapitelliste (Title/FileName/Order)
+├── 01-erste-schritte.md
+├── 02-sortier-workflow.md
+├── 03-lagerverwaltung.md
+├── 04-export-verkauf.md
+├── 05-einstellungen.md
+├── 06-tipps.md
+├── 07-faq.md
+└── images/                 ← optionale Screenshots (PNG/JPG)
+```
+
+**Inhalt erweitern**:
+1. Markdown-Datei in `Resources/Help/` anlegen.
+2. Eintrag in `index.json` mit `title`, `fileName`, `order` ergaenzen.
+3. Build (Resource-Glob im csproj packt automatisch alles ein).
+
+**Konventionen**:
+- Tonfall: freundlicher Du-Form-Anfaengerton, keine Insider-Jargon.
+- Umlaute: ASCII (`ae/oe/ue/ss`), wie ueberall im Codebase.
+- Bilder: `Resources/Help/images/foo.png`, im Markdown als
+  `![Alt](images/foo.png)` referenzieren - Markdig.Wpf loest den
+  Pfad ueber pack-URIs auf.
+- Niemals Funktionen erfinden, die es nicht gibt - nur dokumentieren
+  was tatsaechlich in der App existiert.
+
+**Struktur in der App**:
+- `HelpView.xaml` + `HelpViewModel` + `IHelpContentService`/
+  `HelpContentService` kapseln das Laden + Rendern.
+- `MainViewModel.MainTabIndex == 2` zeigt den Hilfe-Tab.
+- F1-KeyBinding in `MainWindow.xaml` ruft `OpenHelpCommand` auf,
+  der `MainTabIndex = 2` setzt.
+
+### Tooltips + ShowTooltips-Schalter (UX X.9)
+
+Globaler Schalter unter `AppSettings.ShowTooltips` (Default true).
+Architektur:
+- `ITooltipsService` schreibt bool in
+  `Application.Current.Resources["TooltipsEnabled"]`.
+- Alle 11 Window-XAMLs haben
+  `ToolTipService.IsEnabled="{DynamicResource TooltipsEnabled}"` am
+  Wurzel-Element. ToolTipService.IsEnabled inheritet entlang des
+  Visual-Tree -> ein Wert pro Window deckt alle Children inkl.
+  ContentDialogs.
+- SettingsViewModel.OnShowTooltipsChanged ruft live
+  `ITooltipsService.SetEnabled(value)` auf - keine Neustart noetig.
+
+**Stil-Konvention fuer neue Tooltips**:
+- Du-Form, Verb-Anfang, max. ~80 Zeichen.
+- ASCII-Umlaute, Punkt am Ende.
+- Aktiv: "Loescht alle Eintraege ..." - nicht "Wird geloescht ...".
+- Color-Swatches kriegen `ToolTip="{Binding ColorName}"`.
+- Status-Badges: ausfuehrlicher Tooltip ueber computed Property im VM
+  (siehe `InventoryRowItem.StatusTooltip` als Vorlage).
 
 ### Async-First
 Alle API-Calls und DB-Zugriffe sind `async`. UI darf nie blockieren.
