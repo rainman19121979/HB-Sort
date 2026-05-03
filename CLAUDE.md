@@ -1046,8 +1046,56 @@ des Sortier-Tabs (3-Spalten-Layout aus UX#5).
 
 **Neue Models:**
 - `CachedPriceLookup(Price, IsStale)` - Repo-Rueckgabe.
-- `PriceLookupOutcome(Price, Source, FetchedAt, ErrorMessage)` +
-  `PriceLookupSource` enum (Cache/Stale/Live/None).
+- `PriceLookupOutcome(Price, Source, FetchedAt, ErrorMessage, Notice)` +
+  `PriceLookupSource` enum (Cache/Stale/Live/None) +
+  `PriceLookupNotice` enum (None/Error/NotConfigured, Default None).
+
+#### Phase 8-Bugfix (2026-05-03) — keine Preise + Binding-Errors
+
+Zwei Bugs im Anschluss an die Phase 8-UI-Anbindung gefixt:
+
+**1. `Cannot convert '<null>' to ImageSource` Trace-Spam.** WPFs
+eingebauter `ImageSourceConverter` wirft bei null-Bindings eine
+`NotSupportedException`. Trat vor allem in `MinifigDetailView`,
+`SortingView`-Karten und der `InventoryListView` auf, sobald eine
+neu erkannte Figur noch keine `ImageUrl` hatte.
+- Neuer zentraler `HBSort/Converters/NullToImageSourceConverter.cs`
+  (Resource-Key `NullToImageSource`, in `App.xaml` registriert).
+- An alle 19 `<Image Source="{Binding ImageUrl}"/>`-Bindings in 13
+  Views/Dialogen gehaengt (BinDetailDialog, BinOverviewView,
+  BsxExportDialog, BuildSuggestionDetailDialog, BuildSuggestionsView,
+  DismantleWizardDialog, InventoryListView, MinifigDetailView,
+  MinifigSummaryDialog, PartLookupView, SortingView, SupersetsDialog,
+  WaitingDetailView).
+
+**2. Stilles Schweigen bei Provider="None".** Mit dem Default-Provider
+"None" lieferte die obere rechte Preis-Box weder Daten noch einen
+Hinweis - die Box blieb komplett leer und der User wusste nicht,
+warum. Zusaetzlich griff ein Provider-Wechsel im Settings-Dialog
+erst nach App-Neustart, weil `BlPriceCacheService` den Provider im
+Konstruktor cached'te.
+- `PriceLookupOutcome` um Notice-Enum erweitert (Default None,
+  bestehende Aufrufer brauchen keine Aenderung).
+- `BlPriceCacheService.IsProviderConfigured()` prueft live
+  `Settings.Current.Prices.Provider`. Bei "None" -&gt; sofortige
+  `Notice=NotConfigured`-Outcome mit User-Hinweis "Preise nicht
+  verfuegbar - Provider noch nicht eingerichtet. Oeffne Einstellungen
+  → Preise und waehle 'BL-API'.". Cache-Reads bleiben aktiv.
+- **Wichtig**: der NotConfigured-Check liegt in `GetPriceCoreAsync`
+  vor dem `GetLiveWithInFlightGuardAsync`-Aufruf, weil ein
+  synchron-fertiger Task in der `GetOrAdd`-Factory den Stale-Eintrag
+  im In-Flight-Dict liegen lassen wuerde (`finally`-`TryRemove`
+  laeuft VOR dem Add). Ein Test deckt das Verhalten ab
+  (`Provider_switch_in_settings_takes_effect_without_recreating_service`).
+- `_provider`-Field entfernt, `_providerFactory` wird live abgefragt -
+  Settings-Wechsel greifen jetzt sofort, kein Neustart noetig.
+- `MinifigPriceViewModel` hebt Outcome-Notices auf View-Properties:
+  `HasError` (rotes Banner) vs `HasConfigurationHint` (oranges Banner).
+  `MinifigPriceView.xaml` zeigt zwei separate Banner-Reihen damit der
+  Konfigurations-Hinweis nicht wie ein echter Fehler aussieht.
+- TODO im Code vermerkt: klickbarer "Einstellungen oeffnen"-Button im
+  Hinweis-Banner. Braucht einen `INavigationService`, kommt in
+  spaeterer Iteration.
 
 ### UX-Iteration X.4 ✅ (2026-05-03)
 
