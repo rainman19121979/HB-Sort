@@ -69,6 +69,15 @@ Beim App-Start läuft eine Auto-Migration vom alten Pfad
   (sonst friert die WPF-Pipeline ein).
 - **Logs sind tabu für Tokens**: Klartext-BL-Tokens dürfen nie in Logs landen,
   auch nicht auf Debug-Level.
+- **Dialoge**: Statt `MessageBox.Show` immer `IDialogService` (siehe
+  `HBSort.Services`). `ShowQuestionAsync` für destruktive Aktionen
+  ("Ja"/"Nein"), `ShowConfirmAsync` für nicht-destruktive ("OK"/"Abbrechen"),
+  `ShowInfoAsync` / `ShowErrorAsync` für reine Hinweise. Aufrufe sind alle
+  async — Click-Handler ggf. auf `async void` umstellen statt `.Wait()`.
+- **Klickbare Bilder**: Auf jedem `<Image>` mit BL-/Cache-Bild
+  `b:ImageZoom.IsEnabled="True"` setzen (Namespace
+  `xmlns:b="clr-namespace:HBSort.Behaviors"`) → öffnet Modal-Overlay im
+  MainWindow.
 
 ---
 
@@ -915,6 +924,70 @@ NICHT in dieser Phase:
 - HBPriceToolProvider (kommt wenn das eigene Tool dokumentiert ist).
 - Provider-Mocks fuer Unit-Tests (zu aufwaendig fuer den Erstwurf).
 - Bulk-Preis-Update fuer alle wartenden Figuren.
+
+### UX-Iteration X.4 ✅ (2026-05-03)
+
+Acht UX-Verbesserungen quer durch die App:
+
+1. **BuildSuggestions ohne Slider**: Mind.-Match-Slider raus; alle baubaren
+   Vorschlaege werden gezeigt (sortiert nach Match-% absteigend, Top-N=20).
+
+2. **BL-Wanted-List-Export**: Neuer `IWantedListExportService` + Button
+   "Wanted-List exportieren" in der Lagerliste-Header. Dialog mit zwei
+   Modi: "Alle wartenden Figuren in eine Datei" (aggregiert) oder "Pro
+   Figur eine eigene Datei". Format: BrickLink-Wanted-List-XML
+   (`INVENTORY/ITEM` mit ITEMTYPE=P, ITEMID, COLOR, MINQTY).
+   Neuer `AppSettings.WantedListExportFolder` mit Fallback auf
+   `BsxExportFolder` -> Documents/HBSort-Export.
+
+3. **BuildSuggestion-Klick → Figur anlegen**: Klick auf einen Bauvorschlag
+   oeffnet `BuildSuggestionDetailDialog` (Bild, Name, BL-ID, Jahr, Liste
+   aller Required-Parts mit Status "Vorhanden in Box X / Fehlt", Bin-Dropdown,
+   Notizen). "Figur anlegen" ruft `IMinifigPersistenceService.PersistAndStoreAsync`
+   - der bestehende Reverse-Match konsumiert FloatingParts und markiert
+   die Figur ggf. direkt als Complete.
+
+4. **MinifigDetailView Scrollbar-Overlap**: Border in der Teile-Liste
+   bekommt Padding-Right=18 - Quantity-Spalte rechts ist nicht mehr von
+   der ScrollBar verdeckt.
+
+5. **Sortier-Tab auf 3 gleich breite Spalten**: Aus 2 Spalten werden 3
+   (jeweils `Width="*"`). Spalte 3 enthaelt zwei leere Borders im
+   65/35-Verhaeltnis (Inhalte kommen spaeter). Zweiter vertikaler
+   GridSplitter; neuer `AppSettings.WindowState.SplitterColumnRatio2`
+   speichert den Anteil der Mittelspalte.
+
+6. **Klickbare Bilder mit grosser Vorschau**: Neuer
+   `HBSort.Behaviors.ImageZoom` (Attached Property "IsEnabled") +
+   `ZoomOverlayHost` UserControl. `b:ImageZoom.IsEnabled="True"` an einem
+   `<Image>` setzt Cursor=Hand und oeffnet bei Klick ein Modal-Overlay
+   im MainWindow (kein extra Window -> Multi-Monitor-sicher). Schliessen
+   per Klick auf Hintergrund / ESC / X-Button. Eingebaut an allen
+   relevanten Image-Stellen (Brickognize-Karten, MinifigDetailView,
+   PartLookupView, alle Dialog-Bilder, Lagerliste-Spalte).
+
+7. **MessageBox -> ContentDialog ueber IDialogService**: Neuer
+   `HBSort.Services.IDialogService` (`ShowInfoAsync`, `ShowErrorAsync`,
+   `ShowConfirmAsync(okText, cancelText)`, `ShowQuestionAsync` =
+   "Ja"/"Nein"). Implementierung baut `ModernWpf.Controls.ContentDialog`
+   mit Owner=ActiveWindow. 32 von 33 MessageBox-Stellen umgestellt;
+   einzige Ausnahme ist der App-Start-Fatal-Pfad in `App.xaml.cs:108`
+   (laeuft vor DI-Init). Konvention:
+   - Destruktive Aktionen (Loeschen, Cache leeren, Fach leeren) -> "Ja"/"Nein"
+   - Nicht-destruktiv -> "OK"/"Abbrechen"
+   - Click-Handler die noch sync waren wurden auf `async void` umgestellt
+     (kein `.Wait()`/`.Result` -> kein UI-Thread-Block).
+
+8. **Header-/Tab-Bereich modernisiert (Win11-Pivot-Stil)**: Die zwei
+   bisherigen Header-Zeilen (Titelleiste + TabControl) sind zu einer
+   Header-Zeile zusammengefasst: Logo+Version (links), Pivot-Tabs
+   (Mitte), Settings-Button mit Zahnrad-Icon (rechts). Tabs sind
+   RadioButtons mit dem neuen `MainTabRadioStyle` (in `App.xaml`) -
+   aktiver Tab bekommt einen 3px-Akzentfarben-Indikator unten. Der
+   Hauptbereich nutzt jetzt ContentControl + Visibility-Bindings statt
+   TabControl, damit der TabControl-Header nicht zusaetzlich erscheint.
+   Neuer `MainViewModel.MainTabIndex` (0=Sortieren, 1=Lagerliste); nicht
+   persistiert.
 
 ## Wichtige Hinweise
 
