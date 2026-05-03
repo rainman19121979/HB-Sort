@@ -253,4 +253,95 @@ public class BlCacheRepositoryTests : IDisposable
             ColorId = colorId, Quantity = 1, MatchId = matchId,
             FetchedAt = DateTime.UtcNow
         };
+
+    // ====================================================================
+    // Phase 8 / UX#12 Stale-While-Revalidate
+    // ====================================================================
+
+    [Fact]
+    public async Task GetCachedPriceWithStaleFlag_returns_null_when_no_entry()
+    {
+        var hit = await _sut.GetCachedPriceWithStaleFlagAsync(
+            "M", "arc007", 0, "sold", "U", "europe", "EUR", ttlDays: 90);
+        Assert.Null(hit);
+    }
+
+    [Fact]
+    public async Task GetCachedPriceWithStaleFlag_returns_fresh_entry_with_IsStale_false()
+    {
+        await _sut.UpsertPriceAsync("M", "arc007", 0, "sold", "U", "europe", "EUR",
+            new HBSort.Core.Models.Pricing.PriceResult
+            {
+                AvgPrice = 12.50m, Currency = "EUR", FetchedAt = DateTime.UtcNow
+            });
+
+        var hit = await _sut.GetCachedPriceWithStaleFlagAsync(
+            "M", "arc007", 0, "sold", "U", "europe", "EUR", ttlDays: 90);
+
+        Assert.NotNull(hit);
+        Assert.False(hit!.IsStale);
+        Assert.Equal(12.50m, hit.Price.AvgPrice);
+    }
+
+    [Fact]
+    public async Task GetCachedPriceWithStaleFlag_marks_old_entry_as_stale()
+    {
+        // FetchedAt vor 100 Tagen, TTL=90 -> stale
+        await _sut.UpsertPriceAsync("M", "arc007", 0, "sold", "U", "europe", "EUR",
+            new HBSort.Core.Models.Pricing.PriceResult
+            {
+                AvgPrice = 12.50m, Currency = "EUR",
+                FetchedAt = DateTime.UtcNow.AddDays(-100)
+            });
+
+        var hit = await _sut.GetCachedPriceWithStaleFlagAsync(
+            "M", "arc007", 0, "sold", "U", "europe", "EUR", ttlDays: 90);
+
+        Assert.NotNull(hit);
+        Assert.True(hit!.IsStale);
+        Assert.Equal(12.50m, hit.Price.AvgPrice); // Wert wird trotzdem geliefert
+    }
+
+    [Fact]
+    public async Task DeletePrice_removes_specific_entry_and_returns_true()
+    {
+        await _sut.UpsertPriceAsync("M", "arc007", 0, "sold", "U", "europe", "EUR",
+            new HBSort.Core.Models.Pricing.PriceResult { AvgPrice = 1m, Currency = "EUR" });
+
+        var deleted = await _sut.DeletePriceAsync("M", "arc007", 0, "sold", "U", "europe", "EUR");
+        Assert.True(deleted);
+
+        var afterDelete = await _sut.GetCachedPriceWithStaleFlagAsync(
+            "M", "arc007", 0, "sold", "U", "europe", "EUR", ttlDays: 90);
+        Assert.Null(afterDelete);
+    }
+
+    [Fact]
+    public async Task DeletePrice_returns_false_when_not_found()
+    {
+        var deleted = await _sut.DeletePriceAsync("M", "ghost", 0, "sold", "U", "europe", "EUR");
+        Assert.False(deleted);
+    }
+
+    [Fact]
+    public async Task ClearAllPrices_removes_everything_and_returns_count()
+    {
+        await _sut.UpsertPriceAsync("M", "arc007", 0, "sold", "U", "europe", "EUR",
+            new HBSort.Core.Models.Pricing.PriceResult { AvgPrice = 1m, Currency = "EUR" });
+        await _sut.UpsertPriceAsync("P", "3001", 11, "sold", "U", "europe", "EUR",
+            new HBSort.Core.Models.Pricing.PriceResult { AvgPrice = 0.05m, Currency = "EUR" });
+
+        var removed = await _sut.ClearAllPricesAsync();
+        Assert.Equal(2, removed);
+        Assert.Equal(0, await _sut.GetPriceCacheCountAsync());
+    }
+
+    [Fact]
+    public async Task GetPriceCacheCount_increments_with_each_upsert()
+    {
+        Assert.Equal(0, await _sut.GetPriceCacheCountAsync());
+        await _sut.UpsertPriceAsync("M", "arc007", 0, "sold", "U", "europe", "EUR",
+            new HBSort.Core.Models.Pricing.PriceResult { AvgPrice = 1m, Currency = "EUR" });
+        Assert.Equal(1, await _sut.GetPriceCacheCountAsync());
+    }
 }

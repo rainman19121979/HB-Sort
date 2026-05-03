@@ -978,11 +978,122 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
             cmd.Parameters.AddWithValue("$max", (object?)(double?)price.MaxPrice ?? DBNull.Value);
             cmd.Parameters.AddWithValue("$uq", price.UnitQuantity);
             cmd.Parameters.AddWithValue("$tq", price.TotalQuantity);
+            // FetchedAt aus dem PriceResult uebernehmen - der Aufrufer (i.d.R.
+            // der Provider direkt nach dem API-Call) setzt den Wert auf "jetzt".
+            // Tests koennen einen aelteren FetchedAt mitschicken um Stale-
+            // Verhalten zu pruefen, ohne SQL-Direktzugriff.
+            var fetchedAtToWrite = price.FetchedAt == default
+                ? DateTime.UtcNow
+                : price.FetchedAt.ToUniversalTime();
             cmd.Parameters.AddWithValue("$fet",
-                DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+                fetchedAtToWrite.ToString("o", CultureInfo.InvariantCulture));
             cmd.ExecuteNonQuery();
         }
         return Task.CompletedTask;
+    }
+
+    // ========================================================================
+    // Phase 8 / UX#12 Stale-While-Revalidate
+    // ========================================================================
+
+    public Task<Models.Pricing.CachedPriceLookup?> GetCachedPriceWithStaleFlagAsync(
+        string itemType, string itemNo, int colorId,
+        string guideType, string newOrUsed,
+        string region, string currency,
+        int ttlDays,
+        CancellationToken ct = default)
+    {
+        Models.Pricing.CachedPriceLookup? result = null;
+        lock (_lock)
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT min_price, avg_price, qty_avg_price, max_price,
+                       unit_quantity, total_quantity, fetched_at
+                FROM bl_prices
+                WHERE item_type = $it AND item_no = $in AND color_id = $cid
+                  AND guide_type = $gt AND new_or_used = $nu
+                  AND region = $rg AND currency = $cu;";
+            cmd.Parameters.AddWithValue("$it", itemType);
+            cmd.Parameters.AddWithValue("$in", itemNo);
+            cmd.Parameters.AddWithValue("$cid", colorId);
+            cmd.Parameters.AddWithValue("$gt", guideType);
+            cmd.Parameters.AddWithValue("$nu", newOrUsed);
+            cmd.Parameters.AddWithValue("$rg", region ?? string.Empty);
+            cmd.Parameters.AddWithValue("$cu", currency);
+
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read())
+                return Task.FromResult<Models.Pricing.CachedPriceLookup?>(null);
+
+            var fetchedAt = ParseUtc(reader.GetString(6));
+            // ttlDays &lt;= 0 ist ungueltig - wir behandeln es als "alles ist frisch"
+            // (sonst waere jeder Eintrag stale). Aufrufer sollte normalisieren.
+            var maxAge = TimeSpan.FromDays(Math.Max(1, ttlDays));
+            var isStale = (DateTime.UtcNow - fetchedAt) > maxAge;
+
+            var price = new Models.Pricing.PriceResult
+            {
+                MinPrice      = reader.IsDBNull(0) ? null : (decimal?)reader.GetDouble(0),
+                AvgPrice      = reader.IsDBNull(1) ? null : (decimal?)reader.GetDouble(1),
+                QtyAvgPrice   = reader.IsDBNull(2) ? null : (decimal?)reader.GetDouble(2),
+                MaxPrice      = reader.IsDBNull(3) ? null : (decimal?)reader.GetDouble(3),
+                UnitQuantity  = reader.IsDBNull(4) ? 0 : reader.GetInt32(4),
+                TotalQuantity = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
+                Currency      = currency,
+                FetchedAt     = fetchedAt
+            };
+            result = new Models.Pricing.CachedPriceLookup(price, isStale);
+        }
+        return Task.FromResult<Models.Pricing.CachedPriceLookup?>(result);
+    }
+
+    public Task<bool> DeletePriceAsync(
+        string itemType, string itemNo, int colorId,
+        string guideType, string newOrUsed,
+        string region, string currency,
+        CancellationToken ct = default)
+    {
+        lock (_lock)
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = @"
+                DELETE FROM bl_prices
+                WHERE item_type = $it AND item_no = $in AND color_id = $cid
+                  AND guide_type = $gt AND new_or_used = $nu
+                  AND region = $rg AND currency = $cu;";
+            cmd.Parameters.AddWithValue("$it", itemType);
+            cmd.Parameters.AddWithValue("$in", itemNo);
+            cmd.Parameters.AddWithValue("$cid", colorId);
+            cmd.Parameters.AddWithValue("$gt", guideType);
+            cmd.Parameters.AddWithValue("$nu", newOrUsed);
+            cmd.Parameters.AddWithValue("$rg", region ?? string.Empty);
+            cmd.Parameters.AddWithValue("$cu", currency);
+            var deleted = cmd.ExecuteNonQuery();
+            return Task.FromResult(deleted > 0);
+        }
+    }
+
+    public Task<int> ClearAllPricesAsync(CancellationToken ct = default)
+    {
+        lock (_lock)
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "DELETE FROM bl_prices;";
+            var deleted = cmd.ExecuteNonQuery();
+            Log.Information("bl_prices komplett geleert: {Count} Eintraege geloescht", deleted);
+            return Task.FromResult(deleted);
+        }
+    }
+
+    public Task<int> GetPriceCacheCountAsync(CancellationToken ct = default)
+    {
+        lock (_lock)
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM bl_prices;";
+            return Task.FromResult(Convert.ToInt32(cmd.ExecuteScalar()));
+        }
     }
 
     // ========================================================================

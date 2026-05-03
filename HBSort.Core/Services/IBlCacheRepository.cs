@@ -139,4 +139,37 @@ public interface IBlCacheRepository
         string region, string currency,
         Models.Pricing.PriceResult price,
         CancellationToken ct = default);
+
+    // ====================================================================
+    // Phase 8 / UX#12 Stale-While-Revalidate - vier neue Operationen
+    // ====================================================================
+
+    /// <summary>
+    /// Wie GetCachedPriceAsync, aber liefert IMMER den vorhandenen Eintrag
+    /// mit einem IsStale-Flag (FetchedAt + ttlDays &lt; now). Liefert null
+    /// nur wenn kein Eintrag in der DB ist. Fuer Stale-While-Revalidate.
+    /// </summary>
+    Task<Models.Pricing.CachedPriceLookup?> GetCachedPriceWithStaleFlagAsync(
+        string itemType, string itemNo, int colorId,
+        string guideType, string newOrUsed,
+        string region, string currency,
+        int ttlDays,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Loescht GENAU diesen Cache-Eintrag (PRIMARY-KEY-Match). Liefert true
+    /// wenn ein Eintrag entfernt wurde. Fuer Pro-Eintrag-Refresh ueber das
+    /// ↻-Icon in der UI.
+    /// </summary>
+    Task<bool> DeletePriceAsync(
+        string itemType, string itemNo, int colorId,
+        string guideType, string newOrUsed,
+        string region, string currency,
+        CancellationToken ct = default);
+
+    /// <summary>Loescht ALLE Eintraege in bl_prices. Fuer "Cache leeren"-Button.</summary>
+    Task<int> ClearAllPricesAsync(CancellationToken ct = default);
+
+    /// <summary>Anzahl Eintraege in bl_prices. Fuer Settings-Anzeige.</summary>
+    Task<int> GetPriceCacheCountAsync(CancellationToken ct = default);
 }
