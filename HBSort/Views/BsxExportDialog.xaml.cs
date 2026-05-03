@@ -145,7 +145,9 @@ public partial class BsxExportDialog : Window
 
         try
         {
-            var xml = await _exporter.GenerateBsxAsync(_minifigIds, options);
+            // Provisorisch: leere FloatingPart-Liste. UX#10-C baut den Dialog
+            // komplett um und reicht beide Listen durch.
+            var xml = await _exporter.GenerateBsxAsync(_minifigIds, Array.Empty<int>(), options);
 
             // Verzeichnis sicherstellen + UTF-8 ohne BOM (BrickStore mag das so)
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);

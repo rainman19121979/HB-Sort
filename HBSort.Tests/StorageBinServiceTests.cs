@@ -222,6 +222,51 @@ public class StorageBinServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task FindBinsThatWouldBeEmpty_works_with_floating_part_ids()
+    {
+        // Bin enthaelt nur einen FloatingPart - wenn der entfernt wird, ist es leer.
+        var b1 = await _sut.CreateSingleAsync("Box 01");
+        await SeedFloatingPartInBinAsync(b1.Id, "3001", 5);
+
+        await using var ctx = await _factory.CreateDbContextAsync();
+        var fpId = (await ctx.FloatingParts.SingleAsync()).Id;
+
+        var result = await _sut.FindBinsThatWouldBeEmptyAsync(
+            Array.Empty<int>(), new[] { fpId });
+
+        Assert.Single(result);
+        Assert.Equal("Box 01", result[0].Label);
+    }
+
+    [Fact]
+    public async Task FindBinsThatWouldBeEmpty_combines_minifig_and_floating_removal()
+    {
+        // Bin enthaelt EINE komplette Minifig UND EINEN FloatingPart -
+        // beide muessen entfernt werden damit es leer wird.
+        var b1 = await _sut.CreateSingleAsync("Box 01");
+        var minifigId = await SeedMinifigInBinAsync(b1.Id, "arc007", TrackedMinifigStatus.Complete);
+        await SeedFloatingPartInBinAsync(b1.Id, "3001", 1);
+
+        await using var ctx = await _factory.CreateDbContextAsync();
+        var fpId = (await ctx.FloatingParts.SingleAsync()).Id;
+
+        // Nur Minifig entfernen -> Bin nicht leer (FloatingPart bleibt).
+        var resultOnlyMfg = await _sut.FindBinsThatWouldBeEmptyAsync(
+            new[] { minifigId }, Array.Empty<int>());
+        Assert.Empty(resultOnlyMfg);
+
+        // Nur FloatingPart entfernen -> Bin nicht leer (Minifig bleibt).
+        var resultOnlyFp = await _sut.FindBinsThatWouldBeEmptyAsync(
+            Array.Empty<int>(), new[] { fpId });
+        Assert.Empty(resultOnlyFp);
+
+        // Beides entfernen -> Bin leer.
+        var resultBoth = await _sut.FindBinsThatWouldBeEmptyAsync(
+            new[] { minifigId }, new[] { fpId });
+        Assert.Single(resultBoth);
+    }
+
+    [Fact]
     public async Task ReleaseBins_sets_FreedAt_only_for_unreleased_bins()
     {
         var b1 = await _sut.CreateSingleAsync("Box 01");

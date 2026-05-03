@@ -85,6 +85,19 @@ public interface IMinifigPersistenceService
     Task<int> RemoveExportedMinifigsAsync(
         IEnumerable<int> minifigIds,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Phase 7-Erweiterung: BSX-Export-Cleanup fuer Einzelteile. Entfernt die
+    /// uebergebenen FloatingParts komplett aus der DB. Pro entferntem Teil wird
+    /// ein ScanEvent vom Typ <see cref="HBSort.Core.Models.ScanType.FloatingPartExported"/>
+    /// geschrieben - im ResultDescription stehen Quell-Bin-Label, Part-No,
+    /// Color-Id und Quantity, damit man auch nach spaeterer Bin-Freigabe noch
+    /// nachvollziehen kann wo das Teil herkam.
+    /// Liefert die Anzahl tatsaechlich entfernter Eintraege.
+    /// </summary>
+    Task<int> RemoveExportedFloatingPartsAsync(
+        IEnumerable<int> floatingPartIds,
+        CancellationToken ct = default);
 }
 
 /// <summary>Eine Part-Wahl im DismantleWizard.</summary>

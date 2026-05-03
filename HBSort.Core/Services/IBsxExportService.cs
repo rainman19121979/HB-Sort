@@ -1,22 +1,28 @@
 namespace HBSort.Core.Services;
 
 /// <summary>
-/// Phase 7: BSX-Export der kompletten Figuren ins BrickStore-XML-Format.
-/// Erzeugt nur den XML-String; das Schreiben in eine Datei und das
-/// nachgelagerte Cleanup (Figuren entfernen / Faecher freigeben) wird
+/// Phase 7: BSX-Export ins BrickStore-XML-Format.
+/// Erzeugt nur den XML-String; das Schreiben in eine Datei und das nachgelagerte
+/// Cleanup (Figuren / FloatingParts entfernen, leere Faecher freigeben) wird
 /// vom UI-Layer gesteuert.
+///
+/// Phase-7-Erweiterung: Es koennen sowohl komplette Figuren (TrackedMinifig)
+/// als auch lose Einzelteile (FloatingPart) in einer einzigen BSX-Datei
+/// exportiert werden. Mindestens eine der beiden ID-Listen muss befuellt sein.
 /// </summary>
 public interface IBsxExportService
 {
     /// <summary>
-    /// Generiert BSX-XML fuer die uebergebenen TrackedMinifig-IDs.
-    /// Pro Figur wird ein &lt;Item&gt;-Eintrag mit ItemTypeID=M erzeugt.
-    /// Wirft <see cref="System.ArgumentException"/> wenn keine IDs uebergeben
-    /// werden, und <see cref="System.InvalidOperationException"/> wenn keine
-    /// der IDs in der DB gefunden wird.
+    /// Generiert BSX-XML fuer die uebergebenen TrackedMinifig-IDs UND/ODER
+    /// FloatingPart-IDs. Im XML werden zuerst die Minifigs (ItemTypeID=M),
+    /// danach die Einzelteile (ItemTypeID=P) als &lt;Item&gt;-Eintraege geschrieben.
+    /// Wirft <see cref="System.ArgumentException"/> wenn beide Listen leer sind,
+    /// und <see cref="System.InvalidOperationException"/> wenn keine der IDs in
+    /// der DB gefunden wird.
     /// </summary>
     Task<string> GenerateBsxAsync(
-        IEnumerable<int> trackedMinifigIds,
+        IReadOnlyList<int> trackedMinifigIds,
+        IReadOnlyList<int> floatingPartIds,
         BsxExportOptions options,
         CancellationToken ct = default);
 }

@@ -48,25 +48,27 @@ public class BsxExportServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Generate_throws_when_no_ids_passed()
+    public async Task Generate_throws_when_both_lists_empty()
     {
         await Assert.ThrowsAsync<ArgumentException>(
-            () => _sut.GenerateBsxAsync(Array.Empty<int>(), new BsxExportOptions()));
+            () => _sut.GenerateBsxAsync(
+                Array.Empty<int>(), Array.Empty<int>(), new BsxExportOptions()));
     }
 
     [Fact]
     public async Task Generate_throws_when_ids_not_in_db()
     {
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _sut.GenerateBsxAsync(new[] { 9999 }, new BsxExportOptions()));
+            () => _sut.GenerateBsxAsync(
+                new[] { 9999 }, Array.Empty<int>(), new BsxExportOptions()));
     }
 
     [Fact]
     public async Task Generate_emits_BrickStoreXML_root_with_one_item_per_minifig()
     {
-        var ids = await SeedAsync(("arc007", "Arctic Forscher"), ("sw0001", "Stormtrooper"));
+        var ids = await SeedMinifigsAsync(("arc007", "Arctic Forscher"), ("sw0001", "Stormtrooper"));
 
-        var xml = await _sut.GenerateBsxAsync(ids, new BsxExportOptions());
+        var xml = await _sut.GenerateBsxAsync(ids, Array.Empty<int>(), new BsxExportOptions());
         var doc = XDocument.Parse(xml);
 
         Assert.Equal("BrickStoreXML", doc.Root!.Name.LocalName);
@@ -81,10 +83,10 @@ public class BsxExportServiceTests : IDisposable
     [Fact]
     public async Task Generate_uses_default_category_65_when_catalog_returns_null()
     {
-        var ids = await SeedAsync(("unknown01", "X"));
+        var ids = await SeedMinifigsAsync(("unknown01", "X"));
         // Catalog liefert nichts -> Default 65
 
-        var xml = await _sut.GenerateBsxAsync(ids, new BsxExportOptions());
+        var xml = await _sut.GenerateBsxAsync(ids, Array.Empty<int>(), new BsxExportOptions());
         var doc = XDocument.Parse(xml);
         var item = doc.Root!.Element("Inventory")!.Element("Item")!;
 
@@ -94,13 +96,13 @@ public class BsxExportServiceTests : IDisposable
     [Fact]
     public async Task Generate_uses_catalog_category_when_available()
     {
-        var ids = await SeedAsync(("arc007", "Arctic"));
+        var ids = await SeedMinifigsAsync(("arc007", "Arctic"));
         _catalog.Items["arc007"] = new BlItem
         {
             ItemType = "M", ItemNo = "arc007", Name = "Arctic", CategoryId = 273
         };
 
-        var xml = await _sut.GenerateBsxAsync(ids, new BsxExportOptions());
+        var xml = await _sut.GenerateBsxAsync(ids, Array.Empty<int>(), new BsxExportOptions());
         var doc = XDocument.Parse(xml);
         var item = doc.Root!.Element("Inventory")!.Element("Item")!;
 
@@ -112,11 +114,11 @@ public class BsxExportServiceTests : IDisposable
     {
         // 3 Figuren in nicht-alphabetischer Reihenfolge anlegen,
         // dann in absichtlich gemischter Reihenfolge exportieren.
-        var ids = await SeedAsync(
+        var ids = await SeedMinifigsAsync(
             ("z-fig", "Z"), ("a-fig", "A"), ("m-fig", "M"));
         var requested = new[] { ids[2], ids[0], ids[1] }; // m, z, a
 
-        var xml = await _sut.GenerateBsxAsync(requested, new BsxExportOptions());
+        var xml = await _sut.GenerateBsxAsync(requested, Array.Empty<int>(), new BsxExportOptions());
         var items = XDocument.Parse(xml).Root!.Element("Inventory")!.Elements("Item")
             .Select(i => i.Element("ItemID")!.Value).ToList();
 
@@ -126,9 +128,9 @@ public class BsxExportServiceTests : IDisposable
     [Fact]
     public async Task Generate_uses_custom_options_for_status_condition_remark()
     {
-        var ids = await SeedAsync(("arc007", "Arctic"));
+        var ids = await SeedMinifigsAsync(("arc007", "Arctic"));
 
-        var xml = await _sut.GenerateBsxAsync(ids,
+        var xml = await _sut.GenerateBsxAsync(ids, Array.Empty<int>(),
             new BsxExportOptions(Condition: "N", Status: "X", Remark: "Mein Remark"));
         var item = XDocument.Parse(xml).Root!.Element("Inventory")!.Element("Item")!;
 
@@ -137,10 +139,68 @@ public class BsxExportServiceTests : IDisposable
         Assert.Equal("Mein Remark", item.Element("Remarks")!.Value);
     }
 
+    // ====================================================================
+    // Phase 7-Erweiterung: FloatingPart-Export (UX X.6)
+    // ====================================================================
+
+    [Fact]
+    public async Task Generate_emits_part_items_for_floating_parts()
+    {
+        // Minifig + zwei verschiedene FloatingParts. Erwartung: 1x M-Item +
+        // 2x P-Item, in dieser Reihenfolge (Minifigs zuerst, dann Parts).
+        var minifigIds = await SeedMinifigsAsync(("arc007", "Arctic"));
+        var floatIds = await SeedFloatingsAsync(
+            ("3001", 11, 5, "Brick 2x4", "Black"),     // 5x Black
+            ("3024", 0, 3, "Plate 1x1", "White"));     // 3x White
+
+        var xml = await _sut.GenerateBsxAsync(minifigIds, floatIds, new BsxExportOptions());
+        var items = XDocument.Parse(xml).Root!.Element("Inventory")!.Elements("Item").ToList();
+
+        Assert.Equal(3, items.Count);
+        Assert.Equal("M", items[0].Element("ItemTypeID")!.Value);  // Minifig zuerst
+        Assert.Equal("P", items[1].Element("ItemTypeID")!.Value);
+        Assert.Equal("P", items[2].Element("ItemTypeID")!.Value);
+
+        // Erstes Part: Brick 2x4 / Black / 5x
+        Assert.Equal("3001", items[1].Element("ItemID")!.Value);
+        Assert.Equal("11", items[1].Element("ColorID")!.Value);
+        Assert.Equal("5", items[1].Element("Qty")!.Value);
+    }
+
+    [Fact]
+    public async Task Generate_works_with_only_floating_parts_no_minifigs()
+    {
+        // Nur Einzelteile, keine Minifigs - sollte trotzdem laufen.
+        var floatIds = await SeedFloatingsAsync(
+            ("3001", 11, 2, "Brick 2x4", "Black"));
+
+        var xml = await _sut.GenerateBsxAsync(
+            Array.Empty<int>(), floatIds, new BsxExportOptions());
+        var items = XDocument.Parse(xml).Root!.Element("Inventory")!.Elements("Item").ToList();
+
+        Assert.Single(items);
+        Assert.Equal("P", items[0].Element("ItemTypeID")!.Value);
+        Assert.Equal("3001", items[0].Element("ItemID")!.Value);
+    }
+
+    [Fact]
+    public async Task Generate_part_uses_floating_part_color_name_as_fallback()
+    {
+        // Catalog liefert keinen Color-Namen -> wir erwarten den FloatingPart.ColorName.
+        var floatIds = await SeedFloatingsAsync(
+            ("3001", 11, 2, "Brick 2x4", "Black"));
+
+        var xml = await _sut.GenerateBsxAsync(
+            Array.Empty<int>(), floatIds, new BsxExportOptions());
+        var item = XDocument.Parse(xml).Root!.Element("Inventory")!.Element("Item")!;
+
+        Assert.Equal("Black", item.Element("ColorName")!.Value);
+    }
+
     // --- Helpers ---
 
     /// <summary>Legt Test-Minifigs an und gibt deren EF-IDs zurueck.</summary>
-    private async Task<int[]> SeedAsync(params (string blId, string name)[] minifigs)
+    private async Task<int[]> SeedMinifigsAsync(params (string blId, string name)[] minifigs)
     {
         await using var ctx = await _factory.CreateDbContextAsync();
         var ids = new List<int>();
@@ -157,6 +217,40 @@ public class BsxExportServiceTests : IDisposable
             ctx.TrackedMinifigs.Add(m);
             await ctx.SaveChangesAsync();
             ids.Add(m.Id);
+        }
+        return ids.ToArray();
+    }
+
+    /// <summary>Legt Test-FloatingParts an und gibt deren EF-IDs zurueck.</summary>
+    private async Task<int[]> SeedFloatingsAsync(
+        params (string partNo, int colorId, int qty, string partName, string colorName)[] floats)
+    {
+        await using var ctx = await _factory.CreateDbContextAsync();
+        // Wir brauchen ein Bin damit das FloatingPart einen FK hat.
+        var bin = new StorageBin
+        {
+            Label = $"TestBin-{Guid.NewGuid():N}",
+            CreatedAt = DateTime.UtcNow
+        };
+        ctx.StorageBins.Add(bin);
+        await ctx.SaveChangesAsync();
+
+        var ids = new List<int>();
+        foreach (var (partNo, colorId, qty, partName, colorName) in floats)
+        {
+            var fp = new FloatingPart
+            {
+                PartNumber = partNo,
+                ColorId = colorId,
+                Quantity = qty,
+                PartName = partName,
+                ColorName = colorName,
+                StorageBinId = bin.Id,
+                AddedAt = DateTime.UtcNow
+            };
+            ctx.FloatingParts.Add(fp);
+            await ctx.SaveChangesAsync();
+            ids.Add(fp.Id);
         }
         return ids.ToArray();
     }

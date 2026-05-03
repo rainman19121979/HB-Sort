@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Xml.Linq;
 using HBSort.Core.Database;
+using HBSort.Core.Models.Bricklink;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -8,11 +9,19 @@ namespace HBSort.Core.Services;
 
 /// <summary>
 /// Default-Implementierung des BSX-Exports. Liest die ausgewaehlten
-/// TrackedMinifigs aus der userdata.db und ergaenzt Item-Details
-/// (CategoryId) bestmoeglich aus dem BL-Cache.
+/// TrackedMinifigs UND FloatingParts aus userdata.db und ergaenzt
+/// Item-Details (CategoryId, Color-Name) bestmoeglich aus dem BL-Cache.
 ///
 /// BSX-Format-Referenz:
 /// https://www.brickstoreapp.org/files/help/bsx_format_v3.html
+///
+/// XML-Struktur:
+///   &lt;BrickStoreXML&gt;
+///     &lt;Inventory&gt;
+///       &lt;Item&gt; ... ItemTypeID=M, Qty=1, ColorID=0          (komplette Figur)
+///       &lt;Item&gt; ... ItemTypeID=P, Qty=N, ColorID=blColorId   (Einzelteil)
+///     &lt;/Inventory&gt;
+///   &lt;/BrickStoreXML&gt;
 /// </summary>
 public class BsxExportService : IBsxExportService
 {
@@ -21,6 +30,9 @@ public class BsxExportService : IBsxExportService
 
     /// <summary>BL-Default-Kategorie fuer Minifigs wenn der Cache nichts liefert.</summary>
     private const int DefaultMinifigCategoryId = 65;
+
+    /// <summary>BL-Default-Kategorie fuer Teile wenn der Cache nichts liefert.</summary>
+    private const int DefaultPartCategoryId = 5;
 
     public BsxExportService(
         IDbContextFactory<UserDataContext> ctxFactory,
@@ -31,33 +43,58 @@ public class BsxExportService : IBsxExportService
     }
 
     public async Task<string> GenerateBsxAsync(
-        IEnumerable<int> trackedMinifigIds,
+        IReadOnlyList<int> trackedMinifigIds,
+        IReadOnlyList<int> floatingPartIds,
         BsxExportOptions options,
         CancellationToken ct = default)
     {
-        var ids = trackedMinifigIds?.ToList() ?? new List<int>();
-        if (ids.Count == 0)
+        var minifigIds = trackedMinifigIds?.ToList() ?? new List<int>();
+        var floatIds = floatingPartIds?.ToList() ?? new List<int>();
+
+        if (minifigIds.Count == 0 && floatIds.Count == 0)
             throw new ArgumentException(
-                "Keine Figuren zum Export uebergeben.", nameof(trackedMinifigIds));
+                "Keine Figuren oder Einzelteile zum Export uebergeben.",
+                nameof(trackedMinifigIds));
 
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
-        var minifigs = await ctx.TrackedMinifigs.AsNoTracking()
-            .Where(m => ids.Contains(m.Id))
-            .ToListAsync(ct);
 
-        if (minifigs.Count == 0)
+        // Minifigs laden + in der ID-Reihenfolge ordnen.
+        var minifigs = minifigIds.Count == 0
+            ? new List<Models.TrackedMinifig>()
+            : await ctx.TrackedMinifigs.AsNoTracking()
+                .Where(m => minifigIds.Contains(m.Id))
+                .ToListAsync(ct);
+
+        // Einzelteile laden + in der ID-Reihenfolge ordnen.
+        var floats = floatIds.Count == 0
+            ? new List<Models.FloatingPart>()
+            : await ctx.FloatingParts.AsNoTracking()
+                .Where(p => floatIds.Contains(p.Id))
+                .ToListAsync(ct);
+
+        if (minifigs.Count == 0 && floats.Count == 0)
             throw new InvalidOperationException(
                 "Keine der uebergebenen IDs existiert in der DB.");
 
-        // Reihenfolge wie in der ID-Liste (Multi-Select-Reihenfolge der UI beibehalten).
-        var lookup = minifigs.ToDictionary(m => m.Id);
-        var ordered = ids.Where(lookup.ContainsKey).Select(i => lookup[i]).ToList();
+        // Reihenfolge wie in den ID-Listen (Multi-Select-Reihenfolge der UI beibehalten).
+        var minifigLookup = minifigs.ToDictionary(m => m.Id);
+        var orderedMinifigs = minifigIds.Where(minifigLookup.ContainsKey)
+            .Select(i => minifigLookup[i]).ToList();
+
+        var floatLookup = floats.ToDictionary(p => p.Id);
+        var orderedFloats = floatIds.Where(floatLookup.ContainsKey)
+            .Select(i => floatLookup[i]).ToList();
+
+        // Color-Map fuer ColorName-Anreicherung der Einzelteile.
+        var colorMap = (await _catalog.GetAllColorsAsync(ct))
+            .ToDictionary(c => c.ColorId);
 
         var inventory = new XElement("Inventory");
         var nowStr = DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var remark = options.Remark ?? $"HBSort {nowStr}";
 
-        foreach (var m in ordered)
+        // 1) Minifigs (ItemTypeID=M)
+        foreach (var m in orderedMinifigs)
         {
             ct.ThrowIfCancellationRequested();
             var blId = m.BricklinkId ?? m.FigNum;
@@ -71,10 +108,10 @@ public class BsxExportService : IBsxExportService
             }
             catch (Exception ex)
             {
-                Log.Debug(ex, "BSX-Export: Cache-Lookup fuer {Bl} fehlgeschlagen", blId);
+                Log.Debug(ex, "BSX-Export: Cache-Lookup fuer Minifig {Bl} fehlgeschlagen", blId);
             }
 
-            var item = new XElement("Item",
+            inventory.Add(new XElement("Item",
                 new XElement("ItemID", blId),
                 new XElement("ItemTypeID", "M"),
                 new XElement("ColorID", 0),
@@ -88,16 +125,53 @@ public class BsxExportService : IBsxExportService
                 new XElement("Price", options.DefaultPrice
                     .ToString("F4", CultureInfo.InvariantCulture)),
                 new XElement("Condition", options.Condition),
-                new XElement("Remarks", remark));
+                new XElement("Remarks", remark)));
+        }
 
-            inventory.Add(item);
+        // 2) Einzelteile (ItemTypeID=P)
+        foreach (var fp in orderedFloats)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            // Best-effort Cache-Lookup fuer Kategorie + Color-Name.
+            int categoryId = DefaultPartCategoryId;
+            try
+            {
+                var details = await _catalog.GetPartDetailsAsync(fp.PartNumber, ct);
+                if (details?.CategoryId is int cat && cat > 0) categoryId = cat;
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "BSX-Export: Cache-Lookup fuer Part {Bl} fehlgeschlagen", fp.PartNumber);
+            }
+
+            colorMap.TryGetValue(fp.ColorId, out var color);
+            var colorName = color?.Name ?? fp.ColorName;
+            if (string.IsNullOrWhiteSpace(colorName)) colorName = $"Color {fp.ColorId}";
+
+            inventory.Add(new XElement("Item",
+                new XElement("ItemID", fp.PartNumber),
+                new XElement("ItemTypeID", "P"),
+                new XElement("ColorID", fp.ColorId),
+                new XElement("ItemName", fp.PartName),
+                new XElement("ItemTypeName", "Part"),
+                new XElement("ColorName", colorName),
+                new XElement("CategoryID", categoryId),
+                new XElement("CategoryName", "Part"),
+                new XElement("Status", options.Status),
+                new XElement("Qty", fp.Quantity),
+                new XElement("Price", options.DefaultPrice
+                    .ToString("F4", CultureInfo.InvariantCulture)),
+                new XElement("Condition", options.Condition),
+                new XElement("Remarks", remark)));
         }
 
         var doc = new XDocument(
             new XDeclaration("1.0", "UTF-8", null),
             new XElement("BrickStoreXML", inventory));
 
-        Log.Information("BSX-Export: {Count} Figur(en) generiert", ordered.Count);
+        Log.Information("BSX-Export: {Mfg} Figur(en) + {Fp} Einzelteil-Eintraege generiert",
+            orderedMinifigs.Count, orderedFloats.Count);
 
         // XDocument.ToString liefert ohne XML-Declaration. Wir nutzen StringWriter
         // damit die Declaration mitgeschrieben wird.

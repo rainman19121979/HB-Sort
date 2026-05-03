@@ -267,6 +267,54 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         return removed;
     }
 
+    public async Task<int> RemoveExportedFloatingPartsAsync(
+        IEnumerable<int> floatingPartIds,
+        CancellationToken ct = default)
+    {
+        var ids = floatingPartIds?.ToList() ?? new List<int>();
+        if (ids.Count == 0) return 0;
+
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+
+        // Mit StorageBin laden, damit wir das Bin-Label fuer den Audit-Trail haben.
+        var floats = await ctx.FloatingParts
+            .Include(p => p.StorageBin)
+            .Where(p => ids.Contains(p.Id))
+            .ToListAsync(ct);
+
+        if (floats.Count == 0) return 0;
+
+        // Pro entferntem Eintrag ein ScanEvent. ResultDescription enthaelt
+        // Quell-Bin-Label, Part-No, Color-Id und Quantity - so bleibt
+        // nachvollziehbar wo das Teil herkam, auch nachdem das Fach evtl.
+        // wieder freigegeben wurde.
+        foreach (var fp in floats)
+        {
+            ct.ThrowIfCancellationRequested();
+            var binLabel = fp.StorageBin?.Label ?? "(?)";
+            ctx.ScanEvents.Add(new ScanEvent
+            {
+                Timestamp = DateTime.UtcNow,
+                Type = ScanType.FloatingPartExported,
+                RecognizedId = fp.PartNumber,
+                ResultDescription =
+                    $"BSX-Export: Einzelteil aus '{binLabel}' entfernt - " +
+                    $"{fp.PartNumber}, Farbe {fp.ColorId} ({fp.ColorName}), " +
+                    $"Quantity {fp.Quantity}",
+                WasUndone = false
+            });
+        }
+
+        ctx.FloatingParts.RemoveRange(floats);
+        await ctx.SaveChangesAsync(ct);
+
+        Log.Information(
+            "BSX-Export-Cleanup: {Count} FloatingPart-Eintrag(e) entfernt",
+            floats.Count);
+        DataChanged?.Invoke(this, EventArgs.Empty);
+        return floats.Count;
+    }
+
     public async Task<bool> CheckAndMarkCompleteAsync(int minifigId,
         CancellationToken ct = default)
     {

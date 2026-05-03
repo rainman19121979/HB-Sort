@@ -59,12 +59,17 @@ public interface IStorageBinService
 
     /// <summary>
     /// Phase 7: Vorab-Berechnung fuer den BSX-Export-Cleanup. Liefert die Faecher
-    /// die NACH dem Loeschen der uebergebenen Minifig-IDs leer waeren (FreedAt=null,
-    /// keine wartenden Figuren ausser den uebergebenen, keine FloatingParts).
+    /// die NACH dem Loeschen der uebergebenen Minifig-IDs UND/ODER FloatingPart-IDs
+    /// leer waeren (FreedAt=null, keine wartenden Figuren ausser den uebergebenen,
+    /// keine FloatingParts ausser den uebergebenen).
     /// Setzt FreedAt NICHT - der Aufrufer entscheidet ob die Faecher freigegeben werden.
+    /// floatingPartIdsToBeRemoved kann null oder leer sein - dann wird nur Minifig-
+    /// Removal beruecksichtigt (Backwards-Compat zur urspruenglichen Phase-7-Variante).
     /// </summary>
     Task<List<StorageBin>> FindBinsThatWouldBeEmptyAsync(
-        IEnumerable<int> minifigIdsToBeRemoved, CancellationToken ct = default);
+        IEnumerable<int> minifigIdsToBeRemoved,
+        IEnumerable<int>? floatingPartIdsToBeRemoved = null,
+        CancellationToken ct = default);
 
     /// <summary>
     /// Phase 7: setzt FreedAt=now fuer die uebergebenen Faecher.

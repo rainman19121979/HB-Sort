@@ -223,22 +223,40 @@ public class StorageBinService : IStorageBinService
     }
 
     public async Task<List<StorageBin>> FindBinsThatWouldBeEmptyAsync(
-        IEnumerable<int> minifigIdsToBeRemoved, CancellationToken ct = default)
+        IEnumerable<int> minifigIdsToBeRemoved,
+        IEnumerable<int>? floatingPartIdsToBeRemoved = null,
+        CancellationToken ct = default)
     {
-        var idsToRemove = (minifigIdsToBeRemoved ?? Enumerable.Empty<int>()).ToHashSet();
-        if (idsToRemove.Count == 0) return new List<StorageBin>();
+        var minifigIds = (minifigIdsToBeRemoved ?? Enumerable.Empty<int>()).ToHashSet();
+        var floatingIds = (floatingPartIdsToBeRemoved ?? Enumerable.Empty<int>()).ToHashSet();
+        if (minifigIds.Count == 0 && floatingIds.Count == 0)
+            return new List<StorageBin>();
 
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
 
-        // Wir betrachten nur Faecher die ueberhaupt eine der zu loeschenden Figuren
-        // beherbergen UND noch nicht freigegeben sind. Dann pruefen wir, ob nach
-        // dem Cleanup keine Figuren (jeglichen Status) und keine FloatingParts mehr
-        // uebrig waeren.
-        var candidateBinIds = await ctx.TrackedMinifigs.AsNoTracking()
-            .Where(m => idsToRemove.Contains(m.Id) && m.StorageBinId != null)
-            .Select(m => m.StorageBinId!.Value)
-            .Distinct()
-            .ToListAsync(ct);
+        // Kandidaten: Faecher die mind. einen zu entfernenden Eintrag enthalten
+        // UND noch nicht freigegeben sind. Sammeln aus beiden Quellen.
+        var candidateBinIds = new HashSet<int>();
+
+        if (minifigIds.Count > 0)
+        {
+            var fromMinifigs = await ctx.TrackedMinifigs.AsNoTracking()
+                .Where(m => minifigIds.Contains(m.Id) && m.StorageBinId != null)
+                .Select(m => m.StorageBinId!.Value)
+                .Distinct()
+                .ToListAsync(ct);
+            foreach (var id in fromMinifigs) candidateBinIds.Add(id);
+        }
+
+        if (floatingIds.Count > 0)
+        {
+            var fromFloats = await ctx.FloatingParts.AsNoTracking()
+                .Where(p => floatingIds.Contains(p.Id))
+                .Select(p => p.StorageBinId)
+                .Distinct()
+                .ToListAsync(ct);
+            foreach (var id in fromFloats) candidateBinIds.Add(id);
+        }
 
         if (candidateBinIds.Count == 0) return new List<StorageBin>();
 
@@ -248,9 +266,12 @@ public class StorageBinService : IStorageBinService
             .Where(b => b.FreedAt == null && candidateBinIds.Contains(b.Id))
             .ToListAsync(ct);
 
+        // Bin gilt als "wird leer" wenn nach dem Cleanup:
+        //   - alle aktuell drin liegenden Minifigs entfernt werden (in der ID-Liste)
+        //   - alle aktuell drin liegenden FloatingParts entfernt werden (in der ID-Liste)
         return bins.Where(b =>
-            b.FloatingParts.Count == 0
-            && b.TrackedMinifigs.All(m => idsToRemove.Contains(m.Id))
+            b.TrackedMinifigs.All(m => minifigIds.Contains(m.Id))
+            && b.FloatingParts.All(fp => floatingIds.Contains(fp.Id))
         ).OrderBy(b => b.Label).ToList();
     }
 

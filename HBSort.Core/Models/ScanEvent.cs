@@ -35,6 +35,11 @@ public class ScanEvent
 ///   FloatingPartTransfer          - User uebernimmt ein Teil aus einem
 ///                                   Lagerfach in eine wartende oder gerade
 ///                                   gescannte Pending-Minifigur (UX X.4+).
+///   FloatingPartExported          - FloatingPart wurde im BSX-Export
+///                                   beruecksichtigt und beim Cleanup aus
+///                                   der DB entfernt (Phase 7-Erweiterung).
+///                                   ResultDescription enthaelt die Quell-
+///                                   Bin-Info als Audit-Trail.
 /// HasConversion&lt;string&gt;() in UserDataContext - neue Werte sind ohne
 /// DB-Migration moeglich (TEXT-Spalte).
 /// </summary>
@@ -42,5 +47,6 @@ public enum ScanType
 {
     MinifigScan,
     PartScan,
-    FloatingPartTransfer
+    FloatingPartTransfer,
+    FloatingPartExported
 }
