@@ -22,9 +22,20 @@
             <ItemsControl ItemsSource="{Binding Suggestions}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
+                        <!--
+                            Klick auf den Border oeffnet den Detail-Dialog
+                            (siehe BuildSuggestionsView.xaml.cs::Suggestion_MouseDown).
+                            Tag traegt das ViewModel-Objekt, damit der Handler die
+                            ausgewaehlte Suggestion identifizieren kann.
+                        -->
                         <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
                                 BorderThickness="1" CornerRadius="4"
-                                Padding="6" Margin="0,2">
+                                Padding="6" Margin="0,2"
+                                Cursor="Hand"
+                                Background="Transparent"
+                                Tag="{Binding}"
+                                MouseLeftButtonUp="Suggestion_MouseDown"
+                                ToolTip="Klicken um diese Figur als wartende Figur anzulegen">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="48"/>
