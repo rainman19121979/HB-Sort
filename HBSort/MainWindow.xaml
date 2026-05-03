@@ -95,7 +95,13 @@
                              Style="{StaticResource MainTabRadioStyle}"
                              IsChecked="{Binding IsMainTabInventory, Mode=OneWay}"
                              Click="MainTabInventory_Click"
-                             Content="Lagerliste"/>
+                             Content="Lagerliste"
+                             Margin="0,0,8,0"/>
+                <RadioButton x:Name="TabHelpButton" GroupName="MainTabs"
+                             Style="{StaticResource MainTabRadioStyle}"
+                             IsChecked="{Binding IsMainTabHelp, Mode=OneWay}"
+                             Click="MainTabHelp_Click"
+                             Content="Hilfe"/>
             </StackPanel>
 
             <!-- Rechts: Settings-Button als Icon + Text -->
@@ -128,6 +134,10 @@
                                      Visibility="{Binding DataContext.IsMainTabInventory,
                                          RelativeSource={RelativeSource AncestorType=Window},
                                          Converter={StaticResource BoolToVisibility}}"/>
+            <views:HelpView DataContext="{Binding Help}"
+                            Visibility="{Binding DataContext.IsMainTabHelp,
+                                RelativeSource={RelativeSource AncestorType=Window},
+                                Converter={StaticResource BoolToVisibility}}"/>
         </Grid>
 
 

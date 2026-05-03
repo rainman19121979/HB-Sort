@@ -247,6 +247,12 @@ public partial class App : Application
         services.AddSingleton<ViewModels.WaitingDetailViewModel>();
         services.AddSingleton<ViewModels.RecentScansViewModel>();
 
+        // UX-Iteration X.9: Hilfe-Tab.
+        // ContentService liefert die Markdown-Dateien aus den eingebetteten
+        // Resources; Singleton, weil index.json einmal beim Start gelesen wird.
+        services.AddSingleton<IHelpContentService, HelpContentService>();
+        services.AddSingleton<ViewModels.HelpViewModel>();
+
         // Phase 4: Bin-Dialoge (transient – pro Aufruf eine neue Instanz).
         services.AddTransient<Views.BinCreateDialog>();
         services.AddTransient<Views.BinBulkCreateDialog>();

@@ -43,6 +43,13 @@ public partial class MainViewModel : ObservableObject
     /// <summary>Lagerliste-Tab (Phase X).</summary>
     public InventoryListViewModel Inventory { get; }
 
+    /// <summary>
+    /// Hilfe-Tab (UX-Iteration X.9): integrierte Doku als dritter
+    /// Haupt-Tab. Wird vom DI als Singleton bereitgestellt damit die
+    /// Kapitel-Auswahl beim Tab-Wechsel erhalten bleibt.
+    /// </summary>
+    public HelpViewModel Help { get; }
+
     // Variables Feld unten rechts (R2,C2) ist ein TabControl mit 5 Ansichten.
     // Jede VM ist ein Singleton (siehe DI), refresht sich selbst per
     // DataChanged-Event - der TabControl muss kein OnSelectedTab-Refresh triggern.
@@ -60,17 +67,20 @@ public partial class MainViewModel : ObservableObject
     private int _bottomRightSelectedTabIndex;
 
     /// <summary>
-    /// Aktuell gewaehlter Haupt-Tab-Index (UX-Iteration X.4): 0=Sortieren, 1=Lagerliste.
-    /// Wird vom modernisierten Header (RadioButton-Pivot) gesteuert. Nicht persistiert -
-    /// beim App-Start beginnen wir immer auf "Sortieren".
+    /// Aktuell gewaehlter Haupt-Tab-Index: 0=Sortieren, 1=Lagerliste, 2=Hilfe
+    /// (UX-Iteration X.4 + X.9). Wird vom modernisierten Header (RadioButton-
+    /// Pivot) gesteuert. Nicht persistiert - beim App-Start beginnen wir immer
+    /// auf "Sortieren".
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsMainTabSorting))]
     [NotifyPropertyChangedFor(nameof(IsMainTabInventory))]
+    [NotifyPropertyChangedFor(nameof(IsMainTabHelp))]
     private int _mainTabIndex = 0;
 
     public bool IsMainTabSorting   => MainTabIndex == 0;
     public bool IsMainTabInventory => MainTabIndex == 1;
+    public bool IsMainTabHelp      => MainTabIndex == 2;
 
     /// <summary>Toast-Liste fuer das XAML-Binding (ItemsControl).</summary>
     public ObservableCollection<ToastItem> ActiveToasts => _notificationService.ActiveToasts;
@@ -111,7 +121,8 @@ public partial class MainViewModel : ObservableObject
         BuildSuggestionsViewModel buildSuggestions,
         LiveStatsViewModel liveStats,
         WaitingDetailViewModel waitingDetail,
-        RecentScansViewModel recentScans)
+        RecentScansViewModel recentScans,
+        HelpViewModel help)
     {
         _settingsService = settingsService;
         ScanViewModel = scanViewModel;
@@ -121,6 +132,7 @@ public partial class MainViewModel : ObservableObject
         LiveStats = liveStats;
         WaitingDetail = waitingDetail;
         RecentScans = recentScans;
+        Help = help;
         _brickognizeClient = brickognizeClient;
         // Wir brauchen die konkrete Implementierung wegen ActiveToasts –
         // das DI registriert beide Wege auf die selbe Singleton-Instanz.
@@ -153,13 +165,13 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// F1: oeffnet die Hilfe-Ansicht. Wird in Phase 7 implementiert.
-    /// Aktuell Stub mit Info-Toast.
+    /// F1: wechselt zum Hilfe-Tab. Seit UX-Iteration X.9 ist die Hilfe ein
+    /// eigener Haupt-Tab statt nur ein Toast.
     /// </summary>
     [RelayCommand]
     public void OpenHelp()
     {
-        _notificationService.ShowInfo("Hilfe (F1) kommt in Phase 7.");
+        MainTabIndex = 2;
     }
 
     /// <summary>

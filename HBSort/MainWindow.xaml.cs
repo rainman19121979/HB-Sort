@@ -90,6 +90,10 @@ public partial class MainWindow : Window
     private void MainTabInventory_Click(object sender, RoutedEventArgs e)
         => _viewModel.MainTabIndex = 1;
 
+    /// <summary>Header-Tab "Hilfe" geklickt -> MainTabIndex=2.</summary>
+    private void MainTabHelp_Click(object sender, RoutedEventArgs e)
+        => _viewModel.MainTabIndex = 2;
+
     private void OpenSettings_Click(object sender, RoutedEventArgs e)
     {
         var settingsVm = App.Services.GetRequiredService<SettingsViewModel>();

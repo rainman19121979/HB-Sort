@@ -1,0 +1,93 @@
+<UserControl x:Class="HBSort.Views.HelpView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:ui="http://schemas.modernwpf.com/2019"
+             mc:Ignorable="d"
+             d:DesignHeight="600" d:DesignWidth="1000">
+
+    <!--
+        Hilfe-Tab: zweispaltiges Layout wie eine moderne Doku-Seite.
+        LINKS: Sidebar mit Kapitelliste (ListBox).
+        RECHTS: Content-Area mit FlowDocumentScrollViewer der das
+                gerenderte Markdown zeigt.
+
+        Markdig.Wpf wendet seine Default-Styles fuer FlowDocument-Elemente
+        (H1/H2/H3, Listen, Code-Blocks, Tabellen) automatisch an, sobald
+        Markdig.Wpf.Markdown.ToFlowDocument() das Document erzeugt hat.
+    -->
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <!-- Sidebar: feste Breite, ausreichend fuer Kapitel-Titel -->
+            <ColumnDefinition Width="240"/>
+            <!-- Inhaltsbereich: nimmt den Rest -->
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- === LINKS: SIDEBAR === -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="0,0,1,0">
+            <DockPanel LastChildFill="True">
+                <TextBlock DockPanel.Dock="Top"
+                           Text="Hilfe"
+                           FontSize="20" FontWeight="SemiBold"
+                           Margin="16,16,16,8"/>
+
+                <TextBlock DockPanel.Dock="Top"
+                           Text="Waehle ein Kapitel:"
+                           Foreground="Gray"
+                           Margin="16,0,16,8"/>
+
+                <!-- Hinweis wenn keine Kapitel da (z.B. Resources kaputt) -->
+                <TextBlock DockPanel.Dock="Top"
+                           Text="{Binding EmptyStateMessage}"
+                           Foreground="OrangeRed"
+                           TextWrapping="Wrap"
+                           Margin="16,8,16,8"
+                           Visibility="{Binding HasChapters, Converter={StaticResource InverseBoolToVisibility}}"/>
+
+                <ListBox ItemsSource="{Binding Chapters}"
+                         SelectedItem="{Binding SelectedChapter, Mode=TwoWay}"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         Margin="8,4,8,8"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Title}"
+                                       Padding="8,6"
+                                       FontSize="14"
+                                       TextWrapping="Wrap"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <!-- === RECHTS: INHALTS-AREA === -->
+        <Grid Grid.Column="1">
+            <!-- Hinweis wenn nichts ausgewaehlt -->
+            <TextBlock Text="Kein Kapitel ausgewaehlt."
+                       FontSize="14"
+                       Foreground="Gray"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Visibility="{Binding HasSelection, Converter={StaticResource InverseBoolToVisibility}}"/>
+
+            <!--
+                FlowDocumentScrollViewer mit dem von Markdig.Wpf erzeugten
+                Document. Padding gibt den Lese-Innenabstand; das FlowDocument
+                bringt seine Typografie selbst mit.
+            -->
+            <FlowDocumentScrollViewer x:Name="HelpContent"
+                                      Document="{Binding CurrentDocument}"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}"
+                                      Padding="32,16,32,16"/>
+        </Grid>
+    </Grid>
+</UserControl>

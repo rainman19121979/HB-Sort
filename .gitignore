@@ -62,6 +62,15 @@ downloads/
 
 # Lokale Resources (Icons, Screenshots etc. die nicht ins Repo gehoeren)
 Resources/
+# Hilfe-Inhalte gehoeren explizit ins Repo (Markdown + index.json + Bilder),
+# damit sie versioniert sind und in CI/CD-Builds eingebettet werden koennen.
+# Reihenfolge wichtig: erst HBSort/Resources/ wieder zugreifbar machen,
+# dann den direkten Inhalt erneut sperren (logo.png, app.ico etc. bleiben
+# lokal), und schliesslich nur den Help-Unterordner durchlassen.
+!/HBSort/Resources/
+/HBSort/Resources/*
+!/HBSort/Resources/Help/
+!/HBSort/Resources/Help/**
 
 # ============================================
 # Logs

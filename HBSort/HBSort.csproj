@@ -48,12 +48,30 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+
+    <!-- Markdig: CommonMark-konformer Markdown-Parser. Wird vom Hilfe-Tab
+         genutzt, um die .md-Dateien aus Resources/Help/ zur Laufzeit zu rendern. -->
+    <PackageReference Include="Markdig" Version="0.37.0" />
+    <!-- Markdig.Wpf: Renderer der ein FlowDocument aus dem Markdig-Tree baut.
+         Bringt eigene Default-Styles fuer Headings/Listen/Code/Bilder mit, die
+         per ResourceDictionary ueberschrieben werden koennen. -->
+    <PackageReference Include="Markdig.Wpf" Version="0.5.0.1" />
   </ItemGroup>
 
   <!-- Logo-Resources fuer Splash, About-Dialog, Window-Icons -->
   <ItemGroup>
     <Resource Include="Resources\logo.png" />
     <Resource Include="Resources\app.ico" />
+  </ItemGroup>
+
+  <!-- Hilfe-Inhalte (Markdown + index.json + Bilder) als WPF-Resource einbinden,
+       damit sie ueber pack://application:,,, addressierbar sind. Markdig.Wpf
+       kann Bilder direkt ueber pack-URIs laden. -->
+  <ItemGroup>
+    <Resource Include="Resources\Help\**\*.md" />
+    <Resource Include="Resources\Help\**\*.json" />
+    <Resource Include="Resources\Help\images\**\*.png" />
+    <Resource Include="Resources\Help\images\**\*.jpg" />
   </ItemGroup>
 
 </Project>
