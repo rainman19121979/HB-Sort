@@ -902,6 +902,39 @@ exportiert werden. Beides landet in einer einzigen BSX-Datei.
 - Neuer `ScanType.FloatingPartExported` (HasConversion&lt;string&gt;,
   keine DB-Migration noetig).
 
+#### Smart-Storage-Suggestion beim Lagern (UX-Iteration X.7, 2026-05-03)
+
+Beim "Als Einzelteil lagern"-Workflow in der `PartLookupView` schlaegt die
+App jetzt automatisch das passende Lagerfach vor: wenn dasselbe Teil mit
+gleicher Farbe schon in einem Fach liegt, wird dieses Fach im Dropdown
+vorausgewaehlt - so wachsen Stapel weiter statt sich ueber mehrere Faecher
+zu zerstreuen.
+
+- Neue Methode `IFloatingPartTransferService.FindBestStorageBinSuggestionAsync(
+  blPartNo, blColorId)` liefert ein `FloatingPartLocationSuggestion`-DTO
+  (BinId, BinLabel, QuantityInThisBin, TotalMatchingBinsCount,
+  TotalQuantityAcrossAllBins) oder null wenn das Teil noch nirgends liegt.
+- Sortierung: groesste Quantity zuerst (Stapel-Wachstum); bei Gleichstand
+  FIFO nach AddedAt fuer reproduzierbare Wahl.
+- `ScanViewModel.LoadAvailableBinsForPendingPartAsync` ruft den Service vor
+  der Default-Auswahl auf. Bei Match: das Bin wird in `SelectedFloatingBin`
+  gesetzt; bei kein Match: bisheriges Verhalten (naechstes freies Fach).
+- `PartLookupViewModel`-Properties: `HasMatchingFloatingBin`,
+  `MatchingFloatingBinLabel`, `MatchingFloatingBinQuantity`,
+  `MatchingFloatingBinCount` + computed `MatchingFloatingBinHintText`
+  ("📦 Liegt schon in Box 003 (3x)" bzw. "...und 2 weiteren Faechern").
+- `PartLookupView`: zusaetzlicher Hint-TextBlock unter dem Dropdown,
+  Visibility-Binding auf `HasMatchingFloatingBin` (verschwindet komplett
+  wenn kein Match - kein Platzhalter-Slot).
+- Hochzaehl-Logik existiert bereits in
+  `IPartLookupService.AddPartToFloatingAsync` (PartLookupService.cs:186-189)
+  - bei Match auf (PartNumber, ColorId, StorageBinId) wird Quantity addiert
+  statt einen Doppel-Eintrag anzulegen.
+
+Gilt **nur** fuer "Als Einzelteil lagern". Die "Diese Figur anlegen"-
+Workflows (BuildSuggestionDetailDialog, MinifigDetailView) schlagen
+weiterhin freie Faecher vor - eine neue Figur kommt in ihr eigenes Fach.
+
 NICHT in Phase 7 (bewusst weggelassen):
 - Status=Sold (Export ist die Uebergabe ans richtige Lagersystem; eine
   parallele Sold-Markierung waere doppelte Buchhaltung).
