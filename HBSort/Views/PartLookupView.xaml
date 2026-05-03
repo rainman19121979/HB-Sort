@@ -260,10 +260,6 @@
                             ToolTip="Teil als Einzelteil im gewaehlten Fach lagern"/>
                 </Grid>
 
-                <Button Content="Wo kommt das Teil vor? (BL-API)"
-                        Click="ShowSupersets_Click"
-                        Margin="0,8,0,0" HorizontalAlignment="Stretch"
-                        ToolTip="Oeffnet eine Liste aller Minifiguren in denen dieses Teil in dieser Farbe vorkommt."/>
             </StackPanel>
 
             <!-- ===== BUTTONS ===== -->

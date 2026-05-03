@@ -122,43 +122,8 @@ public partial class PartLookupView : UserControl
         }
     }
 
-    /// <summary>"Wo kommt das Teil vor?": oeffnet SupersetsDialog.</summary>
-    private async void ShowSupersets_Click(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is not PartLookupViewModel vm) return;
-
-        // Dialog manuell aufbauen mit injizierten Services + den aktuellen Part-Daten
-        var ctxFactory = Service<Microsoft.EntityFrameworkCore.IDbContextFactory<Core.Database.UserDataContext>>();
-        var catalog = Service<IBlCatalogService>();
-        var binSvc = Service<IStorageBinService>();
-        var partSvc = Service<IPartLookupService>();
-        var notif = Service<INotificationService>();
-        var imgProvider = Service<IPartImageProvider>();
-
-        var window = Window.GetWindow(this);
-        var dlgVm = new SupersetsDialogViewModel(
-            vm.BlPartNo, vm.BlColorId, vm.PartName, vm.ColorName,
-            ctxFactory, catalog, binSvc, partSvc, notif, imgProvider);
-        var dialog = new Views.SupersetsDialog(dlgVm) { Owner = window };
-        await dlgVm.LoadAsync();
-        dialog.ShowDialog();
-
-        // Nach dem Dialog: PartLookup neu (vielleicht wurde das Teil ja zugewiesen).
-        try
-        {
-            var refreshed = await partSvc.LookupPartAsync(vm.BlPartNo, vm.BlColorId);
-            vm.ApplyLookupResult(refreshed);
-            if (refreshed.WaitingMatches.Count == 0 && dlgVm.AnyAssignedOrCollected)
-            {
-                var scan = GetScanViewModel();
-                if (scan != null) scan.PendingPart = null;
-            }
-        }
-        catch (System.Exception ex)
-        {
-            Log.Warning(ex, "Refresh nach SupersetsDialog fehlgeschlagen");
-        }
-    }
+    // (ShowSupersets_Click + Button entfernt - Spec UX-1 FIX 5.
+    //  SupersetsDialog + ViewModel bleiben fuer evtl. spaeteren Re-Use bestehen.)
 
     /// <summary>
     /// "Diese Figur anlegen" auf einem BL-Catalog-Treffer: legt die Figur an,
