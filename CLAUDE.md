@@ -902,6 +902,47 @@ exportiert werden. Beides landet in einer einzigen BSX-Datei.
 - Neuer `ScanType.FloatingPartExported` (HasConversion&lt;string&gt;,
   keine DB-Migration noetig).
 
+#### Phase 7-Bugfix (UX-Iteration X.12, 2026-05-04) — UTF-8 ohne BOM + Currency
+
+BrickStore brach beim Importieren mit "Oeffnendes Element erwartet" ab
+- Ursache war ein falscher XML-Prolog `encoding="utf-16"`, weil
+`BsxExportService` ueber einen `StringWriter` (intern UTF-16)
+gerendert hat. Die Datei selbst war schon UTF-8-kodiert (UI-Layer
+nutzt `UTF8Encoding(false)`), aber der widerspruechliche Prolog hat
+den Parser kaputt gemacht.
+
+**Fix in `HBSort.Core/Services/BsxExportService.cs`**:
+- `StringWriter` raus.
+- `XmlWriter` direkt auf einem `MemoryStream` mit
+  `Encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)`
+  (= UTF-8 OHNE BOM) + `Indent=true`, `IndentChars="  "`,
+  `NewLineChars="\n"` analog zur BrickStore-Referenz.
+- `Encoding.UTF8.GetString(ms.ToArray())` liefert den korrekten String
+  zurueck.
+- Resultat: Prolog ist `<?xml version="1.0" encoding="utf-8"?>`,
+  keine BOM-Bytes davor.
+
+**Convention**: BSX-Dateien MUESSEN UTF-8 ohne BOM sein. Wer den
+Service erweitert oder einen anderen Export-Pfad baut, darf nicht ueber
+`StringWriter`/`StringBuilder` rendern - der erzwingt UTF-16 im
+Prolog. Direkter `MemoryStream`/`FileStream` mit `UTF8Encoding(false)`
+ist Pflicht.
+
+**Currency-Attribut auf Inventory-Tag**: BrickStore-eigene BSX schreibt
+am `<Inventory>`-Tag ein `Currency`-Attribut. HBSort macht das jetzt
+auch, gelesen aus `AppSettings.Prices.Currency` (Default `"EUR"` wenn
+leer/null). `BrickLinkChangelogId` wird bewusst weggelassen - HBSort
+kennt den Wert nicht und Brickstore importiert auch ohne. Der
+`BsxExportService`-Konstruktor bekam dazu `ISettingsService` injiziert.
+
+**Tests** in `HBSort.Tests/BsxExportServiceTests.cs`:
+- Prolog deklariert utf-8 (case-insensitive) und nicht utf-16.
+- String-Anfang ist `<` (kein BOM-Character).
+- UTF-8-Bytes des Outputs beginnen NICHT mit `EF BB BF`.
+- `XmlReader` parst den String fehlerfrei durch.
+- `Inventory`-Tag hat Currency-Attribut aus Settings (Test mit "USD").
+- Bei leerer Settings-Currency Fallback auf "EUR".
+
 #### Smart-Storage-Suggestion beim Lagern (UX-Iteration X.7, 2026-05-03)
 
 Beim "Als Einzelteil lagern"-Workflow in der `PartLookupView` schlaegt die
