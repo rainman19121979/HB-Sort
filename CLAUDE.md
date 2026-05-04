@@ -78,6 +78,20 @@ Beim App-Start läuft eine Auto-Migration vom alten Pfad
   `b:ImageZoom.IsEnabled="True"` setzen (Namespace
   `xmlns:b="clr-namespace:HBSort.Behaviors"`) → öffnet Modal-Overlay im
   MainWindow.
+- **Dialog-Footer-Buttons**: 
+  - **"Abbrechen"** für Editier-Dialoge die Eingaben verwerfen können
+    (Bin anlegen, Dismantle-Wizard, Export, Settings, Detail-Eingaben).
+    Mit `IsCancel="True"`. Der primäre "OK"/Aktion-Button bekommt
+    `IsDefault="True"` + `Style="{StaticResource AccentButtonStyle}"`.
+  - **"Schliessen"** für reine Read-Only-/Info-Dialoge ohne Eingabe-
+    Verwerfen-Effekt (BinDetail, MinifigSummary, Supersets). Nur
+    `IsCancel="True"` setzen — `IsDefault` zusätzlich am selben Button
+    ist widersprüchlich (ESC und ENTER lösen denselben Button aus, das
+    ist Doppelbelegung). Wenn der Dialog mehrere Aktions-Buttons hat,
+    ist "Schliessen" der Cancel-Anker und ein anderer Button (z.B.
+    "Verschieben" im MinifigSummary) bekommt das `IsDefault="True"`.
+  - Reihenfolge im Footer: links Cancel/Schliessen, rechts primärer
+    Button.
 
 ---
 
