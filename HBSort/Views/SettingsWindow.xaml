@@ -675,6 +675,182 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- ============================================================ -->
+            <!-- TAB: CACHE (UX X.11)
+                 Vereint die alten "Bild-Cache"-, "BL-Cache"- und
+                 "Preis-Cache"-Sektionen in einem scrollbaren Tab mit drei
+                 optisch getrennten Sektionen. Die alten 3 Standorte bleiben
+                 in dieser Iteration noch sichtbar - werden in Commit 5
+                 entfernt. -->
+            <!-- ============================================================ -->
+            <TabItem Header="Cache">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
+                    <StackPanel>
+
+                        <!-- ===== SEKTION 1: Bild-Cache ===== -->
+                        <TextBlock Text="Bild-Cache"
+                                   FontSize="15" FontWeight="SemiBold"
+                                   Margin="0,0,0,8"/>
+
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12" Margin="0,0,0,8"
+                                   Text="Lokale Kopien von BrickLink- und Brickognize-Bildern. Spart wiederholte Downloads."/>
+
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Text="Belegt:"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding CacheUsageText}"/>
+
+                            <TextBlock Grid.Row="1" Text="Limit:" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,4,0,0"
+                                       Text="{Binding CacheLimitText}"/>
+                        </Grid>
+
+                        <TextBlock Text="Cache-Limit" FontSize="13" FontWeight="SemiBold" Margin="0,12,0,4"/>
+
+                        <StackPanel>
+                            <RadioButton Content="100 MB"
+                                         IsChecked="{Binding IsLimit100Mb, Mode=OneWay}"
+                                         Click="LimitRadio100_Click"
+                                         GroupName="CacheLimitNew"/>
+                            <RadioButton Content="1 GB (Standard)"
+                                         IsChecked="{Binding IsLimit1Gb, Mode=OneWay}"
+                                         Click="LimitRadio1Gb_Click"
+                                         GroupName="CacheLimitNew"
+                                         Margin="0,4,0,0"/>
+                            <RadioButton Content="5 GB"
+                                         IsChecked="{Binding IsLimit5Gb, Mode=OneWay}"
+                                         Click="LimitRadio5Gb_Click"
+                                         GroupName="CacheLimitNew"
+                                         Margin="0,4,0,0"/>
+                            <RadioButton Content="Unbegrenzt"
+                                         IsChecked="{Binding IsLimitUnlimited, Mode=OneWay}"
+                                         Click="LimitRadioUnlimited_Click"
+                                         GroupName="CacheLimitNew"
+                                         Margin="0,4,0,0"/>
+                        </StackPanel>
+
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Eigener Wert:"
+                                       VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding CustomLimitInput, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="Cache-Limit in Megabyte (positive Ganzzahl)"/>
+                            <TextBlock Grid.Column="2" Text="MB"
+                                       VerticalAlignment="Center" Margin="6,0,8,0"/>
+                            <Button Grid.Column="3" Content="Anwenden"
+                                    Command="{Binding ApplyCustomLimitCommand}"/>
+                        </Grid>
+
+                        <Button Content="Cache jetzt leeren"
+                                Width="200" HorizontalAlignment="Left"
+                                Command="{Binding ClearCacheCommand}"
+                                Margin="0,12,0,0"
+                                ToolTip="Loescht alle Bilder und die Sidecar-DB"/>
+
+                        <TextBlock Text="Optionen" FontSize="13" FontWeight="SemiBold" Margin="0,12,0,4"/>
+
+                        <CheckBox Content="BrickLink-Bilder bevorzugen"
+                                  IsChecked="{Binding PreferBricklinkImages}"
+                                  ToolTip="Bevorzugt echte BrickLink-Teile-Fotos (farbig) statt Brickognize-Graustufen-Renderings. Fallback automatisch."/>
+
+                        <CheckBox Content="Vorab-Cache bei Minifig-Scan"
+                                  IsChecked="{Binding PreloadOnMinifigScan}"
+                                  Margin="0,4,0,0"
+                                  ToolTip="Laedt nach erkannter Minifigur deren Teile-Bilder im Hintergrund vor (Phase 3+)."/>
+
+                        <Separator Margin="0,16,0,16"/>
+
+                        <!-- ===== SEKTION 2: BL-Daten-Cache ===== -->
+                        <TextBlock Text="BL-Daten-Cache"
+                                   FontSize="15" FontWeight="SemiBold"
+                                   Margin="0,0,0,8"/>
+
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12" Margin="0,0,0,8"
+                                   Text="BrickLink-Stammdaten (Items, Subsets, Colors) lokal in bl_cache.db."/>
+
+                        <TextBlock Text="{Binding BlCacheStatsText}"
+                                   FontSize="12" TextWrapping="Wrap"
+                                   Margin="0,4,0,0"/>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Content="Stale-Eintraege loeschen"
+                                    Command="{Binding ClearStaleBlCacheCommand}"
+                                    Width="220" Margin="0,0,8,0"
+                                    ToolTip="Loescht alle Items/Subsets aelter als cacheStaleDays (Default 90)."/>
+                            <Button Content="Cache leeren"
+                                    Command="{Binding ClearBlCacheCommand}"
+                                    Width="120"
+                                    ToolTip="Loescht alle Eintraege im BL-Cache (mit Bestaetigung)."/>
+                        </StackPanel>
+
+                        <Separator Margin="0,16,0,16"/>
+
+                        <!-- ===== SEKTION 3: Preis-Cache ===== -->
+                        <TextBlock Text="Preis-Cache"
+                                   FontSize="15" FontWeight="SemiBold"
+                                   Margin="0,0,0,8"/>
+
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12" Margin="0,0,0,8"
+                                   Text="BL-Preisdaten (Stale-While-Revalidate). Lange TTLs - BL-Preise aendern sich langsam."/>
+
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="280"/>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0"
+                                       Text="Cache-Gueltigkeit komplette Figuren (Tage):"
+                                       VerticalAlignment="Center" Margin="0,0,0,4"/>
+                            <TextBox Grid.Row="0" Grid.Column="1" Margin="0,0,0,4"
+                                     Text="{Binding PriceCacheTtlMinifigDays, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="Wie lange werden Komplett-Figur-Preise als 'frisch' angesehen. Default: 90 Tage."/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0"
+                                       Text="Cache-Gueltigkeit Einzelteile (Tage):"
+                                       VerticalAlignment="Center" Margin="0,0,0,4"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" Margin="0,0,0,4"
+                                     Text="{Binding PriceCacheTtlPartDays, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="Wie lange werden Einzelteil-Preise als 'frisch' angesehen. Default: 90 Tage."/>
+                        </Grid>
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding PriceCacheCountText}"
+                                       FontSize="12" Foreground="Gray"
+                                       VerticalAlignment="Center"/>
+                            <Button Grid.Column="1" Content="Preis-Cache leeren"
+                                    Command="{Binding ClearPriceCacheCommand}"
+                                    Padding="8,4"/>
+                        </Grid>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- ============================================ -->
             <!-- TAB 3: BILD-CACHE (Phase 2.5) -->
             <!-- ============================================ -->
