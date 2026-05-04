@@ -1169,6 +1169,79 @@ Alle Settings werden bei jedem Aufruf live aus
 `_settings.Current.Prices` gelesen - kein Singleton-Cache mehr, kein
 Restart noetig nach Settings-Wechsel.
 
+#### Phase 8-Bugfix #3 (2026-05-04) — Auto/Manuell pro Bereich + GuideType-Contract
+
+Zwei Aenderungen am Phase-8-System:
+
+**TEIL A: GuideType-Contract abgesichert.** Ueber alle Aufrufer
+(`BricklinkApiPriceProvider`, `BlPriceCacheService` Cache+Live,
+`PriceCalculationService`, `MinifigPriceViewModel`) wird `cfg.GuideType`
+genau einmal pro Lookup gelesen - es gibt nirgendwo eine Schleife oder
+parallele Anfragen ueber beide Varianten. Die Beobachtung "beide
+Varianten werden abgefragt" stammt vermutlich aus historischen
+Cache-Eintraegen (PRIMARY KEY in `bl_prices` enthaelt `guide_type`,
+also koexistieren Sold- und Stock-Eintraege fuer dasselbe Item aus
+unterschiedlichen Sitzungen). Zwei neue Lock-the-Contract-Tests in
+`BlPriceCacheServiceTests` sichern das gegen Regression:
+- `Lookup_in_Sold_mode_only_calls_provider_with_Sold_never_with_Stock`
+- `Lookup_in_Stock_mode_only_calls_provider_with_Stock_never_with_Sold`
+
+Der `StubProvider` protokolliert dazu pro Aufruf den live aktiven
+`Settings.GuideType` (`RecordedMinifigGuideTypes` /
+`RecordedPartGuideTypes`).
+
+**TEIL B: Auto vs Manuell pro Bereich.** Die obere rechte Preis-Box
+laed nicht mehr automatisch beim Scannen. Stattdessen entscheidet der
+User pro Bereich ob Auto oder Manuell:
+
+- Neue Settings: `AppSettings.Prices.AutoLoadCompletePrice` und
+  `AutoLoadPartsPrice`, beide vom Typ `PriceLoadMode { Manual, Auto }`,
+  Default `Manual` (spart API-Calls).
+- Altes `AutoLoadOnComplete`-Bool ist `DEPRECATED` (XML-Doc),
+  bleibt in der settings.json fuer Backwards-Compat. Das
+  `MinifigSummaryViewModel` triggert sein Auto-Load jetzt aus
+  `AutoLoadCompletePrice == Auto`.
+- Settings-UI: alter "Preise automatisch laden"-CheckBox raus, neuer
+  Block "Preise laden" mit zwei Dropdowns + Erklaerungs-Text.
+
+**MinifigPriceView neu gebaut**: jede Haelfte (Komplett / Einzelteile)
+ist eine eigene 4-Zustands-Maschine:
+
+| Zustand | Sichtbar |
+|---|---|
+| Idle    | "Preis laden"-Button mittig |
+| Loading | ProgressBar + Status-Text |
+| Loaded  | Preis-Anzeige + ↻-Refresh-Icon oben rechts |
+| Issue   | Banner (rot=Fehler, orange=Provider-noch-nicht-eingerichtet) + "Erneut versuchen" |
+
+Sichtbarkeiten ueber `ShowComplete*` / `ShowParts*` computed
+Properties am VM, mutually exclusive. Der globale ↻-Header-Button
+ist weg - jede Haelfte hat ihr eigenes Refresh-Icon.
+
+**Cache-First-Pfad gilt in beiden Modi gleich** (User-Addendum):
+- Auto-Mode: triggert `LoadCompleteCoreAsync` / `LoadPartsCoreAsync`
+  direkt im Konstruktor.
+- Manual-Mode: wartet auf Klick - der Klick ruft denselben Pfad auf.
+- Beide gehen durch `IBlPriceCacheService` (Stale-While-Revalidate):
+  Cache-Hit -> kein Provider-Call. Cache-Stale -> Stale + Hintergrund-
+  Revalidate. Cache-Miss -> Provider live + Cache-Write.
+- ↻-Icon ist explizit Force-Refresh: loescht den passenden Cache-
+  Eintrag (per Bereich) ueber neue API-Methoden
+  `IBlPriceCacheService.DeleteMinifigPriceAsync(blId)` und
+  `DeletePartPricesAsync(specs)`. `DeleteForMinifigAsync` ist jetzt
+  eine Convenience ueber die zwei.
+
+**Empfehlungs-Banner** unten: nur sichtbar wenn beide Bereiche
+erfolgreich geladen sind (`CompleteHasPrice && PartsHasAnyPrice`).
+Solange einer der beiden idle/loading/error ist: keine Empfehlung.
+
+**Tests** (`HBSort.Tests/MinifigPriceViewModelTests.cs`, 10 neue
+Tests): Auto-Trigger im Konstruktor, Manual-Click, Cache-Hit verhindert
+API-Call (in beiden Modi), Cache-Miss triggert API-Call, Refresh
+loescht NUR die jeweilige Bereichs-Spalte aus dem Cache, Recommendation
+nur bei beiden Halves geladen. `HBSort.Tests` bekommt eine
+ProjectReference auf das WPF-Hauptprojekt damit das VM testbar wird.
+
 ### UX-Iteration X.4 ✅ (2026-05-03)
 
 Acht UX-Verbesserungen quer durch die App:
