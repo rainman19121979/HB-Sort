@@ -943,6 +943,54 @@ kennt den Wert nicht und Brickstore importiert auch ohne. Der
 - `Inventory`-Tag hat Currency-Attribut aus Settings (Test mit "USD").
 - Bei leerer Settings-Currency Fallback auf "EUR".
 
+#### Phase 7-Bugfix (UX-Iteration X.13b, 2026-05-04) — Lagerliste-Selektion ueber Property-Setter
+
+Bug: Klick auf eine einzelne Checkbox in der Lagerliste hat zwar den
+visuellen Haken gesetzt, aber `SelectedExportableCount` blieb 0 und
+der Exportieren-Button ausgegraut. Erst der "Alle"-Button hat
+funktioniert.
+
+Wurzel-Ursache: WPF-DataGrid mit `IsReadOnly="True"` in Kombination
+mit einer eingebetteten CheckBox in `DataGridTemplateColumn`. Der
+bubbled `Click`-Event wird teilweise von der DataGrid-Cell-Mouse-
+Logik verschluckt, bevor er den Code-Behind-Handler erreicht. Der
+`IsChecked`-Toggle (TwoWay-Binding zu `IsSelected`) feuert weiter
+ueber Mouse-Capture des Toggle-Buttons - daher der visuelle Haken -
+aber der `Click`-Handler `CompleteSelect_Click`, der
+`RecalculateSelection()` haette aufrufen sollen, lief nie.
+
+**Fix per Property-Setter** (`InventoryListViewModel.cs`,
+`InventoryRowItem`):
+- Neues `event EventHandler? SelectionChanged` auf `InventoryRowItem`.
+- Der CommunityToolkit.Mvvm-Hook `partial void OnIsSelectedChanged(bool)`
+  feuert das Event - egal ob Klick, Tastatur-Space, Touch, Bulk-Aktion
+  oder Code-Set.
+- `InventoryListViewModel` abonniert `Items.CollectionChanged` und
+  meldet sich auf jedes hinzukommende Row-Item an
+  (`OnRowSelectionChanged → RecalculateSelection()`). Bei Remove
+  sauber abmelden, sonst halten alte Items den Counter wachsam.
+- XAML: `Click="CompleteSelect_Click"` von der CheckBox entfernt;
+  Code-Behind-Handler geloescht.
+
+**Convention**: Selektions-Updates in DataGrid-Cell-Templates IMMER
+ueber Property-Setter (per `partial void OnXxxChanged`) wirken
+lassen, **nicht** ueber Click-Events. Click ist bei DataGrid-Cells
+unzuverlaessig.
+
+**Tests** (`InventoryListViewModelTests.cs`): die alten 8 Regressions-
+Tests waren gruen, weil sie `IsSelected` DIREKT plus manuelles
+`RecalculateSelection()` aufgerufen haben - sie haben den Wiring-Bug
+nie gefangen. Jetzt 5 realistische Tests die NUR `IsSelected` setzen
+(ohne manuellen `RecalculateSelection`-Call):
+- `Setting_IsSelected_directly_updates_SelectedExportableCount`
+- `Setting_IsSelected_on_multiple_rows_increments_count`
+- `Unsetting_IsSelected_decrements_count`
+- `Setting_IsSelected_fires_PropertyChanged_for_SelectedExportableCount`
+- `Removing_a_row_unsubscribes_so_late_changes_are_ignored` (verhindert
+  Geister-Selektionen aus alten Items).
+
+Vor dem Fix: 4/5 dieser Tests scheiterten. Nach dem Fix: alle gruen.
+
 #### Smart-Storage-Suggestion beim Lagern (UX-Iteration X.7, 2026-05-03)
 
 Beim "Als Einzelteil lagern"-Workflow in der `PartLookupView` schlaegt die
