@@ -114,8 +114,8 @@ HBSort.Core/Resources/CatalogSeed/*.zip raus (~16.6 MB Code-Diet).
 Stammdaten kommen jetzt ausschliesslich aus `bl_cache.db`
 (BrickStore-Bulk-Import). Der ColorMatch-Pfad nutzt `bl_colors`
 direkt; Brickognize-Color-id wird als BL-Color-ID interpretiert
-(validiert 2026-05-02). `ColorMapping.cs` bleibt im Code als
-generische RB↔BL-Tabelle, wird aber nicht mehr im Hauptfluss genutzt.
+(validiert 2026-05-02). `ColorMapping.cs` (alte RB↔BL-Tabelle)
+wurde am 2026-05-04 entfernt — bei Bedarf via Git wiederherstellbar.
 
 ## Migrations-Notiz (2026-05-02)
 
@@ -559,20 +559,11 @@ Phase 8: BL-Price-Tool nutzt BL-ID + BL-Color-ID direkt
 ```
 
 **Rebrickable-IDs (PROMPT 6, 2026-05-02):**
-Werden nicht mehr aktiv genutzt. ColorMapping bleibt als generische
-RB↔BL-Tabelle im Code (z.B. fuer kuenftige Reverse-Konvertierungen),
-ist aber nicht mehr Teil des Hauptflusses.
+Werden nicht mehr aktiv genutzt. Die alte RB↔BL-Tabelle in
+`ColorMapping.cs` wurde am 2026-05-04 entfernt (Audit M-1) — bei
+Bedarf fuer kuenftige Reverse-Konvertierungen via Git wiederherstellbar.
 
 URL-Patterns: siehe **`BRICKOGNIZE_API.md`**.
-
-## ColorMapping.cs
-
-`HBSort.Core/Services/ColorMapping.cs` ist eine statisch generierte
-RB↔BL-Tabelle (271 Eintraege, 178 mit BL-Mapping). Wird im Hauptfluss
-nicht mehr verwendet — Brickognize liefert in der `id`-Spalte von
-`colors[]` BL-Color-IDs direkt (validiert 2026-05-02, id=5 = Red = BL-Red).
-Datei bleibt als Reserve fuer kuenftige Reverse-Konversionen im Code,
-nur noch von `HBSort.Tests/ColorMappingTests.cs` referenziert.
 
 ## User-Daten-Schema (in `userdata.db`, via EF Core)
 
@@ -724,7 +715,8 @@ gespeichert.
 2. Frame eingefroren, 1 Sek
 3. Frame → Brickognize `/predict/parts/?predict_color=true`
 4. Brickognize liefert BL-Part-No + Farb-Vermutung (Rebrickable-Name/ID)
-5. **NEU:** Farb-Mapping via ColorMapping.cs zu BL-Color-ID
+5. Brickognize liefert die Color-ID bereits als BL-Color-ID
+   (validiert 2026-05-02), kein separates Mapping noetig
 6. User kann Farbe via Dropdown korrigieren (BL-Color-Liste aus bl_colors)
 7. **Matching-Logik (strikte BL-Color-ID):**
 
@@ -774,7 +766,6 @@ HBSort.sln
 │   │   ├── ICameraService / CameraService.cs
 │   │   ├── IBrickognizeClient / BrickognizeClient.cs
 │   │   ├── IExternalIdResolver / ExternalIdResolver.cs
-│   │   ├── ColorMapping.cs (Legacy-Tabelle, im Hauptfluss ungenutzt)
 │   │   ├── IBricklinkClient / BricklinkClient.cs
 │   │   │     OAuth1, BricklinkSharp-Wrapper
 │   │   ├── IBricklinkTokenStorage / BricklinkTokenStorage.cs
@@ -815,7 +806,7 @@ HBSort.sln
 
 ✅ Phase 1 - WPF-Grundgeruest, Webcam, Settings, Tray
 ✅ Phase 1.5 - Catalog-Import (in PROMPT 6 komplett entfernt)
-✅ Phase 2 - Brickognize, ID-Resolver, ColorMapping
+✅ Phase 2 - Brickognize, ID-Resolver (ColorMapping in 2026-05-04 entfernt)
 ✅ Phase 2.5 - BL-Bilder Hybrid, Persistent Cache, LRU
 
 ## Phase 4-8 (unveraendert in der Logik, aber mit BL-IDs)
