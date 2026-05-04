@@ -2,41 +2,33 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <!--
-        UX#12: Preis-Anzeige in der oberen rechten Box des Sortier-Tabs.
-        DataContext = MinifigPriceViewModel (vom ScanViewModel beim Pending-
-        Aufbau erzeugt). Keine eigenen Click-Handler im Code-Behind - alles
-        ueber Binding und RelayCommand.
+        UX#12 + UX X.10: Preis-Anzeige in der oberen rechten Box des Sortier-Tabs.
+        DataContext = MinifigPriceViewModel (vom ScanViewModel beim Pending-Aufbau erzeugt).
 
         Layout:
-          [ Refresh-Button oben rechts ]
+          [ Header (Titel) ]
           [ LINKS: Komplette Figur | TRENNER | RECHTS: Einzelteile ]
-          [ unten ueber volle Breite: Empfehlung ]
+          [ Empfehlung (nur wenn beide Bereiche geladen) ]
+
+        UX X.10: jede Haelfte ist ein eigenes State-Machine:
+          - Idle (Manual + nicht angefordert): Button "Preis laden" mittig
+          - Loading: ProgressBar
+          - Loaded: Preis-Anzeige + ↻-Refresh-Icon oben rechts
+          - Issue (Error / Provider noch nicht eingerichtet): Banner + Erneut-Button
+        Sichtbarkeiten ueber ShowXxx-Properties am VM, mutually-exclusive.
     -->
     <Grid Margin="6">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>  <!-- 0: Header + Refresh -->
+            <RowDefinition Height="Auto"/>  <!-- 0: Header -->
             <RowDefinition Height="*"/>     <!-- 1: Inhalt 50/50 -->
-            <RowDefinition Height="Auto"/>  <!-- 2: Empfehlung (gruen) -->
-            <RowDefinition Height="Auto"/>  <!-- 3: Konfigurations-Hinweis (orange) -->
-            <RowDefinition Height="Auto"/>  <!-- 4: Echter Fehler (rot) -->
+            <RowDefinition Height="Auto"/>  <!-- 2: Empfehlung -->
         </Grid.RowDefinitions>
 
-        <!-- ===== Header mit Refresh-Icon ===== -->
-        <Grid Grid.Row="0" Margin="0,0,0,6">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Text="BL-PREISE (Used)"
-                       FontSize="11" FontWeight="SemiBold"
-                       Foreground="Gray" VerticalAlignment="Center"/>
-            <Button Grid.Column="1" Content="↻"
-                    Command="{Binding RefreshCommand}"
-                    FontSize="14" Padding="6,0"
-                    ToolTip="Cache fuer diese Figur loeschen und neu laden"
-                    Background="Transparent"
-                    BorderThickness="0"/>
-        </Grid>
+        <!-- ===== Header ===== -->
+        <TextBlock Grid.Row="0"
+                   Text="BL-PREISE (Used)"
+                   FontSize="11" FontWeight="SemiBold"
+                   Foreground="Gray" Margin="0,0,0,6"/>
 
         <!-- ===== 50/50-Split ===== -->
         <Grid Grid.Row="1">
@@ -51,130 +43,254 @@
                     Background="{DynamicResource SystemControlForegroundBaseLowBrush}"
                     Margin="0,4"/>
 
+            <!-- ============================================================ -->
             <!-- ===== LINKS: Komplette Figur ===== -->
+            <!-- ============================================================ -->
             <Grid Grid.Column="0" Margin="0,0,8,0">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>  <!-- 0: Header (Titel + Refresh-Icon) -->
+                    <RowDefinition Height="Auto"/>  <!-- 1: Korrektur-Hint -->
+                    <RowDefinition Height="*"/>     <!-- 2: State-Maschine -->
                 </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0" Orientation="Vertical">
-                    <TextBlock Text="KOMPLETTE FIGUR"
+                <!-- Header der Haelfte: Titel + ↻ -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="KOMPLETTE FIGUR"
                                FontSize="10" FontWeight="SemiBold"
                                Foreground="Gray"/>
                     <!--
-                        Bugfix Phase-8 #3: Hinweis dass die angezeigten Werte
-                        bereits die User-Korrektur enthalten. Unsichtbar wenn
-                        Korrektur=0.
+                        Refresh-Icon: nur sichtbar wenn schon Daten da sind.
+                        Loescht den Cache-Eintrag fuer GuideType+Region+Currency
+                        und triggert Live-Call.
                     -->
-                    <TextBlock Text="{Binding MinifigCorrectionHint}"
-                               FontSize="10" Foreground="#1565C0"
-                               FontStyle="Italic" Margin="0,1,0,0"
-                               Visibility="{Binding HasMinifigCorrectionHint,
-                                   Converter={StaticResource BoolToVisibility}}"/>
-                </StackPanel>
+                    <Button Grid.Column="1" Content="↻"
+                            Command="{Binding RefreshCompleteCommand}"
+                            Visibility="{Binding ShowCompleteRefreshIcon,
+                                Converter={StaticResource BoolToVisibility}}"
+                            Background="Transparent" BorderThickness="0"
+                            Padding="6,0" FontSize="14"
+                            ToolTip="Komplett-Preis aktualisieren (Cache leeren + neu laden)"/>
+                </Grid>
 
-                <!-- Loader -->
-                <ProgressBar Grid.Row="1" Height="2" IsIndeterminate="True"
-                             Margin="0,4,0,0"
-                             Visibility="{Binding IsCompleteLoading,
-                                Converter={StaticResource BoolToVisibility}}"/>
+                <!-- Korrektur-Hint -->
+                <TextBlock Grid.Row="1"
+                           Text="{Binding MinifigCorrectionHint}"
+                           FontSize="10" Foreground="#1565C0"
+                           FontStyle="Italic" Margin="0,1,0,0"
+                           Visibility="{Binding HasMinifigCorrectionHint,
+                               Converter={StaticResource BoolToVisibility}}"/>
 
-                <!-- Preis-Block (sichtbar wenn HasPrice) -->
-                <StackPanel Grid.Row="2" Margin="0,8,0,0"
-                            Visibility="{Binding CompleteHasPrice,
-                                Converter={StaticResource BoolToVisibility}}">
-                    <!-- Tooltip zeigt Roh + Korrigiert wenn Korrektur != 0 -->
-                    <TextBlock Text="{Binding CompletePriceLabel}"
-                               FontSize="22" FontWeight="SemiBold"
-                               ToolTip="{Binding CompletePriceTooltip}"/>
-                    <TextBlock Text="{Binding CompleteMinMaxLabel}"
-                               FontSize="11" Foreground="Gray"
-                               Margin="0,2,0,0"/>
-                    <TextBlock Text="{Binding CompleteListingsLabel}"
-                               FontSize="11" Foreground="Gray"/>
-                </StackPanel>
+                <!-- State-Maschine: Idle / Loading / Loaded / Issue -->
+                <Grid Grid.Row="2" Margin="0,8,0,0">
+                    <!-- Idle: "Preis laden"-Button mittig -->
+                    <Button Content="€ Komplett-Preis laden"
+                            Command="{Binding LoadCompleteCommand}"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Padding="14,8"
+                            Visibility="{Binding ShowCompleteIdleButton,
+                                Converter={StaticResource BoolToVisibility}}"
+                            ToolTip="Cache pruefen, sonst BL-API abfragen. Spart API-Calls solange ungeklickt."/>
 
-                <!-- Footer: FetchedAt + Stale-Hinweis -->
-                <StackPanel Grid.Row="3">
-                    <TextBlock Text="{Binding CompleteFetchedAtLabel}"
-                               FontSize="10" Foreground="Gray"
-                               FontStyle="Italic" Margin="0,4,0,0"/>
-                    <TextBlock Text="↻ Update laeuft im Hintergrund..."
-                               FontSize="10" Foreground="#E65100"
-                               FontStyle="Italic"
-                               Visibility="{Binding IsCompleteStale,
-                                    Converter={StaticResource BoolToVisibility}}"/>
-                </StackPanel>
+                    <!-- Loading: ProgressBar -->
+                    <StackPanel VerticalAlignment="Center"
+                                Visibility="{Binding IsCompleteLoading,
+                                    Converter={StaticResource BoolToVisibility}}">
+                        <ProgressBar Height="2" IsIndeterminate="True"/>
+                        <TextBlock Text="Lade Komplett-Preis..."
+                                   FontSize="10" Foreground="Gray"
+                                   HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                    </StackPanel>
+
+                    <!-- Loaded: Preis-Block -->
+                    <StackPanel VerticalAlignment="Top"
+                                Visibility="{Binding ShowCompleteLoadedContent,
+                                    Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="{Binding CompletePriceLabel}"
+                                   FontSize="22" FontWeight="SemiBold"
+                                   ToolTip="{Binding CompletePriceTooltip}"/>
+                        <TextBlock Text="{Binding CompleteMinMaxLabel}"
+                                   FontSize="11" Foreground="Gray"
+                                   Margin="0,2,0,0"/>
+                        <TextBlock Text="{Binding CompleteListingsLabel}"
+                                   FontSize="11" Foreground="Gray"/>
+                        <TextBlock Text="{Binding CompleteFetchedAtLabel}"
+                                   FontSize="10" Foreground="Gray"
+                                   FontStyle="Italic" Margin="0,4,0,0"/>
+                        <!-- Stale-Marker -->
+                        <TextBlock Text="↻ Update laeuft im Hintergrund..."
+                                   FontSize="10" Foreground="#E65100"
+                                   FontStyle="Italic"
+                                   Visibility="{Binding IsCompleteStale,
+                                        Converter={StaticResource BoolToVisibility}}"/>
+                    </StackPanel>
+
+                    <!--
+                        Issue: Error (rot) ODER Configuration-Hint (orange) +
+                        Erneut-Button. Zwei separate Border-Definitionen damit
+                        wir keinen Bool->Brush-Konverter brauchen.
+                    -->
+                    <StackPanel VerticalAlignment="Center"
+                                Visibility="{Binding ShowCompleteIssueBanner,
+                                    Converter={StaticResource BoolToVisibility}}">
+                        <Border Background="#FFF3E0" BorderBrush="#E65100"
+                                BorderThickness="1" CornerRadius="4" Padding="8,4"
+                                Visibility="{Binding CompleteHasConfigurationHint,
+                                    Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="{Binding CompleteHintMessage}"
+                                       FontSize="11" TextWrapping="Wrap"
+                                       Foreground="#E65100"/>
+                        </Border>
+                        <Border Background="#FFEBEE" BorderBrush="#C62828"
+                                BorderThickness="1" CornerRadius="4" Padding="8,4"
+                                Visibility="{Binding CompleteHasError,
+                                    Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="{Binding CompleteHintMessage}"
+                                       FontSize="11" TextWrapping="Wrap"
+                                       Foreground="#C62828"/>
+                        </Border>
+                        <Button Content="Erneut versuchen"
+                                Command="{Binding LoadCompleteCommand}"
+                                HorizontalAlignment="Center" Margin="0,8,0,0"
+                                Padding="10,4"
+                                ToolTip="Cache pruefen, sonst BL-API neu abfragen."/>
+                    </StackPanel>
+                </Grid>
             </Grid>
 
+            <!-- ============================================================ -->
             <!-- ===== RECHTS: Einzelteile ===== -->
+            <!-- ============================================================ -->
             <Grid Grid.Column="2" Margin="8,0,0,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0" Orientation="Vertical">
-                    <TextBlock Text="EINZELTEILE AUFSUMMIERT"
+                <!-- Header der Haelfte -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="EINZELTEILE AUFSUMMIERT"
                                FontSize="10" FontWeight="SemiBold"
                                Foreground="Gray"/>
-                    <!-- Bugfix Phase-8 #3: dito wie linke Haelfte. -->
-                    <TextBlock Text="{Binding PartsCorrectionHint}"
-                               FontSize="10" Foreground="#1565C0"
-                               FontStyle="Italic" Margin="0,1,0,0"
-                               Visibility="{Binding HasPartsCorrectionHint,
-                                   Converter={StaticResource BoolToVisibility}}"/>
-                </StackPanel>
+                    <Button Grid.Column="1" Content="↻"
+                            Command="{Binding RefreshPartsCommand}"
+                            Visibility="{Binding ShowPartsRefreshIcon,
+                                Converter={StaticResource BoolToVisibility}}"
+                            Background="Transparent" BorderThickness="0"
+                            Padding="6,0" FontSize="14"
+                            ToolTip="Einzelteile-Preise aktualisieren (Cache leeren + neu laden)"/>
+                </Grid>
 
-                <ProgressBar Grid.Row="1" Height="2" IsIndeterminate="True"
-                             Margin="0,4,0,0"
-                             Visibility="{Binding IsPartsLoading,
-                                Converter={StaticResource BoolToVisibility}}"/>
+                <TextBlock Grid.Row="1"
+                           Text="{Binding PartsCorrectionHint}"
+                           FontSize="10" Foreground="#1565C0"
+                           FontStyle="Italic" Margin="0,1,0,0"
+                           Visibility="{Binding HasPartsCorrectionHint,
+                               Converter={StaticResource BoolToVisibility}}"/>
 
-                <!-- Liste der Teile -->
-                <ScrollViewer Grid.Row="2" Margin="0,4,0,0"
-                              VerticalScrollBarVisibility="Auto">
-                    <ItemsControl ItemsSource="{Binding PartRows}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Margin="0,0,0,2"
-                                      ToolTip="{Binding UnitPriceTooltip}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
-                                               Text="{Binding DisplayName}"
-                                               FontSize="11"
-                                               TextTrimming="CharacterEllipsis"
-                                               VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1"
-                                               Text="{Binding SubtotalLabel}"
-                                               FontSize="11" FontWeight="SemiBold"
-                                               Margin="6,0,0,0"
-                                               VerticalAlignment="Center"/>
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+                <!-- State-Maschine: Idle / Loading / Loaded / Issue -->
+                <Grid Grid.Row="2" Margin="0,8,0,0">
+                    <!-- Idle -->
+                    <Button Content="€ Einzelteile-Preise laden"
+                            Command="{Binding LoadPartsCommand}"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Padding="14,8"
+                            Visibility="{Binding ShowPartsIdleButton,
+                                Converter={StaticResource BoolToVisibility}}"
+                            ToolTip="Cache pruefen, sonst BL-API pro Teil abfragen."/>
 
-                <!-- Footer: Summe + Missing -->
-                <StackPanel Grid.Row="3" Margin="0,4,0,0">
-                    <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                            BorderThickness="0,1,0,0" Padding="0,4,0,0">
-                        <TextBlock Text="{Binding PartsTotalLabel}"
-                                   FontSize="14" FontWeight="SemiBold"/>
-                    </Border>
-                    <TextBlock Text="{Binding PartsMissingLabel}"
-                               FontSize="10" Foreground="#E65100"
-                               FontStyle="Italic"/>
-                </StackPanel>
+                    <!-- Loading -->
+                    <StackPanel VerticalAlignment="Center"
+                                Visibility="{Binding IsPartsLoading,
+                                    Converter={StaticResource BoolToVisibility}}">
+                        <ProgressBar Height="2" IsIndeterminate="True"/>
+                        <TextBlock Text="{Binding PartsLoadingLabel}"
+                                   FontSize="10" Foreground="Gray"
+                                   HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                    </StackPanel>
+
+                    <!-- Loaded: Liste + Summe -->
+                    <Grid Visibility="{Binding ShowPartsLoadedContent,
+                              Converter={StaticResource BoolToVisibility}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <ScrollViewer Grid.Row="0"
+                                      VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding PartRows}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,0,0,2"
+                                              ToolTip="{Binding UnitPriceTooltip}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{Binding DisplayName}"
+                                                       FontSize="11"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding SubtotalLabel}"
+                                                       FontSize="11" FontWeight="SemiBold"
+                                                       Margin="6,0,0,0"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <StackPanel Grid.Row="1" Margin="0,4,0,0">
+                            <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                    BorderThickness="0,1,0,0" Padding="0,4,0,0">
+                                <TextBlock Text="{Binding PartsTotalLabel}"
+                                           FontSize="14" FontWeight="SemiBold"/>
+                            </Border>
+                            <TextBlock Text="{Binding PartsMissingLabel}"
+                                       FontSize="10" Foreground="#E65100"
+                                       FontStyle="Italic"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Issue: Error (rot) ODER Configuration-Hint (orange) -->
+                    <StackPanel VerticalAlignment="Center"
+                                Visibility="{Binding ShowPartsIssueBanner,
+                                    Converter={StaticResource BoolToVisibility}}">
+                        <Border Background="#FFF3E0" BorderBrush="#E65100"
+                                BorderThickness="1" CornerRadius="4" Padding="8,4"
+                                Visibility="{Binding PartsHasConfigurationHint,
+                                    Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="{Binding PartsHintMessage}"
+                                       FontSize="11" TextWrapping="Wrap"
+                                       Foreground="#E65100"/>
+                        </Border>
+                        <Border Background="#FFEBEE" BorderBrush="#C62828"
+                                BorderThickness="1" CornerRadius="4" Padding="8,4"
+                                Visibility="{Binding PartsHasError,
+                                    Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="{Binding PartsHintMessage}"
+                                       FontSize="11" TextWrapping="Wrap"
+                                       Foreground="#C62828"/>
+                        </Border>
+                        <Button Content="Erneut versuchen"
+                                Command="{Binding LoadPartsCommand}"
+                                HorizontalAlignment="Center" Margin="0,8,0,0"
+                                Padding="10,4"
+                                ToolTip="Cache pruefen, sonst BL-API neu abfragen."/>
+                    </StackPanel>
+                </Grid>
             </Grid>
         </Grid>
 
@@ -188,36 +304,6 @@
             <TextBlock Text="{Binding RecommendationText}"
                        FontSize="11" FontWeight="SemiBold"
                        Foreground="#2E7D32"
-                       TextWrapping="Wrap"/>
-        </Border>
-
-        <!--
-            ===== Konfigurations-Hinweis (oranges Banner) =====
-            Plan C: erscheint wenn der Preis-Provider in den Settings auf
-            "None" steht. Andere Optik als der rote Fehler-Banner damit
-            klar ist: das ist kein Drama, sondern nur eine fehlende
-            Einstellung.
-        -->
-        <Border Grid.Row="3" Margin="0,4,0,0"
-                Background="#FFF3E0" BorderBrush="#E65100"
-                BorderThickness="1" CornerRadius="4"
-                Padding="8,4"
-                Visibility="{Binding HasConfigurationHint,
-                    Converter={StaticResource BoolToVisibility}}">
-            <TextBlock Text="{Binding ConfigurationHint}"
-                       FontSize="11" Foreground="#E65100"
-                       TextWrapping="Wrap"/>
-        </Border>
-
-        <!-- ===== Globaler Fehler (rotes Banner) ===== -->
-        <Border Grid.Row="4" Margin="0,4,0,0"
-                Background="#FFEBEE" BorderBrush="#C62828"
-                BorderThickness="1" CornerRadius="4"
-                Padding="8,4"
-                Visibility="{Binding HasError,
-                    Converter={StaticResource BoolToVisibility}}">
-            <TextBlock Text="{Binding ErrorMessage}"
-                       FontSize="11" Foreground="#C62828"
                        TextWrapping="Wrap"/>
         </Border>
     </Grid>

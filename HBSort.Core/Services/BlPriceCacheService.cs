@@ -258,25 +258,43 @@ public class BlPriceCacheService : IBlPriceCacheService
         IReadOnlyList<(string PartNo, int ColorId)> subsetParts,
         CancellationToken ct = default)
     {
+        // UX-Iteration X.10: jetzt eine Convenience ueber die zwei
+        // dedizierten Methoden - so bleibt die Loesch-Logik in einem Topf.
+        await DeleteMinifigPriceAsync(blMinifigId, ct);
+        await DeletePartPricesAsync(subsetParts, ct);
+    }
+
+    public async Task DeleteMinifigPriceAsync(string blMinifigId, CancellationToken ct = default)
+    {
         var cfg = _settings.Current.Prices;
         var region = cfg.Region ?? string.Empty;
         var currency = string.IsNullOrWhiteSpace(cfg.Currency) ? "EUR" : cfg.Currency;
 
-        // Komplett-Figur: ein Eintrag mit color_id=0.
         await _repo.DeletePriceAsync("M", blMinifigId, 0,
             cfg.GuideType, "U", region, currency, ct);
 
-        // Subset-Teile: pro Teil ein Eintrag.
-        foreach (var (partNo, colorId) in subsetParts.Distinct())
+        Log.Information("Komplett-Figur-Cache geloescht: {Mfg} ({Guide})",
+            blMinifigId, cfg.GuideType);
+    }
+
+    public async Task DeletePartPricesAsync(
+        IReadOnlyList<(string PartNo, int ColorId)> subsetParts,
+        CancellationToken ct = default)
+    {
+        var cfg = _settings.Current.Prices;
+        var region = cfg.Region ?? string.Empty;
+        var currency = string.IsNullOrWhiteSpace(cfg.Currency) ? "EUR" : cfg.Currency;
+
+        var distinct = subsetParts.Distinct().ToList();
+        foreach (var (partNo, colorId) in distinct)
         {
             ct.ThrowIfCancellationRequested();
             await _repo.DeletePriceAsync("P", partNo, colorId,
                 cfg.GuideType, "U", region, currency, ct);
         }
 
-        Log.Information(
-            "Pro-Eintrag-Refresh: Cache fuer {Mfg} + {Count} Subsets geloescht",
-            blMinifigId, subsetParts.Count);
+        Log.Information("Einzelteil-Cache geloescht: {Count} Eintraege ({Guide})",
+            distinct.Count, cfg.GuideType);
     }
 
     public Task<int> GetEntryCountAsync(CancellationToken ct = default)

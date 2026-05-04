@@ -10,31 +10,35 @@ using Serilog;
 namespace HBSort.ViewModels;
 
 /// <summary>
-/// UX#12: ViewModel fuer die Preis-Anzeige in der oberen rechten Box des
-/// Sortier-Tabs. Wird vom ScanViewModel angelegt sobald eine Pending-Minifig
-/// existiert (gerade gescannt, noch nicht persistiert).
+/// UX#12 + X.10: ViewModel fuer die Preis-Anzeige in der oberen rechten Box
+/// des Sortier-Tabs. Wird vom ScanViewModel angelegt sobald eine
+/// Pending-Minifig existiert (gerade gescannt, noch nicht persistiert).
 ///
 /// Layout:
 ///   LINKS  - "Komplette Figur": Avg + Min/Max + Anzahl Listings + Datum
 ///   RECHTS - "Einzelteile aufsummiert": Liste pro Subset + Summe
 ///   UNTEN  - optional: Empfehlung "Komplett vs Einzelteile"
 ///
-/// Lade-Strategie:
-///   1) Alle Lookups parallel (Task.WhenAll) gegen IBlPriceCacheService.
-///   2) Stale-While-Revalidate ist im Service gekapselt - das VM bekommt
-///      direkt den schnellen (ggf. stale) Wert.
-///   3) IsLoading-Flags fuer Komplett- und Parts-Bereich getrennt.
+/// Lade-Strategie (UX X.10): jede Haelfte hat ihren eigenen Auto/Manual-
+/// Modus aus den Settings (PriceSettings.AutoLoadCompletePrice und
+/// .AutoLoadPartsPrice). Default beider Modi ist Manual - der User klickt
+/// aktiv "Preis laden". Bei Auto-Modus startet der Load direkt im
+/// Konstruktor.
 ///
-/// Bugfix Phase-8 #3 (Bugfix Commit 3, 2026-05-04):
-///   - PriceColumn (min/avg/max/qty_avg) wird jetzt aus Settings.Prices
-///     gelesen statt hardcoded "AvgPrice ?? QtyAvgPrice".
-///   - CorrectionMinifigPercent / CorrectionPartsPercent werden auf alle
-///     angezeigten Werte (Avg/Min/Max + Subtotals + Summe) angewandt.
-///   - Roh- und Korrigiert-Werte sind getrennt im VM, damit die UI per
-///     Tooltip beides anzeigen kann.
+/// Cache-First, dann Provider (Stale-While-Revalidate liegt im
+/// IBlPriceCacheService):
+///   1) Cache-Hit + frisch -> sofort verwenden, keine API-Call.
+///   2) Cache-Hit + stale  -> Stale-Wert sofort anzeigen, im Hintergrund
+///                            Live-Refresh.
+///   3) Cache-Miss         -> Provider live aufrufen, Ergebnis cachen.
+/// Beide Modi (Auto + Manual) gehen durch genau diesen Pfad. Der einzige
+/// Unterschied ist WANN er ausgeloest wird (sofort vs auf Klick).
 ///
-/// Refresh-Button: loescht den Cache fuer diese Figur + alle Subsets und
-/// startet den Load erneut.
+/// Force-Refresh (↻-Icon pro Haelfte):
+///   - Loescht den passenden Cache-Eintrag fuer GuideType + Region +
+///     Currency aus den Settings.
+///   - Triggert dann einen normalen Load (der jetzt zwangslaeufig
+///     Cache-Miss ist und Live geht).
 /// </summary>
 public partial class MinifigPriceViewModel : ObservableObject
 {
@@ -51,32 +55,64 @@ public partial class MinifigPriceViewModel : ObservableObject
 
     public string BlMinifigId => _blMinifigId;
 
+    /// <summary>
+    /// Wenn Auto-Modus aktiv ist, traegt das hier den vom Konstruktor
+    /// gestarteten Hintergrund-Task. Tests koennen darauf awaiten;
+    /// Produktion braucht es nicht (UI updated sich ueber Bindings).
+    /// Null wenn Manual-Modus.
+    /// </summary>
+    public Task? CompleteAutoLoadTask { get; private set; }
+    public Task? PartsAutoLoadTask { get; private set; }
+
     // ===== Komplett-Figur (linke Haelfte) =====
 
+    /// <summary>
+    /// True sobald LoadComplete getriggert wurde (Auto oder Klick). Steuert
+    /// die Sichtbarkeit des "Preis laden"-Buttons (sichtbar nur wenn false).
+    /// </summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CompleteHasPrice))]
+    [NotifyPropertyChangedFor(nameof(ShowCompleteIdleButton))]
+    [NotifyPropertyChangedFor(nameof(ShowCompleteLoadedContent))]
+    [NotifyPropertyChangedFor(nameof(ShowCompleteRefreshIcon))]
+    private bool _isCompleteRequested;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowCompleteLoadedContent))]
+    [NotifyPropertyChangedFor(nameof(ShowCompleteRefreshIcon))]
+    private bool _isCompleteLoading;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsCompleteStale))]
     [NotifyPropertyChangedFor(nameof(CompleteListingsLabel))]
     [NotifyPropertyChangedFor(nameof(CompleteFetchedAtLabel))]
+    [NotifyPropertyChangedFor(nameof(CompleteHasError))]
+    [NotifyPropertyChangedFor(nameof(CompleteHasConfigurationHint))]
+    [NotifyPropertyChangedFor(nameof(CompleteHintMessage))]
+    [NotifyPropertyChangedFor(nameof(ShowCompleteIssueBanner))]
+    [NotifyPropertyChangedFor(nameof(ShowCompleteLoadedContent))]
+    [NotifyPropertyChangedFor(nameof(ShowCompleteRefreshIcon))]
+    [NotifyPropertyChangedFor(nameof(HasRecommendation))]
+    [NotifyPropertyChangedFor(nameof(RecommendationText))]
     private PriceLookupOutcome? _completeOutcome;
 
-    [ObservableProperty] private bool _isCompleteLoading;
-
-    /// <summary>
-    /// Roh-Wert (vor Korrektur) der gerade aktiven PriceColumn fuer die
-    /// Komplett-Figur. Wird in Tooltips gezeigt damit der User sieht was
-    /// von BL kam.
-    /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CompletePriceLabel))]
     [NotifyPropertyChangedFor(nameof(CompletePriceTooltip))]
     [NotifyPropertyChangedFor(nameof(CompleteHasPrice))]
+    [NotifyPropertyChangedFor(nameof(ShowCompleteLoadedContent))]
+    [NotifyPropertyChangedFor(nameof(ShowCompleteRefreshIcon))]
+    [NotifyPropertyChangedFor(nameof(HasRecommendation))]
+    [NotifyPropertyChangedFor(nameof(RecommendationText))]
     private decimal? _completeRawPrice;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CompletePriceLabel))]
     [NotifyPropertyChangedFor(nameof(CompletePriceTooltip))]
     [NotifyPropertyChangedFor(nameof(CompleteHasPrice))]
+    [NotifyPropertyChangedFor(nameof(ShowCompleteLoadedContent))]
+    [NotifyPropertyChangedFor(nameof(ShowCompleteRefreshIcon))]
+    [NotifyPropertyChangedFor(nameof(HasRecommendation))]
+    [NotifyPropertyChangedFor(nameof(RecommendationText))]
     private decimal? _completeCorrectedPrice;
 
     [ObservableProperty]
@@ -95,9 +131,6 @@ public partial class MinifigPriceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CompleteMinMaxLabel))]
     private decimal? _completeCorrectedMax;
 
-    /// <summary>
-    /// Hinweis-Text "Inkl. -10% Korrektur" - leer wenn Korrektur=0.
-    /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasMinifigCorrectionHint))]
     private string? _minifigCorrectionHint;
@@ -107,12 +140,26 @@ public partial class MinifigPriceViewModel : ObservableObject
     public bool CompleteHasPrice => CompleteCorrectedPrice.HasValue && CompleteCorrectedPrice.Value > 0;
     public bool IsCompleteStale => CompleteOutcome?.Source == PriceLookupSource.Stale;
 
+    public bool CompleteHasError =>
+        CompleteOutcome != null && CompleteOutcome.HasError && !CompleteHasPrice;
+
+    public bool CompleteHasConfigurationHint =>
+        CompleteOutcome != null && CompleteOutcome.IsConfigurationHint && !CompleteHasPrice;
+
+    /// <summary>Gemeinsamer Hinweis-Text fuer Error- ODER Configuration-Banner.</summary>
+    public string? CompleteHintMessage => CompleteOutcome?.ErrorMessage;
+
+    public bool ShowCompleteIdleButton => !IsCompleteRequested;
+    public bool ShowCompleteLoadedContent =>
+        IsCompleteRequested && !IsCompleteLoading && CompleteHasPrice;
+    public bool ShowCompleteIssueBanner =>
+        IsCompleteRequested && !IsCompleteLoading
+        && (CompleteHasError || CompleteHasConfigurationHint);
+    public bool ShowCompleteRefreshIcon =>
+        IsCompleteRequested && !IsCompleteLoading && CompleteHasPrice;
+
     public string CompletePriceLabel => FormatMoney(CompleteCorrectedPrice);
 
-    /// <summary>
-    /// Tooltip auf dem Preis-Label - zeigt Roh + Korrigiert wenn unterschiedlich.
-    /// Bugfix Phase-8 #3.
-    /// </summary>
     public string? CompletePriceTooltip
     {
         get
@@ -148,10 +195,25 @@ public partial class MinifigPriceViewModel : ObservableObject
 
     public ObservableCollection<PartPriceRowViewModel> PartRows { get; } = new();
 
-    [ObservableProperty] private bool _isPartsLoading;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowPartsIdleButton))]
+    [NotifyPropertyChangedFor(nameof(ShowPartsLoadedContent))]
+    [NotifyPropertyChangedFor(nameof(ShowPartsRefreshIcon))]
+    private bool _isPartsRequested;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowPartsLoadedContent))]
+    [NotifyPropertyChangedFor(nameof(ShowPartsRefreshIcon))]
+    [NotifyPropertyChangedFor(nameof(PartsLoadingLabel))]
+    private bool _isPartsLoading;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PartsTotalLabel))]
+    [NotifyPropertyChangedFor(nameof(PartsHasAnyPrice))]
+    [NotifyPropertyChangedFor(nameof(ShowPartsLoadedContent))]
+    [NotifyPropertyChangedFor(nameof(ShowPartsRefreshIcon))]
+    [NotifyPropertyChangedFor(nameof(HasRecommendation))]
+    [NotifyPropertyChangedFor(nameof(RecommendationText))]
     private decimal _partsTotalSum;
 
     [ObservableProperty]
@@ -162,7 +224,43 @@ public partial class MinifigPriceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasPartsCorrectionHint))]
     private string? _partsCorrectionHint;
 
+    /// <summary>
+    /// Echter Top-Level-Fehler im Parts-Pfad (nicht pro Zeile - das laeuft
+    /// per row.Outcome.HasError). Tritt nur in seltenen Faellen auf
+    /// (z.B. Cancellation oder unerwartete Exception in LoadPartsAsync).
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PartsHasError))]
+    [NotifyPropertyChangedFor(nameof(ShowPartsIssueBanner))]
+    [NotifyPropertyChangedFor(nameof(ShowPartsLoadedContent))]
+    private string? _partsErrorMessage;
+
+    /// <summary>
+    /// Wenn der Provider nicht konfiguriert ist, kommt diese Meldung von
+    /// jeder Row gleich. Wir heben den Hinweis hier hoch, damit die Liste
+    /// kein "X Teile ohne Preis" zeigt sondern ein klareres Banner.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PartsHasConfigurationHint))]
+    [NotifyPropertyChangedFor(nameof(ShowPartsIssueBanner))]
+    [NotifyPropertyChangedFor(nameof(ShowPartsLoadedContent))]
+    private string? _partsConfigurationHint;
+
     public bool HasPartsCorrectionHint => !string.IsNullOrEmpty(PartsCorrectionHint);
+
+    public bool PartsHasAnyPrice => PartsTotalSum > 0m;
+    public bool PartsHasError => !string.IsNullOrEmpty(PartsErrorMessage);
+    public bool PartsHasConfigurationHint => !string.IsNullOrEmpty(PartsConfigurationHint);
+
+    public bool ShowPartsIdleButton => !IsPartsRequested;
+    public bool ShowPartsLoadedContent =>
+        IsPartsRequested && !IsPartsLoading
+        && !PartsHasError && !PartsHasConfigurationHint;
+    public bool ShowPartsIssueBanner =>
+        IsPartsRequested && !IsPartsLoading
+        && (PartsHasError || PartsHasConfigurationHint);
+    public bool ShowPartsRefreshIcon =>
+        IsPartsRequested && !IsPartsLoading && PartsHasAnyPrice;
 
     public string PartsTotalLabel => $"Summe: {FormatMoney(PartsTotalSum)}";
 
@@ -170,35 +268,37 @@ public partial class MinifigPriceViewModel : ObservableObject
         ? string.Empty
         : $"{PartsMissingCount} Teile ohne Preis";
 
+    public string PartsLoadingLabel
+        => $"Lade {_subsets.Count} Teile...";
+
+    /// <summary>Gemeinsame Hinweis-Message (Error oder Config) fuer den Parts-Banner.</summary>
+    public string? PartsHintMessage => PartsConfigurationHint ?? PartsErrorMessage;
+
     // ===== Empfehlung =====
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasRecommendation))]
-    private string? _recommendationText;
-
-    public bool HasRecommendation => !string.IsNullOrEmpty(RecommendationText);
-
     /// <summary>
-    /// Echter Fehler (rotes Banner): API nicht erreichbar, Token abgelaufen,
-    /// Exception im Provider. Plan B (Bugfix): wird aus dem Outcome
-    /// hochgehoben falls Source=None mit Notice=Error.
+    /// Empfehlung erscheint nur wenn BEIDE Bereiche erfolgreich geladen sind.
+    /// Solange einer noch idle / loading / error ist: keine Empfehlung.
     /// </summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasError))]
-    private string? _errorMessage;
+    public bool HasRecommendation
+        => CompleteHasPrice && PartsHasAnyPrice && !string.IsNullOrEmpty(RecommendationText);
 
-    public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
+    public string? RecommendationText
+    {
+        get
+        {
+            if (!CompleteCorrectedPrice.HasValue || PartsTotalSum <= 0m) return null;
+            var diff = CompleteCorrectedPrice.Value - PartsTotalSum;
+            var basis = Math.Max(CompleteCorrectedPrice.Value, PartsTotalSum);
+            var diffPct = basis > 0 ? Math.Abs(diff) / basis * 100m : 0m;
 
-    /// <summary>
-    /// Konfigurations-Hinweis (oranges Banner): Provider="None", BL-Token
-    /// fehlt. Plan B+C (Bugfix): andere Optik als der rote Fehler-Banner -
-    /// das ist kein Drama, der User muss nur noch zur Settings.
-    /// </summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasConfigurationHint))]
-    private string? _configurationHint;
-
-    public bool HasConfigurationHint => !string.IsNullOrEmpty(ConfigurationHint);
+            if (diffPct < RecommendationThresholdPercent)
+                return "Komplett und Einzelteile etwa gleich wert.";
+            return diff > 0
+                ? $"Komplett verkaufen lohnt sich mehr (+{FormatMoney(diff)})"
+                : $"Einzelteile verkaufen lohnt sich mehr (+{FormatMoney(-diff)})";
+        }
+    }
 
     public MinifigPriceViewModel(
         IBlPriceCacheService cache,
@@ -212,7 +312,7 @@ public partial class MinifigPriceViewModel : ObservableObject
         _subsets = subsets;
 
         // Pre-Fill der PartRows damit die UI sofort einen Skeleton zeigt
-        // und nicht zwischendurch einen leeren Zustand.
+        // sobald Auto-Mode den Load triggert oder der User klickt.
         foreach (var s in subsets)
         {
             PartRows.Add(new PartPriceRowViewModel
@@ -220,69 +320,97 @@ public partial class MinifigPriceViewModel : ObservableObject
                 PartNo = s.PartNo,
                 ColorId = s.ColorId,
                 PartName = s.PartName,
-                QuantityNeeded = s.QuantityNeeded,
-                IsLoading = true
+                QuantityNeeded = s.QuantityNeeded
             });
         }
-    }
 
-    /// <summary>
-    /// Startet das parallele Laden von Komplett-Figur + allen Subset-Teilen.
-    /// Stale-While-Revalidate steckt im Cache-Service - das VM sieht das nicht.
-    /// </summary>
-    public async Task LoadAsync(CancellationToken ct = default)
-    {
-        ErrorMessage = null;
-        ConfigurationHint = null;
-        IsCompleteLoading = true;
-        IsPartsLoading = true;
-
-        // Hint-Texte direkt setzen (auch wenn Korrektur=0 → leer).
-        // Bugfix Phase-8 #3.
+        // Korrektur-Hinweise vorab setzen (unabhaengig vom Lade-Modus).
         var cfg = _settings.Current.Prices;
         MinifigCorrectionHint = BuildCorrectionHint(cfg.CorrectionMinifigPercent);
-        PartsCorrectionHint = BuildCorrectionHint(cfg.CorrectionPartsPercent);
+        PartsCorrectionHint   = BuildCorrectionHint(cfg.CorrectionPartsPercent);
 
-        // Komplett-Figur (linke Haelfte) und alle Parts (rechte Haelfte)
-        // gleichzeitig laden - kein Warten aufeinander.
-        var completeTask = LoadCompleteAsync(ct);
-        var partsTask = LoadPartsAsync(ct);
-        await Task.WhenAll(completeTask, partsTask);
-
-        // Plan B: Outcome-Probleme an die UI durchreichen, damit der User
-        // weiss WARUM nichts kommt.
-        PromoteOutcomeNoticeToBanner(CompleteOutcome);
-
-        UpdateRecommendation();
+        // UX-Iteration X.10: Auto-Modes aus den Settings honorieren.
+        // Manuell wird einfach gar nichts getan - der Idle-Button bleibt
+        // sichtbar bis der User klickt. Tasks werden behalten damit Tests
+        // sauber awaiten koennen (Produktions-Code braucht das nicht).
+        if (cfg.AutoLoadCompletePrice == PriceLoadMode.Auto)
+            CompleteAutoLoadTask = LoadCompleteCoreAsync();
+        if (cfg.AutoLoadPartsPrice == PriceLoadMode.Auto)
+            PartsAutoLoadTask = LoadPartsCoreAsync();
     }
+
+    // ===== Public Commands (Klick-Handler) =====
 
     /// <summary>
-    /// Hebt eine Notice aus dem Outcome auf das passende View-Property.
-    /// - NotConfigured -&gt; ConfigurationHint (orange)
-    /// - Error         -&gt; ErrorMessage      (rot)
-    /// - None          -&gt; nichts tun
-    /// Plan B (Bugfix): bisher blieb der Outcome-ErrorMessage stumm,
-    /// dadurch sah der User nur eine leere Box.
+    /// Manuelles Laden der Komplett-Figur. Geht durch den ganz normalen
+    /// Cache-First-Pfad (Stale-While-Revalidate). KEIN Force-Refresh -
+    /// wenn der Cache einen frischen Eintrag hat, wird gar keine API-Call
+    /// gemacht.
     /// </summary>
-    private void PromoteOutcomeNoticeToBanner(PriceLookupOutcome? outcome)
-    {
-        if (outcome == null) return;
-        if (outcome.HasPrice) return; // Preis vorhanden -&gt; kein Banner.
+    [RelayCommand]
+    public Task LoadCompleteAsync(CancellationToken ct = default)
+        => LoadCompleteCoreAsync(ct);
 
-        if (outcome.IsConfigurationHint)
+    /// <summary>Manuelles Laden der Einzelteile-Liste. Cache-First, dann Provider.</summary>
+    [RelayCommand]
+    public Task LoadPartsAsync(CancellationToken ct = default)
+        => LoadPartsCoreAsync(ct);
+
+    /// <summary>
+    /// Force-Refresh der Komplett-Figur: loescht den Cache-Eintrag fuer die
+    /// aktuelle GuideType+Region+Currency-Kombination und triggert einen
+    /// Live-Call. Nur sichtbar wenn schon Daten geladen sind (kein blinder
+    /// Refresh im leeren Zustand).
+    /// </summary>
+    [RelayCommand]
+    public async Task RefreshCompleteAsync()
+    {
+        if (IsCompleteLoading) return;
+        try
         {
-            ConfigurationHint = outcome.ErrorMessage;
+            await _cache.DeleteMinifigPriceAsync(_blMinifigId);
+            ResetCompleteState();
+            await LoadCompleteCoreAsync();
         }
-        else if (outcome.HasError)
+        catch (Exception ex)
         {
-            ErrorMessage = outcome.ErrorMessage;
+            Log.Warning(ex, "MinifigPriceVM: RefreshComplete fehlgeschlagen");
+            CompleteOutcome = new PriceLookupOutcome(
+                null, PriceLookupSource.None, null, $"Refresh fehlgeschlagen: {ex.Message}",
+                PriceLookupNotice.Error);
         }
     }
 
-    private async Task LoadCompleteAsync(CancellationToken ct)
+    /// <summary>Force-Refresh der Einzelteile-Liste.</summary>
+    [RelayCommand]
+    public async Task RefreshPartsAsync()
     {
+        if (IsPartsLoading) return;
         try
         {
+            var subsetSpecs = _subsets.Select(s => (s.PartNo, s.ColorId)).ToList();
+            await _cache.DeletePartPricesAsync(subsetSpecs);
+            ResetPartsState();
+            await LoadPartsCoreAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "MinifigPriceVM: RefreshParts fehlgeschlagen");
+            PartsErrorMessage = $"Refresh fehlgeschlagen: {ex.Message}";
+        }
+    }
+
+    // ===== Internals =====
+
+    private async Task LoadCompleteCoreAsync(CancellationToken ct = default)
+    {
+        IsCompleteRequested = true;
+        IsCompleteLoading = true;
+        try
+        {
+            // Cache-First, dann Provider - der IBlPriceCacheService kapselt
+            // Stale-While-Revalidate. Der Auto/Manual-Modus aendert nur
+            // WANN dieser Aufruf stattfindet, NICHT was er macht.
             CompleteOutcome = await _cache.GetMinifigPriceAsync(_blMinifigId, ct);
             ApplyCompleteOutcomeToView(CompleteOutcome);
         }
@@ -300,10 +428,6 @@ public partial class MinifigPriceViewModel : ObservableObject
         }
     }
 
-    /// <summary>
-    /// Komputiert Roh- + Korrigiert-Werte fuer die Komplett-Figur basierend
-    /// auf cfg.PriceColumn und cfg.CorrectionMinifigPercent. Bugfix Phase-8 #3.
-    /// </summary>
     private void ApplyCompleteOutcomeToView(PriceLookupOutcome? outcome)
     {
         var cfg = _settings.Current.Prices;
@@ -319,21 +443,35 @@ public partial class MinifigPriceViewModel : ObservableObject
         CompleteCorrectedMax = PriceMath.ApplyCorrection(p?.MaxPrice, cfg.CorrectionMinifigPercent);
     }
 
-    private async Task LoadPartsAsync(CancellationToken ct)
+    private async Task LoadPartsCoreAsync(CancellationToken ct = default)
     {
+        IsPartsRequested = true;
+        IsPartsLoading = true;
+        PartsErrorMessage = null;
+        PartsConfigurationHint = null;
         try
         {
             var cfg = _settings.Current.Prices;
             // Pro Teile-Zeile parallel den Preis ueber den Cache holen.
-            // Wir setzen das Ergebnis direkt in die jeweilige Zeile statt
-            // erst alle zu sammeln - so sieht die UI Werte progressiv.
+            // Cache-First-Pfad pro Row - identisch zur Komplett-Haelfte.
             var rowTasks = PartRows.Select(async row =>
             {
+                row.IsLoading = true;
                 try
                 {
                     var outcome = await _cache.GetPartPriceAsync(row.PartNo, row.ColorId, ct);
                     row.Outcome = outcome;
                     ApplyPartOutcomeToRow(row, outcome, cfg);
+
+                    // Ein Configuration-Hint von einer Row ist universell -
+                    // alle Rows wuerden denselben sehen. Wir ziehen den nach
+                    // oben damit die UI ein einziges grosses Banner zeigt
+                    // statt N redundante "—".
+                    if (outcome != null && outcome.IsConfigurationHint
+                        && PartsConfigurationHint == null)
+                    {
+                        PartsConfigurationHint = outcome.ErrorMessage;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -354,16 +492,17 @@ public partial class MinifigPriceViewModel : ObservableObject
 
             RecalculatePartsTotal();
         }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "MinifigPriceVM: LoadParts geworfen");
+            PartsErrorMessage = ex.Message;
+        }
         finally
         {
             IsPartsLoading = false;
         }
     }
 
-    /// <summary>
-    /// Komputiert Roh- + Korrigiert-Werte fuer eine einzelne Teile-Zeile.
-    /// Bugfix Phase-8 #3.
-    /// </summary>
     private static void ApplyPartOutcomeToRow(
         PartPriceRowViewModel row, PriceLookupOutcome? outcome, PriceSettings cfg)
     {
@@ -378,8 +517,6 @@ public partial class MinifigPriceViewModel : ObservableObject
         int missing = 0;
         foreach (var row in PartRows)
         {
-            // Bugfix Phase-8 #3: Summe operiert auf den korrigierten Werten,
-            // nicht mehr auf dem alten "AvgPrice ?? QtyAvgPrice"-Pfad.
             var unit = row.UnitPriceCorrected;
             if (unit.HasValue && unit.Value > 0)
             {
@@ -394,94 +531,33 @@ public partial class MinifigPriceViewModel : ObservableObject
         PartsMissingCount = missing;
     }
 
-    /// <summary>
-    /// Empfehlung "Komplett verkaufen lohnt sich mehr (+X,XX €)" /
-    /// "Einzelteile verkaufen lohnt sich mehr (+X,XX €)" / "etwa gleich".
-    /// Nur wenn beide Seiten Daten haben. Operiert auf den **korrigierten**
-    /// Werten - sonst waere die Empfehlung von den User-Korrekturen
-    /// entkoppelt.
-    /// </summary>
-    private void UpdateRecommendation()
+    private void ResetCompleteState()
     {
-        var completeAvg = CompleteCorrectedPrice;
-        var partsTotal = PartsTotalSum;
-
-        if (!completeAvg.HasValue || partsTotal <= 0m)
-        {
-            RecommendationText = null;
-            return;
-        }
-
-        var diff = completeAvg.Value - partsTotal;
-        var basis = Math.Max(completeAvg.Value, partsTotal);
-        var diffPct = basis > 0 ? Math.Abs(diff) / basis * 100m : 0m;
-
-        if (diffPct < RecommendationThresholdPercent)
-        {
-            RecommendationText = "Komplett und Einzelteile etwa gleich wert.";
-        }
-        else if (diff > 0)
-        {
-            RecommendationText = $"Komplett verkaufen lohnt sich mehr (+{FormatMoney(diff)})";
-        }
-        else
-        {
-            RecommendationText = $"Einzelteile verkaufen lohnt sich mehr (+{FormatMoney(-diff)})";
-        }
+        CompleteOutcome = null;
+        CompleteRawPrice = null;
+        CompleteCorrectedPrice = null;
+        CompleteRawMin = null;
+        CompleteRawMax = null;
+        CompleteCorrectedMin = null;
+        CompleteCorrectedMax = null;
     }
 
-    /// <summary>
-    /// Pro-Eintrag-Refresh ueber den ↻-Button: loescht den Cache fuer diese
-    /// Figur + alle Subset-Teile und laed neu. In-Flight-Schutz im Service
-    /// verhindert dass paralleles Klicken Doppel-API-Calls ausloest.
-    /// </summary>
-    [RelayCommand]
-    public async Task RefreshAsync()
+    private void ResetPartsState()
     {
-        // Wenn gerade noch ein Load laeuft, ignorieren wir den Klick - der
-        // In-Flight-Schutz im Cache-Service wuerde sowieso nichts doppelt
-        // machen, aber so bleibt das UI konsistent.
-        if (IsCompleteLoading || IsPartsLoading) return;
-
-        try
+        foreach (var row in PartRows)
         {
-            var subsetSpecs = _subsets.Select(s => (s.PartNo, s.ColorId)).ToList();
-            await _cache.DeleteForMinifigAsync(_blMinifigId, subsetSpecs);
-
-            // PartRows resetten auf Loading-Zustand.
-            foreach (var row in PartRows)
-            {
-                row.Outcome = null;
-                row.UnitPriceRaw = null;
-                row.UnitPriceCorrected = null;
-                row.IsLoading = true;
-            }
-            CompleteOutcome = null;
-            CompleteRawPrice = null;
-            CompleteCorrectedPrice = null;
-            CompleteRawMin = null;
-            CompleteRawMax = null;
-            CompleteCorrectedMin = null;
-            CompleteCorrectedMax = null;
-            PartsTotalSum = 0m;
-            PartsMissingCount = 0;
-            RecommendationText = null;
-
-            await LoadAsync();
+            row.Outcome = null;
+            row.UnitPriceRaw = null;
+            row.UnitPriceCorrected = null;
         }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "MinifigPriceVM: Refresh fehlgeschlagen");
-            ErrorMessage = $"Refresh fehlgeschlagen: {ex.Message}";
-        }
+        PartsTotalSum = 0m;
+        PartsMissingCount = 0;
+        PartsErrorMessage = null;
+        PartsConfigurationHint = null;
     }
 
     // ===== Helpers =====
 
-    /// <summary>
-    /// Baut den UI-Hinweis "Inkl. -10% Korrektur". Bei Korrektur=0 leerer
-    /// String, damit der TextBlock unsichtbar bleibt.
-    /// </summary>
     private static string BuildCorrectionHint(decimal correctionPercent)
     {
         if (correctionPercent == 0m) return string.Empty;
@@ -489,14 +565,12 @@ public partial class MinifigPriceViewModel : ObservableObject
         return $"Inkl. {sign}{correctionPercent:0.#}% Korrektur";
     }
 
-    /// <summary>"12,34 €" / "—" wenn null.</summary>
     private static string FormatMoney(decimal? value)
     {
         if (!value.HasValue || value.Value <= 0) return "—";
         return value.Value.ToString("N2", CultureInfo.GetCultureInfo("de-DE")) + " €";
     }
 
-    /// <summary>"Daten vom 03.05.2026" / leer wenn null.</summary>
     private static string FormatFetchedAt(DateTime? utc)
         => utc.HasValue
             ? "Daten vom " + utc.Value.ToLocalTime().ToString("dd.MM.yyyy")
@@ -513,15 +587,9 @@ public partial class PartPriceRowViewModel : ObservableObject
 
     [ObservableProperty] private bool _isLoading;
 
-    /// <summary>Roh-Outcome aus dem Cache-Service. Wird vom Parent gesetzt.</summary>
     [ObservableProperty]
     private PriceLookupOutcome? _outcome;
 
-    /// <summary>
-    /// Roh-Wert (vor Korrektur) der gerade aktiven PriceColumn. Vom Parent
-    /// gesetzt damit die Row nichts ueber Settings wissen muss.
-    /// Bugfix Phase-8 #3.
-    /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UnitPriceLabel))]
     [NotifyPropertyChangedFor(nameof(SubtotalLabel))]
@@ -529,7 +597,6 @@ public partial class PartPriceRowViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasPrice))]
     private decimal? _unitPriceRaw;
 
-    /// <summary>Korrigierter Wert (nach CorrectionPartsPercent).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UnitPrice))]
     [NotifyPropertyChangedFor(nameof(UnitPriceLabel))]
@@ -538,10 +605,6 @@ public partial class PartPriceRowViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasPrice))]
     private decimal? _unitPriceCorrected;
 
-    /// <summary>
-    /// Was das Parent-VM aufsummiert. Identisch zu UnitPriceCorrected -
-    /// als Property fuer eventuelle externe Konsumenten exponiert.
-    /// </summary>
     public decimal? UnitPrice => UnitPriceCorrected;
 
     public bool HasPrice => UnitPriceCorrected.HasValue && UnitPriceCorrected.Value > 0;
@@ -567,10 +630,6 @@ public partial class PartPriceRowViewModel : ObservableObject
         }
     }
 
-    /// <summary>
-    /// Tooltip auf der Subtotal-Zelle: "Roh: X € • Korrigiert: Y €"
-    /// nur wenn Korrektur tatsaechlich greift.
-    /// </summary>
     public string? UnitPriceTooltip
     {
         get

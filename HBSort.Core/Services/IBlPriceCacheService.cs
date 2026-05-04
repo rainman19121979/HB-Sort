@@ -41,10 +41,27 @@ public interface IBlPriceCacheService
     /// Pro-Eintrag-Refresh: loescht den Cache-Eintrag fuer Komplett-Figur
     /// + alle uebergebenen Subset-Teile, sodass die naechsten Aufrufe von
     /// GetMinifigPriceAsync/GetPartPriceAsync live in die API gehen.
-    /// Subset-Spezifikation: (PartNo, ColorId)-Paare.
+    /// Subset-Spezifikation: (PartNo, ColorId)-Paare. Convenience - ruft
+    /// intern <see cref="DeleteMinifigPriceAsync"/> + <see cref="DeletePartPricesAsync"/>.
     /// </summary>
     Task DeleteForMinifigAsync(
         string blMinifigId,
+        IReadOnlyList<(string PartNo, int ColorId)> subsetParts,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// UX-Iteration X.10: nur die Komplett-Figur aus dem Cache loeschen.
+    /// Wird vom Refresh-Icon der Komplett-Haelfte in MinifigPriceView genutzt.
+    /// Aktiviert die GuideType/Region/Currency-Settings live aus
+    /// AppSettings.Prices fuer den Loesch-Schluessel.
+    /// </summary>
+    Task DeleteMinifigPriceAsync(string blMinifigId, CancellationToken ct = default);
+
+    /// <summary>
+    /// UX-Iteration X.10: nur die Einzelteil-Eintraege aus dem Cache loeschen.
+    /// Wird vom Refresh-Icon der Einzelteile-Haelfte in MinifigPriceView genutzt.
+    /// </summary>
+    Task DeletePartPricesAsync(
         IReadOnlyList<(string PartNo, int ColorId)> subsetParts,
         CancellationToken ct = default);
 

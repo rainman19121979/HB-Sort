@@ -18,6 +18,14 @@
   <!-- Referenz auf das Core-Projekt, damit wir Services testen können -->
   <ItemGroup>
     <ProjectReference Include="..\HBSort.Core\HBSort.Core.csproj" />
+    <!--
+      UX-Iteration X.10: zusaetzlich auf das WPF-Hauptprojekt referenzieren
+      damit der MinifigPriceViewModel testbar wird (Auto/Manual-Trigger,
+      Cache-Hit-vermeidet-API-Call etc.). Das Hauptprojekt ist WinExe; eine
+      ProjectReference ist trotzdem erlaubt - wir testen nur Klassen aus
+      ViewModels/, kein Window-Code.
+    -->
+    <ProjectReference Include="..\HBSort\HBSort.csproj" />
   </ItemGroup>
 
   <ItemGroup>

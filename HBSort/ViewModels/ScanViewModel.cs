@@ -807,9 +807,12 @@ public partial class ScanViewModel : ObservableObject
                     QuantityNeeded: p.Quantity,
                     PartName: p.PartName))
                 .ToList();
+            // UX-Iteration X.10: das VM startet im Konstruktor ggf. den
+            // Auto-Load (je nach Settings.Prices.AutoLoadCompletePrice und
+            // .AutoLoadPartsPrice). Im Manual-Modus passiert nichts bis der
+            // User auf "Preis laden" klickt - dann triggert die View den
+            // entsprechenden Command direkt am VM.
             PriceInfo = new MinifigPriceViewModel(_priceCache, _settingsService, bricklinkId, priceSubsets);
-            // Fire-and-forget; das VM hat eigene IsLoading-Flags.
-            _ = PriceInfo.LoadAsync();
 
             if (subsets.Count == 0)
             {
