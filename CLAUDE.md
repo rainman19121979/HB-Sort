@@ -1120,6 +1120,89 @@ einem Build vor UX X.6.
   (Box 002, Box 005, Box 008)"). Helper-Methode `BuildReleaseBinsLabel`.
 - Singular/Plural je nach Anzahl korrekt formuliert.
 
+#### Audit-Restwelle (UX-Iteration X.17, 2026-05-04)
+
+Folge-Iteration zu UX X.16. Alle in der Vorrunde aufgeschobenen Audit-
+Findings sind jetzt abgearbeitet.
+
+**Kritisch:**
+- **K-2** Memory-Leak-Pattern an 4 Singleton-VMs behoben:
+  `BuildSuggestionsViewModel`, `LiveStatsViewModel`,
+  `WaitingDetailViewModel`, `RecentScansViewModel` implementieren jetzt
+  `IDisposable` mit Field-basierter Subscription. ServiceProvider-Dispose
+  in `App.xaml.cs::OnExit` ruft `Dispose()` automatisch.
+  Tests: 4 neue in `SingletonViewModelDisposeTests.cs` mit Subscriber-
+  Counter-Stub.
+
+**Wichtig:**
+- **W-5** `MinifigPersistenceService.PersistAndStoreAsync` ist jetzt mit
+  10 Theory-/Fact-Tests abgedeckt (Match-Szenarien, Auto-Complete,
+  Bin-Zuweisung, DailyStats-Increment, ScanEvent-Audit, Capping,
+  Missing-Bin-Throw).
+- **W-6** Tests fuer `PartLookupService` (15 neue: AddPartToFloating-
+  Stack, Assign/Unassign, FindFloatingLocations, Delete) und
+  `BricklinkApiPriceProvider` (7 neue: Konfiguration, Cache-First,
+  TTL-Routing M/P, Rate-Limit-Stale-Fallback). BlBulkImportService
+  bewusst weggelassen (HTTP+ZIP+XML-Mock-Aufwand disproportional).
+- **W-7** `NullToImageSourceConverter` baut Bilder jetzt explizit mit
+  `BitmapCacheOption.OnLoad` + `Freeze()` statt auf den WPF-Default-
+  TypeConverter zu fallen. Damit lockt ein gerendertes Bild nicht
+  mehr seine Disk-Datei. Plus Try-Catch fuer ungueltige URLs.
+  Tests: 6 neue mit Beweis dass die Datei direkt nach Convert
+  loeschbar ist.
+- **W-8** `PriceSettings.CacheDays` entfernt. Provider liest jetzt die
+  passenden TTL-Felder pro Item-Typ
+  (`BlPriceCacheTtlMinifigDays`/`BlPriceCacheTtlPartDays`). Alte
+  settings.json mit `CacheDays`-Eintrag laedt weiterhin sauber
+  (System.Text.Json ignoriert unbekannte Felder); 3 neue Tests
+  sichern die Migration ab.
+- **W-11** `ScanResultCard` hat keine `System.Windows.Media`-Imports
+  mehr. Brush-Property durch `IsTopHit`-bool ersetzt; XAML setzt die
+  visuellen Stile via `DataTrigger`.
+
+**Mittel:**
+- **M-2/M-3** DateTime-UTC-Vereinheitlichung. `DailyStats.Date`,
+  `LiveStatsViewModel`-Lookup, `SettingsViewModel`-Statistik-Filter
+  und `BricklinkRateLimiter`-CallsToday nutzen jetzt durchgaengig
+  `DateTime.UtcNow.Date`. `BrickognizeClient` Filename- + Trace-
+  Stempel auf UTC. User-facing Filenamen (BSX/Wanted-Export) +
+  Toast-CreatedAt bewusst lokal belassen.
+  Migration-Hinweis: alte DailyStats-Eintraege im lokalen Schema
+  bleiben as-is (max. ein Tag versetzt bei Zeitzonen-Wechsel,
+  fuer Einzel-User-Desktop praktisch irrelevant).
+- **M-8** `MigrateLegacyAppDataIfNeeded` ist jetzt async, Aufruf in
+  `Application_Startup` mit `await`. Praktisch egal (laeuft einmalig
+  vor App-Start), aber konsistent mit dem Rest der File-IO-Konvention.
+- **M-10** Zwei dokumentierte TODOs (`BlPriceCacheService:27`,
+  `HelpViewModel:24`) auf das einheitliche Format
+  "TODO 2026-05 (Kategorie): ..." gebracht.
+- **M-11** Verifiziert: das DB-Doppelfeld `BricklinkColorId` ist seit
+  Migration `20260503110017_RemoveBricklinkColorIdField` (2026-05-03)
+  bereits weg. Verbleibende `BricklinkColorId`-Properties sind
+  Input-DTO-Felder (`PendingPart`, `PersistMinifigPart`) - bewusste
+  Naming-Konvention damit der Caller weiss "hier BL-IDs erwartet".
+- **M-12** `BinNameGeneratorTests` konsolidiert: 14 `[Fact]`-Tests
+  -> 7 Theories mit insgesamt 33 InlineData-Cases. Lesbarer und
+  einfacher um Edge-Cases zu erweitern.
+
+**Nice-to-have:**
+- **N-1** Acht `CornerRadius="3"`-Stellen auf `4` vereinheitlicht
+  (App-Standard). `CornerRadius="6"` an MainWindow Status-Bar +
+  ZoomOverlayHost bleibt - groesserer Container.
+- **N-2** ImageZoom-Anpassung war ein False Positive im Audit -
+  PartLookupView hat den Behavior bereits an allen Image-Elementen.
+  RecentScansView zeigt nur Text-Eintraege (kein Image-Element),
+  daher nicht relevant.
+- **N-3..N-8** Kein Code-Change (siehe Audit-Report-Begruendungen).
+
+**Test-Coverage**: 305/305 Tests gruen (vorher 244 nach UX X.16 +
+61 neue in dieser Iteration).
+
+**Damit ist der CODE_AUDIT_REPORT.md-Backlog komplett abgearbeitet.**
+Verbleibende Audit-Hinweise sind alle bewusste Konventionen (z.B.
+keine Migration der alten DailyStats-Daten), die im Code-Kommentar
+oder hier dokumentiert sind.
+
 #### Audit-Aufraeum-Welle (UX-Iteration X.16, 2026-05-04)
 
 Folge-Iteration zum CODE_AUDIT_REPORT.md (Audit-Stand
