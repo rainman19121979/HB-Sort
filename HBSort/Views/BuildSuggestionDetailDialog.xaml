@@ -54,7 +54,7 @@
 
         <!-- Verfuegbarkeits-Banner -->
         <Border Grid.Row="1"
-                Background="#E3F2FD" BorderBrush="#1976D2"
+                Background="{StaticResource InfoBoxBackground}" BorderBrush="{StaticResource StatusInfoBrush}"
                 BorderThickness="1" CornerRadius="4"
                 Padding="10" Margin="0,0,0,12">
             <TextBlock Text="{Binding AvailabilityLabel}" FontSize="13"/>
@@ -86,10 +86,10 @@
                                                FontWeight="SemiBold">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
-                                                <Setter Property="Foreground" Value="#E65100"/>
+                                                <Setter Property="Foreground" Value="{StaticResource StatusWarningBrush}"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsFullyAvailable}" Value="True">
-                                                        <Setter Property="Foreground" Value="#2E7D32"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource StatusSuccessBrush}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>

@@ -173,7 +173,7 @@
         <!-- Cleanup-Block (nach Export sichtbar) -->
         <Border Grid.Row="4" x:Name="CleanupPanel"
                 Visibility="Collapsed"
-                Background="#E8F5E9" BorderBrush="#2E7D32"
+                Background="{StaticResource SuccessBoxBackground}" BorderBrush="{StaticResource StatusSuccessBrush}"
                 BorderThickness="1" CornerRadius="4"
                 Padding="12" Margin="0,12,0,0">
             <StackPanel>

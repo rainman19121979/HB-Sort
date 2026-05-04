@@ -62,7 +62,7 @@
                     <Style TargetType="Border" BasedOn="{StaticResource PriceWinnerBorderStyle}">
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsCompleteWinning}" Value="True">
-                                <Setter Property="Background" Value="#E8F5E9"/>
+                                <Setter Property="Background" Value="{StaticResource SuccessBoxBackground}"/>
                                 <Setter Property="ToolTip" Value="Diese Variante bringt aktuell mehr"/>
                             </DataTrigger>
                         </Style.Triggers>
@@ -144,7 +144,7 @@
                                    FontStyle="Italic" Margin="0,4,0,0"/>
                         <!-- Stale-Marker -->
                         <TextBlock Text="↻ Update laeuft im Hintergrund..."
-                                   FontSize="10" Foreground="#E65100"
+                                   FontSize="10" Foreground="{StaticResource StatusWarningBrush}"
                                    FontStyle="Italic"
                                    Visibility="{Binding IsCompleteStale,
                                         Converter={StaticResource BoolToVisibility}}"/>
@@ -158,21 +158,21 @@
                     <StackPanel VerticalAlignment="Center"
                                 Visibility="{Binding ShowCompleteIssueBanner,
                                     Converter={StaticResource BoolToVisibility}}">
-                        <Border Background="#FFF3E0" BorderBrush="#E65100"
+                        <Border Background="{StaticResource WarningBoxBackground}" BorderBrush="{StaticResource StatusWarningBrush}"
                                 BorderThickness="1" CornerRadius="4" Padding="8,4"
                                 Visibility="{Binding CompleteHasConfigurationHint,
                                     Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="{Binding CompleteHintMessage}"
                                        FontSize="11" TextWrapping="Wrap"
-                                       Foreground="#E65100"/>
+                                       Foreground="{StaticResource StatusWarningBrush}"/>
                         </Border>
-                        <Border Background="#FFEBEE" BorderBrush="#C62828"
+                        <Border Background="{StaticResource ErrorBoxBackground}" BorderBrush="{StaticResource StatusErrorBrush}"
                                 BorderThickness="1" CornerRadius="4" Padding="8,4"
                                 Visibility="{Binding CompleteHasError,
                                     Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="{Binding CompleteHintMessage}"
                                        FontSize="11" TextWrapping="Wrap"
-                                       Foreground="#C62828"/>
+                                       Foreground="{StaticResource StatusErrorBrush}"/>
                         </Border>
                         <Button Content="Erneut versuchen"
                                 Command="{Binding LoadCompleteCommand}"
@@ -192,7 +192,7 @@
                     <Style TargetType="Border" BasedOn="{StaticResource PriceWinnerBorderStyle}">
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsPartsWinning}" Value="True">
-                                <Setter Property="Background" Value="#E8F5E9"/>
+                                <Setter Property="Background" Value="{StaticResource SuccessBoxBackground}"/>
                                 <Setter Property="ToolTip" Value="Diese Variante bringt aktuell mehr"/>
                             </DataTrigger>
                         </Style.Triggers>
@@ -293,7 +293,7 @@
                                            FontSize="14" FontWeight="SemiBold"/>
                             </Border>
                             <TextBlock Text="{Binding PartsMissingLabel}"
-                                       FontSize="10" Foreground="#E65100"
+                                       FontSize="10" Foreground="{StaticResource StatusWarningBrush}"
                                        FontStyle="Italic"/>
                         </StackPanel>
                     </Grid>
@@ -302,21 +302,21 @@
                     <StackPanel VerticalAlignment="Center"
                                 Visibility="{Binding ShowPartsIssueBanner,
                                     Converter={StaticResource BoolToVisibility}}">
-                        <Border Background="#FFF3E0" BorderBrush="#E65100"
+                        <Border Background="{StaticResource WarningBoxBackground}" BorderBrush="{StaticResource StatusWarningBrush}"
                                 BorderThickness="1" CornerRadius="4" Padding="8,4"
                                 Visibility="{Binding PartsHasConfigurationHint,
                                     Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="{Binding PartsHintMessage}"
                                        FontSize="11" TextWrapping="Wrap"
-                                       Foreground="#E65100"/>
+                                       Foreground="{StaticResource StatusWarningBrush}"/>
                         </Border>
-                        <Border Background="#FFEBEE" BorderBrush="#C62828"
+                        <Border Background="{StaticResource ErrorBoxBackground}" BorderBrush="{StaticResource StatusErrorBrush}"
                                 BorderThickness="1" CornerRadius="4" Padding="8,4"
                                 Visibility="{Binding PartsHasError,
                                     Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="{Binding PartsHintMessage}"
                                        FontSize="11" TextWrapping="Wrap"
-                                       Foreground="#C62828"/>
+                                       Foreground="{StaticResource StatusErrorBrush}"/>
                         </Border>
                         <Button Content="Erneut versuchen"
                                 Command="{Binding LoadPartsCommand}"

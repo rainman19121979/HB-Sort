@@ -485,7 +485,7 @@
                                          Text="{Binding PriceCorrectionMinifigPercent, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}"/>
                                 <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
                                            Text="{Binding MinifigPreviewLabel}"
-                                           Foreground="#1976D2" FontStyle="Italic"
+                                           Foreground="{StaticResource StatusInfoBrush}" FontStyle="Italic"
                                            FontSize="11" Margin="0,0,0,8"/>
 
                                 <TextBlock Grid.Row="2" Grid.Column="0" Text="Einzelteile-Summe (%):"
@@ -494,7 +494,7 @@
                                          Text="{Binding PriceCorrectionPartsPercent, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}"/>
                                 <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2"
                                            Text="{Binding PartsPreviewLabel}"
-                                           Foreground="#1976D2" FontStyle="Italic"
+                                           Foreground="{StaticResource StatusInfoBrush}" FontStyle="Italic"
                                            FontSize="11"/>
                             </Grid>
 
@@ -550,7 +550,7 @@
                                        Text="(Cache-Gueltigkeit + Cache-Verwaltung: siehe Tab &quot;Cache&quot;.)"/>
                         </StackPanel>
 
-                        <Border Background="#E3F2FD" BorderBrush="#1976D2"
+                        <Border Background="{StaticResource InfoBoxBackground}" BorderBrush="{StaticResource StatusInfoBrush}"
                                 BorderThickness="1" CornerRadius="4"
                                 Padding="12" Margin="0,16,0,0"
                                 Visibility="{Binding IsPriceProviderNone, Converter={StaticResource BoolToVisibility}}">
@@ -569,7 +569,7 @@
                                    FontSize="15" FontWeight="SemiBold"
                                    Margin="0,0,0,4"/>
 
-                        <Border Background="#FFF3E0" BorderBrush="#E65100"
+                        <Border Background="{StaticResource WarningBoxBackground}" BorderBrush="{StaticResource StatusWarningBrush}"
                                 BorderThickness="1" CornerRadius="4"
                                 Padding="12" Margin="0,4,0,12">
                             <TextBlock TextWrapping="Wrap" FontSize="12">
@@ -1054,7 +1054,7 @@
                         </TextBlock>
 
                         <!-- Hint-Box: erklaert wo der Export ausgeloest wird. -->
-                        <Border Background="#E3F2FD" BorderBrush="#1976D2"
+                        <Border Background="{StaticResource InfoBoxBackground}" BorderBrush="{StaticResource StatusInfoBrush}"
                                 BorderThickness="1" CornerRadius="4"
                                 Padding="12" Margin="0,16,0,0">
                             <TextBlock TextWrapping="Wrap" FontSize="12">
@@ -1111,7 +1111,7 @@
                                                HorizontalAlignment="Center"/>
                                     <TextBlock Text="{Binding StatsCompletedCount}"
                                                FontSize="32" FontWeight="SemiBold"
-                                               Foreground="#2E7D32"
+                                               Foreground="{StaticResource StatusSuccessBrush}"
                                                HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Border>
@@ -1122,7 +1122,7 @@
                                                HorizontalAlignment="Center"/>
                                     <TextBlock Text="{Binding StatsDismantledCount}"
                                                FontSize="32" FontWeight="SemiBold"
-                                               Foreground="#E65100"
+                                               Foreground="{StaticResource StatusWarningBrush}"
                                                HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Border>
@@ -1147,10 +1147,10 @@
                             <TextBlock Grid.Row="0" Grid.Column="1"
                                        Text="{Binding CurrentWaitingCount}" FontWeight="SemiBold"/>
                             <TextBlock Grid.Row="1" Grid.Column="0" Text="Komplette Figuren"
-                                       Foreground="#2E7D32"/>
+                                       Foreground="{StaticResource StatusSuccessBrush}"/>
                             <TextBlock Grid.Row="1" Grid.Column="1"
                                        Text="{Binding CurrentCompleteCount}" FontWeight="SemiBold"
-                                       Foreground="#2E7D32"/>
+                                       Foreground="{StaticResource StatusSuccessBrush}"/>
                             <TextBlock Grid.Row="2" Grid.Column="0" Text="Floating-Parts (lose)"/>
                             <TextBlock Grid.Row="2" Grid.Column="1"
                                        Text="{Binding CurrentFloatingCount}" FontWeight="SemiBold"/>
@@ -1163,7 +1163,7 @@
                              Tab "Export" (besser auffindbar). Hier nur noch der Hinweis. -->
 
                         <!-- Hint -->
-                        <Border Background="#E3F2FD" BorderBrush="#1976D2"
+                        <Border Background="{StaticResource InfoBoxBackground}" BorderBrush="{StaticResource StatusInfoBrush}"
                                 BorderThickness="1" CornerRadius="4"
                                 Padding="12" Margin="0,16,0,0">
                             <TextBlock TextWrapping="Wrap" FontSize="12">
@@ -1221,7 +1221,7 @@
                         </TextBlock>
 
                         <!-- Markenrechte -->
-                        <Border Background="#FFF3E0" BorderBrush="#E65100"
+                        <Border Background="{StaticResource WarningBoxBackground}" BorderBrush="{StaticResource StatusWarningBrush}"
                                 BorderThickness="1" CornerRadius="4"
                                 Padding="12" Margin="0,0,0,12">
                             <StackPanel>

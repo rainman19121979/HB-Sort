@@ -52,7 +52,7 @@
 
                 <!-- Phase 6: KOMPLETT-Badge bei Status=Complete -->
                 <TextBlock Text="✓ KOMPLETT"
-                           Foreground="#2E7D32" FontWeight="Bold" FontSize="14"
+                           Foreground="{StaticResource StatusSuccessBrush}" FontWeight="Bold" FontSize="14"
                            Visibility="{Binding IsComplete, Converter={StaticResource BoolToVisibility}}"
                            Margin="0,4,0,0"/>
             </StackPanel>
@@ -162,7 +162,7 @@
                            Visibility="{Binding IsLoadingPrices, Converter={StaticResource BoolToVisibility}}"/>
 
                 <!-- Fehler-Anzeige -->
-                <TextBlock Text="{Binding PriceErrorText}" Foreground="#C62828" FontSize="11"
+                <TextBlock Text="{Binding PriceErrorText}" Foreground="{StaticResource StatusErrorBrush}" FontSize="11"
                            TextWrapping="Wrap" Margin="0,0,0,4"/>
 
                 <!-- Daten-Anzeige -->

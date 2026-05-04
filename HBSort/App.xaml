@@ -42,6 +42,39 @@
             <converters:RateLimitStateToBrushConverter x:Key="RateLimitStateToBrush"/>
 
             <!--
+                Status-Brushes (Audit W-4, 2026-05-04):
+                Material-Design-inspirierte Farben fuer einheitliche Status-
+                Anzeige (Komplett, Wartend, Fehler, Info). Vorher waren die
+                Hex-Werte 5x/4x/3x/3x in einzelnen Views hardcoded.
+
+                Verwendung:
+                - StatusSuccessBrush (#2E7D32, dunkelgruen): Komplett, Erfolg,
+                  positive Bestaetigung. Foreground-Farbe.
+                - StatusWarningBrush (#E65100, dunkelorange): Wartend, Stale,
+                  Hinweis. Foreground-Farbe.
+                - StatusErrorBrush (#C62828, dunkelrot): Fehler, kritischer
+                  Status. Foreground-Farbe.
+                - StatusInfoBrush (#1976D2, dunkelblau): Info, Hinweis.
+                  Foreground-Farbe.
+
+                Jeweils dazu die hellen Box-Backgrounds (Material-50-Tone)
+                fuer Banner/Hintergruende:
+                - SuccessBoxBackground (#E8F5E9): zur Kombination mit
+                  StatusSuccessBrush als BorderBrush + Foreground.
+                - WarningBoxBackground (#FFF3E0)
+                - ErrorBoxBackground   (#FFEBEE)
+                - InfoBoxBackground    (#E3F2FD)
+            -->
+            <SolidColorBrush x:Key="StatusSuccessBrush" Color="#2E7D32"/>
+            <SolidColorBrush x:Key="StatusWarningBrush" Color="#E65100"/>
+            <SolidColorBrush x:Key="StatusErrorBrush"   Color="#C62828"/>
+            <SolidColorBrush x:Key="StatusInfoBrush"    Color="#1976D2"/>
+            <SolidColorBrush x:Key="SuccessBoxBackground" Color="#E8F5E9"/>
+            <SolidColorBrush x:Key="WarningBoxBackground" Color="#FFF3E0"/>
+            <SolidColorBrush x:Key="ErrorBoxBackground"   Color="#FFEBEE"/>
+            <SolidColorBrush x:Key="InfoBoxBackground"    Color="#E3F2FD"/>
+
+            <!--
                 MainTabRadioStyle (UX-Iteration X.4): Pivot-/NavigationView-Optik
                 fuer die Haupt-Tabs ("Sortieren" / "Lagerliste") im modernisierten
                 Header. RadioButton wird als grosser Tab-Button ohne Bullet

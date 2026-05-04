@@ -186,7 +186,7 @@
                                                        FontWeight="SemiBold"/>
                                             <TextBlock Text="{Binding QuantityProgressLabel}"
                                                        FontSize="10"
-                                                       Foreground="#2E7D32"
+                                                       Foreground="{StaticResource StatusSuccessBrush}"
                                                        FontWeight="SemiBold"
                                                        Margin="6,0,0,0"
                                                        VerticalAlignment="Center"/>

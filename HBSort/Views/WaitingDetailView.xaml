@@ -55,7 +55,7 @@
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding Label}"
-                                                       FontSize="10" Foreground="#E65100"
+                                                       FontSize="10" Foreground="{StaticResource StatusWarningBrush}"
                                                        Margin="0,1"/>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>

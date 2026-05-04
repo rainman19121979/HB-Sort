@@ -9,7 +9,7 @@
             <TextBlock Text="LIVE-STATS" FontSize="14" FontWeight="SemiBold"
                        Margin="0,0,0,8"/>
 
-            <TextBlock Text="Heute" FontWeight="SemiBold" Foreground="#1976D2"
+            <TextBlock Text="Heute" FontWeight="SemiBold" Foreground="{StaticResource StatusInfoBrush}"
                        Margin="0,4,0,4"/>
             <UniformGrid Columns="3" Margin="0,0,0,12">
                 <Border BorderBrush="Gray" BorderThickness="1"
@@ -29,7 +29,7 @@
                                    HorizontalAlignment="Center"/>
                         <TextBlock Text="{Binding CompletedToday}"
                                    FontSize="20" FontWeight="SemiBold"
-                                   Foreground="#2E7D32"
+                                   Foreground="{StaticResource StatusSuccessBrush}"
                                    HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Border>
@@ -40,18 +40,18 @@
                                    HorizontalAlignment="Center"/>
                         <TextBlock Text="{Binding DismantledToday}"
                                    FontSize="20" FontWeight="SemiBold"
-                                   Foreground="#E65100"
+                                   Foreground="{StaticResource StatusWarningBrush}"
                                    HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Border>
             </UniformGrid>
 
             <TextBlock Text="{Binding StreakText}"
-                       FontStyle="Italic" Foreground="#1976D2"
+                       FontStyle="Italic" Foreground="{StaticResource StatusInfoBrush}"
                        Margin="0,0,0,12"/>
 
             <TextBlock Text="Letzte 7 Tage" FontWeight="SemiBold"
-                       Foreground="#1976D2" Margin="0,4,0,4"/>
+                       Foreground="{StaticResource StatusInfoBrush}" Margin="0,4,0,4"/>
             <Grid Margin="0,0,0,12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -67,13 +67,13 @@
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Komplett:"/>
                 <TextBlock Grid.Row="1" Grid.Column="1"
                            Text="{Binding CompletedLast7Days}" FontWeight="SemiBold"
-                           Foreground="#2E7D32"/>
+                           Foreground="{StaticResource StatusSuccessBrush}"/>
             </Grid>
 
             <Separator Margin="0,8"/>
 
             <TextBlock Text="Aktueller Bestand" FontWeight="SemiBold"
-                       Foreground="#1976D2" Margin="0,4,0,4"/>
+                       Foreground="{StaticResource StatusInfoBrush}" Margin="0,4,0,4"/>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -90,7 +90,7 @@
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Komplette Figuren:"/>
                 <TextBlock Grid.Row="1" Grid.Column="1"
                            Text="{Binding CurrentCompleteCount}" FontWeight="SemiBold"
-                           Foreground="#2E7D32"/>
+                           Foreground="{StaticResource StatusSuccessBrush}"/>
                 <TextBlock Grid.Row="2" Grid.Column="0" Text="Lose Teile:"/>
                 <TextBlock Grid.Row="2" Grid.Column="1"
                            Text="{Binding CurrentFloatingTotal}" FontWeight="SemiBold"/>
