@@ -183,6 +183,67 @@ public class BsxExportServiceTests : IDisposable
         Assert.Equal("3001", items[0].Element("ItemID")!.Value);
     }
 
+    // ====================================================================
+    // UX X.12 Bugfix (2026-05-04): UTF-8-Encoding ohne BOM.
+    // BrickStore wirft "Oeffnendes Element erwartet" wenn der Prolog
+    // encoding="utf-16" sagt - dem Provider wird dann naemlich der UTF-16-
+    // kodierte Inhalt als UTF-8-Bytes vorgesetzt.
+    // ====================================================================
+
+    [Fact]
+    public async Task Generate_xml_prolog_declares_utf8_not_utf16()
+    {
+        var ids = await SeedMinifigsAsync(("arc007", "Arctic"));
+
+        var xml = await _sut.GenerateBsxAsync(ids, Array.Empty<int>(), new BsxExportOptions());
+
+        // Prolog muss utf-8 deklarieren (case-insensitive, .NET schreibt lowercase).
+        Assert.StartsWith("<?xml version=\"1.0\" encoding=\"utf-8\"?>", xml,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("utf-16", xml, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Generate_xml_does_not_start_with_BOM_character()
+    {
+        var ids = await SeedMinifigsAsync(("arc007", "Arctic"));
+
+        var xml = await _sut.GenerateBsxAsync(ids, Array.Empty<int>(), new BsxExportOptions());
+
+        // U+FEFF wuerde die ersten 3 Bytes nach UTF-8-Encoding zu EF BB BF machen.
+        Assert.NotEqual('﻿', xml[0]);
+        Assert.Equal('<', xml[0]);
+    }
+
+    [Fact]
+    public async Task Generate_utf8_bytes_do_not_start_with_BOM()
+    {
+        var ids = await SeedMinifigsAsync(("arc007", "Arctic"));
+
+        var xml = await _sut.GenerateBsxAsync(ids, Array.Empty<int>(), new BsxExportOptions());
+        var bytes = System.Text.Encoding.UTF8.GetBytes(xml);
+
+        // 0xEF 0xBB 0xBF waere der UTF-8-BOM, der den BrickStore-XML-Parser
+        // ebenfalls ins Stolpern bringt.
+        Assert.False(bytes.Length >= 3
+                     && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF,
+                     "BSX-Output darf KEIN UTF-8-BOM enthalten.");
+        Assert.Equal((byte)'<', bytes[0]);
+    }
+
+    [Fact]
+    public async Task Generate_xml_is_parseable_by_XmlReader_without_exception()
+    {
+        var ids = await SeedMinifigsAsync(("arc007", "Arctic"));
+
+        var xml = await _sut.GenerateBsxAsync(ids, Array.Empty<int>(), new BsxExportOptions());
+
+        // XmlReader durchparsen damit wir sicher sind dass der String
+        // syntaktisch sauber ist (was BrickStore auch erwartet).
+        using var reader = System.Xml.XmlReader.Create(new System.IO.StringReader(xml));
+        while (reader.Read()) { /* nur durchlaufen, keine Exception */ }
+    }
+
     [Fact]
     public async Task Generate_part_uses_floating_part_color_name_as_fallback()
     {

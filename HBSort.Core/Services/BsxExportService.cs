@@ -1,4 +1,7 @@
 using System.Globalization;
+using System.IO;
+using System.Text;
+using System.Xml;
 using System.Xml.Linq;
 using HBSort.Core.Database;
 using HBSort.Core.Models.Bricklink;
@@ -173,10 +176,28 @@ public class BsxExportService : IBsxExportService
         Log.Information("BSX-Export: {Mfg} Figur(en) + {Fp} Einzelteil-Eintraege generiert",
             orderedMinifigs.Count, orderedFloats.Count);
 
-        // XDocument.ToString liefert ohne XML-Declaration. Wir nutzen StringWriter
-        // damit die Declaration mitgeschrieben wird.
-        using var sw = new System.IO.StringWriter();
-        doc.Save(sw);
-        return sw.ToString();
+        // BUGFIX (UX X.12, 2026-05-04): NICHT ueber StringWriter rendern - der
+        // ist intern UTF-16 und schreibt deshalb encoding="utf-16" in den
+        // XML-Prolog, egal was wir in XDeclaration uebergeben. BrickStore
+        // bricht den Import dann mit "Oeffnendes Element erwartet" ab.
+        // Loesung: XmlWriter direkt auf einem MemoryStream mit
+        // UTF8Encoding(false) - "false" heisst "ohne BOM". Das BrickStore-
+        // Beispielfile hat ebenfalls UTF-8 ohne BOM und wir matchen exakt.
+        var settings = new XmlWriterSettings
+        {
+            Encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+            Indent = true,
+            IndentChars = "  ",
+            NewLineChars = "\n",
+            OmitXmlDeclaration = false
+        };
+        using var ms = new MemoryStream();
+        using (var writer = XmlWriter.Create(ms, settings))
+        {
+            doc.Save(writer);
+        }
+        // ToArray statt GetBuffer, damit nur die wirklich beschriebenen Bytes
+        // zurueckkommen - GetBuffer wuerde Kapazitaets-Padding mitliefern.
+        return Encoding.UTF8.GetString(ms.ToArray());
     }
 }
