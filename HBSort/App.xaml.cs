@@ -241,7 +241,6 @@ public partial class App : Application
         services.AddTransient<ViewModels.SettingsViewModel>();
         services.AddTransient<ViewModels.BinManagerViewModel>();
         services.AddTransient<ViewModels.BinBulkCreateViewModel>();
-        services.AddSingleton<ViewModels.WaitingMinifigsViewModel>();
         services.AddSingleton<ViewModels.InventoryListViewModel>();
 
         // Variables Feld unten rechts - Singletons damit die VMs auch dann live

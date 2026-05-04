@@ -57,10 +57,6 @@ public partial class SortingView : UserControl
         }
     }
 
-    // Lagerfach-Click-Handler sind nach BinOverviewView.xaml.cs umgezogen:
-    // der R2,C2-Bereich ist ein TabControl, jeder Tab kapselt sein eigenes
-    // UserControl mit eigenen Handlern.
-
     // ====================================================================
     // GridSplitter Persistierung
     // ====================================================================

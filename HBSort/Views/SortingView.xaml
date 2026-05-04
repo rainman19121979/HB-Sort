@@ -353,10 +353,13 @@
             </Grid>
         </Border>
 
-        <!-- ===== UNTEN-MITTE (R2,C2): TabControl mit 5 Ansichten =====
+        <!-- ===== UNTEN-MITTE (R2,C2): TabControl mit 4 Ansichten =====
              Tab-Auswahl wird via MainViewModel.BottomRightSelectedTabIndex an
              AppSettings persistiert; jeder Tab kapselt sein eigenes UserControl
-             mit dem zugehoerigen ViewModel als DataContext. -->
+             mit dem zugehoerigen ViewModel als DataContext.
+             UX X.15: "Lagerfaecher"-Tab entfernt - die volle Lagerliste ist im
+             eigenen Top-Tab "Lagerliste" verfuegbar; die Mini-Uebersicht hier
+             war redundant. -->
         <Border Grid.Row="2" Grid.Column="2"
                 BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                 BorderThickness="1" CornerRadius="4"
@@ -365,17 +368,6 @@
                         SelectedIndex="{Binding BottomRightSelectedTabIndex, Mode=TwoWay}"
                         BorderThickness="0"
                         Background="Transparent">
-
-                <TabItem Header="Lagerfaecher"
-                         ToolTip="Live-Liste deiner Faecher mit Inhalt und Fortschritt.">
-                    <ContentControl Content="{Binding WaitingMinifigs}">
-                        <ContentControl.ContentTemplate>
-                            <DataTemplate>
-                                <views:BinOverviewView/>
-                            </DataTemplate>
-                        </ContentControl.ContentTemplate>
-                    </ContentControl>
-                </TabItem>
 
                 <TabItem Header="Was kann ich bauen?"
                          ToolTip="Reverse-Match aus dem Floating-Pool: welche Figuren koenntest du bauen?">

@@ -37,9 +37,6 @@ public partial class MainViewModel : ObservableObject
 
     public ScanViewModel ScanViewModel { get; }
 
-    /// <summary>Wartende-Figuren-Liste fuer den R2,C2 Quadrant (Phase 4).</summary>
-    public WaitingMinifigsViewModel WaitingMinifigs { get; }
-
     /// <summary>Lagerliste-Tab (Phase X).</summary>
     public InventoryListViewModel Inventory { get; }
 
@@ -116,7 +113,6 @@ public partial class MainViewModel : ObservableObject
         INotificationService notificationService,
         IPersistentImageCache imageCache,
         IBricklinkRateLimiter rateLimiter,
-        WaitingMinifigsViewModel waitingMinifigs,
         InventoryListViewModel inventory,
         BuildSuggestionsViewModel buildSuggestions,
         LiveStatsViewModel liveStats,
@@ -126,7 +122,6 @@ public partial class MainViewModel : ObservableObject
     {
         _settingsService = settingsService;
         ScanViewModel = scanViewModel;
-        WaitingMinifigs = waitingMinifigs;
         Inventory = inventory;
         BuildSuggestions = buildSuggestions;
         LiveStats = liveStats;
