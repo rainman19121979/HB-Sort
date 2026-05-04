@@ -52,6 +52,22 @@ HB-Sort erkennt automatisch, was du vor die Kamera haelst.
    - **Kein Treffer:** du kannst das Teil als **Einzelteil** in einem
      Fach ablegen (Floating-Part).
 
+### Smart-Storage-Suggestion
+
+Wenn du ein Einzelteil als Floating-Part lagerst und dasselbe Teil in
+derselben Farbe schon in einem Fach liegt, schlaegt HB-Sort dieses
+Fach automatisch im Lagerfach-Dropdown vor und zeigt einen Hinweis:
+
+> 📦 *Liegt schon in Box 003 (3x)*
+
+So wachsen Stapel des gleichen Teils statt sich ueber mehrere Faecher
+zu verteilen. Die Quantity wird automatisch hochgezaehlt - du legst
+also kein zweites Floating-Part-Item an, sondern stapelst auf dem
+bestehenden weiter.
+
+Du kannst trotzdem manuell ein anderes Fach waehlen, wenn das Teil
+woanders hin soll.
+
 ## Aus Fach uebernehmen
 
 Beim Pending-Block einer noch nicht gespeicherten Figur taucht hinter
