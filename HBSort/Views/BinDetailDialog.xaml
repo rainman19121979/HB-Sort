@@ -148,7 +148,13 @@
         <!-- Buttons -->
         <StackPanel Grid.Row="3" Orientation="Horizontal"
                     HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button Content="Schliessen" IsDefault="True" IsCancel="True" Width="120"
+            <!--
+                Read-Only-Dialog: nur Info anzeigen, kein Eingabezustand.
+                IsCancel="True" reicht (ESC schliesst); IsDefault="True"
+                wuerde mit IsCancel kollidieren - waere widerspruechlich,
+                weil ENTER und ESC denselben Button auslosen wuerden.
+            -->
+            <Button Content="Schliessen" IsCancel="True" Width="120"
                     Style="{StaticResource AccentButtonStyle}"
                     Click="Close_Click"/>
         </StackPanel>
