@@ -114,12 +114,12 @@
                         </Style>
                     </StackPanel.Style>
                     <TextBlock Text="Scanne eine Figur oder ein Teil"
-                               FontSize="{DynamicResource HeaderFontSize}"
+                               FontSize="13"
                                FontWeight="SemiBold"
                                HorizontalAlignment="Center"
                                Foreground="Gray"/>
                     <TextBlock Text="Druecke Leertaste oder klicke 'Scannen'"
-                               FontSize="{DynamicResource DetailFontSize}"
+                               FontSize="10"
                                Foreground="Gray"
                                HorizontalAlignment="Center"
                                Margin="0,4,0,0"/>
@@ -163,7 +163,7 @@
         <Border Grid.Row="2" Grid.Column="0"
                 BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                 BorderThickness="1" CornerRadius="4"
-                Padding="{DynamicResource BorderPadding}">
+                Padding="8">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -171,7 +171,7 @@
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Text="BRICKOGNIZE-VORSCHLAEGE"
-                           FontSize="{DynamicResource HeaderFontSize}" FontWeight="SemiBold"
+                           FontSize="13" FontWeight="SemiBold"
                            Margin="0,0,0,8"/>
 
                 <TextBlock Grid.Row="1"
@@ -196,7 +196,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
                                    Text="{Binding ScanViewModel.ResultHeadlineText}"
-                                   FontSize="{DynamicResource BodyFontSize}"
+                                   FontSize="11"
                                    FontWeight="SemiBold"/>
                         <Button Grid.Column="1"
                                 Content="Manuelle Suche..."
@@ -213,7 +213,7 @@
                                  Converter={StaticResource BoolToVisibility}}">
                         <StackPanel>
                             <TextBlock Text="Erkannte Farbe(n)"
-                                       FontSize="{DynamicResource DetailFontSize}"
+                                       FontSize="10"
                                        FontWeight="SemiBold"
                                        Margin="0,0,0,6"/>
                             <ItemsControl ItemsSource="{Binding ScanViewModel.RecognizedColors}">
@@ -260,7 +260,7 @@
                                 <Border BorderBrush="{Binding BorderBrush}"
                                         BorderThickness="{Binding BorderThickness}"
                                         CornerRadius="4"
-                                        Padding="{DynamicResource CardPadding}" Margin="4"
+                                        Padding="6" Margin="4"
                                         Background="Transparent"
                                         Cursor="Hand"
                                         Tag="{Binding Rank}"
@@ -304,7 +304,7 @@
 
                                         <TextBlock Grid.Row="1"
                                                    Text="{Binding Name}"
-                                                   FontSize="{DynamicResource BodyFontSize}"
+                                                   FontSize="11"
                                                    FontWeight="SemiBold"
                                                    TextWrapping="Wrap"
                                                    Margin="0,8,0,0"/>
@@ -317,16 +317,16 @@
                                             <TextBlock Grid.Column="0"
                                                        Text="{Binding TypeLabel}"
                                                        Foreground="Gray"
-                                                       FontSize="{DynamicResource DetailFontSize}"/>
+                                                       FontSize="10"/>
                                             <TextBlock Grid.Column="1"
                                                        Text="{Binding ScoreText}"
-                                                       FontSize="{DynamicResource DetailFontSize}"
+                                                       FontSize="10"
                                                        FontWeight="SemiBold"/>
                                         </Grid>
 
                                         <TextBlock Grid.Row="3"
                                                    Text="{Binding HighlightLabel}"
-                                                   FontSize="{DynamicResource DetailFontSize}"
+                                                   FontSize="10"
                                                    Foreground="#4CAF50"
                                                    FontWeight="SemiBold" Margin="0,4,0,0"/>
                                     </Grid>

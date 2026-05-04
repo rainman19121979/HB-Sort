@@ -66,12 +66,13 @@ public class AppSettings
     public int ImageCacheRefreshDays { get; set; } = 30;
 
     /// <summary>
-    /// UI-Darstellungsdichte: "Compact" / "Normal" / "Comfortable".
-    /// Wird beim App-Start vom UiDensityService geladen und die entsprechenden
-    /// Resource-Dictionaries angewendet. Default: Normal.
-    /// String statt Enum damit settings.json menschlich lesbar bleibt.
+    /// UI-Darstellungsdichte (DEPRECATED ab UX-Iteration X.11, 2026-05-04).
+    /// Frueher: "Compact" / "Normal" / "Comfortable". Jetzt sind die
+    /// Compact-Werte fest in den Views verdrahtet. Feld bleibt aus
+    /// Backwards-Compat in der settings.json - wird nirgends mehr
+    /// gelesen. Kann in einer spaeteren Iteration entfernt werden.
     /// </summary>
-    public string UiDensity { get; set; } = "Normal";
+    public string UiDensity { get; set; } = "Compact";
 
     /// <summary>URL zum BrickLink-Preis-Tool (Phase 8+, leer = nicht konfiguriert)</summary>
     public string PriceToolUrl { get; set; } = string.Empty;

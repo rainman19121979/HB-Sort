@@ -9,7 +9,7 @@
 
     <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
             BorderThickness="1" CornerRadius="4"
-            Padding="{DynamicResource BorderPadding}">
+            Padding="8">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>  <!-- Header -->
@@ -35,10 +35,10 @@
 
                 <StackPanel Grid.Column="1" Margin="12,0,0,0">
                     <TextBlock Text="ERKANNTES TEIL"
-                               FontSize="{DynamicResource DetailFontSize}"
+                               FontSize="10"
                                Foreground="Gray" FontWeight="SemiBold"/>
                     <TextBlock Text="{Binding PartName}"
-                               FontSize="{DynamicResource HeaderFontSize}" FontWeight="SemiBold"
+                               FontSize="13" FontWeight="SemiBold"
                                TextWrapping="Wrap"/>
 
                     <Grid Margin="0,4,0,0">
@@ -48,10 +48,10 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="BL:"
                                    Foreground="Gray"
-                                   FontSize="{DynamicResource DetailFontSize}"/>
+                                   FontSize="10"/>
                         <TextBlock Grid.Column="1" Text="{Binding BlPartNo}"
                                    FontFamily="Consolas"
-                                   FontSize="{DynamicResource DetailFontSize}"/>
+                                   FontSize="10"/>
                     </Grid>
 
                     <!-- Color-Zeile mit Swatch + Korrektur-Dropdown -->
@@ -65,7 +65,7 @@
 
                         <TextBlock Grid.Column="0" Text="Farbe:"
                                    Foreground="Gray" VerticalAlignment="Center"
-                                   FontSize="{DynamicResource DetailFontSize}"/>
+                                   FontSize="10"/>
                         <Border Grid.Column="1" Width="20" Height="20"
                                 Background="{Binding SwatchBrush}"
                                 BorderBrush="Black" BorderThickness="1"
@@ -73,7 +73,7 @@
                         <TextBlock Grid.Column="2"
                                    Text="{Binding ColorDisplayLabel}"
                                    VerticalAlignment="Center"
-                                   FontSize="{DynamicResource DetailFontSize}"/>
+                                   FontSize="10"/>
                     </Grid>
 
                     <!-- Korrektur-Dropdown unter der Color-Zeile -->
@@ -85,7 +85,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="Korrektur:"
                                    Foreground="Gray" VerticalAlignment="Center"
-                                   FontSize="{DynamicResource MicroFontSize}"/>
+                                   FontSize="9"/>
                         <ComboBox Grid.Column="1" MinWidth="200"
                                   ItemsSource="{Binding AvailableColors}"
                                   SelectedItem="{Binding SelectedColor}"
@@ -109,7 +109,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="Anzahl:"
                                    Foreground="Gray" VerticalAlignment="Center"
-                                   FontSize="{DynamicResource DetailFontSize}"/>
+                                   FontSize="10"/>
                         <TextBox Grid.Column="1"
                                  Text="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}"
                                  ToolTip="Anzahl Teile (Default 1, fuer Mehrfach-Scans)"/>
@@ -122,7 +122,7 @@
             <!-- ===== WARTENDE FIGUREN + BL-CATALOG (scrollbar damit Buttons unten immer sichtbar) ===== -->
             <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
                 <StackPanel>
-                    <TextBlock FontSize="{DynamicResource DetailFontSize}" FontWeight="SemiBold"
+                    <TextBlock FontSize="10" FontWeight="SemiBold"
                                Margin="0,0,0,6">
                         <Run Text="PASSENDE WARTENDE FIGUREN"/>
                         <Run Text="("/><Run Text="{Binding WaitingMatches.Count, Mode=OneWay}"/><Run Text=")"/>
@@ -153,13 +153,13 @@
                                            b:ImageZoom.IsEnabled="True"/>
 
                                     <StackPanel Grid.Column="1" Margin="8,0,8,0" VerticalAlignment="Center">
-                                        <TextBlock FontSize="{DynamicResource BodyFontSize}"
+                                        <TextBlock FontSize="11"
                                                    FontWeight="SemiBold" TextWrapping="Wrap">
                                             <Run Text="{Binding MinifigName, Mode=OneWay}"/>
                                             <Run Text="{Binding BinLabel, Mode=OneWay}" Foreground="Gray"/>
                                         </TextBlock>
                                         <TextBlock Text="{Binding ProgressLabel}"
-                                                   FontSize="{DynamicResource DetailFontSize}"
+                                                   FontSize="10"
                                                    Foreground="Gray"/>
                                     </StackPanel>
 
@@ -176,7 +176,7 @@
                 </ItemsControl>
 
                 <!-- ===== BL-CATALOG-TREFFER (Cache) ===== -->
-                <TextBlock FontSize="{DynamicResource DetailFontSize}" FontWeight="SemiBold"
+                <TextBlock FontSize="10" FontWeight="SemiBold"
                            Margin="0,12,0,4"
                            Visibility="{Binding HasBlCatalogMatches,
                                Converter={StaticResource BoolToVisibility}}">
@@ -203,9 +203,9 @@
                                            b:ImageZoom.IsEnabled="True"/>
                                     <StackPanel Grid.Column="1" Margin="8,0" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding MinifigName}"
-                                                   FontSize="{DynamicResource BodyFontSize}"
+                                                   FontSize="11"
                                                    FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                        <TextBlock FontSize="{DynamicResource MicroFontSize}"
+                                        <TextBlock FontSize="9"
                                                    Foreground="Gray" FontFamily="Consolas">
                                             <Run Text="BL:"/>
                                             <Run Text="{Binding BlMinifigId, Mode=OneWay}"/>
@@ -231,16 +231,16 @@
             <StackPanel Grid.Row="3" Margin="0,12,0,0">
                 <Separator/>
                 <TextBlock Text="ALTERNATIVEN" Margin="0,8,0,4"
-                           FontSize="{DynamicResource DetailFontSize}" FontWeight="SemiBold"/>
+                           FontSize="10" FontWeight="SemiBold"/>
                 <TextBlock Text="Als Einzelteil lagern in:"
-                           FontSize="{DynamicResource DetailFontSize}" Foreground="Gray"/>
+                           FontSize="10" Foreground="Gray"/>
                 <!--
                     UX-Iteration X.7: Smart-Storage-Hint. Erscheint nur wenn das
                     Teil bereits in einem Fach mit gleicher Farbe liegt - der
                     User soll wissen warum gerade dieses Fach vorgewaehlt ist.
                 -->
                 <TextBlock Text="{Binding MatchingFloatingBinHintText}"
-                           FontSize="{DynamicResource MicroFontSize}"
+                           FontSize="9"
                            Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                            FontStyle="Italic"
                            Margin="0,2,0,0"
@@ -268,7 +268,7 @@
                 <TextBlock Grid.Column="1" Text="Anzahl:"
                            VerticalAlignment="Center" Margin="12,0,6,0"
                            Foreground="Gray"
-                           FontSize="{DynamicResource DetailFontSize}"/>
+                           FontSize="10"/>
                 <TextBox Grid.Column="2"
                          Text="{Binding FloatingQuantity, UpdateSourceTrigger=PropertyChanged}"
                          ToolTip="Wieviele Stueck dieses Teils legst du gerade ab?"/>

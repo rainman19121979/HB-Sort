@@ -9,7 +9,7 @@
 
         DataContext = WaitingMinifigsViewModel (vom umschliessenden TabItem gesetzt).
     -->
-    <Grid Margin="{DynamicResource BorderPadding}">
+    <Grid Margin="8">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -23,7 +23,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock Text="LAGERFAECHER"
-                       FontSize="{DynamicResource HeaderFontSize}" FontWeight="SemiBold"/>
+                       FontSize="13" FontWeight="SemiBold"/>
             <Button Grid.Column="1" Content="↻" Width="28" Padding="0"
                     ToolTip="Laed die Lagerfach-Liste aus der DB neu."
                     Command="{Binding RefreshCommand}"/>
@@ -32,7 +32,7 @@
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,6">
             <TextBlock Text="Anzeigen:" Foreground="Gray"
                        VerticalAlignment="Center" Margin="0,0,8,0"
-                       FontSize="{DynamicResource MicroFontSize}"/>
+                       FontSize="9"/>
             <RadioButton Content="Nur belegt"
                          IsChecked="{Binding IsFilterOccupiedOnly, Mode=OneWay}"
                          Click="BinFilterOccupied_Click"
@@ -77,15 +77,15 @@
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="{Binding ExpandIcon}"
                                                    VerticalAlignment="Center" Margin="0,0,6,0"
-                                                   FontSize="{DynamicResource MicroFontSize}"/>
+                                                   FontSize="9"/>
                                         <TextBlock Grid.Column="1" Text="📦"
                                                    VerticalAlignment="Center" Margin="0,0,4,0"/>
                                         <TextBlock Grid.Column="2" Text="{Binding Label}"
                                                    FontWeight="SemiBold"
-                                                   FontSize="{DynamicResource DetailFontSize}"
+                                                   FontSize="10"
                                                    VerticalAlignment="Center"/>
                                         <TextBlock Grid.Column="3" Text="{Binding StatusText}"
-                                                   FontSize="{DynamicResource MicroFontSize}"
+                                                   FontSize="9"
                                                    Foreground="Gray"
                                                    VerticalAlignment="Center" Margin="0,0,8,0"
                                                    ToolTip="Inhalt dieses Fachs (wartend / komplett / Einzelteile)."/>
@@ -123,18 +123,18 @@
                                                         <StackPanel Grid.Column="1" VerticalAlignment="Center"
                                                                     Margin="6,0">
                                                             <TextBlock Text="{Binding Name}"
-                                                                       FontSize="{DynamicResource MicroFontSize}"
+                                                                       FontSize="9"
                                                                        FontWeight="SemiBold"
                                                                        TextTrimming="CharacterEllipsis"/>
                                                             <TextBlock Text="{Binding BricklinkId}"
                                                                        FontFamily="Consolas"
-                                                                       FontSize="{DynamicResource MicroFontSize}"
+                                                                       FontSize="9"
                                                                        Foreground="Gray"/>
                                                         </StackPanel>
                                                         <StackPanel Grid.Column="2" VerticalAlignment="Center"
                                                                     MinWidth="70">
                                                             <TextBlock Text="{Binding ProgressLabel}"
-                                                                       FontSize="{DynamicResource MicroFontSize}"
+                                                                       FontSize="9"
                                                                        HorizontalAlignment="Right"/>
                                                             <ProgressBar Height="4" Width="64"
                                                                          Minimum="0" Maximum="1"
@@ -146,7 +146,7 @@
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
                                     <TextBlock Text="{Binding MoreLabel}"
-                                               FontSize="{DynamicResource MicroFontSize}"
+                                               FontSize="9"
                                                FontStyle="Italic" Foreground="Gray"
                                                Margin="2,4,0,0"
                                                Visibility="{Binding HasMore,
@@ -160,7 +160,7 @@
         </ScrollViewer>
 
         <TextBlock Grid.Row="3" Text="{Binding SummaryText}"
-                   FontSize="{DynamicResource MicroFontSize}"
+                   FontSize="9"
                    Foreground="Gray" Margin="0,4,0,0"/>
     </Grid>
 </UserControl>

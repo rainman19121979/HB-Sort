@@ -65,10 +65,6 @@ public partial class App : Application
             var settingsService = Services.GetRequiredService<ISettingsService>();
             await settingsService.LoadAsync();
 
-            // 4.5 UI-Density anwenden BEVOR Fenster geladen werden, damit
-            // alle DynamicResource-Lookups direkt den richtigen Wert haben.
-            await ApplyStoredUiDensityAsync(settingsService);
-
             // 4.6 Tooltips-Schalter anwenden (UX-Iteration X.9). Schreibt den
             // gespeicherten ShowTooltips-Wert in die Application-Resource,
             // bevor das erste Fenster gezeigt wird.
@@ -191,9 +187,9 @@ public partial class App : Application
         // DialogService (UX-Iteration X.4): einheitliche ContentDialogs statt MessageBox.
         services.AddSingleton<IDialogService, DialogService>();
 
-        // UI-Density-Service (Compact/Normal/Comfortable). Wechselt zur Laufzeit
-        // das Density-ResourceDictionary in Application.Resources.
-        services.AddSingleton<IUiDensityService, UiDensityService>();
+        // UX-Iteration X.11 (2026-05-04): Darstellungsdichte komplett entfernt.
+        // Frueher gab es hier IUiDensityService mit Compact/Normal/Comfortable -
+        // jetzt sind die Werte fest (Compact-Profil) als XAML-Literale eingebettet.
 
         // UX-Iteration X.9: globaler Tooltips-Schalter (Default: an).
         services.AddSingleton<ITooltipsService, TooltipsService>();
@@ -352,22 +348,6 @@ public partial class App : Application
     /// gespeichert sind: still beenden, kein Toast (User kann ja noch Tokens
     /// eingeben). Wenn Tokens vorhanden aber Test schlaegt fehl: Toast.
     /// </summary>
-    /// <summary>
-    /// Liest die gespeicherte UiDensity-Setting und wendet sie via
-    /// UiDensityService an. Default ist Normal wenn nichts gespeichert ist.
-    /// </summary>
-    private static async Task ApplyStoredUiDensityAsync(ISettingsService settings)
-    {
-        var raw = settings.Current.UiDensity ?? "Normal";
-        if (!Enum.TryParse<UiDensity>(raw, ignoreCase: true, out var density))
-        {
-            density = UiDensity.Normal;
-        }
-
-        var svc = Services.GetRequiredService<IUiDensityService>();
-        await svc.ApplyAsync(density);
-    }
-
     /// <summary>
     /// Loescht api_call_log-Eintraege aelter als 7 Tage (sind weder fuer 24h-Window
     /// noch fuer "Heute" relevant). Ein einmaliger Aufruf beim App-Start reicht.

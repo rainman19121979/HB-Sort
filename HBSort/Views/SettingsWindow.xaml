@@ -147,29 +147,6 @@
 
                         <Separator/>
 
-                        <!-- === SONSTIGES === -->
-                        <TextBlock Text="Darstellungsdichte" FontSize="16" FontWeight="SemiBold"/>
-                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12"
-                                   Margin="0,0,0,4">
-                            Sofortige Vorschau – die Auswahl wird automatisch gespeichert.
-                        </TextBlock>
-                        <StackPanel Margin="0,4,0,0">
-                            <RadioButton Content="Kompakt — viel Info auf einen Blick"
-                                         IsChecked="{Binding IsDensityCompact, Mode=OneWay}"
-                                         Click="DensityCompact_Click"
-                                         GroupName="UiDensity"/>
-                            <RadioButton Content="Normal — ausgewogen (Standard)"
-                                         IsChecked="{Binding IsDensityNormal, Mode=OneWay}"
-                                         Click="DensityNormal_Click"
-                                         GroupName="UiDensity" Margin="0,4,0,0"/>
-                            <RadioButton Content="Komfortabel — groessere Schrift, mehr Abstand"
-                                         IsChecked="{Binding IsDensityComfortable, Mode=OneWay}"
-                                         Click="DensityComfortable_Click"
-                                         GroupName="UiDensity" Margin="0,4,0,0"/>
-                        </StackPanel>
-
-                        <Separator/>
-
                         <TextBlock Text="Sonstiges" FontSize="16" FontWeight="SemiBold"/>
 
                         <CheckBox Content="Sound-Effekte aktivieren"

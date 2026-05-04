@@ -27,7 +27,6 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IBricklinkClient _bricklinkClient;
     private readonly IBlCatalogService _blCatalogService;
     private readonly IBricklinkRateLimiter _rateLimiter;
-    private readonly IUiDensityService _uiDensity;
     private readonly HttpClient _http;
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
     private readonly IDialogService _dialogs;
@@ -130,18 +129,6 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private string _priceToolUrl = string.Empty;
-
-    // --- UI-Darstellungsdichte ---
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsDensityCompact))]
-    [NotifyPropertyChangedFor(nameof(IsDensityNormal))]
-    [NotifyPropertyChangedFor(nameof(IsDensityComfortable))]
-    private UiDensity _selectedDensity;
-
-    public bool IsDensityCompact     => SelectedDensity == UiDensity.Compact;
-    public bool IsDensityNormal      => SelectedDensity == UiDensity.Normal;
-    public bool IsDensityComfortable => SelectedDensity == UiDensity.Comfortable;
 
     // === Phase R1: BrickLink-API ===
 
@@ -250,7 +237,6 @@ public partial class SettingsViewModel : ObservableObject
         IBricklinkClient bricklinkClient,
         IBlCatalogService blCatalogService,
         IBricklinkRateLimiter rateLimiter,
-        IUiDensityService uiDensity,
         HttpClient http,
         IDbContextFactory<UserDataContext> ctxFactory,
         BinManagerViewModel binManager,
@@ -265,7 +251,6 @@ public partial class SettingsViewModel : ObservableObject
         _bricklinkClient = bricklinkClient;
         _blCatalogService = blCatalogService;
         _rateLimiter = rateLimiter;
-        _uiDensity = uiDensity;
         _http = http;
         _ctxFactory = ctxFactory;
         _dialogs = dialogs;
@@ -283,9 +268,6 @@ public partial class SettingsViewModel : ObservableObject
         BricklinkSoftThreshold = settingsService.Current.Bricklink.SoftThreshold;
         BricklinkHardThreshold = settingsService.Current.Bricklink.HardThreshold;
         _ = RefreshRateLimitStatusAsync();
-
-        // Aktuelle UI-Density vom Service uebernehmen
-        SelectedDensity = uiDensity.Current;
 
         // Aktuelle Werte aus den Settings laden
         LoadFromSettings();
@@ -606,20 +588,6 @@ public partial class SettingsViewModel : ObservableObject
         {
             Log.Error(ex, "BL-Cache stale Cleanup fehlgeschlagen");
             BricklinkTestResultText = $"Fehler: {ex.Message}";
-        }
-    }
-
-    /// <summary>
-    /// Wechselt die UI-Density sofort und persistiert sie. Wird von den Radio-Buttons
-    /// im "Darstellungsdichte"-Bereich aufgerufen.
-    /// </summary>
-    [RelayCommand]
-    public async Task ApplyUiDensityAsync(string density)
-    {
-        if (Enum.TryParse<UiDensity>(density, ignoreCase: true, out var d))
-        {
-            SelectedDensity = d;
-            await _uiDensity.ApplyAsync(d);
         }
     }
 

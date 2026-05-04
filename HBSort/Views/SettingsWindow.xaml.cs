@@ -72,17 +72,6 @@ public partial class SettingsWindow : Window
         e.Handled = true;
     }
 
-    // UI-Density Radio-Buttons – Click-Handler statt Two-Way-Binding,
-    // damit wir die Apply-Logik (inkl. Persistierung) sofort triggern.
-    private void DensityCompact_Click(object sender, RoutedEventArgs e)
-        => _viewModel.ApplyUiDensityCommand.Execute("Compact");
-
-    private void DensityNormal_Click(object sender, RoutedEventArgs e)
-        => _viewModel.ApplyUiDensityCommand.Execute("Normal");
-
-    private void DensityComfortable_Click(object sender, RoutedEventArgs e)
-        => _viewModel.ApplyUiDensityCommand.Execute("Comfortable");
-
     // ====================================================================
     // Tab "Lagerfaecher" (Phase 4)
     // ====================================================================

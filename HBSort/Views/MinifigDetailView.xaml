@@ -11,7 +11,7 @@
 
     <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
             BorderThickness="1" CornerRadius="4"
-            Padding="{DynamicResource BorderPadding}">
+            Padding="8">
         <Grid>
             <Grid.RowDefinitions>
                 <!-- Header: Bild + Daten -->
@@ -37,13 +37,13 @@
                        b:ImageZoom.IsEnabled="True"
                        Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
                        Stretch="Uniform"
-                       Width="{DynamicResource MinifigImageSize}"
-                       Height="{DynamicResource MinifigImageSize}"
+                       Width="96"
+                       Height="96"
                        HorizontalAlignment="Left" VerticalAlignment="Top"/>
 
                 <StackPanel Grid.Column="1" Margin="12,0,0,0">
                     <TextBlock Text="{Binding Name}"
-                               FontSize="{DynamicResource HeaderFontSize}" FontWeight="SemiBold"
+                               FontSize="13" FontWeight="SemiBold"
                                TextWrapping="Wrap"/>
 
                     <Grid Margin="0,4,0,0">
@@ -53,10 +53,10 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
                                    Text="BL:" Foreground="Gray"
-                                   FontSize="{DynamicResource DetailFontSize}"/>
+                                   FontSize="10"/>
                         <TextBlock Grid.Column="1"
                                    Text="{Binding BricklinkId}"
-                                   FontSize="{DynamicResource DetailFontSize}"
+                                   FontSize="10"
                                    FontFamily="Consolas"/>
                     </Grid>
 
@@ -67,14 +67,14 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
                                    Text="Jahr:" Foreground="Gray"
-                                   FontSize="{DynamicResource DetailFontSize}"/>
+                                   FontSize="10"/>
                         <TextBlock Grid.Column="1"
                                    Text="{Binding YearReleased, TargetNullValue=-}"
-                                   FontSize="{DynamicResource DetailFontSize}"/>
+                                   FontSize="10"/>
                     </Grid>
 
                     <TextBlock Text="{Binding PartsHeaderLabel}"
-                               FontSize="{DynamicResource DetailFontSize}"
+                               FontSize="10"
                                Foreground="Gray" Margin="0,4,0,0"/>
                 </StackPanel>
             </Grid>
@@ -83,7 +83,7 @@
 
             <TextBlock Grid.Row="2"
                        Text="{Binding SourceLabel}"
-                       FontSize="{DynamicResource DetailFontSize}"
+                       FontSize="10"
                        FontStyle="Italic" Foreground="Gray"
                        Margin="0,0,0,4"/>
 
@@ -138,34 +138,34 @@
                                     <Image Grid.Column="1"
                                            Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
                                            Stretch="Uniform"
-                                           Width="{DynamicResource PartImageSize}"
-                                           Height="{DynamicResource PartImageSize}"
+                                           Width="48"
+                                           Height="48"
                                            Margin="8,0"
                                            b:ImageZoom.IsEnabled="True"/>
 
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding PartName}"
-                                                   FontSize="{DynamicResource BodyFontSize}"
+                                                   FontSize="11"
                                                    FontWeight="SemiBold"
                                                    TextWrapping="Wrap"/>
                                         <TextBlock Text="{Binding PartDisplayLabel}"
                                                    Foreground="Gray"
-                                                   FontSize="{DynamicResource DetailFontSize}"
+                                                   FontSize="10"
                                                    FontFamily="Consolas"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                            <Border Width="{DynamicResource ColorSwatchSize}"
-                                                    Height="{DynamicResource ColorSwatchSize}"
+                                            <Border Width="14"
+                                                    Height="14"
                                                     Background="{Binding SwatchBrush}"
                                                     BorderBrush="Black" BorderThickness="1"
                                                     Margin="0,0,6,0"
                                                     VerticalAlignment="Center"/>
                                             <TextBlock Text="{Binding ColorDisplayLabel}"
-                                                       FontSize="{DynamicResource DetailFontSize}"
+                                                       FontSize="10"
                                                        VerticalAlignment="Center"/>
                                         </StackPanel>
                                         <!-- Alt-Teil-Hinweis (Match-Group) – nur sichtbar wenn IsAlternate=true -->
                                         <TextBlock Text="{Binding AlternateLabel}"
-                                                   FontSize="{DynamicResource MicroFontSize}"
+                                                   FontSize="9"
                                                    Foreground="#FF8000"
                                                    FontStyle="Italic" Margin="0,2,0,0"
                                                    Visibility="{Binding IsAlternate, Converter={StaticResource BoolToVisibility}}"/>
@@ -182,10 +182,10 @@
                                         <StackPanel Orientation="Horizontal"
                                                     HorizontalAlignment="Right">
                                             <TextBlock Text="{Binding QuantityLabel}"
-                                                       FontSize="{DynamicResource BodyFontSize}"
+                                                       FontSize="11"
                                                        FontWeight="SemiBold"/>
                                             <TextBlock Text="{Binding QuantityProgressLabel}"
-                                                       FontSize="{DynamicResource DetailFontSize}"
+                                                       FontSize="10"
                                                        Foreground="#2E7D32"
                                                        FontWeight="SemiBold"
                                                        Margin="6,0,0,0"
