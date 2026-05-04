@@ -1097,6 +1097,78 @@ Konstruktor cached'te.
   Hinweis-Banner. Braucht einen `INavigationService`, kommt in
   spaeterer Iteration.
 
+#### Phase 8-Bugfix (2026-05-04) — Korrektur-Prozente + PriceColumn in der Live-Box
+
+Bug: Die Live-Preis-Box im Sortier-Tab (UX X.8) hat die User-Settings
+gar nicht angewandt:
+- `PriceColumn` (min/avg/max/qty_avg) wurde ignoriert - immer hardcoded
+  `AvgPrice ?? QtyAvgPrice`.
+- `CorrectionMinifigPercent` und `CorrectionPartsPercent` wurden auf
+  Min/Avg/Max + Subtotals + Summe nicht angewandt - die Box zeigte
+  immer rohe BL-Werte.
+- Folge: was die App zeigte unterschied sich vom BL-Wert + von der
+  Empfehlung im `MinifigSummaryDialog` (`PriceCalculationService`
+  machte es richtig).
+
+Architektur-Fix: gemeinsame statische Helfer-Klasse
+`HBSort.Core.Services.PriceMath`:
+- `PickValue(PriceResult?, string?)` - Spaltenwahl mit qty_avg-Fallback.
+- `ApplyCorrection(decimal?, decimal)` - +/-X% mit kaufmaennischer
+  Rundung auf 2 Nachkommastellen, null-safe.
+- `ApplyCorrectionOrZero` - bequemer Wrapper fuer Summen-Pfade.
+
+**Beide Konsumenten ziehen jetzt aus `PriceMath`** statt private
+Helper zu duplizieren:
+- `PriceCalculationService.CalculateForMinifigAsync` (Komplett-
+  Workflow, `MinifigSummaryDialog`).
+- `MinifigPriceViewModel.ApplyCompleteOutcomeToView` +
+  `ApplyPartOutcomeToRow` (Live-Preis-Box im Sortier-Tab).
+
+Damit kann der Pfad nicht mehr auseinanderlaufen.
+
+UI-Aenderungen in `MinifigPriceView`:
+- Pro Haelfte ein blauer Hint "Inkl. -10% Korrektur" /
+  "Inkl. -15% Korrektur" - leer wenn Korrektur=0.
+- Tooltip auf dem Komplett-Preis-Label sowie auf jeder Teile-Zeile:
+  "Roh: 12,00 € • Korrigiert: 10,80 €". Tritt nur bei Korrektur != 0
+  auf.
+- `MinifigPriceViewModel`-Konstruktor kriegt `ISettingsService`;
+  `ScanViewModel` reicht es durch.
+- `UpdateRecommendation` operiert auf den korrigierten Werten - sonst
+  waere die Empfehlung von der User-Korrektur entkoppelt.
+
+GuideType-Plumbing war im Code bereits korrekt (cfg.GuideType wird in
+`BricklinkApiPriceProvider` und `BlPriceCacheService` bei jedem Aufruf
+live aus den Settings gelesen, das `BlCacheRepository` hat
+`guide_type` in allen vier WHERE-/INSERT-Klauseln). Trotzdem zwei
+Regressions-Tests dazu in `BlPriceCacheServiceTests`:
+`Cache_keys_distinguish_between_GuideType_Sold_and_Stock` und
+`Switching_GuideType_misses_old_cache_and_triggers_live_call`.
+
+Tests:
+- 15 neue `PriceMathTests` decken alle Spaltenwahl-Pfade + alle
+  Korrektur-Prozent-Faelle (positiv/negativ/null/Rundung) ab.
+- 2 neue `BlPriceCacheServiceTests` fuer Sold↔Stock.
+- Bestehende `PriceCalculationServiceTests` laufen unveraendert
+  weiter - `PriceCalculationService` nutzt jetzt `PriceMath` statt
+  der lokalen Helfer.
+
+Wo wirken die Settings im Stack? Aktuell:
+
+| Setting | Wirkt in PriceCalculationService | Wirkt in MinifigPriceViewModel |
+|---|---|---|
+| `Provider` | `IPriceProviderFactory.GetActiveProvider()` (live) | dito (via `BlPriceCacheService`) |
+| `GuideType` | `BricklinkApiPriceProvider.GetPriceAsync` + `BlCacheRepository`-Cache-Key | dito |
+| `PriceColumn` | `PriceMath.PickValue` | `PriceMath.PickValue` |
+| `CorrectionMinifigPercent` | `PriceMath.ApplyCorrection` (linke Seite) | `PriceMath.ApplyCorrection` (Komplett-Figur) |
+| `CorrectionPartsPercent` | `PriceMath.ApplyCorrection` (rechte Seite) | `PriceMath.ApplyCorrection` (jede Teile-Zeile) |
+| `Region`/`Currency`/`CountryCode` | `BricklinkApiPriceProvider` + Cache-Key | dito |
+| `BlPriceCacheTtlMinifigDays`/`...PartDays` | n/a | `BlPriceCacheService.GetPriceCoreAsync` (live, jeder Aufruf) |
+
+Alle Settings werden bei jedem Aufruf live aus
+`_settings.Current.Prices` gelesen - kein Singleton-Cache mehr, kein
+Restart noetig nach Settings-Wechsel.
+
 ### UX-Iteration X.4 ✅ (2026-05-03)
 
 Acht UX-Verbesserungen quer durch die App:
