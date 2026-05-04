@@ -1396,6 +1396,61 @@ Anker, ohne `OverrideMetadata`-Hack:
   Color-Swatches (per `ColorName`), Filter-Optionen, Bin-Details,
   Webcam-Bild, Brickognize-Karten, Bottom-Right-TabItems im Sortier-Tab.
 
+### UX-Iteration X.11 ✅ (2026-05-04) — Settings-Konsolidierung + Density-Removal
+
+Settings-Dialog von 9 auf 8 Tabs konsolidiert; Themen sind nicht mehr
+fragmentiert; Darstellungsdichte komplett entfernt.
+
+**Neue Tab-Reihenfolge** (`HBSort/Views/SettingsWindow.xaml`):
+
+| # | Tab | Inhalt | War vorher |
+|---|---|---|---|
+| 1 | **Erkennung** | Kamera, Score-Schwellen, Timing, Sound | "Allgemein" (oberer Teil) |
+| 2 | **Darstellung** | Tooltips-Toggle | "Allgemein" (Density-Block + Tooltips) |
+| 3 | **BrickLink** | API-Zugang + API-Nutzung + Preise + Catalog-Daten | "BrickLink-API" + "BL-Catalog-Daten" + "Preise" |
+| 4 | Lagerfaecher | unveraendert | unveraendert |
+| 5 | **Cache** | Bild-Cache + BL-Daten-Cache + Preis-Cache | "Bild-Cache" + Cache-Sektion in BrickLink-API + Cache-Sektion in Preise |
+| 6 | Export | unveraendert | unveraendert |
+| 7 | Statistik | unveraendert | unveraendert |
+| 8 | Info | unveraendert | unveraendert |
+
+**BrickLink-Tab** (Sektion 3) ist scrollbar mit vier optisch getrennten
+Sektionen (Separators): API-Zugang, API-Nutzung, Preise, Catalog-Daten.
+Sektion-Headers FontSize=15, Sub-Headers innerhalb FontSize=13.
+
+**Cache-Tab** (Sektion 5) hat drei Sektionen: Bild-Cache (Limit-Auswahl
+inkl. Custom-Wert + Optionen), BL-Daten-Cache (Stats + Stale-/Cache-
+Leeren-Buttons), Preis-Cache (TTL-Felder + Eintraege-Anzeige + Leeren).
+
+**Darstellungsdichte komplett entfernt**:
+- `HBSort/Resources/DensityCompact.xaml` + `DensityNormal.xaml` +
+  `DensityComfortable.xaml` geloescht.
+- `HBSort/Services/IUiDensityService.cs` + `UiDensityService.cs`
+  geloescht; DI-Registrierung in `App.xaml.cs` raus.
+- `App.xaml.cs::ApplyStoredUiDensityAsync` raus.
+- `SettingsViewModel`: `_uiDensity`-Field, ctor-Parameter,
+  `SelectedDensity`/`IsDensity*`/`ApplyUiDensityCommand` raus.
+- `SettingsWindow.xaml.cs`: `DensityCompact_Click` /
+  `DensityNormal_Click` / `DensityComfortable_Click`-Handler raus.
+- 65 `DynamicResource`-Stellen in 5 Views (`MainWindow`,
+  `PartLookupView`, `MinifigDetailView`, `SortingView`, `BinOverviewView`)
+  durch feste Werte aus dem **Compact**-Profil ersetzt:
+  - Schriften: Header=13, Body=11, Detail=10, Micro=9
+  - Spacing: BorderPadding=8, CardPadding=6
+  - Bilder: PartImage=48, MinifigImage=96, ColorSwatch=14
+
+**Migration alte settings.json**:
+- `AppSettings.UiDensity` (string) bleibt als `[DEPRECATED]`-XML-Doc
+  im POCO (Default jetzt "Compact"). Wird nirgends mehr gelesen.
+  Alte Werte ("Normal" / "Comfortable" aus frueheren Versionen) werden
+  beim Laden ignoriert; das Compact-Layout greift unabhaengig vom
+  Settings-Wert. Kann in spaeterer Iteration entfernt werden.
+
+**Kein Datenverlust**: alle Settings-Properties (Camera-Index,
+Schwellwerte, Korrekturen, BL-Tokens, BSX-Folder, ...) bleiben
+unveraendert in `AppSettings`. Nur die **Anordnung** im Settings-UI
+hat sich geaendert.
+
 ## Wichtige Hinweise
 
 ### Hilfe-System (UX X.9)
