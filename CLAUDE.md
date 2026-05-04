@@ -850,11 +850,14 @@ HBSort.sln
 - Status=Sold wird **nicht** eingefuehrt - der BSX-Export in Phase 7
   uebernimmt die Uebergabe ans richtige Lagersystem.
 
-Abweichung von der Spec: Die "Komplette Figuren"-Sektion wurde in die
-bestehende Bin-Overview integriert (pro Bin eine eigene Sub-Sektion mit
-gruener Markierung) statt als globale Top-Level-Liste. Das passt zur
-existierenden BinOverview-Architektur und vermeidet einen kompletten
-Umbau der `WaitingMinifigsViewModel`-Klasse.
+Historische Anmerkung zur Phase 6: Die "Komplette Figuren"-Sektion
+wurde damals in die bestehende Bin-Overview integriert (pro Bin eine
+Sub-Sektion mit gruener Markierung) statt als globale Top-Level-Liste,
+um einen kompletten Umbau der damaligen `WaitingMinifigsViewModel`-
+Klasse zu vermeiden. In UX X.15 (2026-05-04) wurde der Lagerfaecher-
+Tab im Sortier-Bereich komplett entfernt — die volle Lagerliste lebt
+jetzt im dedizierten Top-Tab "Lagerliste"; das gesamte VM samt
+BinOverviewView ist geloescht.
 
 ### Phase 7 – BSX-Export ✅ (PROMPT 8, 2026-05-03)
 - `IBsxExportService` (HBSort.Core/Services) generiert pro Figur eine
