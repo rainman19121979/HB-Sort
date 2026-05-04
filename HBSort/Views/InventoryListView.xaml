@@ -85,7 +85,7 @@
              "Alle" markiert beide Typen; Wartende bleiben ignoriert. -->
         <Border Grid.Row="2"
                 Background="#F1F8E9" BorderBrush="#558B2F"
-                BorderThickness="1" CornerRadius="3"
+                BorderThickness="1" CornerRadius="4"
                 Padding="8,6" Margin="0,0,0,8"
                 Visibility="{Binding HasAnyExportable, Converter={StaticResource BoolToVisibility}}">
             <Grid>
@@ -192,7 +192,7 @@
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <Border Background="{Binding StatusBrush}"
-                                    CornerRadius="3" Padding="6,2"
+                                    CornerRadius="4" Padding="6,2"
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Center"
                                     ToolTip="{Binding StatusTooltip}">
@@ -284,7 +284,7 @@
 
         <!-- Footer -->
         <Border Grid.Row="4" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
-                Padding="8,4" CornerRadius="3" Margin="0,8,0,0">
+                Padding="8,4" CornerRadius="4" Margin="0,8,0,0">
             <TextBlock Text="{Binding SummaryText}" FontSize="12" FontWeight="SemiBold"/>
         </Border>
     </Grid>

@@ -228,7 +228,7 @@
                                                 Padding="6,4"
                                                 BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                                                 BorderThickness="1"
-                                                CornerRadius="3">
+                                                CornerRadius="4">
                                             <StackPanel Orientation="Horizontal">
                                                 <Border Width="20" Height="20"
                                                         Background="{Binding SwatchBrush}"
