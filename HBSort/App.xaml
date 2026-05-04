@@ -65,6 +65,13 @@
                 - ErrorBoxBackground   (#FFEBEE)
                 - InfoBoxBackground    (#E3F2FD)
             -->
+            <!--
+                Dialog-/View-Header-Schriftgroesse (Audit M-13, 2026-05-04).
+                Stand 2026-05-04 = 20, kann hier zentral nachjustiert werden.
+                Verwendung: App-Logo-Header, Dialog-Titel, View-Titel.
+            -->
+            <sys:Double x:Key="DialogHeaderFontSize">20</sys:Double>
+
             <SolidColorBrush x:Key="StatusSuccessBrush" Color="#2E7D32"/>
             <SolidColorBrush x:Key="StatusWarningBrush" Color="#E65100"/>
             <SolidColorBrush x:Key="StatusErrorBrush"   Color="#C62828"/>

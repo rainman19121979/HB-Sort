@@ -33,7 +33,8 @@
             <DockPanel LastChildFill="True">
                 <TextBlock DockPanel.Dock="Top"
                            Text="Hilfe"
-                           FontSize="20" FontWeight="SemiBold"
+                           FontSize="{StaticResource DialogHeaderFontSize}"
+                           FontWeight="SemiBold"
                            Margin="16,16,16,8"/>
 
                 <TextBlock DockPanel.Dock="Top"

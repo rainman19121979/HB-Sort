@@ -74,7 +74,9 @@
                        Margin="0,0,12,0"
                        VerticalAlignment="Center"
                        ToolTip="HB-Sort - HB-Bricks"/>
-                <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold">
+                <TextBlock VerticalAlignment="Center"
+                           FontSize="{StaticResource DialogHeaderFontSize}"
+                           FontWeight="SemiBold">
                     <Run Text="HB-Sort"/>
                 </TextBlock>
                 <TextBlock Text="{Binding VersionText, Mode=OneWay}"
