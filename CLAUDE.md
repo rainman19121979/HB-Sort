@@ -991,6 +991,36 @@ nie gefangen. Jetzt 5 realistische Tests die NUR `IsSelected` setzen
 
 Vor dem Fix: 4/5 dieser Tests scheiterten. Nach dem Fix: alle gruen.
 
+#### Phase 7-Bugfix (UX-Iteration X.13c, 2026-05-04) — BSX-Export-Cleanup-Dialog
+
+User-Bug-Bericht: nach Export von 3 Einzelteilen (0 Minifigs) aus
+einem Lagerfach zeigte der Cleanup-Dialog "(keine Faecher wuerden
+leer)" - Bin-Freigabe-Checkbox blieb ausgegraut.
+
+Code-Analyse-Befund: Die Service-Logik
+(`IStorageBinService.FindBinsThatWouldBeEmptyAsync` mit optionalem
+zweiten Parameter `floatingPartIdsToBeRemoved`, seit UX X.6) und der
+Aufruf-Pfad in `BsxExportDialog.xaml.cs::ShowCleanupBlockAsync` sind
+**bereits korrekt**. Vier zusaetzliche Repro-Tests in
+`StorageBinServiceTests.cs` decken das exakte User-Szenario ab und
+laufen gruen:
+- `FindBinsThatWouldBeEmpty_three_floatings_no_minifigs`
+- `FindBinsThatWouldBeEmpty_skips_bin_with_unrelated_floating_left_behind`
+- `FindBinsThatWouldBeEmpty_skips_bin_with_waiting_minifig`
+- `End_to_end_release_after_floating_only_export_marks_bin_as_freed`
+
+Die Tests beweisen dass die Logik im aktuellen Code-Stand das
+User-Szenario korrekt erkennt. Der Bug-Bericht stammt vermutlich aus
+einem Build vor UX X.6.
+
+**UX-Verbesserung am Cleanup-Dialog**: Der Text war ohnehin verwirrend.
+- Header: "Export erfolgreich" (knapp).
+- Body: Item-Anzahl + Datei + Frage. Floating-Origin-Detail gestrichen.
+- Checkbox-Label: konkrete Bin-Namen statt nur Zahl
+  ("Box 002 freigeben (wuerde leer)" / "3 Lagerfaecher freigeben
+  (Box 002, Box 005, Box 008)"). Helper-Methode `BuildReleaseBinsLabel`.
+- Singular/Plural je nach Anzahl korrekt formuliert.
+
 #### Smart-Storage-Suggestion beim Lagern (UX-Iteration X.7, 2026-05-03)
 
 Beim "Als Einzelteil lagern"-Workflow in der `PartLookupView` schlaegt die
