@@ -218,7 +218,8 @@
                                             Click="CollectFromBlCatalog_Click"
                                             Tag="{Binding}"
                                             Padding="8,4"
-                                            VerticalAlignment="Center"/>
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource AccentButtonStyle}"/>
                                 </Grid>
                             </Border>
                         </DataTemplate>

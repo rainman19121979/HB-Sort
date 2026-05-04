@@ -78,6 +78,15 @@ Beim App-Start läuft eine Auto-Migration vom alten Pfad
   `b:ImageZoom.IsEnabled="True"` setzen (Namespace
   `xmlns:b="clr-namespace:HBSort.Behaviors"`) → öffnet Modal-Overlay im
   MainWindow.
+- **Primäre Aktions-Buttons**: bekommen `Style="{StaticResource AccentButtonStyle}"`
+  (z.B. "Speichern", "Anlegen", "Exportieren", "Uebernehmen"). Sekundäre/
+  abbrechende Buttons bekommen keinen Style.
+- **Destruktive Buttons** ("Loeschen", "Fach freigeben mit Inhalt"): 
+  aktuell hardcoded `Background="#D32F2F" Foreground="White"` an einzelnen
+  Stellen (z.B. `MinifigSummaryDialog.xaml:189`). Ein dedizierter
+  `DangerButtonStyle` ist noch nicht definiert — TODO bei nächster UI-
+  Iteration. Bis dahin: bei neuen destruktiven Buttons auf das gleiche
+  Hex-Pärchen zeigen, damit ein späterer Style-Switch trivial wird.
 - **Dialog-Footer-Buttons**: 
   - **"Abbrechen"** für Editier-Dialoge die Eingaben verwerfen können
     (Bin anlegen, Dismantle-Wizard, Export, Settings, Detail-Eingaben).

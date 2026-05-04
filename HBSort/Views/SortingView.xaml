@@ -343,6 +343,7 @@
                                                 Margin="0,6,0,0"
                                                 Padding="0,4"
                                                 HorizontalAlignment="Stretch"
+                                                Style="{StaticResource AccentButtonStyle}"
                                                 ToolTip="Diese Erkennung uebernehmen"/>
                                     </Grid>
                                 </Border>
