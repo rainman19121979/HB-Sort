@@ -42,7 +42,7 @@ public partial class App : Application
     {
         // 0. Auto-Migration: alter Datenbestand (LegoMinifigSorter) -> neuer Pfad (HBSort).
         // Muss VOR EnsureDirectories laufen, weil wir den neuen Ordner sonst leer anlegen.
-        MigrateLegacyAppDataIfNeeded();
+        await MigrateLegacyAppDataIfNeededAsync();
 
         // 1. Ordnerstruktur sicherstellen
         EnsureDirectories();
@@ -468,7 +468,7 @@ public partial class App : Application
     /// und im neuen Ordner (HBSort) noch keine userdata.db liegt, wird der
     /// komplette Datenbestand kopiert. Einmalig beim ersten Start nach dem Rename.
     /// </summary>
-    private static void MigrateLegacyAppDataIfNeeded()
+    private static async Task MigrateLegacyAppDataIfNeededAsync()
     {
         try
         {
@@ -482,7 +482,11 @@ public partial class App : Application
             CopyDirectory(LegacyAppDataFolder, AppDataFolder);
 
             // Marker im alten Ordner setzen, damit klar ist dass migriert wurde.
-            File.WriteAllText(
+            // Audit M-8 (2026-05-04): WriteAllTextAsync statt sync. Laeuft hier
+            // einmalig vor dem App-Start, also kein UI-Block-Risiko - aber
+            // konsistent mit dem Rest der File-IO-Konvention.
+            // User-sichtbare Notiz, daher lokale Zeit (nicht UTC).
+            await File.WriteAllTextAsync(
                 Path.Combine(LegacyAppDataFolder, "MIGRATED_TO_HBSort.txt"),
                 $"Daten wurden nach {AppDataFolder} migriert am " +
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}.\n" +
