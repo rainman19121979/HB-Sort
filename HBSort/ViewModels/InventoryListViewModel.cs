@@ -72,11 +72,7 @@ public partial class InventoryListViewModel : ObservableObject
 
     public bool HasSelectedExportables => SelectedExportableCount > 0;
     partial void OnSelectedExportableCountChanged(int value)
-    {
-        // [SELECTION-DIAG] Diagnose-Log fuer den UX-X.13b-Selektions-Bug.
-        Log.Information("[SELECTION] SelectedExportableCount changed -> {Value}", value);
-        OnPropertyChanged(nameof(HasSelectedExportables));
-    }
+        => OnPropertyChanged(nameof(HasSelectedExportables));
 
     /// <summary>
     /// True wenn mindestens eine komplette Figur ODER ein Einzelteil in der
@@ -130,13 +126,9 @@ public partial class InventoryListViewModel : ObservableObject
     {
         var c = SelectedCompletes.Count();
         var f = SelectedFloatings.Count();
-        var total = c + f;
-        // [SELECTION-DIAG] Diagnose-Log fuer den UX-X.13b-Selektions-Bug.
-        // Nach Behebung wieder reduzieren auf Debug-Level.
-        Log.Information(
-            "[SELECTION] RecalculateSelection called. SelectedCompletes={C}, SelectedFloatings={F}, total={Total}",
-            c, f, total);
-        SelectedExportableCount = total;
+        // Debug-Level: bei Bedarf in den Settings auf Verbose schalten.
+        Log.Debug("[SELECTION] RecalculateSelection: completes={C}, floatings={F}", c, f);
+        SelectedExportableCount = c + f;
     }
 
     public InventoryListViewModel(
@@ -172,37 +164,23 @@ public partial class InventoryListViewModel : ObservableObject
     private void OnItemsCollectionChanged(
         object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {
-        // [SELECTION-DIAG] welche Aktion?
-        Log.Information(
-            "[SELECTION] Items.CollectionChanged: Action={Action}, NewItems={N}, OldItems={O}",
-            e.Action,
-            e.NewItems?.Count ?? -1,
-            e.OldItems?.Count ?? -1);
-
-        // Add/Remove: punktgenau subscriben/unsubscriben.
+        // Add/Remove: punktgenau subscriben/unsubscriben damit jede Row
+        // ihren SelectionChanged-Event an OnRowSelectionChanged liefert.
         if (e.NewItems != null)
             foreach (InventoryRowItem r in e.NewItems)
-            {
                 r.SelectionChanged += OnRowSelectionChanged;
-                Log.Information(
-                    "[SELECTION] Subscribed row: hash={Hash}, ItemId={ItemId}, Status={Status}",
-                    r.GetHashCode(), r.ItemId, r.Status);
-            }
         if (e.OldItems != null)
             foreach (InventoryRowItem r in e.OldItems)
                 r.SelectionChanged -= OnRowSelectionChanged;
 
         // Reset (z.B. Items.Clear()): Items-Snapshot ist hier leer, wir
-        // koennen die alten Subscriptions nicht mehr enumerieren.
+        // koennen die alten Subscriptions nicht mehr enumerieren - GC raeumt
+        // das beim naechsten Sweep auf, solange das VM nicht laenger lebt
+        // als die Rows.
     }
 
     private void OnRowSelectionChanged(object? sender, EventArgs e)
-    {
-        // [SELECTION-DIAG] kommt das ueberhaupt an?
-        var hash = sender?.GetHashCode() ?? 0;
-        Log.Information("[SELECTION] OnRowSelectionChanged from sender hash={Hash}", hash);
-        RecalculateSelection();
-    }
+        => RecalculateSelection();
 
     partial void OnSearchTextChanged(string value) => RefreshView();
     partial void OnShowCompleteChanged(bool value) => RefreshView();
@@ -457,15 +435,11 @@ public partial class InventoryRowItem : ObservableObject
     /// </summary>
     partial void OnIsSelectedChanged(bool value)
     {
-        // [SELECTION-DIAG] Diagnose-Log: laeuft dieser Hook ueberhaupt?
-        // Plus: hat das Event Subscriber? Ueber GetInvocationList ablesen
-        // damit wir sehen ob der CollectionChanged-Hook im VM den Listener
-        // korrekt eingehakt hat.
-        var subscribers = SelectionChanged?.GetInvocationList().Length ?? 0;
-        Serilog.Log.Information(
-            "[SELECTION] InventoryRowItem.OnIsSelectedChanged: hash={Hash}, ItemId={ItemId}, "
-            + "Status={Status}, NewValue={Value}, Subscribers={Subs}",
-            this.GetHashCode(), ItemId, Status, value, subscribers);
+        // Debug-Level - im Standard-Log nicht sichtbar, bei Diagnose-Bedarf
+        // einschaltbar (Settings -> Allgemein -> Logging-Level).
+        Serilog.Log.Debug(
+            "[SELECTION] Row toggled: ItemId={ItemId}, Status={Status}, IsSelected={Value}",
+            ItemId, Status, value);
         SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 

@@ -141,16 +141,28 @@
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <!--
-                                UX X.13b (Bugfix): Click-Handler weg. Selektion
-                                laeuft jetzt ueber den IsSelected-Setter im
-                                ViewModel-Item -> SelectionChanged-Event ->
-                                Parent-VM-RecalculateSelection. WPF-DataGrid
-                                mit IsReadOnly=True frisst den CheckBox-Click-
-                                Event nicht zuverlaessig; der Property-Pfad
-                                triggert dagegen unabhaengig von Maus/Tastatur/
-                                Code-Set immer.
+                                UX X.13b/d (Bugfix): zwei kritische Binding-
+                                Optionen, sonst aktualisiert die CheckBox die
+                                Source-Property NIE wenn die DataGrid auf
+                                IsReadOnly=True steht:
+
+                                1) UpdateSourceTrigger=PropertyChanged - Default
+                                   waere LostFocus, aber die CheckBox in einer
+                                   read-only-DataGrid-Cell behaelt den Tastatur-
+                                   Focus nicht zuverlaessig, daher wuerde der
+                                   Source-Update nie feuern.
+
+                                2) Die Cell IsHitTestVisible="True" + DataGrid-
+                                   intern: die DataGrid-Cell-Mouse-Logik fangt
+                                   Click-Events. Mit PropertyChanged-Trigger geht
+                                   das jetzt aber direkt ueber das Toggle-Event
+                                   der CheckBox (intern), kein Click-Bubble noetig.
+
+                                Dadurch laeuft der IsSelected-Setter SOFORT beim
+                                Toggle -> SelectionChanged-Event -> Parent-VM
+                                RecalculateSelection.
                             -->
-                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                       HorizontalAlignment="Center"
                                       VerticalAlignment="Center"
                                       ToolTip="Fuer BSX-Export auswaehlen">
