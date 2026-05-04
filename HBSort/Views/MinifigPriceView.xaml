@@ -8,7 +8,6 @@
         Layout:
           [ Header (Titel) ]
           [ LINKS: Komplette Figur | TRENNER | RECHTS: Einzelteile ]
-          [ Empfehlung (nur wenn beide Bereiche geladen) ]
 
         UX X.10: jede Haelfte ist ein eigenes State-Machine:
           - Idle (Manual + nicht angefordert): Button "Preis laden" mittig
@@ -16,12 +15,24 @@
           - Loaded: Preis-Anzeige + ↻-Refresh-Icon oben rechts
           - Issue (Error / Provider noch nicht eingerichtet): Banner + Erneut-Button
         Sichtbarkeiten ueber ShowXxx-Properties am VM, mutually-exclusive.
+
+        UX X.15: Statt einer separaten Empfehlungs-Banner wird die staerkere
+        Variante (hoeherer Wert) durch einen gruenen Hintergrund hervorgehoben.
+        Bei Gleichstand gewinnt die Komplett-Figur. Beide Halften muessen
+        geladen sein - sonst bleibt der Hintergrund neutral.
     -->
     <Grid Margin="6">
+        <Grid.Resources>
+            <!-- UX X.15: gruener Hintergrund + Tooltip wenn die Variante gewinnt. -->
+            <Style x:Key="PriceWinnerBorderStyle" TargetType="Border">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="CornerRadius" Value="4"/>
+                <Setter Property="Padding" Value="4"/>
+            </Style>
+        </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>  <!-- 0: Header -->
             <RowDefinition Height="*"/>     <!-- 1: Inhalt 50/50 -->
-            <RowDefinition Height="Auto"/>  <!-- 2: Empfehlung -->
         </Grid.RowDefinitions>
 
         <!-- ===== Header ===== -->
@@ -46,7 +57,18 @@
             <!-- ============================================================ -->
             <!-- ===== LINKS: Komplette Figur ===== -->
             <!-- ============================================================ -->
-            <Grid Grid.Column="0" Margin="0,0,8,0">
+            <Border Grid.Column="0" Margin="0,0,4,0">
+                <Border.Style>
+                    <Style TargetType="Border" BasedOn="{StaticResource PriceWinnerBorderStyle}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCompleteWinning}" Value="True">
+                                <Setter Property="Background" Value="#E8F5E9"/>
+                                <Setter Property="ToolTip" Value="Diese Variante bringt aktuell mehr"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+            <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>  <!-- 0: Header (Titel + Refresh-Icon) -->
                     <RowDefinition Height="Auto"/>  <!-- 1: Korrektur-Hint -->
@@ -160,11 +182,23 @@
                     </StackPanel>
                 </Grid>
             </Grid>
+            </Border>
 
             <!-- ============================================================ -->
             <!-- ===== RECHTS: Einzelteile ===== -->
             <!-- ============================================================ -->
-            <Grid Grid.Column="2" Margin="8,0,0,0">
+            <Border Grid.Column="2" Margin="4,0,0,0">
+                <Border.Style>
+                    <Style TargetType="Border" BasedOn="{StaticResource PriceWinnerBorderStyle}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsPartsWinning}" Value="True">
+                                <Setter Property="Background" Value="#E8F5E9"/>
+                                <Setter Property="ToolTip" Value="Diese Variante bringt aktuell mehr"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+            <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -292,19 +326,7 @@
                     </StackPanel>
                 </Grid>
             </Grid>
+            </Border>
         </Grid>
-
-        <!-- ===== Empfehlung (volle Breite, unten) ===== -->
-        <Border Grid.Row="2" Margin="0,8,0,0"
-                Background="#E8F5E9" BorderBrush="#2E7D32"
-                BorderThickness="1" CornerRadius="4"
-                Padding="8,4"
-                Visibility="{Binding HasRecommendation,
-                    Converter={StaticResource BoolToVisibility}}">
-            <TextBlock Text="{Binding RecommendationText}"
-                       FontSize="11" FontWeight="SemiBold"
-                       Foreground="#2E7D32"
-                       TextWrapping="Wrap"/>
-        </Border>
     </Grid>
 </UserControl>

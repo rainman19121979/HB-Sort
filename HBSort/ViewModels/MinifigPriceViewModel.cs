@@ -91,8 +91,8 @@ public partial class MinifigPriceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ShowCompleteIssueBanner))]
     [NotifyPropertyChangedFor(nameof(ShowCompleteLoadedContent))]
     [NotifyPropertyChangedFor(nameof(ShowCompleteRefreshIcon))]
-    [NotifyPropertyChangedFor(nameof(HasRecommendation))]
-    [NotifyPropertyChangedFor(nameof(RecommendationText))]
+    [NotifyPropertyChangedFor(nameof(IsCompleteWinning))]
+    [NotifyPropertyChangedFor(nameof(IsPartsWinning))]
     private PriceLookupOutcome? _completeOutcome;
 
     [ObservableProperty]
@@ -101,8 +101,8 @@ public partial class MinifigPriceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CompleteHasPrice))]
     [NotifyPropertyChangedFor(nameof(ShowCompleteLoadedContent))]
     [NotifyPropertyChangedFor(nameof(ShowCompleteRefreshIcon))]
-    [NotifyPropertyChangedFor(nameof(HasRecommendation))]
-    [NotifyPropertyChangedFor(nameof(RecommendationText))]
+    [NotifyPropertyChangedFor(nameof(IsCompleteWinning))]
+    [NotifyPropertyChangedFor(nameof(IsPartsWinning))]
     private decimal? _completeRawPrice;
 
     [ObservableProperty]
@@ -111,8 +111,8 @@ public partial class MinifigPriceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CompleteHasPrice))]
     [NotifyPropertyChangedFor(nameof(ShowCompleteLoadedContent))]
     [NotifyPropertyChangedFor(nameof(ShowCompleteRefreshIcon))]
-    [NotifyPropertyChangedFor(nameof(HasRecommendation))]
-    [NotifyPropertyChangedFor(nameof(RecommendationText))]
+    [NotifyPropertyChangedFor(nameof(IsCompleteWinning))]
+    [NotifyPropertyChangedFor(nameof(IsPartsWinning))]
     private decimal? _completeCorrectedPrice;
 
     [ObservableProperty]
@@ -212,8 +212,8 @@ public partial class MinifigPriceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(PartsHasAnyPrice))]
     [NotifyPropertyChangedFor(nameof(ShowPartsLoadedContent))]
     [NotifyPropertyChangedFor(nameof(ShowPartsRefreshIcon))]
-    [NotifyPropertyChangedFor(nameof(HasRecommendation))]
-    [NotifyPropertyChangedFor(nameof(RecommendationText))]
+    [NotifyPropertyChangedFor(nameof(IsCompleteWinning))]
+    [NotifyPropertyChangedFor(nameof(IsPartsWinning))]
     private decimal _partsTotalSum;
 
     [ObservableProperty]
@@ -274,19 +274,56 @@ public partial class MinifigPriceViewModel : ObservableObject
     /// <summary>Gemeinsame Hinweis-Message (Error oder Config) fuer den Parts-Banner.</summary>
     public string? PartsHintMessage => PartsConfigurationHint ?? PartsErrorMessage;
 
-    // ===== Empfehlung =====
+    // ===== Welche Variante bringt mehr (UX X.15) =====
+    //
+    // Statt eines Empfehlungs-Banners markiert die UI die "bessere" Haelfte
+    // mit einem dezenten gruenen Hintergrund. Diese zwei Flags steuern das.
+    //
+    // Voraussetzung: BEIDE Haelften sind erfolgreich geladen
+    // (CompleteHasPrice + PartsHasAnyPrice). Wenn eine Haelfte loadet /
+    // Idle / im Issue-State ist, sind beide Flags false und keine Box wird
+    // markiert.
+    //
+    // Bei exaktem Gleichstand gewinnt die Komplett-Box (Default-Verhalten).
 
     /// <summary>
-    /// Empfehlung erscheint nur wenn BEIDE Bereiche erfolgreich geladen sind.
-    /// Solange einer noch idle / loading / error ist: keine Empfehlung.
+    /// True wenn BEIDE Haelften geladen sind und die Komplett-Variante
+    /// >= Einzelteile-Summe ist (Gleichstand zaehlt fuer Komplett).
     /// </summary>
-    public bool HasRecommendation
-        => CompleteHasPrice && PartsHasAnyPrice && !string.IsNullOrEmpty(RecommendationText);
+    public bool IsCompleteWinning
+    {
+        get
+        {
+            if (!CompleteHasPrice || !PartsHasAnyPrice) return false;
+            return (CompleteCorrectedPrice ?? 0m) >= PartsTotalSum;
+        }
+    }
 
+    /// <summary>
+    /// True wenn BEIDE Haelften geladen sind und die Einzelteile-Summe
+    /// strikt > Komplett-Variante ist.
+    /// </summary>
+    public bool IsPartsWinning
+    {
+        get
+        {
+            if (!CompleteHasPrice || !PartsHasAnyPrice) return false;
+            return PartsTotalSum > (CompleteCorrectedPrice ?? 0m);
+        }
+    }
+
+    // ===== Empfehlung (DEPRECATED ab UX X.15) =====
+    // Diese zwei Properties bleiben aus Backwards-Compat fuer alte
+    // Tests/UI-Bindings, geben aber jetzt immer false/null zurueck.
+    // Werden in einer naechsten Iteration entfernt.
+
+    public bool HasRecommendation => false;
     public string? RecommendationText
     {
         get
         {
+            // Nicht mehr verwendet - die Empfehlung ist visuell durch
+            // die gruene Markierung ersetzt.
             if (!CompleteCorrectedPrice.HasValue || PartsTotalSum <= 0m) return null;
             var diff = CompleteCorrectedPrice.Value - PartsTotalSum;
             var basis = Math.Max(CompleteCorrectedPrice.Value, PartsTotalSum);

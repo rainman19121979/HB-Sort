@@ -184,11 +184,12 @@ public class MinifigPriceViewModelTests
         Assert.Equal(0, _cache.MinifigDeletes); // Komplett-Cache nicht angefasst
     }
 
-    // ===== Empfehlung =====
+    // ===== UX X.15: Gruene Markierung der besseren Variante =====
 
     [Fact]
-    public async Task Recommendation_only_shows_when_both_halves_loaded()
+    public async Task Winner_complete_higher_marks_complete_winning()
     {
+        // Komplett 20€, Einzelteile 2x2€ + 1x2€ = 6€ -> Komplett gewinnt.
         _settings.Current.Prices.AutoLoadCompletePrice = PriceLoadMode.Manual;
         _settings.Current.Prices.AutoLoadPartsPrice    = PriceLoadMode.Manual;
         _settings.Current.Prices.CorrectionMinifigPercent = 0m;
@@ -197,17 +198,100 @@ public class MinifigPriceViewModelTests
         _cache.NextPartOutcome    = MakeOutcome(2m,  PriceLookupSource.Live);
 
         var vm = new MinifigPriceViewModel(_cache, _settings, "arc007", TwoSubsets);
-
-        // Nichts geladen -> keine Empfehlung.
-        Assert.False(vm.HasRecommendation);
-
-        // Nur Komplett geladen -> immer noch keine Empfehlung.
         await vm.LoadCompleteCommand.ExecuteAsync(null);
-        Assert.False(vm.HasRecommendation);
-
-        // Beides geladen -> Empfehlung sichtbar.
         await vm.LoadPartsCommand.ExecuteAsync(null);
-        Assert.True(vm.HasRecommendation);
+
+        Assert.True(vm.IsCompleteWinning);
+        Assert.False(vm.IsPartsWinning);
+    }
+
+    [Fact]
+    public async Task Winner_parts_higher_marks_parts_winning()
+    {
+        // Komplett 5€, Einzelteile 2x10€ + 1x10€ = 30€ -> Einzelteile gewinnen.
+        _settings.Current.Prices.AutoLoadCompletePrice = PriceLoadMode.Manual;
+        _settings.Current.Prices.AutoLoadPartsPrice    = PriceLoadMode.Manual;
+        _settings.Current.Prices.CorrectionMinifigPercent = 0m;
+        _settings.Current.Prices.CorrectionPartsPercent   = 0m;
+        _cache.NextMinifigOutcome = MakeOutcome(5m,  PriceLookupSource.Live);
+        _cache.NextPartOutcome    = MakeOutcome(10m, PriceLookupSource.Live);
+
+        var vm = new MinifigPriceViewModel(_cache, _settings, "arc007", TwoSubsets);
+        await vm.LoadCompleteCommand.ExecuteAsync(null);
+        await vm.LoadPartsCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsCompleteWinning);
+        Assert.True(vm.IsPartsWinning);
+    }
+
+    [Fact]
+    public async Task Winner_equal_values_complete_wins_by_default()
+    {
+        // Komplett 6€ = Einzelteile 2x2€ + 1x2€ = 6€ -> bei Gleichstand
+        // gewinnt die Komplett-Figur (Default-Fall).
+        _settings.Current.Prices.AutoLoadCompletePrice = PriceLoadMode.Manual;
+        _settings.Current.Prices.AutoLoadPartsPrice    = PriceLoadMode.Manual;
+        _settings.Current.Prices.CorrectionMinifigPercent = 0m;
+        _settings.Current.Prices.CorrectionPartsPercent   = 0m;
+        _cache.NextMinifigOutcome = MakeOutcome(6m, PriceLookupSource.Live);
+        _cache.NextPartOutcome    = MakeOutcome(2m, PriceLookupSource.Live);
+
+        var vm = new MinifigPriceViewModel(_cache, _settings, "arc007", TwoSubsets);
+        await vm.LoadCompleteCommand.ExecuteAsync(null);
+        await vm.LoadPartsCommand.ExecuteAsync(null);
+
+        Assert.True(vm.IsCompleteWinning);
+        Assert.False(vm.IsPartsWinning);
+    }
+
+    [Fact]
+    public void Winner_neither_when_nothing_loaded()
+    {
+        // Keine Haelfte geladen -> keine Markierung.
+        _settings.Current.Prices.AutoLoadCompletePrice = PriceLoadMode.Manual;
+        _settings.Current.Prices.AutoLoadPartsPrice    = PriceLoadMode.Manual;
+
+        var vm = new MinifigPriceViewModel(_cache, _settings, "arc007", TwoSubsets);
+
+        Assert.False(vm.IsCompleteWinning);
+        Assert.False(vm.IsPartsWinning);
+    }
+
+    [Fact]
+    public async Task Winner_neither_when_only_one_half_loaded()
+    {
+        // Nur Komplett geladen -> noch kein Vergleich moeglich.
+        _settings.Current.Prices.AutoLoadCompletePrice = PriceLoadMode.Manual;
+        _settings.Current.Prices.AutoLoadPartsPrice    = PriceLoadMode.Manual;
+        _cache.NextMinifigOutcome = MakeOutcome(20m, PriceLookupSource.Live);
+
+        var vm = new MinifigPriceViewModel(_cache, _settings, "arc007", TwoSubsets);
+        await vm.LoadCompleteCommand.ExecuteAsync(null);
+
+        Assert.True(vm.CompleteHasPrice);
+        Assert.False(vm.PartsHasAnyPrice);
+        Assert.False(vm.IsCompleteWinning);
+        Assert.False(vm.IsPartsWinning);
+    }
+
+    [Fact]
+    public async Task Winner_neither_when_complete_errored()
+    {
+        // Komplett-Fehler, Einzelteile geladen -> keine der beiden gewinnt
+        // (Fehler-Status macht die "Variante" nicht vergleichbar).
+        _settings.Current.Prices.AutoLoadCompletePrice = PriceLoadMode.Manual;
+        _settings.Current.Prices.AutoLoadPartsPrice    = PriceLoadMode.Manual;
+        _cache.NextMinifigOutcome = new PriceLookupOutcome(
+            null, PriceLookupSource.None, null, "boom", PriceLookupNotice.Error);
+        _cache.NextPartOutcome = MakeOutcome(2m, PriceLookupSource.Live);
+
+        var vm = new MinifigPriceViewModel(_cache, _settings, "arc007", TwoSubsets);
+        await vm.LoadCompleteCommand.ExecuteAsync(null);
+        await vm.LoadPartsCommand.ExecuteAsync(null);
+
+        Assert.False(vm.CompleteHasPrice);
+        Assert.False(vm.IsCompleteWinning);
+        Assert.False(vm.IsPartsWinning);
     }
 
     // ===== Helpers + Stubs =====
