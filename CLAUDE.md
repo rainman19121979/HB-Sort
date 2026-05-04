@@ -1103,6 +1103,57 @@ einem Build vor UX X.6.
   (Box 002, Box 005, Box 008)"). Helper-Methode `BuildReleaseBinsLabel`.
 - Singular/Plural je nach Anzahl korrekt formuliert.
 
+#### Sortier-Tab UX-Putz (UX-Iteration X.15, 2026-05-04)
+
+Drei kleine UX-Korrekturen im Sortier-Tab:
+
+**Teil 1 — Gruene Markierung der besseren Preis-Variante** (oben rechts,
+MinifigPriceView). Statt einer separaten Empfehlungs-Banner unter der
+zweispaltigen Anzeige wird jetzt die Haelfte mit dem hoeheren Wert in
+gruen (`#E8F5E9`) hinterlegt. Bei Gleichstand gewinnt die Komplett-Figur
+(Default). Beide Halften muessen erfolgreich geladen sein - sonst keine
+Markierung.
+- Neue VM-Properties `IsCompleteWinning` / `IsPartsWinning` (computed,
+  beide false bis CompleteHasPrice && PartsHasAnyPrice).
+- XAML: jede Haelfte in `<Border>` mit DataTrigger gewrappt; Tooltip
+  "Diese Variante bringt aktuell mehr".
+- Empfehlungs-Banner samt Row entfernt; `HasRecommendation` /
+  `RecommendationText` sind als deprecated Stubs erhalten (HasRecommendation
+  liefert immer false).
+- 6 neue Tests in `MinifigPriceViewModelTests` (komplett>parts,
+  parts>komplett, gleich, nichts geladen, nur eine Haelfte, Komplett-Fehler).
+
+**Teil 2 — Brickognize-Karten Klick-Trennung** (unten links, SortingView).
+Die Top-3-Karten hatten `MouseLeftButtonUp` am ganzen Border und
+gleichzeitig `b:ImageZoom.IsEnabled="True"` am Image - der Image-Klick
+hat zwar `e.Handled=true` gesetzt, aber `Cursor=Hand` und der Hover-
+Trigger haben suggeriert dass die ganze Karte geklickt werden soll inkl.
+Bild. Jetzt eindeutig getrennt:
+- Bild-Klick = nur Zoom-Overlay (Tooltip "Vergroessern").
+- Neuer "Uebernehmen"-Button unter HighlightLabel triggert
+  `SelectCardAsync(rank-1)` (Tooltip "Diese Erkennung uebernehmen").
+- Karten-Hintergrund neutral, kein Cursor=Hand mehr; gruener Border bei
+  IsSelected bleibt erhalten.
+- Handler umbenannt: `ResultCard_MouseLeftButtonUp` → `SelectCard_Click`
+  (RoutedEventArgs statt MouseButtonEventArgs).
+- Convention: bei UI-Elementen mit `b:ImageZoom.IsEnabled="True"` darf
+  der umgebende Container keinen MouseLeftButtonUp-Handler oder
+  Cursor=Hand setzen - sonst entsteht eine optische Klick-Erwartung am
+  Bild die mit dem Zoom-Overlay konkurriert.
+
+**Teil 3 — "Lagerfaecher"-Tab aus Sortier-Tab entfernt** (unten mitte,
+TabControl). Der Tab war redundant zum dedizierten "Lagerliste"-Top-Tab.
+Das TabControl unten mitte behaelt vier Tabs: "Was kann ich bauen?",
+"Live-Stats", "Wartende-Detail", "Letzte Scans".
+- `BinOverviewView.xaml` + `.xaml.cs` geloescht.
+- `WaitingMinifigsViewModel.cs` geloescht (inkl. `BinOverviewItemViewModel`,
+  `WaitingMinifigViewModel` innere Klasse, `BinOverviewFilter` enum) -
+  wurde nur von BinOverviewView genutzt.
+- DI-Registrierung in `App.xaml.cs:244` entfernt.
+- `MainViewModel.WaitingMinifigs`-Property + ctor-Parameter entfernt.
+- `BinDetailDialog` bleibt - wird auch von `SettingsWindow` (BinManagerView)
+  genutzt.
+
 #### Smart-Storage-Suggestion beim Lagern (UX-Iteration X.7, 2026-05-03)
 
 Beim "Als Einzelteil lagern"-Workflow in der `PartLookupView` schlaegt die
@@ -1143,8 +1194,9 @@ NICHT in Phase 7 (bewusst weggelassen):
   spaeter ueber eine Read-only-View sichtbar gemacht werden).
 
 ### Phase X.3 – Variables Feld unten rechts ✅ (PROMPT 11, 2026-05-03)
-- Sortier-Tab unten rechts (R2,C2) ist jetzt ein TabControl mit 5 Ansichten:
-  - **Lagerfaecher** (Default, alte Funktionalitaet als BinOverviewView extrahiert)
+- Sortier-Tab unten rechts (R2,C2) ist ein TabControl mit 4 Ansichten
+  (UX X.15: vorher 5, "Lagerfaecher"-Tab entfernt - die volle Lagerliste
+  ist im eigenen Top-Tab "Lagerliste" verfuegbar):
   - **Was kann ich bauen?** - Reverse-Match aus dem Floating-Pool, zeigt
     BL-Minifigs deren Subsets durch die losen Teile (mind. N% Match) abgedeckt
     waeren. Slider fuer Min-Match (10..100, Default 50). Bereits getrackte
