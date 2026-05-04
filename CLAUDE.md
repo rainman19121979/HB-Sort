@@ -991,6 +991,47 @@ nie gefangen. Jetzt 5 realistische Tests die NUR `IsSelected` setzen
 
 Vor dem Fix: 4/5 dieser Tests scheiterten. Nach dem Fix: alle gruen.
 
+##### Phase 7-Bugfix (UX-Iteration X.13d, 2026-05-04) — Re-Open: tatsaechliche Wurzel-Ursache
+
+Die X.13b-Iteration oben (SelectionChanged-Event + CollectionChanged-
+Hook) war architektonisch korrekt, hat den Bug aber **nicht** behoben.
+Drei statische Code-Reviews konnten nicht erklaeren warum trotz
+sauberer VM-Logik die UI weiter "0 markiert" zeigte. Live-Diagnose
+mit `[SELECTION]`-Logs zeigte: der `IsSelected`-Setter wurde bei
+manuellem Checkbox-Klick **nie** aufgerufen, obwohl der Haken
+visuell erschien.
+
+**Echte Wurzel-Ursache**: WPF-CheckBox-IsChecked-TwoWay-Binding hat
+als Default `UpdateSourceTrigger=LostFocus`. In einer
+`DataGrid` mit `IsReadOnly="True"` haelt die CheckBox aber den
+Tastatur-Focus nicht zuverlaessig - die DataGrid-Cell-Mouse-Logik
+nimmt den Focus weg, **bevor** ein LostFocus-Event auf der CheckBox
+feuern wuerde. Folge: der Source-Update-Trigger feuert nie, IsSelected
+bleibt unberuehrt, SelectionChanged-Event wird nicht emittiert.
+Visuelles Toggle der Checkbox kommt aus dem internen IsChecked-State,
+nicht aus der Source.
+
+**Fix**: am Binding explizit `UpdateSourceTrigger=PropertyChanged`
+setzen. `InventoryListView.xaml`:
+```xml
+<CheckBox IsChecked="{Binding IsSelected,
+                       Mode=TwoWay,
+                       UpdateSourceTrigger=PropertyChanged}" .../>
+```
+
+**Convention** (zwingend bei DataGrid mit `IsReadOnly="True"`): jede
+CheckBox/TextBox/Slider in einer `DataGridTemplateColumn` braucht
+`UpdateSourceTrigger=PropertyChanged` am TwoWay-Binding. Ohne das
+greift LostFocus, das aber in read-only-DataGrids nicht zuverlaessig
+feuert. Bei DataGrids mit `IsReadOnly="False"` (Edit-Mode) ist's
+zumindest fuer TextBoxen unkritisch, weil die Cell in den Edit-State
+geht und der Focus dort sauber verwaltet wird.
+
+**Diagnose-Logs** sind als `Log.Debug` im Code geblieben (siehe
+`InventoryRowItem.OnIsSelectedChanged` und `RecalculateSelection`):
+default Information-Level filtert sie raus, fuer kuenftige Diagnose-
+Sessions kann das Log-Level temporaer angehoben werden.
+
 #### Phase 7-Bugfix (UX-Iteration X.13c, 2026-05-04) — BSX-Export-Cleanup-Dialog
 
 User-Bug-Bericht: nach Export von 3 Einzelteilen (0 Minifigs) aus
