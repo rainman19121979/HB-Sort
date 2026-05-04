@@ -249,6 +249,18 @@
                         </StackPanel>
                     </Border>
 
+                    <!--
+                        UX X.15 Teil 2: Klick-Trennung zwischen Bild-Zoom und
+                        Auswahl. Vorher war das ganze Border als MouseLeftButtonUp-
+                        Click markiert; das hat sich mit dem Image-Zoom (b:ImageZoom)
+                        ueberlappt - Klick aufs Bild loeste theoretisch beides aus.
+                        Jetzt:
+                          - Bild -> nur Zoom-Overlay (ToolTip "Vergroessern")
+                          - "Uebernehmen"-Button -> SelectCardAsync (ToolTip
+                            "Diese Erkennung uebernehmen")
+                          - Karten-Hintergrund neutral, kein Cursor=Hand mehr.
+                          - Gruener Border bei IsSelected bleibt.
+                    -->
                     <ItemsControl Grid.Row="2" ItemsSource="{Binding ScanViewModel.ResultCards}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -261,18 +273,10 @@
                                         BorderThickness="{Binding BorderThickness}"
                                         CornerRadius="4"
                                         Padding="6" Margin="4"
-                                        Background="Transparent"
-                                        Cursor="Hand"
-                                        Tag="{Binding Rank}"
-                                        MouseLeftButtonUp="ResultCard_MouseLeftButtonUp"
-                                        ToolTip="Klick um diesen Vorschlag zu uebernehmen. Stammdaten werden geladen.">
+                                        Background="Transparent">
                                     <Border.Style>
                                         <Style TargetType="Border">
                                             <Style.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background"
-                                                            Value="{DynamicResource SystemControlBackgroundChromeMediumBrush}"/>
-                                                </Trigger>
                                                 <DataTrigger Binding="{Binding IsSelected}" Value="True">
                                                     <Setter Property="BorderBrush" Value="#4CAF50"/>
                                                     <Setter Property="BorderThickness" Value="3"/>
@@ -292,6 +296,7 @@
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
 
                                         <Image Grid.Row="0"
@@ -300,7 +305,8 @@
                                                MaxHeight="200"
                                                HorizontalAlignment="Center"
                                                VerticalAlignment="Center"
-                                               b:ImageZoom.IsEnabled="True"/>
+                                               b:ImageZoom.IsEnabled="True"
+                                               ToolTip="Vergroessern"/>
 
                                         <TextBlock Grid.Row="1"
                                                    Text="{Binding Name}"
@@ -329,6 +335,15 @@
                                                    FontSize="10"
                                                    Foreground="#4CAF50"
                                                    FontWeight="SemiBold" Margin="0,4,0,0"/>
+
+                                        <Button Grid.Row="4"
+                                                Content="Uebernehmen"
+                                                Tag="{Binding Rank}"
+                                                Click="SelectCard_Click"
+                                                Margin="0,6,0,0"
+                                                Padding="0,4"
+                                                HorizontalAlignment="Stretch"
+                                                ToolTip="Diese Erkennung uebernehmen"/>
                                     </Grid>
                                 </Border>
                             </DataTemplate>

@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Input;
 using HBSort.Core.Services;
 using HBSort.Services;
 using HBSort.ViewModels;
@@ -45,8 +44,12 @@ public partial class SortingView : UserControl
         Service<INotificationService>().ShowInfo("Manuelle Suche kommt spaeter.");
     }
 
-    /// <summary>Click auf eine Top-3-Karte: triggert SelectCardAsync.</summary>
-    private void ResultCard_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    /// <summary>
+    /// UX X.15: Click auf den "Uebernehmen"-Button einer Top-3-Karte.
+    /// Vorher hing der Click am ganzen Border und ueberlappte sich mit dem
+    /// Image-Zoom; jetzt ist die Auswahl explizit.
+    /// </summary>
+    private void SelectCard_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement fe && fe.Tag is int rank && VM != null)
         {
