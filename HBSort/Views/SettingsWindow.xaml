@@ -953,11 +953,65 @@
                                          Text="{Binding PriceCacheTtlPartDays, UpdateSourceTrigger=PropertyChanged}"
                                          ToolTip="Wie lange werden Einzelteil-Preise als 'frisch' angesehen. Default: 90 Tage."/>
 
-                                <CheckBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3"
-                                          Margin="0,8,0,0"
-                                          Content="Preise automatisch laden bei kompletten Figuren"
-                                          IsChecked="{Binding PriceAutoLoadOnComplete}"/>
                             </Grid>
+
+                            <Separator Margin="0,12,0,8"/>
+
+                            <!--
+                                UX-Iteration X.10 (2026-05-04): "Preise laden"-Block ersetzt
+                                den alten "Auto-Load"-Checkbox. Pro Bereich (Komplett /
+                                Einzelteile) waehlt der User Auto vs Manuell. Default
+                                Manuell - spart API-Calls, der User klickt aktiv wenn er
+                                wirklich Preise sehen will. Wirkt live ohne Neustart, da
+                                der Wert bei jedem Pending-Minifig-Aufbau neu gelesen wird.
+                            -->
+                            <TextBlock Text="Preise laden" FontSize="13" FontWeight="SemiBold"
+                                       Margin="0,0,0,6"/>
+
+                            <TextBlock Text="Wann werden die Preise im Sortier-Tab oben rechts geladen?"
+                                       FontSize="11" Foreground="Gray" TextWrapping="Wrap"
+                                       Margin="0,0,0,6"/>
+
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="240"/>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0"
+                                           Text="Komplett-Figur-Preis:"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <ComboBox Grid.Row="0" Grid.Column="1" Margin="0,0,0,4"
+                                          ItemsSource="{Binding PriceLoadModeOptions}"
+                                          SelectedValuePath="Value"
+                                          DisplayMemberPath="Label"
+                                          SelectedValue="{Binding PriceAutoLoadCompletePrice, Mode=TwoWay}"
+                                          ToolTip="Auto = sofort beim Scannen einer Figur. Manuell = erst auf Klick (spart API-Calls)."/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0"
+                                           Text="Einzelteile-Preise:"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <ComboBox Grid.Row="1" Grid.Column="1" Margin="0,0,0,4"
+                                          ItemsSource="{Binding PriceLoadModeOptions}"
+                                          SelectedValuePath="Value"
+                                          DisplayMemberPath="Label"
+                                          SelectedValue="{Binding PriceAutoLoadPartsPrice, Mode=TwoWay}"
+                                          ToolTip="Auto = sofort beim Scannen. Manuell = erst auf Klick. Unabhaengig vom Komplett-Preis-Setting."/>
+                            </Grid>
+
+                            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
+                                       Margin="0,4,0,0">
+                                <Run Text="Auto:"/>
+                                Preise werden sofort beim Scannen einer Figur geladen.
+                                <LineBreak/>
+                                <Run Text="Manuell:"/>
+                                Preise werden erst auf Klick geladen (spart API-Calls).
+                            </TextBlock>
 
                             <Separator Margin="0,12,0,8"/>
 

@@ -61,6 +61,43 @@ public class PriceSettings
     /// </summary>
     public int BlPriceCacheTtlPartDays { get; set; } = 90;
 
-    /// <summary>Beim Oeffnen einer kompletten Figur Preise sofort laden (sonst Button).</summary>
+    /// <summary>
+    /// Beim Oeffnen einer kompletten Figur Preise sofort laden (sonst Button).
+    /// </summary>
+    /// <remarks>
+    /// DEPRECATED ab UX-Iteration X.10 (2026-05-04): wird durch
+    /// <see cref="AutoLoadCompletePrice"/> ersetzt. Feld bleibt aus
+    /// Backwards-Compat-Gruenden in der settings.json erhalten, wird aber
+    /// nirgends mehr gelesen. Kann in einer spaeteren Iteration entfernt
+    /// werden.
+    /// </remarks>
     public bool AutoLoadOnComplete { get; set; } = true;
+
+    /// <summary>
+    /// UX-Iteration X.10 (2026-05-04): wann der Komplett-Figur-Preis im
+    /// Sortier-Tab (MinifigPriceView) UND im MinifigSummaryDialog geladen
+    /// werden soll. Auto = sofort beim Erscheinen, Manual = erst auf Klick
+    /// (spart API-Calls). Default: Manual.
+    /// </summary>
+    public PriceLoadMode AutoLoadCompletePrice { get; set; } = PriceLoadMode.Manual;
+
+    /// <summary>
+    /// UX-Iteration X.10: dito fuer die Einzelteile-Summe. Default: Manual.
+    /// Unabhaengig von <see cref="AutoLoadCompletePrice"/> - der User kann
+    /// z.B. den Komplett-Preis auto laden lassen und die Teile nur auf Klick.
+    /// </summary>
+    public PriceLoadMode AutoLoadPartsPrice { get; set; } = PriceLoadMode.Manual;
+}
+
+/// <summary>
+/// UX-Iteration X.10: wann ein Preis-Bereich in der MinifigPriceView geladen
+/// werden soll. Auto = automatisch beim Erscheinen einer Pending-Minifig,
+/// Manual = erst auf User-Klick auf einen "Preis laden"-Button.
+/// </summary>
+public enum PriceLoadMode
+{
+    /// <summary>Erst auf Klick laden. Spart API-Calls (Default).</summary>
+    Manual,
+    /// <summary>Sofort laden sobald der Bereich angezeigt wird.</summary>
+    Auto
 }

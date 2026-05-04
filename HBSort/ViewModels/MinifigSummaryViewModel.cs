@@ -245,9 +245,12 @@ public partial class MinifigSummaryViewModel : ObservableObject
         OnPropertyChanged(nameof(ProgressLabel));
 
         // Phase 8: Auto-Load wenn Settings das wuenschen + Provider != None.
+        // UX-Iteration X.10: AutoLoadOnComplete (bool) abgeloest durch
+        // AutoLoadCompletePrice (PriceLoadMode). Default ist jetzt Manual -
+        // der User muss aktiv "Preis laden" klicken (spart API-Calls).
         if (ShowSalesRecommendation
             && _settings != null
-            && _settings.Current.Prices.AutoLoadOnComplete)
+            && _settings.Current.Prices.AutoLoadCompletePrice == Core.Models.PriceLoadMode.Auto)
         {
             _ = ReloadPricesAsync();
         }

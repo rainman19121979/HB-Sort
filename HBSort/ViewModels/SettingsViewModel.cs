@@ -356,6 +356,8 @@ public partial class SettingsViewModel : ObservableObject
         PriceCacheTtlMinifigDays       = s.Prices.BlPriceCacheTtlMinifigDays;
         PriceCacheTtlPartDays          = s.Prices.BlPriceCacheTtlPartDays;
         PriceAutoLoadOnComplete        = s.Prices.AutoLoadOnComplete;
+        PriceAutoLoadCompletePrice     = s.Prices.AutoLoadCompletePrice;
+        PriceAutoLoadPartsPrice        = s.Prices.AutoLoadPartsPrice;
 
         // Kameras auflisten
         AvailableCameras = _cameraService.GetAvailableCameras();
@@ -391,7 +393,9 @@ public partial class SettingsViewModel : ObservableObject
         s.Prices.CacheDays                 = Math.Max(1, PriceCacheDays);
         s.Prices.BlPriceCacheTtlMinifigDays = Math.Max(1, PriceCacheTtlMinifigDays);
         s.Prices.BlPriceCacheTtlPartDays    = Math.Max(1, PriceCacheTtlPartDays);
-        s.Prices.AutoLoadOnComplete        = PriceAutoLoadOnComplete;
+        s.Prices.AutoLoadOnComplete        = PriceAutoLoadOnComplete; // DEPRECATED-Schreiben weiter, fuer Backwards-Compat
+        s.Prices.AutoLoadCompletePrice     = PriceAutoLoadCompletePrice;
+        s.Prices.AutoLoadPartsPrice        = PriceAutoLoadPartsPrice;
 
         await _settingsService.SaveAsync();
         Log.Information("Einstellungen gespeichert");
@@ -832,11 +836,27 @@ public partial class SettingsViewModel : ObservableObject
     private decimal _priceCorrectionPartsPercent = -15m;
 
     [ObservableProperty] private int _priceCacheDays = 7;
-    [ObservableProperty] private bool _priceAutoLoadOnComplete = true;
+    [ObservableProperty] private bool _priceAutoLoadOnComplete = true; // DEPRECATED, siehe AutoLoadCompletePrice
 
     // UX#12: getrennte TTLs fuer Stale-While-Revalidate.
     [ObservableProperty] private int _priceCacheTtlMinifigDays = 90;
     [ObservableProperty] private int _priceCacheTtlPartDays = 90;
+
+    // UX-Iteration X.10: pro Bereich Auto vs Manuell.
+    [ObservableProperty] private PriceLoadMode _priceAutoLoadCompletePrice = PriceLoadMode.Manual;
+    [ObservableProperty] private PriceLoadMode _priceAutoLoadPartsPrice    = PriceLoadMode.Manual;
+
+    /// <summary>
+    /// UX-Iteration X.10: Optionen fuer die zwei "Preise laden"-Dropdowns.
+    /// Statisch - reicht fuer einen Enum mit zwei Werten.
+    /// </summary>
+    public IReadOnlyList<LoadModeOption> PriceLoadModeOptions { get; } = new[]
+    {
+        new LoadModeOption(PriceLoadMode.Manual, "Manuell"),
+        new LoadModeOption(PriceLoadMode.Auto,   "Auto")
+    };
+
+    public sealed record LoadModeOption(PriceLoadMode Value, string Label);
 
     /// <summary>Anzahl Eintraege im Preis-Cache (Settings-Anzeige).</summary>
     [ObservableProperty] private int _priceCacheEntryCount;
