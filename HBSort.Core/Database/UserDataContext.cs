@@ -86,10 +86,18 @@ public class UserDataContext : DbContext
 
             // Optional-FK auf die Origin-Figur (aus DismantleWizard).
             // SetNull beim Loeschen - Teil bleibt als verwaister Eintrag bestehen.
+            // FK erzeugt automatisch einen Index auf OriginMinifigId.
             entity.HasOne(e => e.OriginMinifig)
                 .WithMany()
                 .HasForeignKey(e => e.OriginMinifigId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Composite-Index fuer die haeufigste WHERE-Klausel im
+            // Reverse-Match-Pfad: WHERE PartNumber=? AND ColorId=?
+            // (siehe MinifigPersistenceService.PersistAndStoreAsync und
+            // CheckAndMarkCompleteAsync). Ohne diesen Index wird jeder
+            // Match linear ueber alle FloatingParts gescannt.
+            entity.HasIndex(e => new { e.PartNumber, e.ColorId });
         });
 
         // --- ScanEvent ---
