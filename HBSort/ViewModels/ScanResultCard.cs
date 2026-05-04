@@ -1,5 +1,3 @@
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using HBSort.Core.Models;
 
@@ -9,6 +7,11 @@ namespace HBSort.ViewModels;
 /// Ein Treffer der Top-3-Karten unter dem Webcam-Bild.
 /// Beinhaltet die fuer die UI-Anzeige aufbereiteten Daten:
 /// Bild, Name, Score, Typ, sowie die rohen IDs fuer den naechsten Workflow-Schritt.
+///
+/// Audit W-11 (2026-05-04): Klasse hat keine WPF-Brush-Properties mehr.
+/// Visuelle Marker (Top-Treffer, Selected) sind reine bool-Flags; die XAML-
+/// View setzt darauf die Brushes via DataTrigger. So bleibt das ViewModel
+/// frei von System.Windows.Media-Imports.
 /// </summary>
 public partial class ScanResultCard : ObservableObject
 {
@@ -42,21 +45,21 @@ public partial class ScanResultCard : ObservableObject
     /// <summary>Roher BrickognizeItem zum Spaeter-Verarbeiten.</summary>
     public BrickognizeItem? RawItem { get; init; }
 
-    /// <summary>Rahmenfarbe der Karte - wird bei Top-Treffer (Score &gt;= Auto) gruen.</summary>
+    /// <summary>
+    /// True wenn diese Karte der Top-Treffer mit Score &gt;= ScoreThresholdAuto
+    /// ist und damit auto-akzeptiert wurde. XAML verbindet das per DataTrigger
+    /// mit gruenem 3px-Border + Highlight-Label.
+    /// </summary>
     [ObservableProperty]
-    private Brush _borderBrush = Brushes.Gray;
+    private bool _isTopHit;
 
-    /// <summary>Rahmen-Dicke - Top-Treffer wird dicker dargestellt.</summary>
-    [ObservableProperty]
-    private double _borderThickness = 1;
-
-    /// <summary>Hervorhebungs-Hinweis bei Auto-Akzept ("Top-Treffer").</summary>
+    /// <summary>Hervorhebungs-Hinweis bei Auto-Akzept ("Top-Treffer (auto-akzeptiert)").</summary>
     [ObservableProperty]
     private string _highlightLabel = string.Empty;
 
     /// <summary>
     /// True wenn diese Karte aktuell ausgewaehlt ist (Auto-Akzept oder Click).
-    /// Wird vom XAML als Selected-Indicator (gruener Border) genutzt.
+    /// XAML verbindet das per DataTrigger mit gruenem 3px-Border.
     /// </summary>
     [ObservableProperty]
     private bool _isSelected;

@@ -529,8 +529,9 @@ public partial class ScanViewModel : ObservableObject
             // hervorheben - aber Auswahl bleibt sichtbar.
             if (i == 0 && item.Score >= thresholdAuto)
             {
-                card.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(76, 175, 80));
-                card.BorderThickness = 3;
+                // Audit W-11: kein direktes Brush-Setting mehr - der DataTrigger
+                // im XAML faerbt die Karte basierend auf IsTopHit gruen.
+                card.IsTopHit = true;
                 card.HighlightLabel = "Top-Treffer (auto-akzeptiert)";
             }
 

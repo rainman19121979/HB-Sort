@@ -269,14 +269,27 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border BorderBrush="{Binding BorderBrush}"
-                                        BorderThickness="{Binding BorderThickness}"
-                                        CornerRadius="4"
+                                <!--
+                                    Audit W-11: Border-Optik kommt jetzt rein
+                                    aus DataTriggers auf bool-Properties; das
+                                    ScanResultCard-VM hat keine WPF-Brush-
+                                    Properties mehr.
+                                    Defaults: graue duenne Linie. Bei IsTopHit
+                                    oder IsSelected: gruener 3px-Border.
+                                -->
+                                <Border CornerRadius="4"
                                         Padding="6" Margin="4"
                                         Background="Transparent">
                                     <Border.Style>
                                         <Style TargetType="Border">
+                                            <Setter Property="BorderBrush"
+                                                    Value="{DynamicResource SystemControlForegroundBaseLowBrush}"/>
+                                            <Setter Property="BorderThickness" Value="1"/>
                                             <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsTopHit}" Value="True">
+                                                    <Setter Property="BorderBrush" Value="#4CAF50"/>
+                                                    <Setter Property="BorderThickness" Value="3"/>
+                                                </DataTrigger>
                                                 <DataTrigger Binding="{Binding IsSelected}" Value="True">
                                                     <Setter Property="BorderBrush" Value="#4CAF50"/>
                                                     <Setter Property="BorderThickness" Value="3"/>
