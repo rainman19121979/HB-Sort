@@ -18,8 +18,6 @@ und in BrickStore aufnehmen, um z.B. einen Verkauf vorzubereiten.
    und Einzelteile auswaehlen**.
 4. Klick **Exportieren (n)** in der Action-Bar oben.
 5. Im Dialog:
-   - Optional: Bemerkung eintragen (geht ins Remarks-Feld jeder
-     ITEM-Zeile, Default "HBSort {Datum}").
    - Default-Ordner pruefen / aendern (wird als Default fuer naechsten
      Export gespeichert).
    - **Speichern**.
@@ -30,6 +28,24 @@ und in BrickStore aufnehmen, um z.B. einen Verkauf vorzubereiten.
 
 > **Tipp:** Den Default-Ordner kannst du auch in den Einstellungen
 > unter Tab *Export* fest setzen.
+
+### Was steht in der BSX-Datei?
+
+HB-Sort setzt zwei BrickStore-Felder pro Item, die unterschiedlich
+sichtbar sind:
+
+- **`<Remarks>` = intern (nur du im BrickStore siehst es):** wird
+  automatisch mit dem **Lagerfach-Label** gefuellt (z.B. `Box 003`).
+  So weisst du beim spaeteren Verkauf, woher der Eintrag stammt.
+- **`<Comments>` = oeffentlich (Kaeufer sieht es im Listing):** wird
+  fuer komplette Figuren mit deinen **Notizen** aus dem Sortier-Tab
+  gefuellt. Wenn du das Notizfeld in der MinifigDetailView leer
+  laesst, bleibt auch `<Comments>` leer.
+
+> **Tipp:** Wenn du eine oeffentliche Beschreibung wie "leichte
+> Gebrauchsspuren" oder "vergilbt" mit ausliefern willst, schreib
+> sie schon beim Sortieren ins Notizfeld. So landet sie automatisch
+> im BSX-Comment.
 
 ### Was passiert beim Cleanup?
 
@@ -86,16 +102,19 @@ Einstellungen -> Tab *Preise*:
 ### Live-Anzeige im Sortier-Tab
 
 In der oberen rechten Box des Sortier-Tabs siehst du fuer eine
-gerade gescannte Figur (Pending-Minifig):
+gerade gescannte Figur (Pending-Minifig) eine 50/50-Aufteilung:
 
-- **Komplett-Figur-Preis** (Avg / Min / Max + Anzahl Listings)
-- **Subset-Preise** als Liste mit Summe
-- **Gruener Empfehlungs-Banner** mit Hinweis "Komplett verkaufen
-  lohnt sich mehr (+X,XX EUR)" / "Einzelteile lohnen sich mehr" /
-  "etwa gleich" (10%-Schwelle)
+- **Links: Komplett-Figur-Preis** (Avg / Min / Max + Anzahl Listings)
+- **Rechts: Subset-Preise** als Liste mit Summe
 
-Per **Refresh-Button (↻)** loeschst du den Cache und ziehst die Daten
-neu von der API.
+Die **Haelfte mit dem hoeheren Wert** wird automatisch gruen
+hinterlegt - so siehst du auf einen Blick, ob sich Komplett-Verkauf
+oder Einzelteil-Verkauf mehr lohnt. Bei Gleichstand gewinnt die
+Komplett-Figur (Default). Damit die Markierung erscheint, muessen
+beide Seiten erfolgreich geladen sein.
+
+Per **Refresh-Button (↻)** pro Haelfte loeschst du den jeweiligen
+Cache und ziehst die Daten neu von der API.
 
 ### Cache
 
