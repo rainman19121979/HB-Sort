@@ -228,7 +228,7 @@
                         Visibility="Visible">
             <tb:TaskbarIcon.ContextMenu>
                 <ContextMenu>
-                    <MenuItem Header="Öffnen" Click="TrayOpen_Click"/>
+                    <MenuItem Header="Oeffnen" Click="TrayOpen_Click"/>
                     <Separator/>
                     <MenuItem Header="Beenden" Click="TrayExit_Click"/>
                 </ContextMenu>

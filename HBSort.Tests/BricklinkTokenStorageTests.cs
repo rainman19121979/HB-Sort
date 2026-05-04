@@ -71,7 +71,7 @@ public class BricklinkTokenStorageTests
     public async Task Load_throws_CryptographicException_for_invalid_blob()
     {
         var settings = new InMemorySettingsService();
-        // Kein gueltiges DPAPI-Blob – nur garbage Base64
+        // Kein gueltiges DPAPI-Blob - nur garbage Base64
         settings.Current.Bricklink.TokensEncrypted = Convert.ToBase64String(new byte[] { 1, 2, 3, 4, 5 });
 
         var sut = new BricklinkTokenStorage(settings);

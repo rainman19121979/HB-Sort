@@ -55,7 +55,7 @@ public class PersistentImageCacheTests : IDisposable
     {
         // 3 Eintraege a 100 KB, Limit 200 KB -> nach drittem Add muss der erste evicted sein,
         // Cache reduziert auf 90% von 200 KB = 180 KB -> nur 1 Eintrag uebrig wenn man so rechnet,
-        // aber wir evicten Liste sortiert nach LRU – nach dem dritten Add reicht ein Loeschen.
+        // aber wir evicten Liste sortiert nach LRU - nach dem dritten Add reicht ein Loeschen.
         var bytes100Kb = Encoding.UTF8.GetBytes(new string('x', 100 * 1024));
         var http = MakeClient(_ =>
         {
@@ -63,7 +63,7 @@ public class PersistentImageCacheTests : IDisposable
             msg.Content = new ByteArrayContent(bytes100Kb);
             return msg;
         });
-        // Limit auf "0.2 MB" setzen ist nicht moeglich – minimales Limit ist 1 MB.
+        // Limit auf "0.2 MB" setzen ist nicht moeglich - minimales Limit ist 1 MB.
         // Test fuer Eviction: wir setzen Limit auf 1 MB und schreiben 12x 100 KB = 1.2 MB.
         var cache = NewCache(http, 1);
 
@@ -80,7 +80,7 @@ public class PersistentImageCacheTests : IDisposable
             $"Cache ueber Limit: {stats.TotalSizeBytes} bytes");
         // Mindestens ein Eintrag muss evicted sein
         Assert.True(stats.FileCount < 12, $"Erwartet < 12, war {stats.FileCount}");
-        // Erster Eintrag (file0) sollte weg sein – als aeltester
+        // Erster Eintrag (file0) sollte weg sein - als aeltester
         Assert.False(File.Exists(Path.Combine(_testDir, "images", "file0.png")));
     }
 

@@ -30,7 +30,7 @@ public interface IBricklinkRateLimiter
 
     /// <summary>
     /// Wird ausgeloest sobald der Status sich aendert (Ok->Warning, Warning->Blocked, etc).
-    /// Wird auch bei jedem Call gefeuert (auch wenn State gleich bleibt) – das UI
+    /// Wird auch bei jedem Call gefeuert (auch wenn State gleich bleibt) - das UI
     /// kann darueber den Counter live aktualisieren.
     /// </summary>
     event EventHandler<RateLimitStatus>? StatusChanged;

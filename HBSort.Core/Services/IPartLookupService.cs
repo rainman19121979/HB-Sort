@@ -63,7 +63,7 @@ public interface IPartLookupService
 
     /// <summary>
     /// Findet alle Lagerfaecher in denen das Teil (BL-Part-No + BL-Color-Id) bereits
-    /// als Einzelteil liegt. Sortiert absteigend nach Gesamt-Menge im Fach – das
+    /// als Einzelteil liegt. Sortiert absteigend nach Gesamt-Menge im Fach - das
     /// erste Element ist das "Smart-Default-Fach" fuer den DismantleWizard.
     /// </summary>
     Task<List<FloatingPartLocation>> FindFloatingLocationsAsync(

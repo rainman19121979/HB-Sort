@@ -7,7 +7,7 @@ namespace HBSort.Core.Services;
 
 /// <summary>
 /// EF-Core-Implementierung des Lagerfach-Service. Nutzt einen IDbContextFactory&lt;UserDataContext&gt;
-/// damit jede Operation einen frischen Context bekommt – einfache Concurrency.
+/// damit jede Operation einen frischen Context bekommt - einfache Concurrency.
 /// </summary>
 public class StorageBinService : IStorageBinService
 {
@@ -46,7 +46,7 @@ public class StorageBinService : IStorageBinService
     public async Task<List<StorageBin>> GetFreeAsync(CancellationToken ct = default)
     {
         // "Frei" heisst hier: keine wartende Figur (Status=WAITING) UND keine FloatingParts.
-        // Status spielt mit – eine COMPLETE-Figur "blockiert" das Fach nicht mehr.
+        // Status spielt mit - eine COMPLETE-Figur "blockiert" das Fach nicht mehr.
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
         return await ctx.StorageBins
             .AsNoTracking()
@@ -82,7 +82,7 @@ public class StorageBinService : IStorageBinService
 
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
 
-        // Existenz-Check (ueber unique Index – aber bessere Fehlermeldung)
+        // Existenz-Check (ueber unique Index - aber bessere Fehlermeldung)
         if (await ctx.StorageBins.AnyAsync(b => b.Label == label, ct))
             throw new InvalidOperationException($"Lagerfach '{label}' existiert bereits.");
 
@@ -207,7 +207,7 @@ public class StorageBinService : IStorageBinService
                 $"Lagerfach '{bin.Label}' enthaelt noch wartende Figuren oder Teile. Erst leeren.");
         }
 
-        // Nicht-wartende Figuren (DISMANTLED, COMPLETE, SOLD) werden ab-gekoppelt –
+        // Nicht-wartende Figuren (DISMANTLED, COMPLETE, SOLD) werden ab-gekoppelt -
         // sie bleiben in der DB fuer Statistik, sind aber nicht mehr im Fach.
         var detachedCount = bin.TrackedMinifigs.Count;
         foreach (var m in bin.TrackedMinifigs.ToList())

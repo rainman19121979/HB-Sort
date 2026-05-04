@@ -92,7 +92,7 @@ public class BlBulkImportService : IBlBulkImportService
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    // Verzeichnis-Eintraege haben einen leeren Name – ueberspringen.
+                    // Verzeichnis-Eintraege haben einen leeren Name - ueberspringen.
                     if (string.IsNullOrEmpty(entry.Name)) continue;
 
                     var destPath = Path.Combine(tempDir, entry.FullName);
@@ -147,7 +147,7 @@ public class BlBulkImportService : IBlBulkImportService
         if (!Directory.Exists(folder))
             throw new DirectoryNotFoundException($"Ordner nicht gefunden: {folder}");
 
-        // PHASE 1: Stammdaten – alle BL-Item-Types
+        // PHASE 1: Stammdaten - alle BL-Item-Types
         // (B=Book, C=Catalog, G=Gear, I=Instruction, M=Minifig, O=OriginalBox,
         //  P=Part, S=Set). BrickStore liefert pro Type genau eine items/{T}.xml.
         var itemsFolder = Path.Combine(folder, "items");
@@ -208,7 +208,7 @@ public class BlBulkImportService : IBlBulkImportService
                 var xmlFile = xmlFiles[i];
                 var parentNo = Path.GetFileNameWithoutExtension(xmlFile);
 
-                // Progress alle 25 Files reporten – haeufiger Update fuer User-Feedback.
+                // Progress alle 25 Files reporten - haeufiger Update fuer User-Feedback.
                 if (i % 25 == 0)
                 {
                     progress?.Report(new BlBulkImportProgress(
@@ -326,7 +326,7 @@ public class BlBulkImportService : IBlBulkImportService
             if (reader.NodeType == XmlNodeType.Element && reader.Name == "ITEM")
             {
                 var elementXml = await reader.ReadOuterXmlAsync();
-                // Reader steht jetzt bereits auf dem naechsten Knoten – beim
+                // Reader steht jetzt bereits auf dem naechsten Knoten - beim
                 // naechsten Schleifen-Durchlauf NICHT ReadAsync() rufen.
                 moveNext = false;
 

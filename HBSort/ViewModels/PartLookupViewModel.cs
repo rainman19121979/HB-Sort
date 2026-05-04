@@ -30,7 +30,7 @@ public partial class PartLookupViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ColorDisplayLabel))]
     private string _colorName = string.Empty;
 
-    /// <summary>RGB-Hex (ohne #) – fuer Swatch.</summary>
+    /// <summary>RGB-Hex (ohne #) - fuer Swatch.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SwatchBrush))]
     private string? _colorRgb;
@@ -48,7 +48,7 @@ public partial class PartLookupViewModel : ObservableObject
 
     /// <summary>
     /// Treffer im BL-Catalog-Cache (Minifigs deren Subsets schon mal gecached
-    /// wurden) – die der User aber noch NICHT als wartende Figur hat. "Diese
+    /// wurden) - die der User aber noch NICHT als wartende Figur hat. "Diese
     /// Figur sammeln"-Aktion legt die Figur an + setzt das Trigger-Teil collected.
     /// </summary>
     public ObservableCollection<BlCatalogMatchViewModel> BlCatalogMatches { get; } = new();

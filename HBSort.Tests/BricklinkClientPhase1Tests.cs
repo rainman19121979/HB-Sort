@@ -4,7 +4,7 @@ using HBSort.Core.Services;
 namespace HBSort.Tests;
 
 /// <summary>
-/// Tests fuer den BricklinkClient – Phase R1.
+/// Tests fuer den BricklinkClient - Phase R1.
 /// Wir testen nur das Verhalten mit/ohne Tokens; ein echter API-Roundtrip
 /// ist nicht testbar weil OAuth1 + IP-Whitelist + Rate-Limit involviert sind.
 /// Den TestConnection-Endpunkt verifizieren wir manuell beim User-Test.

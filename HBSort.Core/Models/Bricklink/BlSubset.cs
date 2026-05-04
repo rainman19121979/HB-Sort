@@ -23,7 +23,7 @@ public record BlSubset
     public DateTime FetchedAt { get; init; } = DateTime.UtcNow;
 
     /// <summary>
-    /// True wenn der Eintrag aus einer GetSupersets-Antwort stammt – also nur ein
+    /// True wenn der Eintrag aus einer GetSupersets-Antwort stammt - also nur ein
     /// Single-Row-Eintrag pro Parent ist und KEINE vollstaendige Teileliste der
     /// Minifig darstellt. Cache-Konsumenten muessen pruefen ob mind. 1 Eintrag
     /// "echt" (IsFromSupersets=false) ist, bevor sie den Cache als komplett

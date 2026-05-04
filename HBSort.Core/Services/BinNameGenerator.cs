@@ -18,7 +18,7 @@ public enum BinSequenceType
 ///   Generate("", "-rot", Letters, "Z", "AB", 0)
 ///     -> ["Z-rot", "AA-rot", "AB-rot"]
 ///
-/// Statisch, keine Dependencies – einfach testbar.
+/// Statisch, keine Dependencies - einfach testbar.
 /// </summary>
 public static class BinNameGenerator
 {

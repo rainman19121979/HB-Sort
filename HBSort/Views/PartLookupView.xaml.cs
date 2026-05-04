@@ -50,7 +50,7 @@ public partial class PartLookupView : UserControl
             var completed = await lookup.AssignPartToMinifigAsync(match.TrackedMinifigPartId);
             if (completed)
             {
-                notif.ShowSuccess($"Teil zugeordnet – Figur '{match.MinifigName}' jetzt KOMPLETT!");
+                notif.ShowSuccess($"Teil zugeordnet - Figur '{match.MinifigName}' jetzt KOMPLETT!");
             }
             else
             {
@@ -146,7 +146,7 @@ public partial class PartLookupView : UserControl
                   ?? vm.AvailableBins.FirstOrDefault();
         if (bin == null)
         {
-            notif.ShowWarning("Kein Lagerfach verfuegbar – bitte erst ein Fach anlegen.");
+            notif.ShowWarning("Kein Lagerfach verfuegbar - bitte erst ein Fach anlegen.");
             return;
         }
 
@@ -161,9 +161,9 @@ public partial class PartLookupView : UserControl
                 Math.Max(1, vm.Quantity));
 
             notif.ShowSuccess(
-                $"Figur '{minifig.Name}' angelegt in '{bin.Label}' – Trigger-Teil sofort gesammelt.");
+                $"Figur '{minifig.Name}' angelegt in '{bin.Label}' - Trigger-Teil sofort gesammelt.");
 
-            // Pending ausblenden – Workflow ist abgeschlossen.
+            // Pending ausblenden - Workflow ist abgeschlossen.
             var scan = GetScanViewModel();
             if (scan != null) scan.PendingPart = null;
         }

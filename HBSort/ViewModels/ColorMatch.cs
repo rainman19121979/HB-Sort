@@ -7,7 +7,7 @@ namespace HBSort.ViewModels;
 /// <summary>
 /// Eine erkannte Farbe (Brickognize-/predict/parts/-Response).
 /// Enthaelt sowohl die rohen Daten als auch das RGB-Swatch fuer die UI.
-/// Brickognize liefert in der "id"-Spalte BL-Color-IDs direkt – RGB kommt
+/// Brickognize liefert in der "id"-Spalte BL-Color-IDs direkt - RGB kommt
 /// direkt aus bl_colors, kein RB->BL-Mapping noetig.
 /// </summary>
 public class ColorMatch
@@ -27,7 +27,7 @@ public class ColorMatch
     /// <summary>Score numerisch fuer Sortierung/Hervorhebung.</summary>
     public double Score { get; init; }
 
-    /// <summary>Brush fuer das Farbquadrat in der UI – auf Basis des Hex-RGB-Werts aus bl_colors.</summary>
+    /// <summary>Brush fuer das Farbquadrat in der UI - auf Basis des Hex-RGB-Werts aus bl_colors.</summary>
     public Brush SwatchBrush { get; init; } = Brushes.Gray;
 
     /// <summary>True wenn die Farbe lt. BL-Type "Transparent" ist.</summary>

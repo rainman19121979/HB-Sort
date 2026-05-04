@@ -11,7 +11,7 @@ namespace HBSort.Services;
 ///
 /// Architektur-Entscheidung: Eigene Mini-Implementierung (statt Toolkit-Toast),
 /// weil die Toolkit-Variante UWP-Notifications nutzt und damit ueber das System
-/// laeuft – wir wollen aber Toasts INNERHALB des App-Fensters, das ist viel
+/// laeuft - wir wollen aber Toasts INNERHALB des App-Fensters, das ist viel
 /// dezenter und braucht keine UWP-Registrierung.
 /// </summary>
 public class NotificationService : INotificationService

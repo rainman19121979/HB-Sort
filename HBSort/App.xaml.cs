@@ -18,8 +18,8 @@ public partial class App : Application
 {
     /// <summary>
     /// Der DI-Container (Dependency Injection).
-    /// Alle Services werden hier registriert und können dann überall angefordert werden.
-    /// Das macht den Code testbar, weil wir Services in Tests durch Mocks ersetzen können.
+    /// Alle Services werden hier registriert und koennen dann ueberall angefordert werden.
+    /// Das macht den Code testbar, weil wir Services in Tests durch Mocks ersetzen koennen.
     /// </summary>
     public static IServiceProvider Services { get; private set; } = null!;
 
@@ -28,7 +28,7 @@ public partial class App : Application
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "HBSort");
 
-    // Alter AppData-Pfad (vor dem Renaming auf HBSort) – fuer einmalige
+    // Alter AppData-Pfad (vor dem Renaming auf HBSort) - fuer einmalige
     // Auto-Migration des Datenbestands beim ersten Start nach dem Rename.
     private static readonly string LegacyAppDataFolder = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -36,7 +36,7 @@ public partial class App : Application
 
     /// <summary>
     /// Wird beim App-Start aufgerufen (statt StartupUri in XAML).
-    /// Wir steuern den Start selbst, damit wir DI, Logging etc. einrichten können.
+    /// Wir steuern den Start selbst, damit wir DI, Logging etc. einrichten koennen.
     /// </summary>
     private async void Application_Startup(object sender, StartupEventArgs e)
     {
@@ -76,7 +76,7 @@ public partial class App : Application
             // 6. Backup der userdata.db beim Start anlegen
             BackupUserData();
 
-            // 6.5 Cleanup: Altdaten – nicht-wartende Figuren von Faechern loesen,
+            // 6.5 Cleanup: Altdaten - nicht-wartende Figuren von Faechern loesen,
             // damit BinManager-Zaehler und DeleteAsync konsistent bleiben.
             await CleanupStaleBinAssignmentsAsync();
 
@@ -117,7 +117,7 @@ public partial class App : Application
 
     /// <summary>
     /// Richtet Serilog ein: Konsole + tagesweise rotierende Logdateien.
-    /// Logs werden 30 Tage aufbewahrt, dann automatisch gelöscht.
+    /// Logs werden 30 Tage aufbewahrt, dann automatisch geloescht.
     /// </summary>
     private static void SetupLogging()
     {
@@ -138,12 +138,12 @@ public partial class App : Application
 
     /// <summary>
     /// Registriert alle Services im DI-Container.
-    /// Jeder Service wird über sein Interface registriert (z.B. ICameraService → CameraService),
-    /// damit wir in Tests leicht Mock-Implementierungen einsetzen können.
+    /// Jeder Service wird ueber sein Interface registriert (z.B. ICameraService → CameraService),
+    /// damit wir in Tests leicht Mock-Implementierungen einsetzen koennen.
     /// </summary>
     private static void ConfigureServices(IServiceCollection services)
     {
-        // Services als Singleton registrieren (eine Instanz für die gesamte App-Laufzeit)
+        // Services als Singleton registrieren (eine Instanz fuer die gesamte App-Laufzeit)
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<ICameraService, CameraService>();
 
@@ -180,7 +180,7 @@ public partial class App : Application
         services.AddSingleton<IBlCatalogService, BlCatalogService>();
 
         // NotificationService als Singleton, beide Registrierungen zeigen auf die selbe
-        // Instanz – damit MainViewModel die ObservableCollection direkt anbinden kann.
+        // Instanz - damit MainViewModel die ObservableCollection direkt anbinden kann.
         services.AddSingleton<NotificationService>();
         services.AddSingleton<INotificationService>(sp => sp.GetRequiredService<NotificationService>());
 
@@ -194,10 +194,10 @@ public partial class App : Application
         // UX-Iteration X.9: globaler Tooltips-Schalter (Default: an).
         services.AddSingleton<ITooltipsService, TooltipsService>();
 
-        // EF Core DbContext für userdata.db.
+        // EF Core DbContext fuer userdata.db.
         // Wir registrieren beide Wege: AddDbContext (fuer Migrationen) und
         // AddDbContextFactory (damit Services pro Operation einen frischen Context
-        // bekommen koennen — wichtig in WPF, wo es keinen klaren Scope gibt).
+        // bekommen koennen - wichtig in WPF, wo es keinen klaren Scope gibt).
         var dbPath = Path.Combine(AppDataFolder, "userdata.db");
         services.AddDbContext<UserDataContext>(options =>
             options.UseSqlite($"Data Source={dbPath}"));
@@ -256,14 +256,14 @@ public partial class App : Application
         services.AddSingleton<IHelpContentService, HelpContentService>();
         services.AddSingleton<ViewModels.HelpViewModel>();
 
-        // Phase 4: Bin-Dialoge (transient – pro Aufruf eine neue Instanz).
+        // Phase 4: Bin-Dialoge (transient - pro Aufruf eine neue Instanz).
         services.AddTransient<Views.BinCreateDialog>();
         services.AddTransient<Views.BinBulkCreateDialog>();
 
         // Phase 7: BSX-Export-Dialog
         services.AddTransient<Views.BsxExportDialog>();
 
-        // UX-Iteration X.4: Wanted-List-Export-Dialog (transient – pro Klick eine
+        // UX-Iteration X.4: Wanted-List-Export-Dialog (transient - pro Klick eine
         // neue Instanz, damit Status/Inputs frisch sind).
         services.AddTransient<Views.WantedListExportDialog>();
 
@@ -371,7 +371,7 @@ public partial class App : Application
             var blClient = Services.GetRequiredService<IBricklinkClient>();
             if (!await blClient.IsConfiguredAsync())
             {
-                Log.Information("Keine BL-Tokens hinterlegt – BL-Test uebersprungen.");
+                Log.Information("Keine BL-Tokens hinterlegt - BL-Test uebersprungen.");
                 return;
             }
 
@@ -431,7 +431,7 @@ public partial class App : Application
 
     /// <summary>
     /// Erstellt ein Backup der userdata.db beim App-Start.
-    /// Falls die Datei beschädigt wird, haben wir wenigstens den Stand vom letzten Start.
+    /// Falls die Datei beschaedigt wird, haben wir wenigstens den Stand vom letzten Start.
     /// </summary>
     private static void BackupUserData()
     {
@@ -453,7 +453,7 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Stellt sicher, dass alle benötigten Unterordner im AppData-Ordner existieren.
+    /// Stellt sicher, dass alle benoetigten Unterordner im AppData-Ordner existieren.
     /// </summary>
     private static void EnsureDirectories()
     {
@@ -475,7 +475,7 @@ public partial class App : Application
             if (!Directory.Exists(LegacyAppDataFolder)) return;
 
             // Wenn im neuen Ordner schon userdata.db existiert: schon migriert
-            // ODER frische Installation – nicht ueberschreiben.
+            // ODER frische Installation - nicht ueberschreiben.
             var newDbExists = File.Exists(Path.Combine(AppDataFolder, "userdata.db"));
             if (newDbExists) return;
 
@@ -505,7 +505,7 @@ public partial class App : Application
         {
             var destFile = Path.Combine(destDir, Path.GetFileName(file));
             try { File.Copy(file, destFile, overwrite: false); }
-            catch (IOException) { /* Datei existiert schon – ueberspringen */ }
+            catch (IOException) { /* Datei existiert schon - ueberspringen */ }
         }
 
         foreach (var subDir in Directory.GetDirectories(sourceDir))
@@ -524,7 +524,7 @@ public partial class App : Application
 
     /// <summary>
     /// Wird aufgerufen wenn die App beendet wird.
-    /// Räumt auf: alle DI-Singletons freigeben, Logging flushen.
+    /// Raeumt auf: alle DI-Singletons freigeben, Logging flushen.
     /// </summary>
     protected override void OnExit(ExitEventArgs e)
     {

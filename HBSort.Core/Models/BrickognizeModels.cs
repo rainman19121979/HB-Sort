@@ -90,7 +90,7 @@ public class BrickognizeExternalSite
 /// <summary>Farb-Vorschlag bei /predict/parts/.</summary>
 public class BrickognizeColor
 {
-    /// <summary>Color-ID als String (Brickognize liefert das so) – Rebrickable-Color-IDs.</summary>
+    /// <summary>Color-ID als String (Brickognize liefert das so) - Rebrickable-Color-IDs.</summary>
     [JsonPropertyName("id")]
     public string Id { get; set; } = string.Empty;
 

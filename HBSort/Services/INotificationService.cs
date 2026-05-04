@@ -19,7 +19,7 @@ public interface INotificationService
     void ShowError(string message);
 }
 
-/// <summary>Toast-Typ – bestimmt Hintergrundfarbe.</summary>
+/// <summary>Toast-Typ - bestimmt Hintergrundfarbe.</summary>
 public enum ToastKind
 {
     Info,

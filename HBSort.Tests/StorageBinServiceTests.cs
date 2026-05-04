@@ -202,9 +202,9 @@ public class StorageBinServiceTests : IDisposable
     [Fact]
     public async Task FindBinsThatWouldBeEmpty_returns_bins_only_holding_to_be_removed_minifigs()
     {
-        // Box 01: enthält nur die zu entfernende Figur -> waere leer
-        // Box 02: enthält die zu entfernende Figur PLUS eine andere -> waere nicht leer
-        // Box 03: enthält nur die zu entfernende Figur, aber ein FloatingPart -> waere nicht leer
+        // Box 01: enthaelt nur die zu entfernende Figur -> waere leer
+        // Box 02: enthaelt die zu entfernende Figur PLUS eine andere -> waere nicht leer
+        // Box 03: enthaelt nur die zu entfernende Figur, aber ein FloatingPart -> waere nicht leer
         var b1 = await _sut.CreateSingleAsync("Box 01");
         var b2 = await _sut.CreateSingleAsync("Box 02");
         var b3 = await _sut.CreateSingleAsync("Box 03");

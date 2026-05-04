@@ -16,7 +16,7 @@ using Serilog;
 namespace HBSort.ViewModels;
 
 /// <summary>
-/// ViewModel für die Scan-Ansicht (Hauptansicht der App).
+/// ViewModel fuer die Scan-Ansicht (Hauptansicht der App).
 ///
 /// Phase 2: Brickognize-Integration.
 ///   - Modus-Auswahl (Figur / Teil / Auto)
@@ -115,7 +115,7 @@ public partial class ScanViewModel : ObservableObject
 
     /// <summary>
     /// Top-3-Karten werden ausgeblendet sobald die MinifigDetailView ODER PartLookupView
-    /// gezeigt wird – beide Detail-Views machen die Top-Treffer-Info redundant.
+    /// gezeigt wird - beide Detail-Views machen die Top-Treffer-Info redundant.
     /// </summary>
     public bool ShouldShowTopCards => HasResults && !HasPendingMinifig && !HasPendingPart;
 
@@ -231,7 +231,7 @@ public partial class ScanViewModel : ObservableObject
 
         if (AvailableCameras.Count == 0)
         {
-            ScanStatusText = "Keine Kamera gefunden! Bitte USB-Kamera anschließen.";
+            ScanStatusText = "Keine Kamera gefunden! Bitte USB-Kamera anschliessen.";
             Log.Warning("Keine Kamera gefunden");
             return;
         }
@@ -251,7 +251,7 @@ public partial class ScanViewModel : ObservableObject
         UpdateCanScan();
 
         ScanStatusText = IsCameraRunning
-            ? "Leertaste drücken zum Scannen"
+            ? "Leertaste druecken zum Scannen"
             : "Kamera konnte nicht gestartet werden!";
 
         if (IsCameraRunning) Log.Information("Kamera {Index} aktiv", index);
@@ -269,7 +269,7 @@ public partial class ScanViewModel : ObservableObject
         {
             BrickognizeStatus.Online  => $"Brickognize: Online ({health.ResponseTimeMs} ms)",
             BrickognizeStatus.Slow    => $"Brickognize: Langsam ({health.ResponseTimeMs} ms)",
-            BrickognizeStatus.Offline => $"Brickognize: Offline – {health.ErrorMessage}",
+            BrickognizeStatus.Offline => $"Brickognize: Offline - {health.ErrorMessage}",
             _                          => "Brickognize: Status unbekannt"
         };
 
@@ -277,7 +277,7 @@ public partial class ScanViewModel : ObservableObject
 
         if (health.Status == BrickognizeStatus.Offline)
         {
-            _notifications.ShowError("Brickognize nicht erreichbar – Scannen deaktiviert.");
+            _notifications.ShowError("Brickognize nicht erreichbar - Scannen deaktiviert.");
         }
     }
 
@@ -337,7 +337,7 @@ public partial class ScanViewModel : ObservableObject
         // Wenn der User gerade in einem Eingabe-Control tippt (z.B. Notiz-TextBox
         // in Phase 3+), soll das Drucken der Leertaste KEINEN Scan ausloesen,
         // sondern als Leerzeichen im Text landen. WPF leitet KeyBindings auch
-        // bei TextBox-Fokus weiter – deshalb pruefen wir das hier explizit.
+        // bei TextBox-Fokus weiter - deshalb pruefen wir das hier explizit.
         // Wenn TextBox Fokus hat: still beenden, damit die TextBox-Default-Verarbeitung
         // (Leerzeichen einfuegen) durchlaeuft.
         if (Keyboard.FocusedElement is TextBoxBase)
@@ -379,7 +379,7 @@ public partial class ScanViewModel : ObservableObject
 
         Log.Information("Schnappschuss aufgenommen ({Size} Bytes), Modus={Mode}",
             snapshot.Length, ScanMode);
-        ScanStatusText = "Bild eingefroren – sende an Brickognize...";
+        ScanStatusText = "Bild eingefroren - sende an Brickognize...";
 
         // Bild im scans-Ordner archivieren
         await SaveScanImageAsync(snapshot);
@@ -404,7 +404,7 @@ public partial class ScanViewModel : ObservableObject
             // auf Rang 2/3 stehen), machen wir einen zweiten Call um die Farbe
             // zusaetzlich zu erfassen. Der Call ist schnell (~50ms) und
             // wird im selben brickognize-debug.log mitgeschrieben.
-            // Vorher (BUG): nur wenn der Top-Treffer ein Teil war – dann blieben
+            // Vorher (BUG): nur wenn der Top-Treffer ein Teil war - dann blieben
             // die Teile auf Rang 2/3 ohne Farbe und wurden in BL color=0
             // (oft schwarz) angezeigt.
             if (ScanMode == ScanMode.Auto
@@ -469,7 +469,7 @@ public partial class ScanViewModel : ObservableObject
 
         _isFrozen = false;
         UpdateCanScan();
-        ScanStatusText = "Leertaste drücken zum Scannen";
+        ScanStatusText = "Leertaste druecken zum Scannen";
     }
 
     /// <summary>
@@ -495,7 +495,7 @@ public partial class ScanViewModel : ObservableObject
 
         if (prediction.Items.Count == 0)
         {
-            ResultHeadlineText = "Nichts erkannt – bitte erneut versuchen oder manuelle Suche.";
+            ResultHeadlineText = "Nichts erkannt - bitte erneut versuchen oder manuelle Suche.";
             HasResults = true;
             ShowSearchFallback = true;
             return;
@@ -523,10 +523,10 @@ public partial class ScanViewModel : ObservableObject
             };
 
             // Hervorhebung NUR fuer den Top-Treffer und NUR wenn Score >= scoreThresholdAuto.
-            // Zusaetzliche Regel aus CLAUDE.md: ab Score < ShowSelection IMMER Auswahl-UI –
+            // Zusaetzliche Regel aus CLAUDE.md: ab Score < ShowSelection IMMER Auswahl-UI -
             // d.h. selbst wenn der Top-Score >= Auto liegt, aber ShowSelection groesser ist
             // (sollte normal nicht sein, da Auto > ShowSelection als Default), trotzdem
-            // hervorheben – aber Auswahl bleibt sichtbar.
+            // hervorheben - aber Auswahl bleibt sichtbar.
             if (i == 0 && item.Score >= thresholdAuto)
             {
                 card.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(76, 175, 80));
@@ -545,7 +545,7 @@ public partial class ScanViewModel : ObservableObject
         }
         else if (topScore >= thresholdAuto && topScore >= thresholdShowSel)
         {
-            ResultHeadlineText = $"Top-Treffer mit {topScore:P0} – auto-akzeptiert.";
+            ResultHeadlineText = $"Top-Treffer mit {topScore:P0} - auto-akzeptiert.";
             ShowSearchFallback = false;
         }
         else
@@ -556,7 +556,7 @@ public partial class ScanViewModel : ObservableObject
 
         HasResults = true;
 
-        // Toast nur fuer "Nicht sicher" / "Bitte auswaehlen" – Auto-Akzept-Feedback
+        // Toast nur fuer "Nicht sicher" / "Bitte auswaehlen" - Auto-Akzept-Feedback
         // wird vom SelectCardAsync-Flow gesteuert (Detail-Lookup-Toast).
         if (topScore < thresholdMin)
         {
@@ -571,7 +571,7 @@ public partial class ScanViewModel : ObservableObject
     /// <summary>
     /// Loest fuer jede Top-Card die Bild-URL via PartImageProvider auf.
     /// BrickLink-First, Fallback auf Brickognize-Render. Wird ohne Farbe aufgerufen
-    /// (vor der Farb-Identifikation) – die Top-Card wird spaeter via
+    /// (vor der Farb-Identifikation) - die Top-Card wird spaeter via
     /// RefreshTopCardImageAsync aktualisiert sobald die Farbe bekannt ist.
     /// </summary>
     private async Task ResolveCardImagesAsync(BrickognizePrediction prediction, int? knownColorId)
@@ -666,11 +666,11 @@ public partial class ScanViewModel : ObservableObject
         var topScore = ResultCards.FirstOrDefault()?.Score ?? 0;
         if (index == 0 && topScore >= s.ScoreThresholdAuto)
         {
-            ResultHeadlineText = $"Top-Treffer mit {topScore:P0} – auto-akzeptiert.";
+            ResultHeadlineText = $"Top-Treffer mit {topScore:P0} - auto-akzeptiert.";
         }
         else
         {
-            ResultHeadlineText = $"Treffer {index + 1} mit {card.Score:P0} – manuell ausgewaehlt.";
+            ResultHeadlineText = $"Treffer {index + 1} mit {card.Score:P0} - manuell ausgewaehlt.";
             // Toast bei manuellem Wechsel (nicht bei Auto-Akzept und nicht bei
             // unveraendertem Index)
             if (prevIndex >= 0 && prevIndex != index)
@@ -732,7 +732,7 @@ public partial class ScanViewModel : ObservableObject
         var bricklinkId = card.Ids.BricklinkId ?? card.RawItem?.Id;
         if (string.IsNullOrEmpty(bricklinkId))
         {
-            _notifications.ShowWarning("Keine BL-Referenz – Lookup nicht moeglich.");
+            _notifications.ShowWarning("Keine BL-Referenz - Lookup nicht moeglich.");
             PendingMinifig = null;
             MinifigStatusText = "Keine BL-Referenz fuer diese Karte.";
             return;
@@ -762,7 +762,7 @@ public partial class ScanViewModel : ObservableObject
 
             ct.ThrowIfCancellationRequested();
 
-            // Tasks sind nach WhenAll garantiert abgeschlossen – await ist hier
+            // Tasks sind nach WhenAll garantiert abgeschlossen - await ist hier
             // ein billiges Auslesen des bereits berechneten Resultats.
             var details = await detailsTask;
             var subsets = await partsTask;
@@ -841,7 +841,7 @@ public partial class ScanViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
-            // Vom User durch neuen Klick / neuen Scan abgebrochen – kein Toast.
+            // Vom User durch neuen Klick / neuen Scan abgebrochen - kein Toast.
             Log.Debug("BL-Lookup fuer {Id} abgebrochen", bricklinkId);
         }
         catch (BricklinkAuthException ex)
@@ -876,7 +876,7 @@ public partial class ScanViewModel : ObservableObject
         var blPartNo = card.Ids.BricklinkId ?? card.RawItem?.Id;
         if (string.IsNullOrEmpty(blPartNo))
         {
-            _notifications.ShowWarning("Keine BL-Part-No – Teile-Lookup nicht moeglich.");
+            _notifications.ShowWarning("Keine BL-Part-No - Teile-Lookup nicht moeglich.");
             return;
         }
 
@@ -1045,7 +1045,7 @@ public partial class ScanViewModel : ObservableObject
             if (known.Count == 0)
             {
                 known = await _blCatalog.GetAllColorsAsync();
-                Log.Debug("KnownColors leer – Fallback auf {Count} alle BL-Farben", known.Count);
+                Log.Debug("KnownColors leer - Fallback auf {Count} alle BL-Farben", known.Count);
             }
 
             System.Windows.Application.Current?.Dispatcher.Invoke(() =>
@@ -1158,7 +1158,7 @@ public partial class ScanViewModel : ObservableObject
             {
                 var msg = $"Fach '{pending.SelectedBin.Label}' ist bereits belegt: " +
                           $"{occ.MinifigCount} Figur(en), {occ.FloatingPartCount} Teil(e).\n\n" +
-                          "Mehrere Figuren in einem Fach sind erlaubt – willst du fortfahren?";
+                          "Mehrere Figuren in einem Fach sind erlaubt - willst du fortfahren?";
                 // Bestaetigung vor dem Mischen - "Ja" / "Nein", weil das Fach
                 // dann eine zusaetzliche Figur bekommt und das schwer rueckgaengig ist.
                 if (!await _dialogs.ShowQuestionAsync("Lagerfach belegt", msg)) return;
@@ -1234,7 +1234,7 @@ public partial class ScanViewModel : ObservableObject
 
     /// <summary>
     /// Laed die Teile-Bilder einer erkannten Minifigur im Hintergrund vor.
-    /// SemaphoreSlim(5) als Throttle. Best-effort – einzelne Fehler werden nur geloggt.
+    /// SemaphoreSlim(5) als Throttle. Best-effort - einzelne Fehler werden nur geloggt.
     /// </summary>
     private async Task PreloadPartImagesAsync(PendingMinifigViewModel pending)
     {
@@ -1244,7 +1244,7 @@ public partial class ScanViewModel : ObservableObject
             await throttle.WaitAsync();
             try
             {
-                // Direkt mit BL-IDs – kein Brickognize-Wrapper noetig.
+                // Direkt mit BL-IDs - kein Brickognize-Wrapper noetig.
                 var url = await _imageProvider.GetImageFileByBlAsync("P", part.BricklinkPartNo, part.BricklinkColorId);
 
                 System.Windows.Application.Current?.Dispatcher.Invoke(() =>
@@ -1497,10 +1497,10 @@ public partial class ScanViewModel : ObservableObject
 /// <summary>Scan-Modus: bestimmt welcher Brickognize-Endpoint angesprochen wird.</summary>
 public enum ScanMode
 {
-    /// <summary>Generischer /predict/ – wenn unklar.</summary>
+    /// <summary>Generischer /predict/ - wenn unklar.</summary>
     Auto,
-    /// <summary>/predict/figs/ – Minifiguren.</summary>
+    /// <summary>/predict/figs/ - Minifiguren.</summary>
     Minifig,
-    /// <summary>/predict/parts/?predict_color=true – Teile + Farbe.</summary>
+    /// <summary>/predict/parts/?predict_color=true - Teile + Farbe.</summary>
     Part
 }

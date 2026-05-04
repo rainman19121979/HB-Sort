@@ -204,7 +204,7 @@ public partial class SupersetsDialogViewModel : ObservableObject
         {
             var done = await _partLookup.AssignPartToMinifigAsync(part.Id);
             _notifications.ShowSuccess(done
-                ? $"Teil zugeordnet – '{item.MinifigName}' jetzt KOMPLETT!"
+                ? $"Teil zugeordnet - '{item.MinifigName}' jetzt KOMPLETT!"
                 : $"Teil zu '{item.MinifigName}' zugeordnet.");
             AnyAssignedOrCollected = true;
         }

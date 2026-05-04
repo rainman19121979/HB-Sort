@@ -11,7 +11,7 @@ using Serilog;
 namespace HBSort.ViewModels;
 
 /// <summary>
-/// ViewModel für das Hauptfenster.
+/// ViewModel fuer das Hauptfenster.
 ///
 /// Phase 2: Erweiterung um Brickognize-Health-Check und Toast-Container.
 /// Der Toast-Container (NotificationService.ActiveToasts) wird hier ueber
@@ -32,7 +32,7 @@ public partial class MainViewModel : ObservableObject
         Interval = TimeSpan.FromSeconds(60)
     };
 
-    /// <summary>Letzter beobachteter State – fuer Toast-Trigger bei Wechseln.</summary>
+    /// <summary>Letzter beobachteter State - fuer Toast-Trigger bei Wechseln.</summary>
     private RateLimitState _lastRateLimitState = RateLimitState.Ok;
 
     public ScanViewModel ScanViewModel { get; }
@@ -129,7 +129,7 @@ public partial class MainViewModel : ObservableObject
         RecentScans = recentScans;
         Help = help;
         _brickognizeClient = brickognizeClient;
-        // Wir brauchen die konkrete Implementierung wegen ActiveToasts –
+        // Wir brauchen die konkrete Implementierung wegen ActiveToasts -
         // das DI registriert beide Wege auf die selbe Singleton-Instanz.
         _notificationService = (NotificationService)notificationService;
         _imageCache = imageCache;

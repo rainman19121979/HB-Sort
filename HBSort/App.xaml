@@ -9,7 +9,7 @@
     <!--
         ShutdownMode="OnExplicitShutdown": Die App beendet sich NICHT automatisch wenn
         das Fenster geschlossen wird. Stattdessen minimieren wir ins Tray-Icon.
-        Erst über das Tray-Menü "Beenden" wird die App wirklich geschlossen.
+        Erst ueber das Tray-Menue "Beenden" wird die App wirklich geschlossen.
     -->
     <Application.Resources>
         <ResourceDictionary>
@@ -28,7 +28,7 @@
             -->
             <sys:Boolean x:Key="TooltipsEnabled">True</sys:Boolean>
 
-            <!-- Converter für Datenbindung (z.B. bool → Visibility umkehren) -->
+            <!-- Converter fuer Datenbindung (z.B. bool → Visibility umkehren) -->
             <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
             <!--

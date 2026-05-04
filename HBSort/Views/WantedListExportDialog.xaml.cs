@@ -112,7 +112,7 @@ public partial class WantedListExportDialog : Window
                 firstPath = path;
             }
 
-            // Persist gewählten Ordner als neuen Default.
+            // Persist gewaehlten Ordner als neuen Default.
             _settings.Current.WantedListExportFolder = folder;
             await _settings.SaveAsync();
 

@@ -319,7 +319,7 @@ public partial class MinifigSummaryViewModel : ObservableObject
             dbm.LocalImagePath = url;
             await ctx.SaveChangesAsync();
 
-            // UI aktualisieren – ImageUrl ist ein normales Property mit
+            // UI aktualisieren - ImageUrl ist ein normales Property mit
             // OnPropertyChanged-Trigger via Dialog-Binding.
             Application.Current?.Dispatcher.Invoke(() =>
             {
@@ -380,11 +380,11 @@ public partial class SummaryPartViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(QuantityLabel))]
     private int _quantityCollected;
 
-    /// <summary>BL-Bild des Teils (URL/Pfad) – wird vom Parent-VM async befuellt.</summary>
+    /// <summary>BL-Bild des Teils (URL/Pfad) - wird vom Parent-VM async befuellt.</summary>
     [ObservableProperty]
     private string? _imageUrl;
 
-    /// <summary>Color-Swatch – wird vom Parent-VM async aus bl_colors befuellt.</summary>
+    /// <summary>Color-Swatch - wird vom Parent-VM async aus bl_colors befuellt.</summary>
     [ObservableProperty]
     private Brush _swatchBrush = Brushes.Gray;
 

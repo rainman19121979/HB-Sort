@@ -97,7 +97,7 @@ public partial class MinifigSummaryDialog : Window
         var wizard = new DismantleWizardDialog(wizardVm, notif) { Owner = this };
         if (wizard.ShowDialog() == true)
         {
-            // Wizard hat den Vorgang ausgefuehrt + Toast gezeigt – Summary-Dialog schliessen.
+            // Wizard hat den Vorgang ausgefuehrt + Toast gezeigt - Summary-Dialog schliessen.
             DialogResult = true;
             Close();
         }
@@ -157,7 +157,7 @@ public partial class MinifigSummaryDialog : Window
     }
 
     /// <summary>
-    /// Phase 6: "Wieder oeffnen" – setzt eine komplette Figur zurueck auf Waiting.
+    /// Phase 6: "Wieder oeffnen" - setzt eine komplette Figur zurueck auf Waiting.
     /// </summary>
     private async void Reopen_Click(object sender, RoutedEventArgs e)
     {

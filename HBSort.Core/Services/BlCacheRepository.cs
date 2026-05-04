@@ -13,7 +13,7 @@ namespace HBSort.Core.Services;
 /// damit die Bulk-Inserts nicht durch EF gebremst werden.
 ///
 /// Verbindungs-Modell: Ein Connection pro Repository-Instanz (Singleton im DI).
-/// SQLite-Connections sind nicht threadsafe – Operationen werden ueber einen
+/// SQLite-Connections sind nicht threadsafe - Operationen werden ueber einen
 /// Lock serialisiert. Das ist OK weil die Aufrufe ohnehin von einzelnen
 /// User-Aktionen (Scan) ausgeloest werden.
 /// </summary>
@@ -847,7 +847,7 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
 
     public Task<int> GetCallCountSinceAsync(DateTime since, CancellationToken ct = default)
     {
-        // Caller uebergibt typisch lokales "00:00 heute" – wir vergleichen UTC-ISO,
+        // Caller uebergibt typisch lokales "00:00 heute" - wir vergleichen UTC-ISO,
         // also vorher zu UTC umwandeln (DateTime.Kind=Local nehmen wir an).
         var sinceUtc = since.Kind == DateTimeKind.Utc ? since : since.ToUniversalTime();
         var cutoff = sinceUtc.ToString("o", CultureInfo.InvariantCulture);
@@ -1102,7 +1102,7 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
 
     private static DateTime ParseUtc(string isoString)
     {
-        // RoundtripKind respektiert das eingebettete K-Suffix (Z fuer UTC) –
+        // RoundtripKind respektiert das eingebettete K-Suffix (Z fuer UTC) -
         // die kombinierten Flags AssumeUniversal+RoundtripKind sind nicht erlaubt.
         return DateTime.TryParse(isoString, CultureInfo.InvariantCulture,
             DateTimeStyles.RoundtripKind, out var dt)

@@ -161,7 +161,7 @@ public class BricklinkImageProviderTests : IDisposable
         var sut = NewProvider(http);
         var path = await sut.GetImageFileAsync(item, bricklinkColorId: null);
 
-        // Kein HEAD-Request – direkt GET fuer das Brickognize-Bild
+        // Kein HEAD-Request - direkt GET fuer das Brickognize-Bild
         Assert.DoesNotContain(requested, r => r.StartsWith("HEAD "));
         Assert.Contains("bo_", path);
     }

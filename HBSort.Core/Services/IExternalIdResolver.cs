@@ -14,6 +14,6 @@ public interface IExternalIdResolver
     /// oder die URL nicht zu einem bekannten Pattern passt.
     /// </summary>
     /// <param name="sites">Liste aus BrickognizeItem.ExternalSites.</param>
-    /// <param name="type">Item-Typ (Part / Minifig / Set) – beeinflusst nur Loggen.</param>
+    /// <param name="type">Item-Typ (Part / Minifig / Set) - beeinflusst nur Loggen.</param>
     ExternalIds Resolve(IEnumerable<BrickognizeExternalSite> sites, BrickognizeItemType type);
 }

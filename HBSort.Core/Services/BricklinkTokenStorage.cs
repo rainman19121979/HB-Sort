@@ -69,7 +69,7 @@ public class BricklinkTokenStorage : IBricklinkTokenStorage
         {
             // Typischerweise: settings.json wurde von anderem Windows-User kopiert,
             // oder die Maschine hat den DPAPI-Schluessel verloren. Wir reichen die
-            // Exception nach oben durch mit klarer Message – der Aufrufer (UI)
+            // Exception nach oben durch mit klarer Message - der Aufrufer (UI)
             // kann dem User dann sagen "bitte Tokens neu eingeben".
             throw new CryptographicException(
                 "BL-Tokens konnten nicht entschluesselt werden. Sie wurden vermutlich " +

@@ -1,14 +1,14 @@
 namespace HBSort.Core.Models;
 
 /// <summary>
-/// Ein einzelnes Teil, das für eine bestimmte Minifigur benötigt wird.
+/// Ein einzelnes Teil, das fuer eine bestimmte Minifigur benoetigt wird.
 /// Trackt wie viele Exemplare gebraucht werden und wie viele schon gesammelt sind.
 /// </summary>
 public class TrackedMinifigPart
 {
     public int Id { get; set; }
 
-    /// <summary>Fremdschlüssel zur zugehörigen Minifigur</summary>
+    /// <summary>Fremdschluessel zur zugehoerigen Minifigur</summary>
     public int TrackedMinifigId { get; set; }
 
     /// <summary>Navigation Property zur Minifigur</summary>
@@ -20,7 +20,7 @@ public class TrackedMinifigPart
     /// <summary>BrickLink-Farb-ID (Brickognize liefert die direkt).</summary>
     public int ColorId { get; set; }
 
-    /// <summary>Farbname gecacht, z.B. "Black" – damit wir nicht immer den Katalog fragen müssen</summary>
+    /// <summary>Farbname gecacht, z.B. "Black" - damit wir nicht immer den Katalog fragen muessen</summary>
     public string ColorName { get; set; } = string.Empty;
 
     /// <summary>Teilename gecacht, z.B. "Brick 2 x 4"</summary>

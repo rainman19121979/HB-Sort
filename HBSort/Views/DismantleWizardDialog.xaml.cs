@@ -51,7 +51,7 @@ public partial class DismantleWizardDialog : Window
         {
             Result = await _viewModel.ConfirmAsync();
             var msg = Result.TotalPartsTransferred > 0
-                ? $"Figur '{_viewModel.MinifigName}' zerlegt – {Result.TotalPartsTransferred} Einzelteil(e) in Pool uebernommen."
+                ? $"Figur '{_viewModel.MinifigName}' zerlegt - {Result.TotalPartsTransferred} Einzelteil(e) in Pool uebernommen."
                 : $"Figur '{_viewModel.MinifigName}' zerlegt (keine Teile uebernommen).";
             _notifications.ShowSuccess(msg);
             DialogResult = true;

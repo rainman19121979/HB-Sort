@@ -133,7 +133,7 @@
                                     <CheckBox Grid.Column="0"
                                               IsChecked="{Binding IsCollected, Mode=TwoWay}"
                                               VerticalAlignment="Center"
-                                              ToolTip="Markieren wenn du dieses Teil bereits hast — beim &quot;In Fach legen&quot; wird es als &quot;gesammelt&quot; uebernommen."/>
+                                              ToolTip="Markieren wenn du dieses Teil bereits hast - beim &quot;In Fach legen&quot; wird es als &quot;gesammelt&quot; uebernommen."/>
 
                                     <Image Grid.Column="1"
                                            Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
@@ -163,7 +163,7 @@
                                                        FontSize="10"
                                                        VerticalAlignment="Center"/>
                                         </StackPanel>
-                                        <!-- Alt-Teil-Hinweis (Match-Group) – nur sichtbar wenn IsAlternate=true -->
+                                        <!-- Alt-Teil-Hinweis (Match-Group) - nur sichtbar wenn IsAlternate=true -->
                                         <TextBlock Text="{Binding AlternateLabel}"
                                                    FontSize="9"
                                                    Foreground="#FF8000"

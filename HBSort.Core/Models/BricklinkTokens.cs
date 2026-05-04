@@ -74,7 +74,7 @@ public class BricklinkSettings
 }
 
 /// <summary>
-/// Konstanten zur BL-API. BL_REAL_LIMIT ist NICHT in den Settings editierbar –
+/// Konstanten zur BL-API. BL_REAL_LIMIT ist NICHT in den Settings editierbar -
 /// das ist BLs fixes Tageskontingent.
 /// </summary>
 public static class BricklinkConstants

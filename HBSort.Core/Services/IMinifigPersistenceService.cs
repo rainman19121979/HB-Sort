@@ -39,7 +39,7 @@ public interface IMinifigPersistenceService
 
     /// <summary>
     /// Loescht eine Figur komplett aus der DB. RequiredParts werden via Cascade
-    /// mitgeloescht. FloatingParts mit OriginMinifigId=Figur bleiben bestehen –
+    /// mitgeloescht. FloatingParts mit OriginMinifigId=Figur bleiben bestehen -
     /// ihr OriginMinifigId wird auf null gesetzt (sie werden in der Lagerliste
     /// dann als "lose" angezeigt).
     /// </summary>
@@ -53,7 +53,7 @@ public interface IMinifigPersistenceService
 
     /// <summary>
     /// Beim App-Start: Pseudo-Figuren aus dem alten "Diese Figur anlegen"-Bug
-    /// loeschen — Status=COMPLETE mit genau 1 RequiredPart. Diese sind durch den
+    /// loeschen - Status=COMPLETE mit genau 1 RequiredPart. Diese sind durch den
     /// Single-Row-Supersets-Cache entstanden, bevor IsFromSupersets eingefuehrt wurde.
     /// </summary>
     Task<int> CleanupOnePartCompletesAsync(CancellationToken ct = default);
@@ -147,10 +147,10 @@ public class PersistMinifigInput
     /// <summary>ID des Lagerfaches (StorageBin), in dem die Figur landet.</summary>
     public int StorageBinId { get; init; }
 
-    /// <summary>Brickognize-Konfidenz – fuer ScanEvent.</summary>
+    /// <summary>Brickognize-Konfidenz - fuer ScanEvent.</summary>
     public double? Confidence { get; init; }
 
-    /// <summary>Pfad zum Scan-Bild (im scans-Ordner) – fuer ScanEvent.</summary>
+    /// <summary>Pfad zum Scan-Bild (im scans-Ordner) - fuer ScanEvent.</summary>
     public string? ScanImagePath { get; init; }
 
     /// <summary>Required-Parts der Figur. Werden 1:1 in TrackedMinifigPart kopiert.</summary>

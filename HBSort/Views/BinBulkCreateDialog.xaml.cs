@@ -25,7 +25,7 @@ public partial class BinBulkCreateDialog : Window
 
     // RadioButton-Klicks setzen den Typ im ViewModel.
     // Wir koennten zwar Two-Way-Binding nutzen, aber RadioButtons mit Enum-Binding
-    // sind in WPF umstaendlich – Click-Handler ist hier sauberer.
+    // sind in WPF umstaendlich - Click-Handler ist hier sauberer.
     private void TypeNumbers_Click(object sender, RoutedEventArgs e)
     {
         _viewModel.SequenceType = BinSequenceType.Numbers;
@@ -40,7 +40,7 @@ public partial class BinBulkCreateDialog : Window
     {
         await _viewModel.CreateAsync();
         // GeneratedLabels wird vom VM gesetzt sobald die Anlage durch ist
-        // (auch bei 0 erstellten Faechern – dann ist die Liste leer aber nicht null).
+        // (auch bei 0 erstellten Faechern - dann ist die Liste leer aber nicht null).
         if (_viewModel.GeneratedLabels != null)
         {
             DialogResult = true;

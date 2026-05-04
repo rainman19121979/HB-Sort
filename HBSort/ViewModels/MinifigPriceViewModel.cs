@@ -503,7 +503,7 @@ public partial class MinifigPriceViewModel : ObservableObject
                     // Ein Configuration-Hint von einer Row ist universell -
                     // alle Rows wuerden denselben sehen. Wir ziehen den nach
                     // oben damit die UI ein einziges grosses Banner zeigt
-                    // statt N redundante "—".
+                    // statt N redundante "-".
                     if (outcome != null && outcome.IsConfigurationHint
                         && PartsConfigurationHint == null)
                     {
@@ -604,7 +604,7 @@ public partial class MinifigPriceViewModel : ObservableObject
 
     private static string FormatMoney(decimal? value)
     {
-        if (!value.HasValue || value.Value <= 0) return "—";
+        if (!value.HasValue || value.Value <= 0) return "-";
         return value.Value.ToString("N2", CultureInfo.GetCultureInfo("de-DE")) + " €";
     }
 
@@ -651,7 +651,7 @@ public partial class PartPriceRowViewModel : ObservableObject
         get
         {
             var u = UnitPriceCorrected;
-            if (!u.HasValue || u.Value <= 0) return "—";
+            if (!u.HasValue || u.Value <= 0) return "-";
             return Format(u.Value);
         }
     }
@@ -661,7 +661,7 @@ public partial class PartPriceRowViewModel : ObservableObject
         get
         {
             var u = UnitPriceCorrected;
-            if (!u.HasValue || u.Value <= 0) return "—";
+            if (!u.HasValue || u.Value <= 0) return "-";
             var sub = u.Value * QuantityNeeded;
             return Format(sub);
         }

@@ -6,14 +6,14 @@ namespace HBSort.Core.Models;
 /// </summary>
 public class AppSettings
 {
-    /// <summary>Index der ausgewählten USB-Kamera (0 = erste Kamera)</summary>
+    /// <summary>Index der ausgewaehlten USB-Kamera (0 = erste Kamera)</summary>
     public int SelectedCameraIndex { get; set; } = 0;
 
-    /// <summary>Gespeicherter Fensterzustand (Position, Größe, Maximiert)</summary>
+    /// <summary>Gespeicherter Fensterzustand (Position, Groesse, Maximiert)</summary>
     public WindowState WindowState { get; set; } = new();
 
     /// <summary>
-    /// Ab diesem Score wird ein Scan-Ergebnis automatisch akzeptiert (ohne User-Bestätigung)
+    /// Ab diesem Score wird ein Scan-Ergebnis automatisch akzeptiert (ohne User-Bestaetigung)
     /// und ein BL-Lookup wird sofort ausgeloest. Empfohlen: 0.95 (sehr sicher), damit nur
     /// klare Treffer ohne Nachfrage gehen. Bei niedrigeren Scores klickt der User die
     /// passende Karte aus den Top-3 manuell an, was den BL-Call dann gezielt ausloest.
@@ -110,8 +110,8 @@ public class AppSettings
 }
 
 /// <summary>
-/// Speichert Position und Größe des Hauptfensters,
-/// damit beim nächsten Start alles so ist wie beim letzten Mal.
+/// Speichert Position und Groesse des Hauptfensters,
+/// damit beim naechsten Start alles so ist wie beim letzten Mal.
 /// </summary>
 public class WindowState
 {

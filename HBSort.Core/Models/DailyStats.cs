@@ -2,11 +2,11 @@ namespace HBSort.Core.Models;
 
 /// <summary>
 /// Tagesstatistik: wie viele Scans, wie viele Figuren komplettiert/zerlegt.
-/// Ein Eintrag pro Tag, das Datum ist der Primärschlüssel.
+/// Ein Eintrag pro Tag, das Datum ist der Primaerschluessel.
 /// </summary>
 public class DailyStats
 {
-    /// <summary>Datum (nur Tag, ohne Uhrzeit) – dient als Primärschlüssel</summary>
+    /// <summary>Datum (nur Tag, ohne Uhrzeit) - dient als Primaerschluessel</summary>
     public DateTime Date { get; set; }
 
     /// <summary>Anzahl der Scans an diesem Tag</summary>

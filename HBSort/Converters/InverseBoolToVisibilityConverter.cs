@@ -9,7 +9,7 @@ namespace HBSort.Converters;
 /// true → Collapsed (unsichtbar), false → Visible (sichtbar).
 ///
 /// Wird verwendet um z.B. einen Platzhalter-Text anzuzeigen
-/// wenn die Kamera NICHT läuft (IsCameraRunning = false → Text sichtbar).
+/// wenn die Kamera NICHT laeuft (IsCameraRunning = false → Text sichtbar).
 ///
 /// Ein Converter ist in WPF die Standard-Methode um Werte zwischen
 /// ViewModel und View umzurechnen.

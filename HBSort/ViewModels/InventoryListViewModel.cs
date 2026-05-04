@@ -15,7 +15,7 @@ using Serilog;
 namespace HBSort.ViewModels;
 
 /// <summary>
-/// Tab "Lagerliste" – jetzt als BrickStore-Style DataGrid.
+/// Tab "Lagerliste" - jetzt als BrickStore-Style DataGrid.
 /// Eine flache Liste aller Items (Minifiguren + Einzelteile) mit
 /// Status-Icon-Spalte, Bild, Color-Swatch, Lagerfach, Aktionen.
 /// </summary>
@@ -362,7 +362,7 @@ public partial class InventoryRowItem : ObservableObject
     public string StorageBinLabel { get; init; } = string.Empty;
     public int? StorageBinId { get; init; }
 
-    /// <summary>Kategorie (z.B. "Minifig", "Part") – Phase 7-Vorbereitung.</summary>
+    /// <summary>Kategorie (z.B. "Minifig", "Part") - Phase 7-Vorbereitung.</summary>
     public string Category { get; init; } = string.Empty;
 
     /// <summary>Item-Typ-Label fuer DataGrid ("Minifig" / "Einzelteil").</summary>
@@ -471,7 +471,7 @@ public partial class InventoryRowItem : ObservableObject
             ColorName = "(N/A)",
             ColorId = 0,
             Quantity = 1,
-            StorageBinLabel = m.StorageBin?.Label ?? "—",
+            StorageBinLabel = m.StorageBin?.Label ?? "-",
             StorageBinId = m.StorageBinId,
             Category = "Minifig",
             ItemTypeLabel = "Minifig",
@@ -498,7 +498,7 @@ public partial class InventoryRowItem : ObservableObject
             ColorName = fp.ColorName,
             ColorId = fp.ColorId,
             Quantity = fp.Quantity,
-            StorageBinLabel = fp.StorageBin?.Label ?? "—",
+            StorageBinLabel = fp.StorageBin?.Label ?? "-",
             StorageBinId = fp.StorageBinId,
             Category = "Part",
             ItemTypeLabel = "Einzelteil",

@@ -2,7 +2,7 @@ namespace HBSort.Core.Models;
 
 /// <summary>
 /// Ein physisches Lagerfach (Box, Schale etc.) in dem Teile und Figuren zwischengelagert werden.
-/// Fächer werden nie gelöscht, nur als "frei" markiert, damit die Nummerierung stabil bleibt.
+/// Faecher werden nie geloescht, nur als "frei" markiert, damit die Nummerierung stabil bleibt.
 /// </summary>
 public class StorageBin
 {
@@ -16,7 +16,7 @@ public class StorageBin
 
     /// <summary>
     /// Wann das Fach zuletzt freigegeben wurde. null = derzeit belegt.
-    /// Ein Fach ist erst wieder verfügbar, wenn der User explizit "Fach freigeben" klickt.
+    /// Ein Fach ist erst wieder verfuegbar, wenn der User explizit "Fach freigeben" klickt.
     /// </summary>
     public DateTime? FreedAt { get; set; }
 

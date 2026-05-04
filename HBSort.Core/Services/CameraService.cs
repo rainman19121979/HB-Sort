@@ -5,12 +5,12 @@ namespace HBSort.Core.Services;
 
 /// <summary>
 /// Implementierung des Kamera-Service mit OpenCvSharp4.
-/// Läuft in einem Hintergrund-Thread und feuert FrameReceived-Events
-/// für jeden neuen Frame, den die Kamera liefert.
+/// Laeuft in einem Hintergrund-Thread und feuert FrameReceived-Events
+/// fuer jeden neuen Frame, den die Kamera liefert.
 /// </summary>
 public class CameraService : ICameraService
 {
-    // Das VideoCapture-Objekt von OpenCV – unsere Verbindung zur Kamera
+    // Das VideoCapture-Objekt von OpenCV - unsere Verbindung zur Kamera
     private VideoCapture? _capture;
 
     // Hintergrund-Thread der kontinuierlich Frames liest
@@ -19,11 +19,11 @@ public class CameraService : ICameraService
     // Signal zum Stoppen des Threads
     private CancellationTokenSource? _cancellationTokenSource;
 
-    // Der zuletzt gelesene Frame (für Snapshot-Funktion)
+    // Der zuletzt gelesene Frame (fuer Snapshot-Funktion)
     // "volatile" bedeutet: verschiedene Threads sehen immer den aktuellsten Wert
     private volatile byte[]? _lastFrame;
 
-    /// <summary>Wird für jeden neuen Frame aufgerufen (als JPEG-Bytes)</summary>
+    /// <summary>Wird fuer jeden neuen Frame aufgerufen (als JPEG-Bytes)</summary>
     public event Action<byte[]>? FrameReceived;
 
     public bool IsRunning => _capture != null && _capture.IsOpened();
@@ -33,14 +33,14 @@ public class CameraService : ICameraService
         var cameras = new List<string>();
 
         // OpenCV hat leider keine eingebaute Methode um Kamera-Namen zu lesen.
-        // Wir probieren einfach die Indizes 0-9 durch und schauen welche sich öffnen lassen.
+        // Wir probieren einfach die Indizes 0-9 durch und schauen welche sich oeffnen lassen.
         // Annahme: Mehr als 10 USB-Kameras hat niemand angeschlossen.
         for (int i = 0; i < 10; i++)
         {
             using var testCapture = new VideoCapture(i);
             if (testCapture.IsOpened())
             {
-                // Da wir den echten Kamera-Namen nicht auslesen können,
+                // Da wir den echten Kamera-Namen nicht auslesen koennen,
                 // vergeben wir einen generischen Namen mit dem Index
                 cameras.Add($"Kamera {i}");
                 testCapture.Release();
@@ -59,7 +59,7 @@ public class CameraService : ICameraService
 
     public Task StartAsync(int cameraIndex)
     {
-        // Falls schon eine Kamera läuft, erst stoppen
+        // Falls schon eine Kamera laeuft, erst stoppen
         Stop();
 
         Log.Information("Starte Kamera mit Index {Index}", cameraIndex);
@@ -68,13 +68,13 @@ public class CameraService : ICameraService
 
         if (!_capture.IsOpened())
         {
-            Log.Error("Kamera {Index} konnte nicht geöffnet werden", cameraIndex);
+            Log.Error("Kamera {Index} konnte nicht geoeffnet werden", cameraIndex);
             _capture.Dispose();
             _capture = null;
             return Task.CompletedTask;
         }
 
-        // Auflösung setzen (Standard: 640x480 ist meistens gut genug für Brickognize)
+        // Aufloesung setzen (Standard: 640x480 ist meistens gut genug fuer Brickognize)
         _capture.Set(VideoCaptureProperties.FrameWidth, 640);
         _capture.Set(VideoCaptureProperties.FrameHeight, 480);
 
@@ -84,7 +84,7 @@ public class CameraService : ICameraService
 
         _captureThread = new Thread(() => CaptureLoop(token))
         {
-            // Als Background-Thread markiert: wird automatisch beendet wenn die App schließt
+            // Als Background-Thread markiert: wird automatisch beendet wenn die App schliesst
             IsBackground = true,
             Name = "CameraCapture"
         };
@@ -95,12 +95,12 @@ public class CameraService : ICameraService
     }
 
     /// <summary>
-    /// Endlosschleife die im Hintergrund läuft und Frames von der Kamera liest.
-    /// Jeder Frame wird als JPEG kodiert und über das FrameReceived-Event verteilt.
+    /// Endlosschleife die im Hintergrund laeuft und Frames von der Kamera liest.
+    /// Jeder Frame wird als JPEG kodiert und ueber das FrameReceived-Event verteilt.
     /// </summary>
     private void CaptureLoop(CancellationToken token)
     {
-        // Mat ist das OpenCV-Format für ein Bild im Speicher ("Matrix")
+        // Mat ist das OpenCV-Format fuer ein Bild im Speicher ("Matrix")
         using var frame = new Mat();
 
         while (!token.IsCancellationRequested)
@@ -115,18 +115,18 @@ public class CameraService : ICameraService
 
                 if (!success || frame.Empty())
                 {
-                    // Kein Frame bekommen – kurz warten und nochmal versuchen
+                    // Kein Frame bekommen - kurz warten und nochmal versuchen
                     Thread.Sleep(10);
                     continue;
                 }
 
-                // Frame als JPEG-Bytes kodieren (für Anzeige in WPF und API-Calls)
+                // Frame als JPEG-Bytes kodieren (fuer Anzeige in WPF und API-Calls)
                 var jpegBytes = frame.ImEncode(".jpg");
 
-                // Letzten Frame merken (für Snapshot-Funktion)
+                // Letzten Frame merken (fuer Snapshot-Funktion)
                 _lastFrame = jpegBytes;
 
-                // Alle Subscriber benachrichtigen (z.B. das UI für Live-Anzeige)
+                // Alle Subscriber benachrichtigen (z.B. das UI fuer Live-Anzeige)
                 FrameReceived?.Invoke(jpegBytes);
 
                 // ~30 FPS: ca. 33ms zwischen Frames
@@ -164,7 +164,7 @@ public class CameraService : ICameraService
 
     public byte[]? CaptureSnapshot()
     {
-        // Einfach den zuletzt gelesenen Frame zurückgeben
+        // Einfach den zuletzt gelesenen Frame zurueckgeben
         return _lastFrame;
     }
 

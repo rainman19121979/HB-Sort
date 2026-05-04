@@ -12,7 +12,7 @@ namespace HBSort.Core.Services;
 ///   * GetMinifigDetails: Cache liefern wenn vorhanden und (full ODER nicht stale).
 ///     Stale full -> refresh via GetItem; nicht-vorhanden -> GetItem; subset reicht
 ///     aktuell nicht fuer "Details" (in Phase R2-R3 reicht aber subset, weil wir
-///     nur Name/Image brauchen – siehe CLAUDE.md "Use-Case mehr braucht").
+///     nur Name/Image brauchen - siehe CLAUDE.md "Use-Case mehr braucht").
 ///   * GetMinifigParts: Cache liefern wenn vorhanden und nicht stale.
 ///     Stale -> refresh; nicht-vorhanden -> GetSubsets.
 ///     Beim Refresh: Subsets ersetzen UND uebergreifend bl_items mit Subset-Eintraegen befuellen.
@@ -20,7 +20,7 @@ namespace HBSort.Core.Services;
 ///     oder stale full.
 ///   * GetAllColors: 1x holen, dann lebenslang cachen.
 ///
-/// Bei Auth-Fehlern (401/403) WERFEN wir – der Aufrufer (UI) muss reagieren.
+/// Bei Auth-Fehlern (401/403) WERFEN wir - der Aufrufer (UI) muss reagieren.
 /// Bei Rate-Limit (429) oder Netzwerk-Fehlern: stale Cache-Eintrag zurueckgeben,
 /// nur warning loggen.
 /// </summary>
@@ -48,7 +48,7 @@ public class BlCatalogService : IBlCatalogService
     /// <summary>
     /// Hilfsmethode: Call gegen die BL-API + Rate-Limit-Gate + Tracking + Fehler-Klassifikation.
     /// Wirft BricklinkAuthException wenn 401/403 (Aufrufer muss reagieren).
-    /// Wirft RateLimitBlockedException wenn Hard-Limit erreicht ist – Aufrufer kann darauf
+    /// Wirft RateLimitBlockedException wenn Hard-Limit erreicht ist - Aufrufer kann darauf
     /// mit Cache-Fallback reagieren.
     /// Wirft die Original-Exception bei anderen Fehlern damit der Caller stale-cache servieren kann.
     /// </summary>
@@ -59,7 +59,7 @@ public class BlCatalogService : IBlCatalogService
         // 1) Rate-Limit-Gate
         if (!await _rateLimiter.CanMakeCallAsync(ct))
         {
-            Log.Warning("BL Rate-Limit blockiert {Method}({Type},{No}) – Hard-Threshold erreicht.",
+            Log.Warning("BL Rate-Limit blockiert {Method}({Type},{No}) - Hard-Threshold erreicht.",
                 method, itemType, itemNo);
             throw new RateLimitBlockedException(
                 $"BL Hard-Limit erreicht. Call '{method}' wird blockiert; nur Cache verfuegbar.");
@@ -133,12 +133,12 @@ public class BlCatalogService : IBlCatalogService
                     blMinifigId, cached.Count, ageDays);
                 return cached;
             }
-            Log.Debug("BL-Cache stale Subsets M:{No} ({Days:F1}d) – refresh", blMinifigId, ageDays);
+            Log.Debug("BL-Cache stale Subsets M:{No} ({Days:F1}d) - refresh", blMinifigId, ageDays);
         }
         else if (cached.Count > 0)
         {
             // Vorhanden, aber alle Eintraege aus GetSupersets -> Liste ist unvollstaendig.
-            Log.Debug("BL-Cache nur Pseudo-Eintraege M:{No} ({Count}) – force-fetch", blMinifigId, cached.Count);
+            Log.Debug("BL-Cache nur Pseudo-Eintraege M:{No} ({Count}) - force-fetch", blMinifigId, cached.Count);
         }
 
         // Cache-Miss oder stale -> BL-Call (durch Rate-Limiter geleitet)
@@ -196,18 +196,18 @@ public class BlCatalogService : IBlCatalogService
         catch (RateLimitBlockedException)
         {
             // Eigener Hard-Stop -> stale Cache liefern, KEIN Throw
-            Log.Warning("BL Hard-Limit blockt GetSubsets({No}) – serve stale cache ({Count})",
+            Log.Warning("BL Hard-Limit blockt GetSubsets({No}) - serve stale cache ({Count})",
                 blMinifigId, cached.Count);
             return cached;
         }
         catch (BricklinkRateLimitException ex)
         {
-            Log.Warning(ex, "BL Rate-Limit beim GetSubsets({No}) – serve stale cache", blMinifigId);
+            Log.Warning(ex, "BL Rate-Limit beim GetSubsets({No}) - serve stale cache", blMinifigId);
             return cached;
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "BL GetSubsets({No}) fehlgeschlagen – serve stale cache", blMinifigId);
+            Log.Warning(ex, "BL GetSubsets({No}) fehlgeschlagen - serve stale cache", blMinifigId);
             return cached;
         }
     }
@@ -224,7 +224,7 @@ public class BlCatalogService : IBlCatalogService
     /// <summary>
     /// Gemeinsame Lookup-Logik fuer Items (Minifig + Part + Set).
     /// Phase R2/R3: ein Subset-Eintrag reicht zur Anzeige (Name, Image-URL aus dem Cache,
-    /// Image kommt eh ueber den BricklinkImageProvider – nicht ueber das Item-Objekt).
+    /// Image kommt eh ueber den BricklinkImageProvider - nicht ueber das Item-Objekt).
     /// Daher: subset = OK; full hat Vorrang wenn ohnehin frisch.
     /// </summary>
     private async Task<BlItem?> GetItemDetailsCoreAsync(string itemType, string itemNo, CancellationToken ct)
@@ -235,7 +235,7 @@ public class BlCatalogService : IBlCatalogService
             var age = DateTime.UtcNow - cached.FetchedAt;
             var stale = age.TotalDays > StaleDays;
 
-            // Subset-Daten zaehlen NICHT als stale (sie sind eh nur ein Schnellzugriff –
+            // Subset-Daten zaehlen NICHT als stale (sie sind eh nur ein Schnellzugriff -
             // Phase R2-R3 nutzt sie nur fuer Name; ein "echter" Refresh ist nicht noetig).
             if (cached.DataCompleteness == DataCompleteness.Subset)
             {
@@ -248,7 +248,7 @@ public class BlCatalogService : IBlCatalogService
                 Log.Debug("BL-Cache full-hit {Type}:{No}", itemType, itemNo);
                 return cached;
             }
-            Log.Debug("BL-Cache stale full {Type}:{No} ({Days:F1}d) – refresh", itemType, itemNo, age.TotalDays);
+            Log.Debug("BL-Cache stale full {Type}:{No} ({Days:F1}d) - refresh", itemType, itemNo, age.TotalDays);
         }
 
         // Cache-Miss oder stale full -> BL-Call (durch Rate-Limiter geleitet)
@@ -284,13 +284,13 @@ public class BlCatalogService : IBlCatalogService
         }
         catch (RateLimitBlockedException)
         {
-            Log.Warning("BL Hard-Limit blockt GetItem({Type},{No}) – serve {What} cache",
+            Log.Warning("BL Hard-Limit blockt GetItem({Type},{No}) - serve {What} cache",
                 itemType, itemNo, cached == null ? "no" : "stale");
             return cached;
         }
         catch (BricklinkRateLimitException ex)
         {
-            Log.Warning(ex, "BL Rate-Limit bei GetItem({Type},{No}) – serve stale cache", itemType, itemNo);
+            Log.Warning(ex, "BL Rate-Limit bei GetItem({Type},{No}) - serve stale cache", itemType, itemNo);
             return cached;
         }
         catch (Exception ex)
@@ -335,12 +335,12 @@ public class BlCatalogService : IBlCatalogService
         }
         catch (RateLimitBlockedException)
         {
-            Log.Warning("BL Hard-Limit blockt GetColorList – Cache bleibt leer");
+            Log.Warning("BL Hard-Limit blockt GetColorList - Cache bleibt leer");
             return cached;
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "BL GetColorList fehlgeschlagen – Cache bleibt leer");
+            Log.Warning(ex, "BL GetColorList fehlgeschlagen - Cache bleibt leer");
             return cached;
         }
     }
@@ -375,7 +375,7 @@ public class BlCatalogService : IBlCatalogService
     public async Task<List<BlSubset>> GetSupersetsAsync(string blPartNo, int blColorId, CancellationToken ct = default)
     {
         // Cache-First: bl_subsets mit item_no=blPartNo + color_id=blColorId. Es existiert
-        // kein "primary key" auf der Reverse-Seite – wir treffen die Eintraege ueber Index.
+        // kein "primary key" auf der Reverse-Seite - wir treffen die Eintraege ueber Index.
         // Stale-Check pro Eintrag (oldest); wenn alles frisch -> Cache-Hit reicht.
         var cachedParents = await _cache.FindParentsByItemAsync("P", blPartNo, blColorId, ct);
         var cachedSubsets = new List<BlSubset>();
@@ -418,7 +418,7 @@ public class BlCatalogService : IBlCatalogService
             // - Pro Parent: einen bl_subsets-Eintrag fuer (M, parentNo, P, blPartNo, blColorId, qty).
             //   Wir koennen NICHT die ganze Subsets-Liste der Minifig ableiten (kennen wir nicht aus
             //   der Supersets-Antwort), sondern nur diesen einen Eintrag schreiben. Das mischt
-            //   sich mit echten "vollstaendigen" Eintraegen aus GetSubsets – das ist OK,
+            //   sich mit echten "vollstaendigen" Eintraegen aus GetSubsets - das ist OK,
             //   aber wir muessen aufpassen das nicht zu ueberschreiben.
             // - Items: Parent als 'subset'-Eintrag.
             foreach (var entry in minifigEntries)
@@ -488,18 +488,18 @@ public class BlCatalogService : IBlCatalogService
         }
         catch (RateLimitBlockedException)
         {
-            Log.Warning("BL Hard-Limit blockt GetSupersets({No},{C}) – serve cache ({Count})",
+            Log.Warning("BL Hard-Limit blockt GetSupersets({No},{C}) - serve cache ({Count})",
                 blPartNo, blColorId, cachedSubsets.Count);
             return cachedSubsets;
         }
         catch (BricklinkRateLimitException ex)
         {
-            Log.Warning(ex, "BL Rate-Limit beim GetSupersets({No},{C}) – serve cache", blPartNo, blColorId);
+            Log.Warning(ex, "BL Rate-Limit beim GetSupersets({No},{C}) - serve cache", blPartNo, blColorId);
             return cachedSubsets;
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "BL GetSupersets({No},{C}) fehlgeschlagen – serve cache", blPartNo, blColorId);
+            Log.Warning(ex, "BL GetSupersets({No},{C}) fehlgeschlagen - serve cache", blPartNo, blColorId);
             return cachedSubsets;
         }
     }
@@ -508,7 +508,7 @@ public class BlCatalogService : IBlCatalogService
     {
         // Vollstaendigkeit anhand des IsFromSupersets-Flags pruefen, NICHT anhand der
         // Anzahl. Single-Row-Eintraege aus GetSupersets sind Pseudo-Daten (nur ein Teil)
-        // und duerfen NICHT als komplette Teileliste gelten – sonst wuerde "Diese Figur
+        // und duerfen NICHT als komplette Teileliste gelten - sonst wuerde "Diese Figur
         // anlegen" eine 1/1-Pseudo-Figur produzieren.
         var cached = await _cache.GetSubsetsAsync("M", blMinifigId, ct);
         var allReal = cached.Count > 0 && cached.All(s => !s.IsFromSupersets);
@@ -567,7 +567,7 @@ public class BlCatalogService : IBlCatalogService
         catch (BricklinkAuthException) { throw; }
         catch (RateLimitBlockedException)
         {
-            Log.Warning("BL Hard-Limit blockt GetKnownColors({No}) – serve cache (ggf. leer)", blPartNo);
+            Log.Warning("BL Hard-Limit blockt GetKnownColors({No}) - serve cache (ggf. leer)", blPartNo);
             var fallbackIds = await _cache.GetKnownColorIdsAsync(blPartNo, ct);
             var allColors = await _cache.GetAllColorsAsync(ct);
             var idSet = new HashSet<int>(fallbackIds);
@@ -575,7 +575,7 @@ public class BlCatalogService : IBlCatalogService
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "BL GetKnownColors({No}) fehlgeschlagen – serve cache", blPartNo);
+            Log.Warning(ex, "BL GetKnownColors({No}) fehlgeschlagen - serve cache", blPartNo);
             var fallbackIds = await _cache.GetKnownColorIdsAsync(blPartNo, ct);
             var allColors = await _cache.GetAllColorsAsync(ct);
             var idSet = new HashSet<int>(fallbackIds);

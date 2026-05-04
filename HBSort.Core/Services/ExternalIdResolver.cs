@@ -10,7 +10,7 @@ namespace HBSort.Core.Services;
 /// und BrickOwl per Regex und Query-String-Parsing.
 ///
 /// Patterns siehe BRICKOGNIZE_API.md. Wenn eine URL nicht erkannt wird, geben wir
-/// eine Warnung ins Log – so koennen wir fehlende Patterns spaeter ergaenzen.
+/// eine Warnung ins Log - so koennen wir fehlende Patterns spaeter ergaenzen.
 /// </summary>
 public partial class ExternalIdResolver : IExternalIdResolver
 {
@@ -42,7 +42,7 @@ public partial class ExternalIdResolver : IExternalIdResolver
                 continue;
             }
 
-            // Site-Name ist nicht unbedingt zuverlaessig (lowercase in echten Responses) –
+            // Site-Name ist nicht unbedingt zuverlaessig (lowercase in echten Responses) -
             // wir entscheiden anhand der Domain.
             var host = uri.Host.ToLowerInvariant();
 
@@ -70,7 +70,7 @@ public partial class ExternalIdResolver : IExternalIdResolver
         // (z.B. "3001" = "3001"). Brickognize liefert in echten Responses NUR die
         // BrickLink-Site, nie eine Rebrickable-Site. Wir kopieren daher die BL-ID
         // als plausiblen Default, damit der Catalog-Lookup ueberhaupt eine Chance hat.
-        // Fuer Minifiguren ist das NICHT moeglich (BL "cty0969" != fig_num "fig-XXXXXX") –
+        // Fuer Minifiguren ist das NICHT moeglich (BL "cty0969" != fig_num "fig-XXXXXX") -
         // dort muss Phase 3 einen anderen Weg finden (Name-Matching im Catalog).
         if (rebrickableId == null && bricklinkId != null && type == BrickognizeItemType.Part)
         {
@@ -91,7 +91,7 @@ public partial class ExternalIdResolver : IExternalIdResolver
     {
         var query = HttpUtility.ParseQueryString(uri.Query);
 
-        // Reihenfolge nach Item-Typ optimieren – aber alle pruefen.
+        // Reihenfolge nach Item-Typ optimieren - aber alle pruefen.
         var keysInOrder = type switch
         {
             BrickognizeItemType.Minifig => new[] { "M", "P", "S" },
@@ -102,7 +102,7 @@ public partial class ExternalIdResolver : IExternalIdResolver
 
         foreach (var key in keysInOrder)
         {
-            // ParseQueryString ist case-sensitiv – BrickLink benutzt aber Grossbuchstaben.
+            // ParseQueryString ist case-sensitiv - BrickLink benutzt aber Grossbuchstaben.
             var v = query[key];
             if (!string.IsNullOrWhiteSpace(v))
             {

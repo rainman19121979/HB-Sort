@@ -99,7 +99,7 @@ public class WantedListExportService : IWantedListExportService
         return result;
     }
 
-    /// <summary>Lädt alle wartenden Figuren mit ihren Required-Parts.</summary>
+    /// <summary>Laedt alle wartenden Figuren mit ihren Required-Parts.</summary>
     private static async Task<List<TrackedMinifig>> LoadWaitingMinifigsAsync(
         UserDataContext ctx, CancellationToken ct)
     {

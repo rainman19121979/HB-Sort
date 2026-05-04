@@ -11,7 +11,7 @@ public interface ISettingsService
     /// <summary>Die aktuell geladenen Einstellungen</summary>
     AppSettings Current { get; }
 
-    /// <summary>Lädt die Einstellungen aus der Datei (oder erstellt Defaults)</summary>
+    /// <summary>Laedt die Einstellungen aus der Datei (oder erstellt Defaults)</summary>
     Task LoadAsync();
 
     /// <summary>Speichert die aktuellen Einstellungen in die Datei</summary>

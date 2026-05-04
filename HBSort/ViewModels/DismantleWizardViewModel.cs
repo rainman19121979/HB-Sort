@@ -270,11 +270,11 @@ public partial class DismantlePartItemViewModel : ObservableObject
     [ObservableProperty]
     private StorageBin? _targetBin;
 
-    /// <summary>BL-Bild des Teils – wird vom Parent-VM async befuellt.</summary>
+    /// <summary>BL-Bild des Teils - wird vom Parent-VM async befuellt.</summary>
     [ObservableProperty]
     private string? _imageUrl;
 
-    /// <summary>Color-Swatch – wird vom Parent-VM async aus bl_colors befuellt.</summary>
+    /// <summary>Color-Swatch - wird vom Parent-VM async aus bl_colors befuellt.</summary>
     [ObservableProperty]
     private Brush _swatchBrush = Brushes.Gray;
 
@@ -292,7 +292,7 @@ public partial class DismantlePartItemViewModel : ObservableObject
     public string EffectiveQtyLabel => WasCollected
         ? $"x{QuantityCollected} (gesammelt)"
         : $"x{QuantityNeeded} (NICHT gesammelt)";
-    public string DisplayLine => $"{PartName} ({BlPartNo}) – {ColorName}, {EffectiveQtyLabel}";
+    public string DisplayLine => $"{PartName} ({BlPartNo}) - {ColorName}, {EffectiveQtyLabel}";
 
     public DismantlePartItemViewModel(TrackedMinifigPart p)
     {

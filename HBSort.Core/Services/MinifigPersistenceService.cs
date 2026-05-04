@@ -17,7 +17,7 @@ namespace HBSort.Core.Services;
 ///    Wenn FloatingPart komplett verbraucht: loeschen.
 /// 4. Status auf Complete setzen wenn alle RequiredParts vollstaendig.
 ///
-/// Hinweis: FloatingParts duerfen aus ANDEREN Faechern stammen – der User wird
+/// Hinweis: FloatingParts duerfen aus ANDEREN Faechern stammen - der User wird
 /// per Toast informiert ("Verschiebe Teil X von Box 7 in Box 3"). Die Daten-
 /// Anpassung passiert hier; der Toast ist Sache des aufrufenden ViewModels.
 /// </summary>
@@ -61,7 +61,7 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             .FirstOrDefaultAsync(m => m.Id == trackedMinifigId, ct);
         if (minifig == null) return false;
 
-        // FloatingParts mit OriginMinifigId=this auf null setzen (nicht loeschen –
+        // FloatingParts mit OriginMinifigId=this auf null setzen (nicht loeschen -
         // der User hat die Teile ja im Pool, nur die Origin-Verbindung verschwindet).
         var origins = await ctx.FloatingParts
             .Where(fp => fp.OriginMinifigId == trackedMinifigId)
@@ -81,7 +81,7 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         ctx.TrackedMinifigs.Remove(minifig);
         await ctx.SaveChangesAsync(ct);
 
-        Log.Information("Figur '{Name}' (Id={Id}, Status={Status}) geloescht – {OriginCount} FloatingParts entkoppelt",
+        Log.Information("Figur '{Name}' (Id={Id}, Status={Status}) geloescht - {OriginCount} FloatingParts entkoppelt",
             minifig.Name, minifig.Id, minifig.Status, origins.Count);
 
         DataChanged?.Invoke(this, EventArgs.Empty);
@@ -162,7 +162,7 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             Type = ScanType.MinifigScan,
             RecognizedId = originBlId,
             ResultDescription = totalQty > 0
-                ? $"Figur '{originName}' zerlegt – {totalQty} Einzelteil(e) in Pool uebernommen"
+                ? $"Figur '{originName}' zerlegt - {totalQty} Einzelteil(e) in Pool uebernommen"
                 : $"Figur '{originName}' zerlegt (keine Teile uebernommen)",
             WasUndone = false
         });
@@ -382,7 +382,7 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         var minifig = new TrackedMinifig
         {
             // CLAUDE.md sieht FigNum (Rebrickable) und BricklinkId vor. Wir sind aktuell
-            // BL-first ohne Rebrickable-Resolve – also legen wir die BL-ID auch in FigNum
+            // BL-first ohne Rebrickable-Resolve - also legen wir die BL-ID auch in FigNum
             // ab (FigNum ist non-null). R4 raeumt das spaeter ggf. auf.
             FigNum = input.BricklinkId,
             BricklinkId = input.BricklinkId,

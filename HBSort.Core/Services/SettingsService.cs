@@ -19,7 +19,7 @@ public class SettingsService : ISettingsService
     // Voller Pfad zur settings.json
     private static readonly string SettingsFilePath = Path.Combine(AppDataFolder, "settings.json");
 
-    // JSON-Optionen: eingerückt für Lesbarkeit, case-insensitive für Robustheit
+    // JSON-Optionen: eingerueckt fuer Lesbarkeit, case-insensitive fuer Robustheit
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -52,7 +52,7 @@ public class SettingsService : ISettingsService
         }
         catch (Exception ex)
         {
-            // Bei Fehler: Defaults verwenden und weitermachen (App soll nicht abstürzen)
+            // Bei Fehler: Defaults verwenden und weitermachen (App soll nicht abstuerzen)
             Log.Warning(ex, "Fehler beim Laden der Einstellungen, verwende Standardwerte");
             Current = new AppSettings();
         }

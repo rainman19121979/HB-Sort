@@ -9,7 +9,7 @@ namespace HBSort.Core.Services;
 /// api_call_log (Sidecar-Tabelle in bl_cache.db) und liest fuer die State-
 /// Berechnung das rollende 24h-Window aus.
 ///
-/// Aktualisierung des States via Event – bewusst KEIN polling-loop. Das UI
+/// Aktualisierung des States via Event - bewusst KEIN polling-loop. Das UI
 /// hoert auf StatusChanged und kann zusaetzlich alle 60s pollen, damit der
 /// Counter ohne neue Calls aktualisiert wird (alte Calls fallen aus dem Window).
 /// </summary>
@@ -21,7 +21,7 @@ public class BricklinkRateLimiter : IBricklinkRateLimiter
     private readonly IBlCacheRepository _repo;
     private readonly ISettingsService _settings;
 
-    /// <summary>Letzter publizierter State – fuer Wechsel-Detektion (Toast-Trigger).</summary>
+    /// <summary>Letzter publizierter State - fuer Wechsel-Detektion (Toast-Trigger).</summary>
     private RateLimitState _lastPublishedState = RateLimitState.Ok;
 
     public event EventHandler<RateLimitStatus>? StatusChanged;
@@ -91,7 +91,7 @@ public class BricklinkRateLimiter : IBricklinkRateLimiter
     /// <summary>
     /// Reine Funktion: Berechnet State aus Counter + Schwellen.
     /// Critical = ab 95% des BL-Limits (sehr ungewoehnlich, weil HardThreshold
-    /// uns vorher schon blockt – aber falls jemand softThreshold &gt; 4750 setzt,
+    /// uns vorher schon blockt - aber falls jemand softThreshold &gt; 4750 setzt,
     /// kann es passieren).
     /// </summary>
     public static RateLimitState ComputeState(int callsLast24h, int softThreshold, int hardThreshold)

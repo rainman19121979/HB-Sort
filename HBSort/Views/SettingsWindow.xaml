@@ -1,4 +1,4 @@
-﻿<Window x:Class="HBSort.Views.SettingsWindow"
+<Window x:Class="HBSort.Views.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.modernwpf.com/2019"
@@ -258,7 +258,7 @@
                         </Grid>
 
                         <TextBlock Foreground="Gray" FontSize="11" FontStyle="Italic" Margin="0,4,0,8">
-                            Hinweis: Tokens sind als reiner Text sichtbar â€“ das Fenster ist
+                            Hinweis: Tokens sind als reiner Text sichtbar - das Fenster ist
                             nur lokal und die Werte werden beim Speichern verschluesselt.
                         </TextBlock>
 
@@ -662,7 +662,7 @@
                             <TextBlock FontSize="11" Foreground="Gray"
                                        FontStyle="Italic" Margin="0,4,0,0"
                                        TextWrapping="Wrap"
-                                       Text="Import laeuft im Hintergrund. Die App ist nicht eingefroren â€“ bitte warten."/>
+                                       Text="Import laeuft im Hintergrund. Die App ist nicht eingefroren - bitte warten."/>
                         </StackPanel>
 
                         <TextBlock Text="{Binding ImportResultText}"

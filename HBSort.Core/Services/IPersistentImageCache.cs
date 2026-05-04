@@ -8,10 +8,10 @@ namespace HBSort.Core.Services;
 /// Cache-Verzeichnis liegt unter %APPDATA%\HBSort\images\.
 ///
 /// Cache-Keys nutzen ein Praefix-Schema:
-///   part_{bl_part}_c{bl_color}.png   – Teil mit Farbe (oder c0 fuer ohne Farbe)
-///   fig_{bl_minifig}.png             – Minifigur
-///   set_{bl_set}.png                 – Set
-///   bo_{md5(url)}.png                – Brickognize-Fallback
+///   part_{bl_part}_c{bl_color}.png   - Teil mit Farbe (oder c0 fuer ohne Farbe)
+///   fig_{bl_minifig}.png             - Minifigur
+///   set_{bl_set}.png                 - Set
+///   bo_{md5(url)}.png                - Brickognize-Fallback
 /// </summary>
 public interface IPersistentImageCache
 {

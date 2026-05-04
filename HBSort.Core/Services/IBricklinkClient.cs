@@ -6,7 +6,7 @@ namespace HBSort.Core.Services;
 /// Phase R2: GetItem/GetSubsets/GetColorList implementiert.
 ///
 /// Eigene DTOs (BricklinkItemDto/SubsetDto/ColorDto) damit unser Service-Layer
-/// nicht direkt von BricklinkSharp-Types abhaengt – Tests koennen den Wrapper
+/// nicht direkt von BricklinkSharp-Types abhaengt - Tests koennen den Wrapper
 /// einfach mocken.
 /// </summary>
 public interface IBricklinkClient

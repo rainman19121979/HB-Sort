@@ -13,7 +13,7 @@ namespace HBSort.Core.Services;
 ///   - Bild-Dateien liegen flach im imagesDir.
 ///   - Metadaten in einer separaten image_cache.db (NICHT in userdata.db oder bl_cache.db,
 ///     damit Cache-Loeschen die DBs nicht beruehrt).
-///   - Cache-Limit wird ueber ISettingsService abgefragt – LRU-Eviction reduziert den Cache
+///   - Cache-Limit wird ueber ISettingsService abgefragt - LRU-Eviction reduziert den Cache
 ///     auf 90% des Limits, damit nach jedem Add nicht sofort wieder evicted werden muss.
 /// </summary>
 public class PersistentImageCache : IPersistentImageCache, IDisposable
@@ -178,7 +178,7 @@ public class PersistentImageCache : IPersistentImageCache, IDisposable
                     source_url = excluded.source_url;
             ";
             cmd.Parameters.AddWithValue("$key", cacheKey);
-            cmd.Parameters.AddWithValue("$file", cacheKey); // Schema fuehrt file_name separat – wir nutzen denselben Wert
+            cmd.Parameters.AddWithValue("$file", cacheKey); // Schema fuehrt file_name separat - wir nutzen denselben Wert
             cmd.Parameters.AddWithValue("$size", sizeBytes);
             cmd.Parameters.AddWithValue("$now", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
             cmd.Parameters.AddWithValue("$url", sourceUrl);
@@ -239,7 +239,7 @@ public class PersistentImageCache : IPersistentImageCache, IDisposable
 
         if (currentSize <= limitBytes) return;
 
-        Log.Information("Cache ueber Limit ({Current} > {Limit} bytes) – starte LRU-Eviction auf {Target}",
+        Log.Information("Cache ueber Limit ({Current} > {Limit} bytes) - starte LRU-Eviction auf {Target}",
             currentSize, limitBytes, targetBytes);
 
         // Kandidaten in LRU-Reihenfolge holen
@@ -342,7 +342,7 @@ public class PersistentImageCache : IPersistentImageCache, IDisposable
         catch { /* ignore */ }
 
         StatsChanged?.Invoke(this, EventArgs.Empty);
-        // Async-Signature laut Interface – die Implementierung ist aber synchron
+        // Async-Signature laut Interface - die Implementierung ist aber synchron
         // (SQLite + File-IO sind hier ohnehin blockierend). Wrapping mit FromResult
         // statt async/await spart die State-Machine.
         return Task.FromResult(deleted);

@@ -32,7 +32,7 @@ public class BsxExportServiceTests : IDisposable
             .UseSqlite(_connection)
             .Options;
 
-        // Tests brauchen weder Migrations noch EF-Initialisierung – EnsureCreated
+        // Tests brauchen weder Migrations noch EF-Initialisierung - EnsureCreated
         // legt das Schema einmalig an.
         using (var ctx = new UserDataContext(options))
         {

@@ -4,7 +4,7 @@ namespace HBSort.Core.Services;
 
 /// <summary>
 /// Cache-First-Lookup gegen die BL-API. Zentraler Einstiegspunkt fuer
-/// Catalog-Daten ueberall in der App – ScanViewModel und Co. nutzen NUR
+/// Catalog-Daten ueberall in der App - ScanViewModel und Co. nutzen NUR
 /// diesen Service, nie direkt BricklinkClient oder BlCacheRepository.
 ///
 /// Strategie:
@@ -19,7 +19,7 @@ public interface IBlCatalogService
     /// <summary>
     /// Holt Item-Details (Name, Image, Year, Weight, ...).
     /// Liefert null wenn das Item in BL nicht existiert (HTTP 404).
-    /// Wirft <see cref="Models.Exceptions.BricklinkAuthException"/> bei 401/403 –
+    /// Wirft <see cref="Models.Exceptions.BricklinkAuthException"/> bei 401/403 -
     /// der Aufrufer (UI) muss den User auf die Settings hinweisen.
     /// </summary>
     Task<BlItem?> GetMinifigDetailsAsync(string blMinifigId, CancellationToken ct = default);
@@ -77,13 +77,13 @@ public interface IBlCatalogService
     /// <summary>
     /// Liefert die bekannten Farben fuer ein Teil (BL "GetKnownColors").
     /// Nutzt bl_known_colors als Cache; bei Miss BL-Call. Liefert die zugehoerigen
-    /// BlColor-Objekte aus bl_colors (Name + RGB) – nicht nur die IDs.
+    /// BlColor-Objekte aus bl_colors (Name + RGB) - nicht nur die IDs.
     /// </summary>
     Task<List<BlColor>> GetKnownColorsAsync(string blPartNo, CancellationToken ct = default);
 
     /// <summary>
     /// Reverse-Lookup im bl_subsets-Cache: welche Minifigs verwenden dieses Teil
-    /// in dieser Farbe? Reine Cache-Abfrage – kein BL-Call. Daten kommen aus den
+    /// in dieser Farbe? Reine Cache-Abfrage - kein BL-Call. Daten kommen aus den
     /// Subsets die schon mal via GetMinifigPartsAsync oder GetSupersetsAsync
     /// gecached wurden.
     /// </summary>

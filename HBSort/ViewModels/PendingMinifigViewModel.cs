@@ -77,7 +77,7 @@ public partial class PendingMinifigViewModel : ObservableObject
 
     /// <summary>Header-Label fuer die Teileliste.</summary>
     public string PartsHeaderLabel => CollectedCount > 0
-        ? $"{NumParts} Teile insgesamt – {CollectedCount} bereits markiert"
+        ? $"{NumParts} Teile insgesamt - {CollectedCount} bereits markiert"
         : $"{NumParts} Teile insgesamt";
 
     /// <summary>True wenn alle Teile manuell markiert sind -> Figur wird COMPLETE.</summary>
@@ -133,12 +133,12 @@ public partial class PendingPartViewModel : ObservableObject
     public string PartName { get; init; } = string.Empty;
     public string ColorName { get; init; } = string.Empty;
 
-    /// <summary>RGB-Hex (ohne #) – fuer Farbquadrat in der UI.</summary>
+    /// <summary>RGB-Hex (ohne #) - fuer Farbquadrat in der UI.</summary>
     public string? ColorRgb { get; init; }
 
     public int Quantity { get; init; }
 
-    /// <summary>BL "ExtraQty" – zusaetzliche Teile bei Sets, fuer Minifigs meist 0.</summary>
+    /// <summary>BL "ExtraQty" - zusaetzliche Teile bei Sets, fuer Minifigs meist 0.</summary>
     public int ExtraQuantity { get; init; }
 
     /// <summary>True wenn das Teil eine Match-Group-Alternative ist.</summary>
@@ -211,10 +211,10 @@ public partial class PendingPartViewModel : ObservableObject
             ? string.Empty
             : $"({QuantityCollected}/{Quantity})";
 
-    /// <summary>"BL-Part: 3024" – fuer die UI-Zeile.</summary>
+    /// <summary>"BL-Part: 3024" - fuer die UI-Zeile.</summary>
     public string PartDisplayLabel => $"BL-Part: {BricklinkPartNo}";
 
-    /// <summary>"Green (BL:36)" – fuer die UI-Zeile.</summary>
+    /// <summary>"Green (BL:36)" - fuer die UI-Zeile.</summary>
     public string ColorDisplayLabel
         => $"{ColorName} (BL:{BricklinkColorId.ToString(CultureInfo.InvariantCulture)})";
 

@@ -11,7 +11,7 @@ public class TrackedMinifig
     /// <summary>Rebrickable-ID, z.B. "fig-001549"</summary>
     public string FigNum { get; set; } = string.Empty;
 
-    /// <summary>BrickLink-ID, z.B. "sw0001" – für BrickStore-Export und Preis-Tool</summary>
+    /// <summary>BrickLink-ID, z.B. "sw0001" - fuer BrickStore-Export und Preis-Tool</summary>
     public string? BricklinkId { get; set; }
 
     /// <summary>Name der Figur, gecacht aus dem Katalog</summary>
@@ -41,12 +41,12 @@ public class TrackedMinifig
     /// <summary>Navigation Property: das zugewiesene Lagerfach</summary>
     public StorageBin? StorageBin { get; set; }
 
-    /// <summary>Liste aller benötigten Einzelteile mit Sammel-Fortschritt</summary>
+    /// <summary>Liste aller benoetigten Einzelteile mit Sammel-Fortschritt</summary>
     public List<TrackedMinifigPart> RequiredParts { get; set; } = [];
 }
 
 /// <summary>
-/// Die möglichen Zustände einer verfolgten Minifigur.
+/// Die moeglichen Zustaende einer verfolgten Minifigur.
 /// WAITING = Teile werden gesammelt, COMPLETE = alle Teile da,
 /// DISMANTLED = wieder zerlegt, SOLD = verkauft.
 /// </summary>

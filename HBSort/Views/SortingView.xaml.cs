@@ -15,7 +15,7 @@ namespace HBSort.Views;
 /// DataContext wird vom Parent (TabItem) geerbt = MainViewModel.
 ///
 /// Click-Handler operieren auf den ViewModels via DataContext und auf dem
-/// parent Window via Window.GetWindow(this) – damit Dialoge ein Owner haben.
+/// parent Window via Window.GetWindow(this) - damit Dialoge ein Owner haben.
 /// </summary>
 public partial class SortingView : UserControl
 {

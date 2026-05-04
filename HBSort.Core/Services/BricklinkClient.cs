@@ -25,7 +25,7 @@ public class BricklinkClient : IBricklinkClient
     /// Limiter bauen koennen; in der Production-DI wird er immer gesetzt.
     /// Wenn vorhanden, zaehlt jeder TestConnection-Call mit (LogCall nach Erfolg/Fehler).
     /// GetItem/GetSubsets/GetColorList werden ueber den BlCatalogService bereits
-    /// getrackt – dort wuerden wir doppelt zaehlen, wenn der Client das auch tun wuerde.
+    /// getrackt - dort wuerden wir doppelt zaehlen, wenn der Client das auch tun wuerde.
     /// Daher: TestConnection ist die EINZIGE Methode hier mit eigenem Tracking.
     /// </summary>
     public BricklinkClient(IBricklinkTokenStorage tokenStorage, IBricklinkRateLimiter? rateLimiter = null)
@@ -71,7 +71,7 @@ public class BricklinkClient : IBricklinkClient
             sw.Stop();
             success = true;
 
-            // BL-API liefert Namen HTML-kodiert (z.B. &#40; statt "(") – an dieser
+            // BL-API liefert Namen HTML-kodiert (z.B. &#40; statt "(") - an dieser
             // Boundary einmal dekodieren, damit alles dahinter sauber ist.
             var name = WebUtility.HtmlDecode(item?.Name ?? "(no name)");
             Log.Information("BL TestConnection erfolgreich, ItemName='{Name}' ({Ms} ms)", name, sw.ElapsedMilliseconds);
@@ -155,11 +155,11 @@ public class BricklinkClient : IBricklinkClient
             {
                 ItemType = itemType,
                 ItemNo = item.Number ?? itemNo,
-                // HTML-Decode: BL liefert Namen mit Numeric-Entities (z.B. &#40;) – einmalig
+                // HTML-Decode: BL liefert Namen mit Numeric-Entities (z.B. &#40;) - einmalig
                 // an der API-Boundary dekodieren, damit Cache und UI sauber sind.
                 Name = WebUtility.HtmlDecode(item.Name ?? string.Empty),
                 YearReleased = item.YearReleased > 0 ? item.YearReleased : null,
-                // BricklinkSharp liefert "https://..." mit ggf. fuehrendem Slash – wir nehmen ImageUrl roh.
+                // BricklinkSharp liefert "https://..." mit ggf. fuehrendem Slash - wir nehmen ImageUrl roh.
                 ImageUrl = item.ImageUrl,
                 Weight = SafeDouble(item.Weight),
                 DimX = SafeDouble(item.DimX),
@@ -213,7 +213,7 @@ public class BricklinkClient : IBricklinkClient
                         ExtraQuantity = sub.ExtraQuantity,
                         // Wenn die Match-Group mehrere Eintraege hat, sind alle nach dem
                         // ersten alternativ. BL liefert "IsAlternate" auf der Eintragsebene
-                        // bereits korrekt fuer einige Faelle – wir kombinieren zur Sicherheit.
+                        // bereits korrekt fuer einige Faelle - wir kombinieren zur Sicherheit.
                         IsAlternate = !isFirstInGroup || sub.IsAlternate,
                         IsCounterpart = sub.IsCounterpart,
                         MatchId = entry.MatchNo,
@@ -386,7 +386,7 @@ public class BricklinkClient : IBricklinkClient
 
     /// <summary>
     /// Wandelt unsere kurzen Type-Strings ('M','P','S','B','G','I','O','C') in den
-    /// BricklinkSharp-Enum. Wir akzeptieren auch Langformen ('Minifig', 'Part'...) –
+    /// BricklinkSharp-Enum. Wir akzeptieren auch Langformen ('Minifig', 'Part'...) -
     /// macht das Aufrufer-Coden einfacher.
     /// </summary>
     private static ItemType ParseItemType(string s) => (s ?? "").ToUpperInvariant() switch
@@ -441,7 +441,7 @@ public class BricklinkClient : IBricklinkClient
         var msg = ex.Message ?? string.Empty;
         if (msg.Contains("401")) return "Authentifizierung fehlgeschlagen (HTTP 401). Tokens pruefen.";
         if (msg.Contains("403")) return "Zugriff verweigert (HTTP 403). Ist die externe IP im BL-Consumer-Profile eingetragen?";
-        if (msg.Contains("404")) return "Test-Item 'arc007' nicht gefunden – BL-API antwortet aber.";
+        if (msg.Contains("404")) return "Test-Item 'arc007' nicht gefunden - BL-API antwortet aber.";
         if (msg.Contains("429")) return "Rate-Limit erreicht (HTTP 429).";
         return $"Verbindungsfehler: {ex.Message}";
     }

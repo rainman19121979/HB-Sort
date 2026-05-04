@@ -5,8 +5,8 @@ namespace HBSort.Core.Database;
 
 /// <summary>
 /// Diese Klasse wird NUR vom EF-Core-Migrations-Tooling verwendet (dotnet ef migrations add ...).
-/// Sie erstellt einen DbContext mit einem festen Pfad, damit EF weiß wie es die DB öffnen soll.
-/// Im laufenden Programm wird der Context über den DI-Container konfiguriert.
+/// Sie erstellt einen DbContext mit einem festen Pfad, damit EF weiss wie es die DB oeffnen soll.
+/// Im laufenden Programm wird der Context ueber den DI-Container konfiguriert.
 /// </summary>
 public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<UserDataContext>
 {
@@ -14,7 +14,7 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<UserDataCo
     {
         var optionsBuilder = new DbContextOptionsBuilder<UserDataContext>();
 
-        // Temporärer Pfad nur für Migrations-Erstellung (wird zur Laufzeit überschrieben)
+        // Temporaerer Pfad nur fuer Migrations-Erstellung (wird zur Laufzeit ueberschrieben)
         optionsBuilder.UseSqlite("Data Source=design_time_userdata.db");
 
         return new UserDataContext(optionsBuilder.Options);

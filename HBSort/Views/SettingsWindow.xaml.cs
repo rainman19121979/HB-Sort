@@ -11,7 +11,7 @@ using Serilog;
 namespace HBSort.Views;
 
 /// <summary>
-/// Code-Behind für das Einstellungen-Fenster.
+/// Code-Behind fuer das Einstellungen-Fenster.
 /// Minimal gehalten: nur die Button-Clicks, die Logik steckt im ViewModel.
 /// </summary>
 public partial class SettingsWindow : Window
@@ -36,15 +36,15 @@ public partial class SettingsWindow : Window
         Loaded += async (_, _) => await _viewModel.LoadStatsAsync();
     }
 
-    /// <summary>Speichern-Button: Settings übernehmen und Fenster schließen</summary>
+    /// <summary>Speichern-Button: Settings uebernehmen und Fenster schliessen</summary>
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
         await _viewModel.SaveSettingsAsync();
-        DialogResult = true; // Signalisiert dem Hauptfenster: "Änderungen übernommen"
+        DialogResult = true; // Signalisiert dem Hauptfenster: "Aenderungen uebernommen"
         Close();
     }
 
-    /// <summary>Abbrechen-Button: Fenster schließen ohne zu speichern</summary>
+    /// <summary>Abbrechen-Button: Fenster schliessen ohne zu speichern</summary>
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
         DialogResult = false;
@@ -52,7 +52,7 @@ public partial class SettingsWindow : Window
     }
 
     // Cache-Limit Radio-Buttons. Wir koennten die direkt an die Property binden,
-    // aber RadioButton.IsChecked ist nur One-Way an IsLimitXyz – Click-Handler ist klarer.
+    // aber RadioButton.IsChecked ist nur One-Way an IsLimitXyz - Click-Handler ist klarer.
     private void LimitRadio100_Click(object sender, RoutedEventArgs e)
         => _viewModel.SetCacheLimitCommand.Execute("100");
 
@@ -108,7 +108,7 @@ public partial class SettingsWindow : Window
         }
     }
 
-    /// <summary>Per-Row "Inhalt" – oeffnet BinDetailDialog mit Figuren + Floating-Parts.</summary>
+    /// <summary>Per-Row "Inhalt" - oeffnet BinDetailDialog mit Figuren + Floating-Parts.</summary>
     private void BinShowDetail_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button b || b.Tag is not BinRowViewModel row) return;
@@ -362,7 +362,7 @@ public partial class SettingsWindow : Window
 
         try
         {
-            // Schwere Operation auf den Threadpool – UI-Thread bleibt responsiv,
+            // Schwere Operation auf den Threadpool - UI-Thread bleibt responsiv,
             // Progress-Reports kommen dank IProgress<T> auf dem UI-Thread an.
             var result = await Task.Run(() => importer(progress, default));
             _viewModel.ImportResultText =

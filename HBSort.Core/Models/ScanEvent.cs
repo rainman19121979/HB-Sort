@@ -1,7 +1,7 @@
 namespace HBSort.Core.Models;
 
 /// <summary>
-/// Protokolliert jeden Scan-Vorgang für die Undo-Funktion und Statistik.
+/// Protokolliert jeden Scan-Vorgang fuer die Undo-Funktion und Statistik.
 /// </summary>
 public class ScanEvent
 {
@@ -22,10 +22,10 @@ public class ScanEvent
     /// <summary>Pfad zum gespeicherten Scan-Bild im scans-Ordner</summary>
     public string? ImagePath { get; set; }
 
-    /// <summary>Beschreibung des Ergebnisses für die Anzeige</summary>
+    /// <summary>Beschreibung des Ergebnisses fuer die Anzeige</summary>
     public string ResultDescription { get; set; } = string.Empty;
 
-    /// <summary>Wurde dieser Scan per Undo rückgängig gemacht?</summary>
+    /// <summary>Wurde dieser Scan per Undo rueckgaengig gemacht?</summary>
     public bool WasUndone { get; set; }
 }
 

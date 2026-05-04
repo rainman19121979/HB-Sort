@@ -23,7 +23,7 @@ public class BricklinkRateLimitException : Exception
 /// <summary>
 /// Wird geworfen wenn unser EIGENER Rate-Limiter den Call blockt (hardThreshold erreicht).
 /// Anders als <see cref="BricklinkRateLimitException"/> ist hier kein API-Call
-/// passiert – der wurde vorher abgewuergt. Der Aufrufer soll Cache-Daten zurueckgeben.
+/// passiert - der wurde vorher abgewuergt. Der Aufrufer soll Cache-Daten zurueckgeben.
 /// </summary>
 public class RateLimitBlockedException : Exception
 {

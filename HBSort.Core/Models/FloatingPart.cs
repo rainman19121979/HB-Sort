@@ -29,7 +29,7 @@ public class FloatingPart
     /// <summary>Navigation Property zum Lagerfach</summary>
     public StorageBin StorageBin { get; set; } = null!;
 
-    /// <summary>Wann das Teil hinzugefügt wurde</summary>
+    /// <summary>Wann das Teil hinzugefuegt wurde</summary>
     public DateTime AddedAt { get; set; }
 
     /// <summary>
@@ -37,7 +37,7 @@ public class FloatingPart
     /// gesetzt wenn der User eine Figur "aufgibt" und Teile in den Floating-Pool
     /// uebernimmt. Erlaubt es, Teile in der Lagerliste als "aus zerlegter Figur X"
     /// zu kennzeichnen. Bei Loeschung der Figur wird der FK auf NULL gesetzt
-    /// (OnDelete=SetNull) – das Teil bleibt also als "verwaister Origin"-Eintrag bestehen.
+    /// (OnDelete=SetNull) - das Teil bleibt also als "verwaister Origin"-Eintrag bestehen.
     /// </summary>
     public int? OriginMinifigId { get; set; }
 

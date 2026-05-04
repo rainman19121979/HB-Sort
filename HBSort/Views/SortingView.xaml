@@ -70,7 +70,7 @@
                        ToolTip="Live-Bild deiner USB-Webcam. Halte hier Teile oder Figuren rein."/>
 
                 <TextBlock Grid.Row="0"
-                           Text="Kein Kamerabild verfügbar"
+                           Text="Kein Kamerabild verfuegbar"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"
                            FontSize="16" Foreground="Gray"

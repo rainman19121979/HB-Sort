@@ -15,17 +15,17 @@ public interface IBrickognizeClient
 {
     /// <summary>
     /// Pingt den Health-Endpoint mit kurzem Timeout (5 Sek).
-    /// Wirft KEINE Exception bei Fehler – gibt stattdessen ein Result-Objekt zurueck.
+    /// Wirft KEINE Exception bei Fehler - gibt stattdessen ein Result-Objekt zurueck.
     /// </summary>
     Task<BrickognizeHealth> CheckHealthAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Generischer Endpoint /predict/ – Fallback wenn unklar ob Teil oder Figur.</summary>
+    /// <summary>Generischer Endpoint /predict/ - Fallback wenn unklar ob Teil oder Figur.</summary>
     Task<BrickognizePrediction> PredictGenericAsync(byte[] jpegBytes, CancellationToken cancellationToken = default);
 
-    /// <summary>Endpoint /predict/parts/?predict_color=true – Teile + Farberkennung.</summary>
+    /// <summary>Endpoint /predict/parts/?predict_color=true - Teile + Farberkennung.</summary>
     Task<BrickognizePrediction> PredictPartAsync(byte[] jpegBytes, CancellationToken cancellationToken = default);
 
-    /// <summary>Endpoint /predict/figs/ – Minifiguren.</summary>
+    /// <summary>Endpoint /predict/figs/ - Minifiguren.</summary>
     Task<BrickognizePrediction> PredictMinifigAsync(byte[] jpegBytes, CancellationToken cancellationToken = default);
 }
 

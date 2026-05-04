@@ -167,7 +167,7 @@ public class BricklinkImageProvider : IPartImageProvider
 
     /// <summary>
     /// Laed das Brickognize-Bild ueber den Cache. Wenn es ueberhaupt keine URL gibt
-    /// oder der Download fehlschlaegt, wird ein leerer String zurueckgegeben –
+    /// oder der Download fehlschlaegt, wird ein leerer String zurueckgegeben -
     /// die UI zeigt dann eben kein Bild an.
     /// </summary>
     private async Task<string> DownloadFallbackOrEmptyAsync(BrickognizeItem item, CancellationToken ct)

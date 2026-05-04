@@ -62,7 +62,7 @@ public partial class BinDetailViewModel : ObservableObject
             foreach (var m in data.Minifigs)
                 Minifigs.Add(new TrackedMinifigSummaryViewModel(m));
 
-            // FloatingParts gruppieren nach (PartNumber, ColorId) – falls in mehreren
+            // FloatingParts gruppieren nach (PartNumber, ColorId) - falls in mehreren
             // Eintraegen das gleiche Teil/Farbe vorkommt, summieren wir die Quantity.
             var allColors = await _catalog.GetAllColorsAsync();
             var colorDict = allColors.ToDictionary(c => c.ColorId);

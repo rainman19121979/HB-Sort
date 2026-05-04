@@ -14,9 +14,9 @@ using Serilog;
 namespace HBSort.ViewModels;
 
 /// <summary>
-/// ViewModel für den Einstellungen-Dialog.
-/// Zeigt die aktuellen Settings an und lässt den User sie ändern.
-/// Änderungen werden erst beim Klick auf "Speichern" übernommen.
+/// ViewModel fuer den Einstellungen-Dialog.
+/// Zeigt die aktuellen Settings an und laesst den User sie aendern.
+/// Aenderungen werden erst beim Klick auf "Speichern" uebernommen.
 /// </summary>
 public partial class SettingsViewModel : ObservableObject
 {
@@ -33,16 +33,16 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IBlPriceCacheService _priceCache;
     private readonly ITooltipsService _tooltips;
 
-    /// <summary>Tab "Lagerfaecher" – eigenes ViewModel mit Liste + Commands.</summary>
+    /// <summary>Tab "Lagerfaecher" - eigenes ViewModel mit Liste + Commands.</summary>
     public BinManagerViewModel BinManager { get; }
 
     // --- Kamera ---
 
-    /// <summary>Liste der verfügbaren Kameras</summary>
+    /// <summary>Liste der verfuegbaren Kameras</summary>
     [ObservableProperty]
     private List<string> _availableCameras = [];
 
-    /// <summary>Aktuell ausgewählte Kamera</summary>
+    /// <summary>Aktuell ausgewaehlte Kamera</summary>
     [ObservableProperty]
     private int _selectedCameraIndex;
 
@@ -473,7 +473,7 @@ public partial class SettingsViewModel : ObservableObject
         {
             // settings.json wurde von anderem Windows-User uebernommen
             Log.Warning(ex, "BL-Tokens konnten nicht entschluesselt werden");
-            BricklinkStatusText = "Tokens nicht entschluesselbar – bitte neu eingeben.";
+            BricklinkStatusText = "Tokens nicht entschluesselbar - bitte neu eingeben.";
         }
     }
 
@@ -536,7 +536,7 @@ public partial class SettingsViewModel : ObservableObject
             var result = await _bricklinkClient.TestConnectionAsync();
             if (result.Success)
             {
-                BricklinkTestResultText = $"OK – '{result.ItemName}' erkannt ({result.ResponseTimeMs} ms)";
+                BricklinkTestResultText = $"OK - '{result.ItemName}' erkannt ({result.ResponseTimeMs} ms)";
             }
             else
             {

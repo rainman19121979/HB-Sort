@@ -76,7 +76,7 @@ public class PriceCalculationService : IPriceCalculationService
 
         await Task.WhenAll(new[] { minifigTask }.Concat(partTasks));
 
-        // Nach WhenAll sind alle Tasks abgeschlossen – await liest direkt den
+        // Nach WhenAll sind alle Tasks abgeschlossen - await liest direkt den
         // gecachten Wert (kein zweiter Schedule). Lesbarer als .Result.
         var minifigPrice = await minifigTask;
         var partPrices = new List<PriceResult?>(partTasks.Count);

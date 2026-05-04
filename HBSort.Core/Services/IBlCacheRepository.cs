@@ -4,7 +4,7 @@ namespace HBSort.Core.Services;
 
 /// <summary>
 /// Direkt-Zugriff auf bl_cache.db. Microsoft.Data.Sqlite, kein EF.
-/// Keine Cache-Logik (wann refresh, wann fallback) – die liegt im BlCatalogService.
+/// Keine Cache-Logik (wann refresh, wann fallback) - die liegt im BlCatalogService.
 /// </summary>
 public interface IBlCacheRepository
 {

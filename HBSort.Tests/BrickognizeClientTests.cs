@@ -7,7 +7,7 @@ namespace HBSort.Tests;
 
 /// <summary>
 /// Tests fuer den BrickognizeClient mit einem custom HttpMessageHandler-Mock.
-/// Wir bauen keinen externen Mocking-Framework ein – das geht mit eigenem
+/// Wir bauen keinen externen Mocking-Framework ein - das geht mit eigenem
 /// FakeHandler einfacher und ohne zusaetzliche Dependencies.
 /// </summary>
 public class BrickognizeClientTests
@@ -255,7 +255,7 @@ public class BrickognizeClientTests
     {
         private readonly Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> _handler;
 
-        // Privater Konstruktor – Factory-Methoden disambiguieren Sync/Async-Lambdas
+        // Privater Konstruktor - Factory-Methoden disambiguieren Sync/Async-Lambdas
         private FakeHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler)
         {
             _handler = handler;

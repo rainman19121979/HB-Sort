@@ -63,7 +63,7 @@ public class BricklinkRateLimiterTests : IDisposable
     [InlineData(4900, RateLimitState.Blocked)]
     public void ComputeState_at_boundaries(int calls, RateLimitState expected)
     {
-        // Verwendet die statische Funktion direkt – keine DB noetig.
+        // Verwendet die statische Funktion direkt - keine DB noetig.
         var state = BricklinkRateLimiter.ComputeState(calls, softThreshold: 1000, hardThreshold: 4500);
         Assert.Equal(expected, state);
     }
@@ -153,7 +153,7 @@ public class BricklinkRateLimiterTests : IDisposable
         if (daysAgo.HasValue) ts = ts.AddDays(-daysAgo.Value);
         if (hoursAgo.HasValue) ts = ts.AddHours(-hoursAgo.Value);
 
-        // Wir nutzen die LogApi + manuelle SQL-Update Methode hier nicht – stattdessen direkter Insert.
+        // Wir nutzen die LogApi + manuelle SQL-Update Methode hier nicht - stattdessen direkter Insert.
         var connStr = $"Data Source={Path.Combine(_testDir, "bl_cache.db")}";
         await using var conn = new Microsoft.Data.Sqlite.SqliteConnection(connStr);
         await conn.OpenAsync();

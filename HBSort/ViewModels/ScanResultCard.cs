@@ -28,7 +28,7 @@ public partial class ScanResultCard : ObservableObject
     public string TypeLabel { get; init; } = string.Empty;
 
     /// <summary>
-    /// URL zum Vorschaubild. Wird ueber den IPartImageProvider aufgeloest –
+    /// URL zum Vorschaubild. Wird ueber den IPartImageProvider aufgeloest -
     /// bevorzugt BrickLink-Foto (farbig), Fallback auf Brickognize-Render.
     /// Observable damit das Bild nach der Farb-Identifikation austauschen koennen
     /// (Erst-Anzeige ohne Farbe, dann farbiges BL-Bild wenn die Farbe erkannt wurde).
@@ -42,11 +42,11 @@ public partial class ScanResultCard : ObservableObject
     /// <summary>Roher BrickognizeItem zum Spaeter-Verarbeiten.</summary>
     public BrickognizeItem? RawItem { get; init; }
 
-    /// <summary>Rahmenfarbe der Karte – wird bei Top-Treffer (Score &gt;= Auto) gruen.</summary>
+    /// <summary>Rahmenfarbe der Karte - wird bei Top-Treffer (Score &gt;= Auto) gruen.</summary>
     [ObservableProperty]
     private Brush _borderBrush = Brushes.Gray;
 
-    /// <summary>Rahmen-Dicke – Top-Treffer wird dicker dargestellt.</summary>
+    /// <summary>Rahmen-Dicke - Top-Treffer wird dicker dargestellt.</summary>
     [ObservableProperty]
     private double _borderThickness = 1;
 
