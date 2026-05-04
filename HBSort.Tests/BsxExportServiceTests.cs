@@ -18,6 +18,7 @@ public class BsxExportServiceTests : IDisposable
     private readonly SqliteConnection _connection;
     private readonly IDbContextFactory<UserDataContext> _factory;
     private readonly StubBlCatalog _catalog = new();
+    private readonly StubSettings _settings = new();
     private readonly BsxExportService _sut;
 
     public BsxExportServiceTests()
@@ -39,7 +40,7 @@ public class BsxExportServiceTests : IDisposable
         }
 
         _factory = new SimpleContextFactory(options);
-        _sut = new BsxExportService(_factory, _catalog);
+        _sut = new BsxExportService(_factory, _catalog, _settings);
     }
 
     public void Dispose()
@@ -245,6 +246,31 @@ public class BsxExportServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Generate_inventory_has_Currency_attribute_from_settings()
+    {
+        _settings.Current.Prices.Currency = "USD";
+        var ids = await SeedMinifigsAsync(("arc007", "Arctic"));
+
+        var xml = await _sut.GenerateBsxAsync(ids, Array.Empty<int>(), new BsxExportOptions());
+        var doc = XDocument.Parse(xml);
+
+        var inventory = doc.Root!.Element("Inventory")!;
+        Assert.Equal("USD", inventory.Attribute("Currency")!.Value);
+    }
+
+    [Fact]
+    public async Task Generate_inventory_falls_back_to_EUR_when_settings_currency_empty()
+    {
+        _settings.Current.Prices.Currency = "";
+        var ids = await SeedMinifigsAsync(("arc007", "Arctic"));
+
+        var xml = await _sut.GenerateBsxAsync(ids, Array.Empty<int>(), new BsxExportOptions());
+        var inventory = XDocument.Parse(xml).Root!.Element("Inventory")!;
+
+        Assert.Equal("EUR", inventory.Attribute("Currency")!.Value);
+    }
+
+    [Fact]
     public async Task Generate_part_uses_floating_part_color_name_as_fallback()
     {
         // Catalog liefert keinen Color-Namen -> wir erwarten den FloatingPart.ColorName.
@@ -358,5 +384,15 @@ public class BsxExportServiceTests : IDisposable
         private readonly DbContextOptions<UserDataContext> _options;
         public SimpleContextFactory(DbContextOptions<UserDataContext> options) => _options = options;
         public UserDataContext CreateDbContext() => new(_options);
+    }
+
+    private sealed class StubSettings : ISettingsService
+    {
+        public AppSettings Current { get; } = new()
+        {
+            Prices = new PriceSettings { Currency = "EUR" }
+        };
+        public Task LoadAsync() => Task.CompletedTask;
+        public Task SaveAsync() => Task.CompletedTask;
     }
 }

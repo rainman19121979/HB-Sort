@@ -30,6 +30,7 @@ public class BsxExportService : IBsxExportService
 {
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
     private readonly IBlCatalogService _catalog;
+    private readonly ISettingsService _settings;
 
     /// <summary>BL-Default-Kategorie fuer Minifigs wenn der Cache nichts liefert.</summary>
     private const int DefaultMinifigCategoryId = 65;
@@ -37,12 +38,21 @@ public class BsxExportService : IBsxExportService
     /// <summary>BL-Default-Kategorie fuer Teile wenn der Cache nichts liefert.</summary>
     private const int DefaultPartCategoryId = 5;
 
+    /// <summary>
+    /// Fallback-Currency wenn die Settings keinen Wert oder einen leeren
+    /// String haben. EUR passt zur europaeischen User-Basis, BL-Default
+    /// fuer EU-Verkaeufer.
+    /// </summary>
+    private const string DefaultCurrency = "EUR";
+
     public BsxExportService(
         IDbContextFactory<UserDataContext> ctxFactory,
-        IBlCatalogService catalog)
+        IBlCatalogService catalog,
+        ISettingsService settings)
     {
         _ctxFactory = ctxFactory;
         _catalog = catalog;
+        _settings = settings;
     }
 
     public async Task<string> GenerateBsxAsync(
@@ -92,7 +102,16 @@ public class BsxExportService : IBsxExportService
         var colorMap = (await _catalog.GetAllColorsAsync(ct))
             .ToDictionary(c => c.ColorId);
 
-        var inventory = new XElement("Inventory");
+        // BUGFIX (UX X.12, 2026-05-04): Inventory-Tag bekommt das Currency-
+        // Attribut, wie es BrickStore-eigene BSX-Dateien auch tun. Wert kommt
+        // aus den Preise-Settings; bei leeren/fehlenden Settings auf EUR
+        // zurueckfallen. BrickLinkChangelogId wird absichtlich weggelassen -
+        // HBSort kennt diesen Wert nicht und Brickstore importiert auch ohne.
+        var currency = _settings.Current.Prices?.Currency;
+        if (string.IsNullOrWhiteSpace(currency)) currency = DefaultCurrency;
+
+        var inventory = new XElement("Inventory",
+            new XAttribute("Currency", currency));
         var nowStr = DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var remark = options.Remark ?? $"HBSort {nowStr}";
 
