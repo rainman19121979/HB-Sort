@@ -99,7 +99,7 @@
         <!-- Vorschau -->
         <Border Grid.Row="6" Margin="0,12,0,0"
                 BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                BorderThickness="1" CornerRadius="4" Padding="10">
+                BorderThickness="1" CornerRadius="4" Padding="12">
             <StackPanel>
                 <TextBlock Text="Vorschau" FontWeight="SemiBold" Margin="0,0,0,4"/>
                 <ItemsControl ItemsSource="{Binding PreviewItems}">
