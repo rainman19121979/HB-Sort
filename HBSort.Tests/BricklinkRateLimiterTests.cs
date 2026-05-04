@@ -133,6 +133,33 @@ public class BricklinkRateLimiterTests : IDisposable
     }
 
     [Fact]
+    public async Task GetStatus_uses_UTC_midnight_for_CallsToday()
+    {
+        // Audit M-2: CallsToday filtert nach DateTime.UtcNow.Date.
+        // Robust gegen Test-Lauf nahe UTC-Mitternacht: wir holen die Anzahl
+        // Sekunden seit UTC-Mitternacht und verwenden zwei sicher in-/ausserhalb-
+        // liegende Offsets.
+        var secondsSinceMidnight = (DateTime.UtcNow - DateTime.UtcNow.Date).TotalSeconds;
+
+        // Frischer Eintrag (gerade jetzt) - in jedem Fall heute.
+        await _sut.LogCallAsync("GetItem", "M", "fresh", 100, 200, true);
+        // 26h alt - auf jeden Fall gestern (oder vorgestern) UTC.
+        await InsertOldCallAsync(hoursAgo: 26);
+
+        var status = await _sut.GetStatusAsync();
+
+        // Heute: mind. 1 (fresh), maximal 2 wenn der 26h-alte gerade noch
+        // heute liegt (was nur passiert wenn jetzt < 2h nach UTC-Mitternacht).
+        // Wir testen hier defensiv den Fresh-Eintrag drin, den 26h-alten draussen.
+        Assert.True(status.CallsToday >= 1);
+        if (secondsSinceMidnight >= 2 * 3600)
+        {
+            // Sicher in der "Mitte" eines UTC-Tages: 26h alt ist definitiv gestern.
+            Assert.Equal(1, status.CallsToday);
+        }
+    }
+
+    [Fact]
     public async Task Rolling_window_excludes_calls_older_than_24h()
     {
         await InsertOldCallAsync(hoursAgo: 25);  // ausserhalb

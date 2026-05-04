@@ -41,8 +41,8 @@ public class BrickognizeHealth
     /// <summary>Fehlertext bei Status=Offline.</summary>
     public string? ErrorMessage { get; set; }
 
-    /// <summary>Zeitpunkt des Checks.</summary>
-    public DateTime CheckedAt { get; set; } = DateTime.Now;
+    /// <summary>Zeitpunkt des Checks (UTC, Audit M-3).</summary>
+    public DateTime CheckedAt { get; set; } = DateTime.UtcNow;
 }
 
 /// <summary>Brickognize-Verfuegbarkeitsstatus.</summary>

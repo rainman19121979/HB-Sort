@@ -38,9 +38,15 @@ public class BricklinkRateLimiter : IBricklinkRateLimiter
         var calls24h = await _repo.GetCallCountInWindowAsync(Window24h, ct);
         var calls1h = await _repo.GetCallCountInWindowAsync(Window1h, ct);
 
-        // CallsToday = seit 00:00 lokale Zeit
-        var todayLocalStart = DateTime.Now.Date; // Kind=Local
-        var callsToday = await _repo.GetCallCountSinceAsync(todayLocalStart, ct);
+        // Audit M-2 (2026-05-04): "CallsToday seit UTC-Mitternacht". Frueher
+        // war das DateTime.Now.Date (lokal) - der nachgeschaltete Repository-
+        // Call hat das via .ToUniversalTime() korrekt konvertiert, aber die
+        // Konvention war damit zwischen Code und DB unterschiedlich. Jetzt
+        // konsistent UTC. Effektiv: der Counter resettet einmal pro UTC-Tag,
+        // nicht pro lokalem Tag - in einer Einzel-User-Desktop-App
+        // praktisch egal, semantisch klarer.
+        var todayUtcStart = DateTime.UtcNow.Date;
+        var callsToday = await _repo.GetCallCountSinceAsync(todayUtcStart, ct);
 
         var oldest = await _repo.GetOldestCallInWindowAsync(Window24h, ct);
 

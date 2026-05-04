@@ -885,10 +885,13 @@ public partial class SettingsViewModel : ObservableObject
         {
             await using var ctx = await _ctxFactory.CreateDbContextAsync();
 
-            DateTime? since = StatsRangeToday   ? DateTime.Today
-                            : StatsRange7Days   ? DateTime.Today.AddDays(-6)   // inkl. heute
-                            : StatsRange30Days  ? DateTime.Today.AddDays(-29)  // inkl. heute
-                            : (DateTime?)null;                                  // AllTime
+            // Audit M-2: DailyStats.Date ist in UTC - die Statistik-Filter
+            // muessen ebenfalls UTC nutzen, sonst sind die Counts off-by-one.
+            var todayUtc = DateTime.UtcNow.Date;
+            DateTime? since = StatsRangeToday   ? todayUtc
+                            : StatsRange7Days   ? todayUtc.AddDays(-6)   // inkl. heute
+                            : StatsRange30Days  ? todayUtc.AddDays(-29)  // inkl. heute
+                            : (DateTime?)null;                            // AllTime
 
             var query = ctx.DailyStats.AsNoTracking().AsQueryable();
             if (since.HasValue) query = query.Where(s => s.Date >= since.Value);

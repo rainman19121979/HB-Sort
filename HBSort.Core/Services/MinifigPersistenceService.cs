@@ -43,7 +43,14 @@ public class MinifigPersistenceService : IMinifigPersistenceService
     private static async Task IncrementDailyStatAsync(UserDataContext ctx,
         Action<DailyStats> mutate, CancellationToken ct)
     {
-        var today = DateTime.Today;
+        // Audit M-2 (2026-05-04): DailyStats.Date wird konsequent in UTC
+        // gespeichert (DateTime.UtcNow.Date). Vorher: DateTime.Today (lokal).
+        // Lese-Pfade (LiveStatsViewModel, SettingsViewModel-Statistik) sind
+        // ebenfalls auf UTC umgestellt. Alte Eintraege aus dem lokalen Schema
+        // bleiben as-is in der DB - bei Zeitzonen-Wechsel des Users kann ein
+        // alter Eintrag um max. einen Tag versetzt erscheinen, wir nehmen das
+        // bewusst in Kauf.
+        var today = DateTime.UtcNow.Date;
         var stat = await ctx.DailyStats.FirstOrDefaultAsync(s => s.Date == today, ct);
         if (stat == null)
         {

@@ -63,7 +63,8 @@ public partial class LiveStatsViewModel : ObservableObject, IDisposable
         try
         {
             await using var ctx = await _ctxFactory.CreateDbContextAsync();
-            var today = DateTime.Today;
+            // Audit M-2: DailyStats.Date ist UTC - dieser Lookup muss konsistent sein.
+            var today = DateTime.UtcNow.Date;
             var weekAgo = today.AddDays(-6);
 
             var todayStat = await ctx.DailyStats.AsNoTracking()

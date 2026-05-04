@@ -117,8 +117,9 @@ public class BrickognizeClient : IBrickognizeClient
         using var content = new MultipartFormDataContent();
         var imageContent = new ByteArrayContent(jpegBytes);
         imageContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
-        // Filename ist egal, aber muss da sein. Mit Zeitstempel fuer Debug-Logs.
-        content.Add(imageContent, "query_image", $"scan_{DateTime.Now:yyyyMMdd_HHmmss}.jpg");
+        // Filename ist egal, aber muss da sein. Mit UTC-Zeitstempel fuer
+        // konsistente Debug-Logs (Audit M-3, 2026-05-04).
+        content.Add(imageContent, "query_image", $"scan_{DateTime.UtcNow:yyyyMMdd_HHmmss}.jpg");
 
         Log.Debug("Brickognize POST {Endpoint} ({Size} Byte)", endpoint, jpegBytes.Length);
 
@@ -179,7 +180,7 @@ public class BrickognizeClient : IBrickognizeClient
 
             var entry = $"""
                 ====================================================================
-                Timestamp:    {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}
+                Timestamp:    {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss.fff} UTC
                 Endpoint-Tag: {endpointTag}
                 URL:          {endpoint}
                 HTTP-Status:  {(int)statusCode} {statusCode}
