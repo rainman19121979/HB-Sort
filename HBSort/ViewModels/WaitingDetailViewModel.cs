@@ -15,9 +15,13 @@ namespace HBSort.ViewModels;
 /// Teilen pro Figur, damit man auf einen Blick sieht "ach, mir fehlt
 /// noch X fuer Box 3".
 /// </summary>
-public partial class WaitingDetailViewModel : ObservableObject
+public partial class WaitingDetailViewModel : ObservableObject, IDisposable
 {
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
+
+    // Audit K-2: Subscription als Field, damit Dispose() abmelden kann.
+    private readonly IMinifigPersistenceService _persistence;
+    private readonly EventHandler _onDataChanged;
 
     public ObservableCollection<WaitingFigureWithMissing> Items { get; } = new();
 
@@ -29,8 +33,9 @@ public partial class WaitingDetailViewModel : ObservableObject
         IMinifigPersistenceService persistence)
     {
         _ctxFactory = ctxFactory;
+        _persistence = persistence;
 
-        persistence.DataChanged += (_, _) =>
+        _onDataChanged = (_, _) =>
         {
             var disp = Application.Current?.Dispatcher;
             if (disp != null && !disp.CheckAccess())
@@ -38,7 +43,15 @@ public partial class WaitingDetailViewModel : ObservableObject
             else
                 _ = RefreshAsync();
         };
+        _persistence.DataChanged += _onDataChanged;
         _ = RefreshAsync();
+    }
+
+    /// <summary>Audit K-2: Unsubscribe beim ServiceProvider-Dispose.</summary>
+    public void Dispose()
+    {
+        _persistence.DataChanged -= _onDataChanged;
+        GC.SuppressFinalize(this);
     }
 
     [RelayCommand]

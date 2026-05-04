@@ -14,11 +14,15 @@ namespace HBSort.ViewModels;
 /// "Letzte Scans"-Tab. Zeigt die juengsten 50 ScanEvents chronologisch
 /// absteigend. Refresht automatisch bei DataChanged.
 /// </summary>
-public partial class RecentScansViewModel : ObservableObject
+public partial class RecentScansViewModel : ObservableObject, IDisposable
 {
     private const int MaxItems = 50;
 
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
+
+    // Audit K-2: Subscription als Field, damit Dispose() abmelden kann.
+    private readonly IMinifigPersistenceService _persistence;
+    private readonly EventHandler _onDataChanged;
 
     public ObservableCollection<ScanEventDisplay> Items { get; } = new();
 
@@ -27,7 +31,8 @@ public partial class RecentScansViewModel : ObservableObject
         IMinifigPersistenceService persistence)
     {
         _ctxFactory = ctxFactory;
-        persistence.DataChanged += (_, _) =>
+        _persistence = persistence;
+        _onDataChanged = (_, _) =>
         {
             var disp = Application.Current?.Dispatcher;
             if (disp != null && !disp.CheckAccess())
@@ -35,7 +40,15 @@ public partial class RecentScansViewModel : ObservableObject
             else
                 _ = RefreshAsync();
         };
+        _persistence.DataChanged += _onDataChanged;
         _ = RefreshAsync();
+    }
+
+    /// <summary>Audit K-2: Unsubscribe beim ServiceProvider-Dispose.</summary>
+    public void Dispose()
+    {
+        _persistence.DataChanged -= _onDataChanged;
+        GC.SuppressFinalize(this);
     }
 
     [RelayCommand]

@@ -14,9 +14,13 @@ namespace HBSort.ViewModels;
 /// Aggregiert "Heute" (DailyStats) + "Letzte 7 Tage" + aktueller Bestand.
 /// Refresht automatisch bei jedem DataChanged-Event.
 /// </summary>
-public partial class LiveStatsViewModel : ObservableObject
+public partial class LiveStatsViewModel : ObservableObject, IDisposable
 {
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
+
+    // Audit K-2: Subscription als Field, damit Dispose() abmelden kann.
+    private readonly IMinifigPersistenceService _persistence;
+    private readonly EventHandler _onDataChanged;
 
     [ObservableProperty] private int _scansToday;
     [ObservableProperty] private int _completedToday;
@@ -33,7 +37,8 @@ public partial class LiveStatsViewModel : ObservableObject
         IMinifigPersistenceService persistence)
     {
         _ctxFactory = ctxFactory;
-        persistence.DataChanged += (_, _) =>
+        _persistence = persistence;
+        _onDataChanged = (_, _) =>
         {
             var disp = Application.Current?.Dispatcher;
             if (disp != null && !disp.CheckAccess())
@@ -41,7 +46,15 @@ public partial class LiveStatsViewModel : ObservableObject
             else
                 _ = RefreshAsync();
         };
+        _persistence.DataChanged += _onDataChanged;
         _ = RefreshAsync();
+    }
+
+    /// <summary>Audit K-2: Unsubscribe beim ServiceProvider-Dispose.</summary>
+    public void Dispose()
+    {
+        _persistence.DataChanged -= _onDataChanged;
+        GC.SuppressFinalize(this);
     }
 
     [RelayCommand]

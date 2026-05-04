@@ -22,13 +22,22 @@ namespace HBSort.ViewModels;
 ///   4. Pro Kandidat: Match-Prozent berechnen (Quantity-aware).
 ///   5. Sortieren nach Match-%, Top 20.
 /// </summary>
-public partial class BuildSuggestionsViewModel : ObservableObject
+public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
 {
     private const int MaxSuggestions = 20;
 
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
     private readonly IBlCacheRepository _blCache;
     private readonly IPartImageProvider _imageProvider;
+
+    // Audit K-2: Wir merken uns die DataChanged-Subscription (als Field), damit
+    // wir sie in Dispose() sauber abmelden koennen. Ohne das Unsubscribe wuerde
+    // der Event-Handler die VM-Instanz am Leben halten - bei Singleton-Lifetime
+    // ist das in Production kein Problem (lebt sowieso bis App-Ende), aber:
+    // 1) Bei Tests die das VM-Setup wiederholen sammeln sich Handler an,
+    // 2) Future-Refactor (z.B. Tab-Lazy-Init) wird damit zur echten Leak-Quelle.
+    private readonly IMinifigPersistenceService _persistence;
+    private readonly EventHandler _onDataChanged;
 
     public ObservableCollection<BuildSuggestionItem> Suggestions { get; } = new();
 
@@ -47,8 +56,9 @@ public partial class BuildSuggestionsViewModel : ObservableObject
         _ctxFactory = ctxFactory;
         _blCache = blCache;
         _imageProvider = imageProvider;
+        _persistence = persistence;
 
-        persistence.DataChanged += (_, _) =>
+        _onDataChanged = (_, _) =>
         {
             var disp = Application.Current?.Dispatcher;
             if (disp != null && !disp.CheckAccess())
@@ -56,8 +66,19 @@ public partial class BuildSuggestionsViewModel : ObservableObject
             else
                 _ = RefreshAsync();
         };
+        _persistence.DataChanged += _onDataChanged;
 
         _ = RefreshAsync();
+    }
+
+    /// <summary>
+    /// Audit K-2: meldet sich vom DataChanged-Event ab. Wird vom DI-Container
+    /// automatisch beim ServiceProvider-Dispose (App.xaml.cs::OnExit) aufgerufen.
+    /// </summary>
+    public void Dispose()
+    {
+        _persistence.DataChanged -= _onDataChanged;
+        GC.SuppressFinalize(this);
     }
 
     [RelayCommand]
