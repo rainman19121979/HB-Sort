@@ -189,8 +189,10 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- PROMPT 6 (2026-05-02): Tab "Katalog" (Rebrickable catalog.db) entfernt.
-                 Stammdaten kommen jetzt aus bl_cache.db (Tab "BL-Catalog-Daten"). -->
+            <!-- Hinweis: Frueher gab es hier einen Tab "Katalog" fuer die
+                 Rebrickable catalog.db. Wurde 2026-05-02 entfernt; Stammdaten
+                 kommen jetzt aus bl_cache.db, sichtbar im Tab "BrickLink"
+                 unter "BL-Catalog-Daten". -->
 
             <!-- ============================================================ -->
             <!-- TAB: BRICKLINK (UX X.11)
