@@ -2,107 +2,119 @@ using HBSort.Core.Services;
 
 namespace HBSort.Tests;
 
-/// <summary>Tests fuer den Bulk-Bin-Name-Generator.</summary>
+/// <summary>
+/// Tests fuer den Bulk-Bin-Name-Generator.
+///
+/// Audit M-12 (2026-05-04): mehrere strukturell aehnliche [Fact]-Tests
+/// auf [Theory] mit [InlineData] konsolidiert. Die Test-Anzahl insgesamt
+/// steigt leicht (Theory-Cases werden einzeln gezaehlt), die Lesbarkeit
+/// und Erweiterbarkeit ist deutlich besser.
+/// </summary>
 public class BinNameGeneratorTests
 {
-    [Fact]
-    public void Numbers_without_padding()
-    {
-        var result = BinNameGenerator.Generate("", "", BinSequenceType.Numbers, "1", "3");
-        Assert.Equal(new[] { "1", "2", "3" }, result);
-    }
+    // ====================================================================
+    // Generate(): erfolgreiche Sequenzen
+    // ====================================================================
 
-    [Fact]
-    public void Numbers_with_padding_3()
+    [Theory]
+    [InlineData("1", "3", 0,    new[] { "1", "2", "3" })]
+    [InlineData("1", "5", 0,    new[] { "1", "2", "3", "4", "5" })]
+    [InlineData("1", "3", 3,    new[] { "001", "002", "003" })]
+    [InlineData("9", "11", 2,   new[] { "09", "10", "11" })]
+    public void Generate_numbers(string start, string end, int padding, string[] expected)
     {
-        var result = BinNameGenerator.Generate("", "", BinSequenceType.Numbers, "1", "10", padding: 3);
-        Assert.Equal(10, result.Count);
-        Assert.Equal("001", result[0]);
-        Assert.Equal("010", result[9]);
-    }
-
-    [Fact]
-    public void Letters_simple()
-    {
-        var result = BinNameGenerator.Generate("", "", BinSequenceType.Letters, "A", "C");
-        Assert.Equal(new[] { "A", "B", "C" }, result);
-    }
-
-    [Fact]
-    public void Letters_Z_to_AB()
-    {
-        var result = BinNameGenerator.Generate("", "", BinSequenceType.Letters, "Z", "AB");
-        Assert.Equal(new[] { "Z", "AA", "AB" }, result);
-    }
-
-    [Fact]
-    public void Letters_three_letters_AAA_to_AAC()
-    {
-        var result = BinNameGenerator.Generate("", "", BinSequenceType.Letters, "AAA", "AAC");
-        Assert.Equal(new[] { "AAA", "AAB", "AAC" }, result);
-    }
-
-    [Fact]
-    public void Prefix_and_suffix_combine_correctly()
-    {
-        var result = BinNameGenerator.Generate("Box ", "-rot", BinSequenceType.Numbers, "1", "2");
-        Assert.Equal(new[] { "Box 1-rot", "Box 2-rot" }, result);
+        var result = BinNameGenerator.Generate("", "", BinSequenceType.Numbers, start, end, padding);
+        Assert.Equal(expected, result);
     }
 
     [Theory]
-    [InlineData("A", "B")]
-    [InlineData("Z", "AA")]
-    [InlineData("AZ", "BA")]
-    [InlineData("ZZ", "AAA")]
+    [InlineData("A", "C",     new[] { "A", "B", "C" })]
+    [InlineData("X", "Z",     new[] { "X", "Y", "Z" })]
+    [InlineData("Z", "AB",    new[] { "Z", "AA", "AB" })]
+    [InlineData("AAA", "AAC", new[] { "AAA", "AAB", "AAC" })]
+    [InlineData("A", "A",     new[] { "A" })]
+    public void Generate_letters(string start, string end, string[] expected)
+    {
+        var result = BinNameGenerator.Generate("", "", BinSequenceType.Letters, start, end);
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("Box ", "",       BinSequenceType.Numbers, "1", "2", new[] { "Box 1", "Box 2" })]
+    [InlineData("",     "-rot",   BinSequenceType.Numbers, "1", "2", new[] { "1-rot", "2-rot" })]
+    [InlineData("Box ", "-rot",   BinSequenceType.Numbers, "1", "2", new[] { "Box 1-rot", "Box 2-rot" })]
+    [InlineData("Bin-", "",       BinSequenceType.Letters, "A", "B", new[] { "Bin-A", "Bin-B" })]
+    public void Generate_prefix_and_suffix_combine(string prefix, string suffix, BinSequenceType type, string start, string end, string[] expected)
+    {
+        var result = BinNameGenerator.Generate(prefix, suffix, type, start, end);
+        Assert.Equal(expected, result);
+    }
+
+    // ====================================================================
+    // Generate(): Fehler-Pfade
+    // ====================================================================
+
+    [Theory]
+    [InlineData(BinSequenceType.Numbers, "10", "5")]   // Numbers: end < start
+    [InlineData(BinSequenceType.Letters, "C", "A")]    // Letters: end < start
+    public void Generate_throws_when_end_before_start(BinSequenceType type, string start, string end)
+    {
+        Assert.Throws<ArgumentException>(() =>
+            BinNameGenerator.Generate("", "", type, start, end));
+    }
+
+    [Theory]
+    [InlineData(BinSequenceType.Numbers, "abc", "10")]  // Numbers: nicht-numerisch
+    [InlineData(BinSequenceType.Letters, "A1", "C")]    // Letters: Zahlen drin
+    public void Generate_throws_when_invalid_input(BinSequenceType type, string start, string end)
+    {
+        Assert.Throws<ArgumentException>(() =>
+            BinNameGenerator.Generate("", "", type, start, end));
+    }
+
+    // ====================================================================
+    // IncrementAlpha
+    // ====================================================================
+
+    [Theory]
+    [InlineData("",    "A")]
+    [InlineData("A",   "B")]
+    [InlineData("Y",   "Z")]
+    [InlineData("Z",   "AA")]
+    [InlineData("AZ",  "BA")]
+    [InlineData("ZZ",  "AAA")]
     [InlineData("BZZ", "CAA")]
-    public void IncrementAlpha_carries_over(string input, string expected)
+    public void IncrementAlpha(string input, string expected)
     {
         Assert.Equal(expected, BinNameGenerator.IncrementAlpha(input));
     }
 
-    [Fact]
-    public void IncrementAlpha_empty_returns_A()
+    // ====================================================================
+    // CountAlpha
+    // ====================================================================
+
+    [Theory]
+    [InlineData("A", "A", 1)]
+    [InlineData("A", "C", 3)]
+    [InlineData("Z", "AB", 3)]
+    [InlineData("C", "A", 0)]   // end < start -> 0
+    public void CountAlpha(string start, string end, int expectedCount)
     {
-        Assert.Equal("A", BinNameGenerator.IncrementAlpha(""));
+        Assert.Equal(expectedCount, BinNameGenerator.CountAlpha(start, end));
     }
 
-    [Fact]
-    public void CountAlpha_includes_both_endpoints()
-    {
-        Assert.Equal(3, BinNameGenerator.CountAlpha("A", "C"));
-        Assert.Equal(3, BinNameGenerator.CountAlpha("Z", "AB"));
-        Assert.Equal(1, BinNameGenerator.CountAlpha("A", "A"));
-    }
+    // ====================================================================
+    // CompareAlpha
+    // ====================================================================
 
-    [Fact]
-    public void CountAlpha_zero_when_end_before_start()
+    [Theory]
+    [InlineData("Z",  "AA",  -1)]   // kuerzer ist kleiner
+    [InlineData("AA", "Z",    1)]
+    [InlineData("AB", "AB",   0)]
+    [InlineData("A",  "B",   -1)]
+    public void CompareAlpha(string left, string right, int expectedSign)
     {
-        Assert.Equal(0, BinNameGenerator.CountAlpha("C", "A"));
-    }
-
-    [Fact]
-    public void Generate_throws_when_end_before_start()
-    {
-        Assert.Throws<ArgumentException>(() =>
-            BinNameGenerator.Generate("", "", BinSequenceType.Numbers, "10", "5"));
-        Assert.Throws<ArgumentException>(() =>
-            BinNameGenerator.Generate("", "", BinSequenceType.Letters, "C", "A"));
-    }
-
-    [Fact]
-    public void Generate_throws_when_invalid_input()
-    {
-        Assert.Throws<ArgumentException>(() =>
-            BinNameGenerator.Generate("", "", BinSequenceType.Numbers, "abc", "10"));
-        Assert.Throws<ArgumentException>(() =>
-            BinNameGenerator.Generate("", "", BinSequenceType.Letters, "A1", "C"));
-    }
-
-    [Fact]
-    public void Compare_alpha_shorter_is_smaller()
-    {
-        Assert.True(BinNameGenerator.CompareAlpha("Z", "AA") < 0);
-        Assert.True(BinNameGenerator.CompareAlpha("AA", "Z") > 0);
-        Assert.Equal(0, BinNameGenerator.CompareAlpha("AB", "AB"));
+        var result = BinNameGenerator.CompareAlpha(left, right);
+        Assert.Equal(expectedSign, Math.Sign(result));
     }
 }
