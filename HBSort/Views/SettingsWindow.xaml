@@ -1,4 +1,4 @@
-<Window x:Class="HBSort.Views.SettingsWindow"
+﻿<Window x:Class="HBSort.Views.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.modernwpf.com/2019"
@@ -12,8 +12,8 @@
         ResizeMode="CanResize"
         ToolTipService.IsEnabled="{DynamicResource TooltipsEnabled}">
     <!--
-        CenterOwner: Fenster erscheint mittig über dem Hauptfenster.
-        ResizeMode="NoResize": Feste Größe, kein Resize-Handle.
+        CenterOwner: Fenster erscheint mittig Ã¼ber dem Hauptfenster.
+        ResizeMode="NoResize": Feste GrÃ¶ÃŸe, kein Resize-Handle.
         Phase 1.5: Auf Tabs umgebaut, neuer Tab "Katalog".
     -->
 
@@ -258,7 +258,7 @@
                         </Grid>
 
                         <TextBlock Foreground="Gray" FontSize="11" FontStyle="Italic" Margin="0,4,0,8">
-                            Hinweis: Tokens sind als reiner Text sichtbar – das Fenster ist
+                            Hinweis: Tokens sind als reiner Text sichtbar â€“ das Fenster ist
                             nur lokal und die Werte werden beim Speichern verschluesselt.
                         </TextBlock>
 
@@ -662,7 +662,7 @@
                             <TextBlock FontSize="11" Foreground="Gray"
                                        FontStyle="Italic" Margin="0,4,0,0"
                                        TextWrapping="Wrap"
-                                       Text="Import laeuft im Hintergrund. Die App ist nicht eingefroren – bitte warten."/>
+                                       Text="Import laeuft im Hintergrund. Die App ist nicht eingefroren â€“ bitte warten."/>
                         </StackPanel>
 
                         <TextBlock Text="{Binding ImportResultText}"
@@ -673,6 +673,148 @@
 
                     </StackPanel>
                 </ScrollViewer>
+            </TabItem>
+
+            <!-- ============================================ -->
+            <!-- TAB: LAGERFAECHER (Phase 4) -->
+            <!-- ============================================ -->
+            <TabItem Header="Lagerfaecher" DataContext="{Binding BinManager}">
+                <Grid Margin="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Header + Buttons -->
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Lagerfach-Verwaltung" FontSize="16" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                        <Button Grid.Column="1" Content="+ Einzeln anlegen"
+                                Width="160" Margin="0,0,8,0"
+                                Click="BinCreateSingle_Click"/>
+                        <Button Grid.Column="2" Content="+ Bulk anlegen"
+                                Width="140"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Click="BinCreateBulk_Click"/>
+                    </Grid>
+
+                    <!-- Filter + Sort -->
+                    <Grid Grid.Row="1" Margin="0,8,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Text="Anzeigen:"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <RadioButton Grid.Column="1" Content="Alle"
+                                     IsChecked="{Binding IsFilterAll, Mode=OneWay}"
+                                     Click="FilterAll_Click"
+                                     GroupName="BinFilter" Margin="0,0,12,0"
+                                     VerticalAlignment="Center"/>
+                        <RadioButton Grid.Column="2" Content="Nur frei"
+                                     IsChecked="{Binding IsFilterFreeOnly, Mode=OneWay}"
+                                     Click="FilterFree_Click"
+                                     GroupName="BinFilter" Margin="0,0,12,0"
+                                     VerticalAlignment="Center"/>
+                        <RadioButton Grid.Column="3" Content="Nur belegt"
+                                     IsChecked="{Binding IsFilterOccupiedOnly, Mode=OneWay}"
+                                     Click="FilterOccupied_Click"
+                                     GroupName="BinFilter"
+                                     VerticalAlignment="Center"/>
+
+                        <TextBlock Grid.Column="5" Text="Sortieren nach:"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox Grid.Column="6" Width="180"
+                                  SelectedValue="{Binding SortMode}"
+                                  SelectedValuePath="Tag">
+                            <ComboBoxItem Content="Label (A-Z)" Tag="{x:Static vm:BinSortMode.LabelAsc}"/>
+                            <ComboBoxItem Content="Label (Z-A)" Tag="{x:Static vm:BinSortMode.LabelDesc}"/>
+                            <ComboBoxItem Content="Erstellt (neueste zuerst)" Tag="{x:Static vm:BinSortMode.CreatedNewest}"/>
+                            <ComboBoxItem Content="Erstellt (aelteste zuerst)" Tag="{x:Static vm:BinSortMode.CreatedOldest}"/>
+                            <ComboBoxItem Content="Belegt zuerst" Tag="{x:Static vm:BinSortMode.OccupiedFirst}"/>
+                        </ComboBox>
+                    </Grid>
+
+                    <!-- DataGrid -->
+                    <DataGrid Grid.Row="2"
+                              ItemsSource="{Binding BinsView}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False" CanUserDeleteRows="False"
+                              IsReadOnly="True"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal"
+                              SelectionMode="Single">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Label"
+                                                Binding="{Binding Label}"
+                                                Width="*"/>
+                            <DataGridTextColumn Header="Status"
+                                                Binding="{Binding StatusText}"
+                                                Width="100"/>
+                            <DataGridTextColumn Header="Figuren"
+                                                Binding="{Binding MinifigCount}"
+                                                Width="100"/>
+                            <DataGridTextColumn Header="Einzelteile"
+                                                Binding="{Binding FloatingPartCount}"
+                                                Width="120"/>
+                            <DataGridTextColumn Header="Erstellt"
+                                                Binding="{Binding CreatedAt, StringFormat=g}"
+                                                Width="120"/>
+                            <DataGridTemplateColumn Header="Aktionen" Width="300">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Content="Inhalt"
+                                                    Click="BinShowDetail_Click"
+                                                    Tag="{Binding}"
+                                                    Margin="0,0,4,0" Padding="6,2"
+                                                    ToolTip="Zeigt Figuren + Einzelteile in diesem Fach"/>
+                                            <Button Content="Umbenennen"
+                                                    Click="BinRename_Click"
+                                                    Tag="{Binding}"
+                                                    Margin="0,0,4,0" Padding="6,2"/>
+                                            <Button Content="Leeren"
+                                                    Click="BinEmpty_Click"
+                                                    Tag="{Binding}"
+                                                    Margin="0,0,4,0" Padding="6,2"/>
+                                            <Button Content="Loeschen"
+                                                    Click="BinDelete_Click"
+                                                    Tag="{Binding}"
+                                                    Padding="6,2"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <!-- Footer mit Summary + Loading -->
+                    <Grid Grid.Row="3" Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding SummaryText}"
+                                   VerticalAlignment="Center"
+                                   Foreground="Gray" FontStyle="Italic"/>
+                        <ProgressBar Grid.Column="1" Width="120" Height="6"
+                                     IsIndeterminate="True"
+                                     Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}"/>
+                    </Grid>
+                </Grid>
             </TabItem>
 
             <!-- ============================================================ -->
@@ -851,838 +993,78 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- ============================================ -->
-            <!-- TAB 3: BILD-CACHE (Phase 2.5) -->
-            <!-- ============================================ -->
-            <TabItem Header="Bild-Cache">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
-                    <StackPanel>
-
-                        <!-- === STATS === -->
-                        <TextBlock Text="Aktueller Cache" FontSize="16" FontWeight="SemiBold"/>
-
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="150"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0" Text="Belegt:"/>
-                            <TextBlock Grid.Row="0" Grid.Column="1"
-                                       Text="{Binding CacheUsageText}"/>
-
-                            <TextBlock Grid.Row="1" Text="Limit:" Margin="0,4,0,0"/>
-                            <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,4,0,0"
-                                       Text="{Binding CacheLimitText}"/>
-                        </Grid>
-
-                        <Separator/>
-
-                        <!-- === LIMIT-AUSWAHL === -->
-                        <TextBlock Text="Cache-Limit" FontSize="16" FontWeight="SemiBold"/>
-
-                        <StackPanel Margin="0,8,0,0">
-                            <RadioButton Content="100 MB"
-                                         IsChecked="{Binding IsLimit100Mb, Mode=OneWay}"
-                                         Click="LimitRadio100_Click"
-                                         GroupName="CacheLimit"/>
-                            <RadioButton Content="1 GB (Standard)"
-                                         IsChecked="{Binding IsLimit1Gb, Mode=OneWay}"
-                                         Click="LimitRadio1Gb_Click"
-                                         GroupName="CacheLimit"
-                                         Margin="0,4,0,0"/>
-                            <RadioButton Content="5 GB"
-                                         IsChecked="{Binding IsLimit5Gb, Mode=OneWay}"
-                                         Click="LimitRadio5Gb_Click"
-                                         GroupName="CacheLimit"
-                                         Margin="0,4,0,0"/>
-                            <RadioButton Content="Unbegrenzt"
-                                         IsChecked="{Binding IsLimitUnlimited, Mode=OneWay}"
-                                         Click="LimitRadioUnlimited_Click"
-                                         GroupName="CacheLimit"
-                                         Margin="0,4,0,0"/>
-                        </StackPanel>
-
-                        <!-- Custom-Eingabe -->
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="100"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Eigener Wert:"
-                                       VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <TextBox Grid.Column="1"
-                                     Text="{Binding CustomLimitInput, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="Cache-Limit in Megabyte (positive Ganzzahl)"/>
-                            <TextBlock Grid.Column="2" Text="MB"
-                                       VerticalAlignment="Center" Margin="6,0,8,0"/>
-                            <Button Grid.Column="3" Content="Anwenden"
-                                    Command="{Binding ApplyCustomLimitCommand}"/>
-                        </Grid>
-
-                        <Separator/>
-
-                        <!-- === ACTIONS === -->
-                        <TextBlock Text="Aktionen" FontSize="16" FontWeight="SemiBold"/>
-
-                        <Button Content="Cache jetzt leeren"
-                                Width="200" HorizontalAlignment="Left"
-                                Command="{Binding ClearCacheCommand}"
-                                Margin="0,8,0,0"
-                                ToolTip="Loescht alle Bilder und die Sidecar-DB"/>
-
-                        <Separator/>
-
-                        <!-- === OPTIONS === -->
-                        <TextBlock Text="Optionen" FontSize="16" FontWeight="SemiBold"/>
-
-                        <CheckBox Content="BrickLink-Bilder bevorzugen"
-                                  IsChecked="{Binding PreferBricklinkImages}"
-                                  Margin="0,8,0,0"
-                                  ToolTip="Bevorzugt echte BrickLink-Teile-Fotos (farbig) statt Brickognize-Graustufen-Renderings. Fallback automatisch."/>
-
-                        <CheckBox Content="Vorab-Cache bei Minifig-Scan"
-                                  IsChecked="{Binding PreloadOnMinifigScan}"
-                                  Margin="0,4,0,0"
-                                  ToolTip="Laedt nach erkannter Minifigur deren Teile-Bilder im Hintergrund vor (Phase 3+)."/>
-
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <!-- ============================================ -->
-            <!-- TAB 4: LAGERFAECHER (Phase 4) -->
-            <!-- ============================================ -->
-            <TabItem Header="Lagerfaecher" DataContext="{Binding BinManager}">
-                <Grid Margin="12">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- Header + Buttons -->
-                    <Grid Grid.Row="0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Lagerfach-Verwaltung" FontSize="16" FontWeight="SemiBold"
-                                   VerticalAlignment="Center"/>
-                        <Button Grid.Column="1" Content="+ Einzeln anlegen"
-                                Width="160" Margin="0,0,8,0"
-                                Click="BinCreateSingle_Click"/>
-                        <Button Grid.Column="2" Content="+ Bulk anlegen"
-                                Width="140"
-                                Style="{StaticResource AccentButtonStyle}"
-                                Click="BinCreateBulk_Click"/>
-                    </Grid>
-
-                    <!-- Filter + Sort -->
-                    <Grid Grid.Row="1" Margin="0,8,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <TextBlock Grid.Column="0" Text="Anzeigen:"
-                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <RadioButton Grid.Column="1" Content="Alle"
-                                     IsChecked="{Binding IsFilterAll, Mode=OneWay}"
-                                     Click="FilterAll_Click"
-                                     GroupName="BinFilter" Margin="0,0,12,0"
-                                     VerticalAlignment="Center"/>
-                        <RadioButton Grid.Column="2" Content="Nur frei"
-                                     IsChecked="{Binding IsFilterFreeOnly, Mode=OneWay}"
-                                     Click="FilterFree_Click"
-                                     GroupName="BinFilter" Margin="0,0,12,0"
-                                     VerticalAlignment="Center"/>
-                        <RadioButton Grid.Column="3" Content="Nur belegt"
-                                     IsChecked="{Binding IsFilterOccupiedOnly, Mode=OneWay}"
-                                     Click="FilterOccupied_Click"
-                                     GroupName="BinFilter"
-                                     VerticalAlignment="Center"/>
-
-                        <TextBlock Grid.Column="5" Text="Sortieren nach:"
-                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <ComboBox Grid.Column="6" Width="180"
-                                  SelectedValue="{Binding SortMode}"
-                                  SelectedValuePath="Tag">
-                            <ComboBoxItem Content="Label (A-Z)" Tag="{x:Static vm:BinSortMode.LabelAsc}"/>
-                            <ComboBoxItem Content="Label (Z-A)" Tag="{x:Static vm:BinSortMode.LabelDesc}"/>
-                            <ComboBoxItem Content="Erstellt (neueste zuerst)" Tag="{x:Static vm:BinSortMode.CreatedNewest}"/>
-                            <ComboBoxItem Content="Erstellt (aelteste zuerst)" Tag="{x:Static vm:BinSortMode.CreatedOldest}"/>
-                            <ComboBoxItem Content="Belegt zuerst" Tag="{x:Static vm:BinSortMode.OccupiedFirst}"/>
-                        </ComboBox>
-                    </Grid>
-
-                    <!-- DataGrid -->
-                    <DataGrid Grid.Row="2"
-                              ItemsSource="{Binding BinsView}"
-                              AutoGenerateColumns="False"
-                              CanUserAddRows="False" CanUserDeleteRows="False"
-                              IsReadOnly="True"
-                              HeadersVisibility="Column"
-                              GridLinesVisibility="Horizontal"
-                              SelectionMode="Single">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Label"
-                                                Binding="{Binding Label}"
-                                                Width="*"/>
-                            <DataGridTextColumn Header="Status"
-                                                Binding="{Binding StatusText}"
-                                                Width="100"/>
-                            <DataGridTextColumn Header="Figuren"
-                                                Binding="{Binding MinifigCount}"
-                                                Width="100"/>
-                            <DataGridTextColumn Header="Einzelteile"
-                                                Binding="{Binding FloatingPartCount}"
-                                                Width="120"/>
-                            <DataGridTextColumn Header="Erstellt"
-                                                Binding="{Binding CreatedAt, StringFormat=g}"
-                                                Width="120"/>
-                            <DataGridTemplateColumn Header="Aktionen" Width="300">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Orientation="Horizontal">
-                                            <Button Content="Inhalt"
-                                                    Click="BinShowDetail_Click"
-                                                    Tag="{Binding}"
-                                                    Margin="0,0,4,0" Padding="6,2"
-                                                    ToolTip="Zeigt Figuren + Einzelteile in diesem Fach"/>
-                                            <Button Content="Umbenennen"
-                                                    Click="BinRename_Click"
-                                                    Tag="{Binding}"
-                                                    Margin="0,0,4,0" Padding="6,2"/>
-                                            <Button Content="Leeren"
-                                                    Click="BinEmpty_Click"
-                                                    Tag="{Binding}"
-                                                    Margin="0,0,4,0" Padding="6,2"/>
-                                            <Button Content="Loeschen"
-                                                    Click="BinDelete_Click"
-                                                    Tag="{Binding}"
-                                                    Padding="6,2"/>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                        </DataGrid.Columns>
-                    </DataGrid>
-
-                    <!-- Footer mit Summary + Loading -->
-                    <Grid Grid.Row="3" Margin="0,8,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding SummaryText}"
-                                   VerticalAlignment="Center"
-                                   Foreground="Gray" FontStyle="Italic"/>
-                        <ProgressBar Grid.Column="1" Width="120" Height="6"
-                                     IsIndeterminate="True"
-                                     Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}"/>
-                    </Grid>
-                </Grid>
-            </TabItem>
-
-            <!-- ============================================ -->
-            <!-- TAB 5: BRICKLINK-API (Phase R1) -->
-            <!-- ============================================ -->
-            <TabItem Header="BrickLink-API">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
-                    <StackPanel>
-                        <TextBlock Text="BrickLink API-Zugang" FontSize="16" FontWeight="SemiBold"/>
-
-                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12" Margin="0,4,0,8">
-                            Du brauchst einen BrickLink-Verkaeufer-Account und eine
-                            registrierte Consumer-Application. Die Tokens werden mit
-                            Windows-DPAPI verschluesselt in settings.json gespeichert.
-                        </TextBlock>
-
-                        <TextBlock>
-                            <Hyperlink NavigateUri="https://www.bricklink.com/v2/api/register_consumer.page"
-                                       RequestNavigate="Hyperlink_RequestNavigate">
-                                BL-Consumer-Registrierung oeffnen
-                            </Hyperlink>
-                        </TextBlock>
-
-                        <Separator/>
-
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="160"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0" Text="Consumer Key:" VerticalAlignment="Center"/>
-                            <TextBox Grid.Row="0" Grid.Column="1" Margin="0,0,4,4"
-                                     x:Name="BlConsumerKeyBox"
-                                     Text="{Binding BricklinkConsumerKey, UpdateSourceTrigger=PropertyChanged}"/>
-
-                            <TextBlock Grid.Row="1" Text="Consumer Secret:" VerticalAlignment="Center"/>
-                            <TextBox Grid.Row="1" Grid.Column="1" Margin="0,0,4,4"
-                                     x:Name="BlConsumerSecretBox"
-                                     Text="{Binding BricklinkConsumerSecret, UpdateSourceTrigger=PropertyChanged}"/>
-
-                            <TextBlock Grid.Row="2" Text="Token Value:" VerticalAlignment="Center"/>
-                            <TextBox Grid.Row="2" Grid.Column="1" Margin="0,0,4,4"
-                                     x:Name="BlTokenValueBox"
-                                     Text="{Binding BricklinkTokenValue, UpdateSourceTrigger=PropertyChanged}"/>
-
-                            <TextBlock Grid.Row="3" Text="Token Secret:" VerticalAlignment="Center"/>
-                            <TextBox Grid.Row="3" Grid.Column="1" Margin="0,0,4,4"
-                                     x:Name="BlTokenSecretBox"
-                                     Text="{Binding BricklinkTokenSecret, UpdateSourceTrigger=PropertyChanged}"/>
-                        </Grid>
-
-                        <TextBlock Foreground="Gray" FontSize="11" FontStyle="Italic" Margin="0,4,0,8">
-                            Hinweis: Tokens sind als reiner Text sichtbar – das Fenster ist
-                            nur lokal und die Werte werden beim Speichern verschluesselt.
-                        </TextBlock>
-
-                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                            <Button Content="Tokens speichern"
-                                    Command="{Binding SaveBricklinkTokensCommand}"
-                                    Width="160" Margin="0,0,8,0"/>
-                            <Button Content="Verbindung testen"
-                                    Command="{Binding TestBricklinkConnectionCommand}"
-                                    Width="160" Margin="0,0,8,0"/>
-                            <Button Content="Loeschen"
-                                    Command="{Binding ClearBricklinkTokensCommand}"
-                                    Width="120"/>
-                        </StackPanel>
-
-                        <Separator/>
-
-                        <TextBlock Text="Status" FontSize="14" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding BricklinkStatusText}"
-                                   Margin="0,4,0,0"/>
-                        <TextBlock Text="{Binding BricklinkTestResultText}"
-                                   Margin="0,2,0,0" FontStyle="Italic"
-                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
-
-                        <Separator/>
-
-                        <TextBlock Text="IP-Whitelist-Hinweis" FontSize="14" FontWeight="SemiBold"/>
-                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12">
-                            Deine externe IP muss im BL-Consumer-Profile in der
-                            "Allowed IP"-Liste eingetragen sein, sonst antwortet die API mit HTTP 403.
-                        </TextBlock>
-
-                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                            <Button Content="Aktuelle IP anzeigen"
-                                    Command="{Binding ShowExternalIpCommand}"
-                                    Width="200" Margin="0,0,8,0"/>
-                            <TextBlock Text="{Binding BricklinkExternalIp}"
-                                       VerticalAlignment="Center"
-                                       FontFamily="Consolas"/>
-                        </StackPanel>
-
-                        <Separator/>
-
-                        <!-- === API-NUTZUNG (Phase R2.5) === -->
-                        <TextBlock Text="API-Nutzung" FontSize="14" FontWeight="SemiBold"/>
-
-                        <Grid Margin="0,4,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="180"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0" Text="Letzte 24h (rolling):"/>
-                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding RateLimitCalls24h}"/>
-
-                            <TextBlock Grid.Row="1" Text="Heute (seit 00:00):" Margin="0,2,0,0"/>
-                            <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,2,0,0"
-                                       Text="{Binding RateLimitCallsToday}"/>
-
-                            <TextBlock Grid.Row="2" Text="Letzte Stunde:" Margin="0,2,0,0"/>
-                            <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,2,0,0"
-                                       Text="{Binding RateLimitCallsThisHour}"/>
-
-                            <TextBlock Grid.Row="3" Text="Status:" Margin="0,2,0,0"/>
-                            <TextBlock Grid.Row="3" Grid.Column="1" Margin="0,2,0,0"
-                                       Text="{Binding RateLimitStateText}" FontWeight="SemiBold"/>
-
-                            <TextBlock Grid.Row="4" Text="Aelteste Call im Window:" Margin="0,2,0,0"/>
-                            <TextBlock Grid.Row="4" Grid.Column="1" Margin="0,2,0,0"
-                                       Text="{Binding RateLimitOldestCallText}"/>
-                        </Grid>
-
-                        <Separator/>
-
-                        <TextBlock Text="Schwellwerte" FontSize="14" FontWeight="SemiBold"/>
-                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12">
-                            Soft = gelber Toast bei Erreichen. Hard = keine API-Calls mehr (nur Cache).
-                            BL-Limit (fix): 5000 Calls / 24h.
-                        </TextBlock>
-
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="180"/>
-                                <ColumnDefinition Width="120"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0" Text="Soft-Threshold:" VerticalAlignment="Center"/>
-                            <TextBox Grid.Row="0" Grid.Column="1"
-                                     Text="{Binding BricklinkSoftThreshold, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="Bei diesem Stand kommt eine gelbe Warnung. Default 1000."/>
-
-                            <TextBlock Grid.Row="1" Text="Hard-Threshold:" VerticalAlignment="Center" Margin="0,4,0,0"/>
-                            <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4,0,0"
-                                     Text="{Binding BricklinkHardThreshold, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="Hard-Stop: ab hier nur noch Cache, keine API-Calls. Default 4500, max 4900."/>
-
-                            <TextBlock Grid.Row="2" Text="BL-Limit (fix):" VerticalAlignment="Center" Margin="0,4,0,0"/>
-                            <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,4,0,0"
-                                       Text="{Binding BricklinkRealLimit}" Foreground="Gray"/>
-                        </Grid>
-
-                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                            <Button Content="Schwellwerte speichern"
-                                    Command="{Binding SaveRateLimitThresholdsCommand}"
-                                    Width="220"/>
-                            <TextBlock Text="{Binding RateLimitSaveMessage}"
-                                       VerticalAlignment="Center" Margin="12,0,0,0"
-                                       FontStyle="Italic" Foreground="Gray"/>
-                        </StackPanel>
-
-                        <Separator/>
-
-                        <!-- === BL-CACHE-STATISTIK (Phase R2) === -->
-                        <TextBlock Text="BL-Cache" FontSize="14" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding BlCacheStatsText}"
-                                   FontSize="12" TextWrapping="Wrap"
-                                   Margin="0,4,0,0"/>
-
-                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                            <Button Content="Stale-Eintraege loeschen"
-                                    Command="{Binding ClearStaleBlCacheCommand}"
-                                    Width="220" Margin="0,0,8,0"
-                                    ToolTip="Loescht alle Items/Subsets aelter als cacheStaleDays (Default 90)."/>
-                            <Button Content="Cache leeren"
-                                    Command="{Binding ClearBlCacheCommand}"
-                                    Width="120"
-                                    ToolTip="Loescht alle Eintraege im BL-Cache (mit Bestaetigung)."/>
-                        </StackPanel>
-
-                        <!-- Debug-Button: testet die R2-Cache-Mechanik vor R3 -->
-                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                            <Button Content="Debug: arc007 holen"
-                                    Command="{Binding DebugFetchArc007Command}"
-                                    Width="220"
-                                    ToolTip="Ruft BlCatalogService.GetMinifigPartsAsync('arc007') auf und aktualisiert die Cache-Stats."/>
-                        </StackPanel>
-
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <!-- ============================================ -->
-            <!-- TAB: BL-CATALOG-DATEN (Phase 5.5) -->
-            <!-- ============================================ -->
-            <TabItem Header="BL-Catalog-Daten">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
-                    <StackPanel>
-
-                        <!-- Lizenz-Hinweis -->
-                        <Border Background="#FFF3E0" BorderBrush="#E65100"
-                                BorderThickness="1" CornerRadius="4"
-                                Padding="12" Margin="0,0,0,12">
-                            <TextBlock TextWrapping="Wrap" FontSize="12">
-                                <Run FontWeight="Bold">Datenquelle &amp; Lizenz</Run>
-                                <LineBreak/><LineBreak/>
-                                BL-Catalog-Daten (Item-Stammdaten und Inventories) sind
-                                Eigentum von BrickLink (bricklink.com). Diese Anwendung
-                                nutzt die Aufbereitung dieser Daten durch BrickStore von
-                                Robert Griebl (brickstore.dev, GPL-3,
-                                github.com/rgriebl/brickstore-database).
-                                <LineBreak/><LineBreak/>
-                                LEGO ist eine Marke der LEGO-Gruppe, die diese Software
-                                weder sponsert noch unterstuetzt.
-                            </TextBlock>
-                        </Border>
-
-                        <TextBlock Text="BrickStore-Daten importieren"
-                                   FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
-
-                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,12"
-                                   Foreground="Gray" FontSize="12">
-                            Importiert ca. 18.750 Minifig-Stammdaten und ihre
-                            vollstaendigen Teilelisten. Dauer: 1-3 Minuten.
-                            Empfohlen: Quartal-weise neu importieren.
-                        </TextBlock>
-
-                        <!-- Stats -->
-                        <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4"
-                                Padding="12" Margin="0,0,0,12">
-                            <StackPanel>
-                                <TextBlock>
-                                    <Run Text="Items im Cache:" Foreground="Gray"/>
-                                    <Run Text="{Binding BlCacheItemsCount, Mode=OneWay}" FontWeight="SemiBold"/>
-                                </TextBlock>
-                                <TextBlock>
-                                    <Run Text="Subsets im Cache:" Foreground="Gray"/>
-                                    <Run Text="{Binding BlCacheSubsetsCount, Mode=OneWay}" FontWeight="SemiBold"/>
-                                </TextBlock>
-                                <TextBlock>
-                                    <Run Text="Cache-Groesse:" Foreground="Gray"/>
-                                    <Run Text="{Binding BlCacheSizeLabel, Mode=OneWay}" FontWeight="SemiBold"/>
-                                </TextBlock>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- GitHub-Download Button -->
-                        <Button Content="Von GitHub importieren (empfohlen)"
-                                Padding="12,8" HorizontalAlignment="Left"
-                                Style="{StaticResource AccentButtonStyle}"
-                                Click="ImportFromGitHub_Click"
-                                IsEnabled="{Binding IsNotImporting}"
-                                ToolTip="Laed downloads.zip von github.com/rgriebl/brickstore-database und importiert direkt. Internet-Verbindung noetig (~12 MB)."
-                                Margin="0,0,0,8"/>
-
-                        <!-- Lokal-Import Expander -->
-                        <Expander Header="Aus lokalem Ordner importieren (optional)"
-                                  Margin="0,8,0,0">
-                            <StackPanel Margin="0,8,0,0">
-                                <TextBlock TextWrapping="Wrap" Foreground="Gray"
-                                           FontSize="11" Margin="0,0,0,8">
-                                    Ordner muss enthalten: items/M.xml, items/P.xml, M/*.xml
-                                </TextBlock>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox Grid.Column="0"
-                                             Text="{Binding LocalImportFolder, UpdateSourceTrigger=PropertyChanged}"
-                                             Margin="0,0,8,0"/>
-                                    <Button Grid.Column="1" Content="..." Width="40"
-                                            Click="BrowseImportFolder_Click"/>
-                                </Grid>
-                                <Button Content="Aus lokalem Ordner importieren"
-                                        Padding="12,8" HorizontalAlignment="Left"
-                                        Click="ImportFromFolder_Click"
-                                        IsEnabled="{Binding IsNotImporting}"
-                                        Margin="0,8,0,0"/>
-                            </StackPanel>
-                        </Expander>
-
-                        <!-- Progress -->
-                        <StackPanel Margin="0,16,0,0"
-                                    Visibility="{Binding IsImporting, Converter={StaticResource BoolToVisibility}}">
-                            <TextBlock Text="{Binding ImportStatus}"
-                                       FontSize="12" FontWeight="SemiBold"
-                                       TextWrapping="Wrap"/>
-                            <ProgressBar Height="6" Margin="0,6,0,4"
-                                         Minimum="0" Maximum="100"
-                                         Value="{Binding ImportProgress, Mode=OneWay}"/>
-                            <TextBlock FontSize="11" Foreground="Gray"
-                                       HorizontalAlignment="Right"
-                                       Text="{Binding ImportProgress, Mode=OneWay, StringFormat={}{0:F0}%}"/>
-                            <TextBlock FontSize="11" Foreground="Gray"
-                                       FontStyle="Italic" Margin="0,4,0,0"
-                                       TextWrapping="Wrap"
-                                       Text="Import laeuft im Hintergrund. Die App ist nicht eingefroren – bitte warten."/>
-                        </StackPanel>
-
-                        <!-- Result -->
-                        <TextBlock Text="{Binding ImportResultText}"
-                                   TextWrapping="Wrap" FontSize="12"
-                                   Foreground="DarkGreen"
-                                   Margin="0,16,0,0"
-                                   Visibility="{Binding HasImportResult, Converter={StaticResource BoolToVisibility}}"/>
-
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
 
             <!-- ====================================== -->
-            <!-- TAB: PREISE (Phase 8 / PROMPT 12)      -->
+            <!-- TAB: EXPORT (BSX-Export-Standard-Ordner)   -->
             <!-- ====================================== -->
-            <TabItem Header="Preise">
+            <!--
+                Eigener Tab fuer den BSX-Export-Default-Ordner. Wurde aus dem
+                Statistik-Tab herausgezogen, weil er dort schwer zu finden war.
+                Aenderungen werden SOFORT gespeichert (nicht erst beim "Speichern"-
+                Button), damit der naechste Export ohne Umweg den neuen Pfad nutzt.
+            -->
+            <TabItem Header="Export">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
                     <StackPanel MaxWidth="700" HorizontalAlignment="Left">
 
-                        <TextBlock Text="Preis-Quelle" FontSize="14" FontWeight="SemiBold"
-                                   Margin="0,0,0,8"/>
+                        <TextBlock Text="BSX-Export"
+                                   FontSize="16" FontWeight="SemiBold"
+                                   Margin="0,0,0,12"/>
+
+                        <!-- Label + read-only TextBox + zwei Buttons -->
+                        <TextBlock Text="Standard-Ordner fuer BSX-Export:"
+                                   Margin="0,0,0,4"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <!-- TextBox absichtlich read-only: Aenderung nur ueber den
+                                 Ordner-Picker, sonst koennte der User einen ungueltigen
+                                 Pfad eintippen ohne dass wir ihn validieren koennen. -->
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding BsxExportFolder, Mode=OneWay}"
+                                     IsReadOnly="True"
+                                     VerticalAlignment="Center"
+                                     ToolTip="Leer = Default-Ordner Documents\HBSort-Export\"/>
+                            <Button Grid.Column="1" Content="Ordner waehlen..."
+                                    Margin="8,0,0,0" Padding="10,4"
+                                    Click="BrowseBsxFolder_Click"/>
+                            <Button Grid.Column="2" Content="Zuruecksetzen"
+                                    Margin="8,0,0,0" Padding="10,4"
+                                    Click="ResetBsxFolder_Click"
+                                    ToolTip="Setzt den Pfad auf den Default zurueck (Documents\HBSort-Export\)"/>
+                        </Grid>
+
+                        <!-- Hilfetext direkt darunter -->
                         <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Gray"
-                                   Margin="0,0,0,8"
-                                   Text="Bestimmt, woher die Preise fuer die Verkaufsempfehlung im Detail-Dialog kommen."/>
+                                   Margin="0,8,0,0">
+                            Hier werden BSX-Dateien standardmaessig gespeichert. Beim Export
+                            kann der Ordner pro Export auch noch geaendert werden.
+                        </TextBlock>
 
-                        <RadioButton Content="Keine Preise"
-                                     GroupName="PriceProvider"
-                                     IsChecked="{Binding IsPriceProviderNone, Mode=OneWay}"
-                                     Click="PriceProviderNone_Click"
-                                     Margin="0,0,0,4"/>
-                        <RadioButton Content="BrickLink-API (benoetigt BL-Tokens, siehe BrickLink-API-Tab)"
-                                     GroupName="PriceProvider"
-                                     IsChecked="{Binding IsPriceProviderBricklink, Mode=OneWay}"
-                                     Click="PriceProviderBricklink_Click"
-                                     Margin="0,0,0,12"/>
+                        <!-- Anzeige des Default-Pfades, damit der User sieht
+                             worauf "Zuruecksetzen" zurueckspringt. -->
+                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
+                                   FontStyle="Italic" Margin="0,8,0,0">
+                            <Run Text="Default-Ordner: "/>
+                            <Run Text="{Binding Source={x:Static vm:SettingsViewModel.DefaultBsxExportFolder}, Mode=OneTime}"
+                                 FontFamily="Consolas"/>
+                        </TextBlock>
 
-                        <!-- Detail-Felder nur wenn BL-Provider gewaehlt -->
-                        <StackPanel Visibility="{Binding IsPriceProviderBricklink, Converter={StaticResource BoolToVisibility}}">
-
-                            <Separator Margin="0,4,0,8"/>
-
-                            <TextBlock Text="BL-API-Filter" FontSize="13" FontWeight="SemiBold"
-                                       Margin="0,0,0,6"/>
-                            <Grid Margin="0,0,0,12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="180"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Guide-Typ:"
-                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
-                                <ComboBox Grid.Row="0" Grid.Column="1" Margin="0,0,0,4"
-                                          SelectedValue="{Binding PriceGuideType, Mode=TwoWay}"
-                                          SelectedValuePath="Tag">
-                                    <ComboBoxItem Content="Sold (was wirklich verkauft wurde)" Tag="sold"/>
-                                    <ComboBoxItem Content="Stock (aktuelle Angebote)" Tag="stock"/>
-                                </ComboBox>
-
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Spalte:"
-                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
-                                <ComboBox Grid.Row="1" Grid.Column="1" Margin="0,0,0,4"
-                                          SelectedValue="{Binding PricePriceColumn, Mode=TwoWay}"
-                                          SelectedValuePath="Tag">
-                                    <ComboBoxItem Content="Min" Tag="min"/>
-                                    <ComboBoxItem Content="Avg" Tag="avg"/>
-                                    <ComboBoxItem Content="Qty-Avg (Default)" Tag="qty_avg"/>
-                                    <ComboBoxItem Content="Max" Tag="max"/>
-                                </ComboBox>
-
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Region:"
-                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
-                                <ComboBox Grid.Row="2" Grid.Column="1" Margin="0,0,0,4"
-                                          SelectedValue="{Binding PriceRegion, Mode=TwoWay}"
-                                          SelectedValuePath="Tag">
-                                    <ComboBoxItem Content="(global, keine Filterung)" Tag=""/>
-                                    <ComboBoxItem Content="europe" Tag="europe"/>
-                                    <ComboBoxItem Content="north_america" Tag="north_america"/>
-                                    <ComboBoxItem Content="asia" Tag="asia"/>
-                                    <ComboBoxItem Content="south_america" Tag="south_america"/>
-                                    <ComboBoxItem Content="africa" Tag="africa"/>
-                                </ComboBox>
-
-                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Country-Code (z.B. DE):"
-                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
-                                <TextBox Grid.Row="3" Grid.Column="1" Margin="0,0,0,4"
-                                         MaxLength="2"
-                                         Text="{Binding PriceCountryCode, UpdateSourceTrigger=PropertyChanged}"
-                                         ToolTip="Lass das Feld leer, wenn du keinen Country-Filter willst."/>
-
-                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Waehrung:"
-                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
-                                <TextBox Grid.Row="4" Grid.Column="1" Margin="0,0,0,4"
-                                         MaxLength="3"
-                                         Text="{Binding PriceCurrency, UpdateSourceTrigger=PropertyChanged}"/>
-                            </Grid>
-
-                            <Separator Margin="0,4,0,8"/>
-
-                            <TextBlock Text="Korrekturfaktoren" FontSize="13" FontWeight="SemiBold"
-                                       Margin="0,0,0,6"/>
-                            <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Gray"
-                                       Margin="0,0,0,6"
-                                       Text="Negative Werte = Abschlag vom BL-Preis (z.B. -10 = 10% weniger)."/>
-                            <Grid Margin="0,0,0,12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="180"/>
-                                    <ColumnDefinition Width="100"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Komplett-Figur (%):"
-                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
-                                <TextBox Grid.Row="0" Grid.Column="1" Margin="0,0,8,4"
-                                         Text="{Binding PriceCorrectionMinifigPercent, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}"/>
-                                <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
-                                           Text="{Binding MinifigPreviewLabel}"
-                                           Foreground="#1976D2" FontStyle="Italic"
-                                           FontSize="11" Margin="0,0,0,8"/>
-
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Einzelteile-Summe (%):"
-                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
-                                <TextBox Grid.Row="2" Grid.Column="1" Margin="0,0,8,4"
-                                         Text="{Binding PriceCorrectionPartsPercent, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}"/>
-                                <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2"
-                                           Text="{Binding PartsPreviewLabel}"
-                                           Foreground="#1976D2" FontStyle="Italic"
-                                           FontSize="11"/>
-                            </Grid>
-
-                            <Separator Margin="0,4,0,8"/>
-
-                            <TextBlock Text="Cache + Verhalten" FontSize="13" FontWeight="SemiBold"
-                                       Margin="0,0,0,6"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="240"/>
-                                    <ColumnDefinition Width="100"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-
-                                <!-- UX#12: getrennte TTLs fuer das Stale-While-Revalidate-
-                                     Cache-System. Defaults 90 Tage. -->
-                                <TextBlock Grid.Row="0" Grid.Column="0"
-                                           Text="Cache-Gueltigkeit komplette Figuren (Tage):"
-                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
-                                <TextBox Grid.Row="0" Grid.Column="1" Margin="0,0,0,4"
-                                         Text="{Binding PriceCacheTtlMinifigDays, UpdateSourceTrigger=PropertyChanged}"
-                                         ToolTip="Wie lange werden Komplett-Figur-Preise als 'frisch' angesehen. Default: 90 Tage."/>
-
-                                <TextBlock Grid.Row="1" Grid.Column="0"
-                                           Text="Cache-Gueltigkeit Einzelteile (Tage):"
-                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
-                                <TextBox Grid.Row="1" Grid.Column="1" Margin="0,0,0,4"
-                                         Text="{Binding PriceCacheTtlPartDays, UpdateSourceTrigger=PropertyChanged}"
-                                         ToolTip="Wie lange werden Einzelteil-Preise als 'frisch' angesehen. Default: 90 Tage."/>
-
-                            </Grid>
-
-                            <Separator Margin="0,12,0,8"/>
-
-                            <!--
-                                UX-Iteration X.10 (2026-05-04): "Preise laden"-Block ersetzt
-                                den alten "Auto-Load"-Checkbox. Pro Bereich (Komplett /
-                                Einzelteile) waehlt der User Auto vs Manuell. Default
-                                Manuell - spart API-Calls, der User klickt aktiv wenn er
-                                wirklich Preise sehen will. Wirkt live ohne Neustart, da
-                                der Wert bei jedem Pending-Minifig-Aufbau neu gelesen wird.
-                            -->
-                            <TextBlock Text="Preise laden" FontSize="13" FontWeight="SemiBold"
-                                       Margin="0,0,0,6"/>
-
-                            <TextBlock Text="Wann werden die Preise im Sortier-Tab oben rechts geladen?"
-                                       FontSize="11" Foreground="Gray" TextWrapping="Wrap"
-                                       Margin="0,0,0,6"/>
-
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="240"/>
-                                    <ColumnDefinition Width="180"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-
-                                <TextBlock Grid.Row="0" Grid.Column="0"
-                                           Text="Komplett-Figur-Preis:"
-                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
-                                <ComboBox Grid.Row="0" Grid.Column="1" Margin="0,0,0,4"
-                                          ItemsSource="{Binding PriceLoadModeOptions}"
-                                          SelectedValuePath="Value"
-                                          DisplayMemberPath="Label"
-                                          SelectedValue="{Binding PriceAutoLoadCompletePrice, Mode=TwoWay}"
-                                          ToolTip="Auto = sofort beim Scannen einer Figur. Manuell = erst auf Klick (spart API-Calls)."/>
-
-                                <TextBlock Grid.Row="1" Grid.Column="0"
-                                           Text="Einzelteile-Preise:"
-                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
-                                <ComboBox Grid.Row="1" Grid.Column="1" Margin="0,0,0,4"
-                                          ItemsSource="{Binding PriceLoadModeOptions}"
-                                          SelectedValuePath="Value"
-                                          DisplayMemberPath="Label"
-                                          SelectedValue="{Binding PriceAutoLoadPartsPrice, Mode=TwoWay}"
-                                          ToolTip="Auto = sofort beim Scannen. Manuell = erst auf Klick. Unabhaengig vom Komplett-Preis-Setting."/>
-                            </Grid>
-
-                            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
-                                       Margin="0,4,0,0">
-                                <Run Text="Auto:"/>
-                                Preise werden sofort beim Scannen einer Figur geladen.
-                                <LineBreak/>
-                                <Run Text="Manuell:"/>
-                                Preise werden erst auf Klick geladen (spart API-Calls).
-                            </TextBlock>
-
-                            <Separator Margin="0,12,0,8"/>
-
-                            <!-- UX#12: Cache-Verwaltung -->
-                            <TextBlock Text="Cache-Verwaltung" FontSize="13" FontWeight="SemiBold"
-                                       Margin="0,0,0,6"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0"
-                                           Text="{Binding PriceCacheCountText}"
-                                           FontSize="12" Foreground="Gray"
-                                           VerticalAlignment="Center"/>
-                                <Button Grid.Column="1" Content="Preis-Cache leeren"
-                                        Command="{Binding ClearPriceCacheCommand}"
-                                        Padding="8,4"/>
-                            </Grid>
-                        </StackPanel>
-
+                        <!-- Hint-Box: erklaert wo der Export ausgeloest wird. -->
                         <Border Background="#E3F2FD" BorderBrush="#1976D2"
                                 BorderThickness="1" CornerRadius="4"
-                                Padding="12" Margin="0,16,0,0"
-                                Visibility="{Binding IsPriceProviderNone, Converter={StaticResource BoolToVisibility}}">
+                                Padding="12" Margin="0,16,0,0">
                             <TextBlock TextWrapping="Wrap" FontSize="12">
                                 <Run Text="Hinweis:" FontWeight="SemiBold"/>
-                                Bei "Keine Preise" wird im Detail-Dialog kompletter Figuren keine
-                                Verkaufsempfehlung angezeigt. Alle anderen Funktionen bleiben
-                                unveraendert.
+                                Komplette Figuren koennen ueber den "Exportieren"-Button
+                                in der Lagerfach-Uebersicht als BSX-Datei in BrickStore
+                                uebertragen werden.
                             </TextBlock>
                         </Border>
+
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
@@ -1792,81 +1174,6 @@
                                 waehrend des Sortier-Workflows.
                             </TextBlock>
                         </Border>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <!-- ====================================== -->
-            <!-- TAB: EXPORT (BSX-Export-Standard-Ordner)   -->
-            <!-- ====================================== -->
-            <!--
-                Eigener Tab fuer den BSX-Export-Default-Ordner. Wurde aus dem
-                Statistik-Tab herausgezogen, weil er dort schwer zu finden war.
-                Aenderungen werden SOFORT gespeichert (nicht erst beim "Speichern"-
-                Button), damit der naechste Export ohne Umweg den neuen Pfad nutzt.
-            -->
-            <TabItem Header="Export">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
-                    <StackPanel MaxWidth="700" HorizontalAlignment="Left">
-
-                        <TextBlock Text="BSX-Export"
-                                   FontSize="16" FontWeight="SemiBold"
-                                   Margin="0,0,0,12"/>
-
-                        <!-- Label + read-only TextBox + zwei Buttons -->
-                        <TextBlock Text="Standard-Ordner fuer BSX-Export:"
-                                   Margin="0,0,0,4"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <!-- TextBox absichtlich read-only: Aenderung nur ueber den
-                                 Ordner-Picker, sonst koennte der User einen ungueltigen
-                                 Pfad eintippen ohne dass wir ihn validieren koennen. -->
-                            <TextBox Grid.Column="0"
-                                     Text="{Binding BsxExportFolder, Mode=OneWay}"
-                                     IsReadOnly="True"
-                                     VerticalAlignment="Center"
-                                     ToolTip="Leer = Default-Ordner Documents\HBSort-Export\"/>
-                            <Button Grid.Column="1" Content="Ordner waehlen..."
-                                    Margin="8,0,0,0" Padding="10,4"
-                                    Click="BrowseBsxFolder_Click"/>
-                            <Button Grid.Column="2" Content="Zuruecksetzen"
-                                    Margin="8,0,0,0" Padding="10,4"
-                                    Click="ResetBsxFolder_Click"
-                                    ToolTip="Setzt den Pfad auf den Default zurueck (Documents\HBSort-Export\)"/>
-                        </Grid>
-
-                        <!-- Hilfetext direkt darunter -->
-                        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Gray"
-                                   Margin="0,8,0,0">
-                            Hier werden BSX-Dateien standardmaessig gespeichert. Beim Export
-                            kann der Ordner pro Export auch noch geaendert werden.
-                        </TextBlock>
-
-                        <!-- Anzeige des Default-Pfades, damit der User sieht
-                             worauf "Zuruecksetzen" zurueckspringt. -->
-                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
-                                   FontStyle="Italic" Margin="0,8,0,0">
-                            <Run Text="Default-Ordner: "/>
-                            <Run Text="{Binding Source={x:Static vm:SettingsViewModel.DefaultBsxExportFolder}, Mode=OneTime}"
-                                 FontFamily="Consolas"/>
-                        </TextBlock>
-
-                        <!-- Hint-Box: erklaert wo der Export ausgeloest wird. -->
-                        <Border Background="#E3F2FD" BorderBrush="#1976D2"
-                                BorderThickness="1" CornerRadius="4"
-                                Padding="12" Margin="0,16,0,0">
-                            <TextBlock TextWrapping="Wrap" FontSize="12">
-                                <Run Text="Hinweis:" FontWeight="SemiBold"/>
-                                Komplette Figuren koennen ueber den "Exportieren"-Button
-                                in der Lagerfach-Uebersicht als BSX-Datei in BrickStore
-                                uebertragen werden.
-                            </TextBlock>
-                        </Border>
-
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
