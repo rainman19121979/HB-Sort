@@ -14,7 +14,7 @@ public class BlPriceCacheServiceTests : IDisposable
     private readonly string _testDir = Path.Combine(
         Path.GetTempPath(), $"hbsort-pricecache-tests-{Guid.NewGuid():N}");
     private readonly BlCacheRepository _repo;
-    private readonly StubProvider _provider = new();
+    private readonly StubProvider _provider;
     private readonly StubProviderFactory _factory;
     private readonly StubSettings _settings = new();
     private readonly BlPriceCacheService _sut;
@@ -23,6 +23,11 @@ public class BlPriceCacheServiceTests : IDisposable
     {
         Directory.CreateDirectory(_testDir);
         _repo = new BlCacheRepository(Path.Combine(_testDir, "bl_cache.db"));
+        // StubProvider bekommt die Settings-Referenz mit, damit er bei jedem
+        // Aufruf den live aktiven GuideType protokollieren kann (Lock-the-
+        // Contract: kein Code-Pfad darf beide Varianten in einem Lookup
+        // anfassen).
+        _provider = new StubProvider(_settings);
         _factory = new StubProviderFactory(_provider);
         _sut = new BlPriceCacheService(_repo, _factory, _settings);
     }
@@ -256,6 +261,52 @@ public class BlPriceCacheServiceTests : IDisposable
         Assert.Equal(0, _provider.MinifigCallCount);
     }
 
+    // ===== Lock-the-Contract: nur die eingestellte GuideType-Variante wird
+    //       jemals in einer Lookup-Sitzung an den Provider gereicht.
+    //       Soll verhindern dass ein zukuenftiger Refactor versehentlich
+    //       beide Varianten holt (z.B. fuer eine "Vergleichs"-Anzeige).
+
+    [Fact]
+    public async Task Lookup_in_Sold_mode_only_calls_provider_with_Sold_never_with_Stock()
+    {
+        _settings.Current.Prices.GuideType = "sold";
+        _provider.NextMinifigPrice = new PriceResult
+        {
+            AvgPrice = 5m, Currency = "EUR", FetchedAt = DateTime.UtcNow
+        };
+
+        await _sut.GetMinifigPriceAsync("arc007");
+
+        Assert.Single(_provider.RecordedMinifigGuideTypes);
+        Assert.Equal("sold", _provider.RecordedMinifigGuideTypes[0]);
+        Assert.DoesNotContain("stock", _provider.RecordedMinifigGuideTypes);
+    }
+
+    [Fact]
+    public async Task Lookup_in_Stock_mode_only_calls_provider_with_Stock_never_with_Sold()
+    {
+        _settings.Current.Prices.GuideType = "stock";
+        _provider.NextMinifigPrice = new PriceResult
+        {
+            AvgPrice = 7m, Currency = "EUR", FetchedAt = DateTime.UtcNow
+        };
+        _provider.NextPartPrice = new PriceResult
+        {
+            AvgPrice = 0.5m, Currency = "EUR", FetchedAt = DateTime.UtcNow
+        };
+
+        await _sut.GetMinifigPriceAsync("arc007");
+        await _sut.GetPartPriceAsync("3001", 11);
+
+        // Genau ein Call pro Methode, beide unter "stock", kein "sold" dazwischen.
+        Assert.Single(_provider.RecordedMinifigGuideTypes);
+        Assert.Single(_provider.RecordedPartGuideTypes);
+        Assert.Equal("stock", _provider.RecordedMinifigGuideTypes[0]);
+        Assert.Equal("stock", _provider.RecordedPartGuideTypes[0]);
+        Assert.DoesNotContain("sold", _provider.RecordedMinifigGuideTypes);
+        Assert.DoesNotContain("sold", _provider.RecordedPartGuideTypes);
+    }
+
     [Fact]
     public async Task Switching_GuideType_misses_old_cache_and_triggers_live_call()
     {
@@ -312,9 +363,16 @@ public class BlPriceCacheServiceTests : IDisposable
             });
     }
 
-    /// <summary>Stub-Provider mit einstellbaren Antworten.</summary>
+    /// <summary>
+    /// Stub-Provider mit einstellbaren Antworten. Erweitert um GuideType-
+    /// Tracking: bei jedem Aufruf wird der aktuelle Settings-GuideType
+    /// protokolliert, damit Tests den "Lock-the-Contract" durchsetzen koennen
+    /// (kein Code-Pfad darf beide Varianten in einer Sitzung anfassen).
+    /// </summary>
     private sealed class StubProvider : IPriceProvider
     {
+        private readonly ISettingsService? _settings;
+
         public string Name => "Stub";
         public bool IsConfigured { get; set; } = true;
 
@@ -326,12 +384,21 @@ public class BlPriceCacheServiceTests : IDisposable
         public int MinifigCallCount;
         public int PartCallCount;
 
+        /// <summary>GuideType der bei jedem GetMinifigPriceAsync gerade in den Settings stand.</summary>
+        public List<string> RecordedMinifigGuideTypes { get; } = new();
+        /// <summary>Dito fuer GetPartPriceAsync.</summary>
+        public List<string> RecordedPartGuideTypes { get; } = new();
+
+        public StubProvider() : this(null) { }
+        public StubProvider(ISettingsService? settings) { _settings = settings; }
+
         public Task<bool> IsConfiguredAsync(CancellationToken ct = default)
             => Task.FromResult(IsConfigured);
 
         public async Task<PriceResult?> GetMinifigPriceAsync(string blMinifigId, CancellationToken ct = default)
         {
             Interlocked.Increment(ref MinifigCallCount);
+            if (_settings != null) RecordedMinifigGuideTypes.Add(_settings.Current.Prices.GuideType);
             if (MinifigDelayMs > 0) await Task.Delay(MinifigDelayMs, ct);
             if (MinifigShouldThrow) throw new InvalidOperationException("simuliert");
             return NextMinifigPrice;
@@ -340,6 +407,7 @@ public class BlPriceCacheServiceTests : IDisposable
         public Task<PriceResult?> GetPartPriceAsync(string blPartNo, int blColorId, CancellationToken ct = default)
         {
             Interlocked.Increment(ref PartCallCount);
+            if (_settings != null) RecordedPartGuideTypes.Add(_settings.Current.Prices.GuideType);
             if (PartShouldThrow) throw new InvalidOperationException("simuliert");
             return Task.FromResult(NextPartPrice);
         }
