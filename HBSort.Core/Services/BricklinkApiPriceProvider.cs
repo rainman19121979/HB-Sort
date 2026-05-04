@@ -68,7 +68,14 @@ public class BricklinkApiPriceProvider : IPriceProvider
         var newOrUsed = "U"; // CLAUDE.md: Default-Condition ist Used (Sammler-Workflow)
         var region = cfg.Region ?? string.Empty;
         var currency = string.IsNullOrWhiteSpace(cfg.Currency) ? "EUR" : cfg.Currency;
-        var staleDays = Math.Max(1, cfg.CacheDays);
+        // Audit W-8 (2026-05-04): pro Item-Typ die dedizierte TTL nutzen.
+        // Frueher hatte hier ein einzelnes cfg.CacheDays-Feld gestanden; das
+        // ist im Stale-While-Revalidate-Pfad (BlPriceCacheService) schon laenger
+        // durch zwei TTL-Felder ersetzt - der Provider hat sie aber bisher
+        // ignoriert. Jetzt konsistent: M -> Minifig-TTL, P -> Part-TTL.
+        var staleDays = Math.Max(1, itemType == "M"
+            ? cfg.BlPriceCacheTtlMinifigDays
+            : cfg.BlPriceCacheTtlPartDays);
 
         // 1) Cache-Hit?
         try

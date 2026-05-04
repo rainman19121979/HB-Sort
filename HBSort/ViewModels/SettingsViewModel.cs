@@ -334,7 +334,8 @@ public partial class SettingsViewModel : ObservableObject
         PriceCurrency                  = s.Prices.Currency;
         PriceCorrectionMinifigPercent  = s.Prices.CorrectionMinifigPercent;
         PriceCorrectionPartsPercent    = s.Prices.CorrectionPartsPercent;
-        PriceCacheDays                 = s.Prices.CacheDays;
+        // Audit W-8: PriceCacheDays-Feld wurde entfernt - die TTL kommt jetzt
+        // aus den zwei dedizierten Minifig/Part-Feldern.
         PriceCacheTtlMinifigDays       = s.Prices.BlPriceCacheTtlMinifigDays;
         PriceCacheTtlPartDays          = s.Prices.BlPriceCacheTtlPartDays;
         PriceAutoLoadOnComplete        = s.Prices.AutoLoadOnComplete;
@@ -372,7 +373,7 @@ public partial class SettingsViewModel : ObservableObject
         s.Prices.Currency                  = string.IsNullOrWhiteSpace(PriceCurrency) ? "EUR" : PriceCurrency;
         s.Prices.CorrectionMinifigPercent  = PriceCorrectionMinifigPercent;
         s.Prices.CorrectionPartsPercent    = PriceCorrectionPartsPercent;
-        s.Prices.CacheDays                 = Math.Max(1, PriceCacheDays);
+        // Audit W-8: kein CacheDays-Schreiben mehr - Property entfernt.
         s.Prices.BlPriceCacheTtlMinifigDays = Math.Max(1, PriceCacheTtlMinifigDays);
         s.Prices.BlPriceCacheTtlPartDays    = Math.Max(1, PriceCacheTtlPartDays);
         s.Prices.AutoLoadOnComplete        = PriceAutoLoadOnComplete; // DEPRECATED-Schreiben weiter, fuer Backwards-Compat
@@ -803,7 +804,8 @@ public partial class SettingsViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(PartsPreviewLabel))]
     private decimal _priceCorrectionPartsPercent = -15m;
 
-    [ObservableProperty] private int _priceCacheDays = 7;
+    // Audit W-8 (2026-05-04): _priceCacheDays-Field entfernt; siehe
+    // _priceCacheTtlMinifigDays / _priceCacheTtlPartDays unten.
     [ObservableProperty] private bool _priceAutoLoadOnComplete = true; // DEPRECATED, siehe AutoLoadCompletePrice
 
     // UX#12: getrennte TTLs fuer Stale-While-Revalidate.

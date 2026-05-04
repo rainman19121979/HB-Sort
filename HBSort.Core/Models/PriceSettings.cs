@@ -39,12 +39,13 @@ public class PriceSettings
     /// </summary>
     public decimal CorrectionPartsPercent { get; set; } = -15m;
 
-    /// <summary>Cache-Lebensdauer in Tagen. Aeltere Eintraege werden neu geholt.</summary>
-    // DEPRECATED ab Phase 8 - wird vom Stale-While-Revalidate-Pfad
-    // (IBlPriceCacheService) nicht mehr genutzt. Stattdessen die zwei
-    // dedizierten TTL-Felder unten verwenden. Kann in einer spaeteren
-    // Iteration entfernt werden.
-    public int CacheDays { get; set; } = 7;
+    // Audit W-8 (2026-05-04): Frueher gab es hier ein einzelnes CacheDays-
+    // Feld (Default 7). Mit Phase 8 wurden zwei dedizierte TTL-Felder
+    // eingefuehrt (s.u.); im Audit X.16 wurde der BricklinkApiPriceProvider
+    // auf die neuen Felder umgestellt und das alte CacheDays entfernt.
+    // System.Text.Json ignoriert unbekannte Properties beim Deserialize -
+    // alte settings.json mit "CacheDays": 7 wird also ohne Crash geladen,
+    // der Wert verfaellt einfach.
 
     /// <summary>
     /// Phase 8 / UX#12: TTL fuer Komplett-Figur-Cache-Eintraege in Tagen.
