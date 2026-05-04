@@ -192,6 +192,489 @@
             <!-- PROMPT 6 (2026-05-02): Tab "Katalog" (Rebrickable catalog.db) entfernt.
                  Stammdaten kommen jetzt aus bl_cache.db (Tab "BL-Catalog-Daten"). -->
 
+            <!-- ============================================================ -->
+            <!-- TAB: BRICKLINK (UX X.11)
+                 Vereint die alten 3 Tabs "BrickLink-API" + "BL-Catalog-Daten"
+                 + "Preise" in einem scrollbaren Tab. Vier Sektionen:
+                 1) API-Zugang (Tokens, Test, IP-Whitelist)
+                 2) API-Nutzung (Counter + Schwellwerte)
+                 3) Preise (Provider, Filter, Korrekturen, Lade-Modi)
+                 4) Catalog-Daten (BrickStore-Bulk-Import)
+
+                 Cache-Sektionen (BL-Daten-Cache, Preis-Cache-Verwaltung,
+                 TTL-Felder) wandern in den separaten "Cache"-Tab in
+                 Commit 4. Die alten 3 Tabs bleiben in dieser Iteration
+                 noch sichtbar - werden in Commit 5 entfernt. -->
+            <!-- ============================================================ -->
+            <TabItem Header="BrickLink">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
+                    <StackPanel>
+
+                        <!-- ===== SEKTION 1: API-Zugang ===== -->
+                        <TextBlock Text="API-Zugang"
+                                   FontSize="15" FontWeight="SemiBold"
+                                   Margin="0,0,0,4"/>
+
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12" Margin="0,0,0,8">
+                            Du brauchst einen BrickLink-Verkaeufer-Account und eine
+                            registrierte Consumer-Application. Die Tokens werden mit
+                            Windows-DPAPI verschluesselt in settings.json gespeichert.
+                        </TextBlock>
+
+                        <TextBlock>
+                            <Hyperlink NavigateUri="https://www.bricklink.com/v2/api/register_consumer.page"
+                                       RequestNavigate="Hyperlink_RequestNavigate">
+                                BL-Consumer-Registrierung oeffnen
+                            </Hyperlink>
+                        </TextBlock>
+
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="160"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Text="Consumer Key:" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="0" Grid.Column="1" Margin="0,0,4,4"
+                                     Text="{Binding BricklinkConsumerKey, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <TextBlock Grid.Row="1" Text="Consumer Secret:" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" Margin="0,0,4,4"
+                                     Text="{Binding BricklinkConsumerSecret, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <TextBlock Grid.Row="2" Text="Token Value:" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="2" Grid.Column="1" Margin="0,0,4,4"
+                                     Text="{Binding BricklinkTokenValue, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <TextBlock Grid.Row="3" Text="Token Secret:" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="3" Grid.Column="1" Margin="0,0,4,4"
+                                     Text="{Binding BricklinkTokenSecret, UpdateSourceTrigger=PropertyChanged}"/>
+                        </Grid>
+
+                        <TextBlock Foreground="Gray" FontSize="11" FontStyle="Italic" Margin="0,4,0,8">
+                            Hinweis: Tokens sind als reiner Text sichtbar – das Fenster ist
+                            nur lokal und die Werte werden beim Speichern verschluesselt.
+                        </TextBlock>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                            <Button Content="Tokens speichern"
+                                    Command="{Binding SaveBricklinkTokensCommand}"
+                                    Width="160" Margin="0,0,8,0"/>
+                            <Button Content="Verbindung testen"
+                                    Command="{Binding TestBricklinkConnectionCommand}"
+                                    Width="160" Margin="0,0,8,0"/>
+                            <Button Content="Loeschen"
+                                    Command="{Binding ClearBricklinkTokensCommand}"
+                                    Width="120"/>
+                        </StackPanel>
+
+                        <TextBlock Text="Status" FontSize="13" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                        <TextBlock Text="{Binding BricklinkStatusText}" Margin="0,4,0,0"/>
+                        <TextBlock Text="{Binding BricklinkTestResultText}"
+                                   Margin="0,2,0,0" FontStyle="Italic"
+                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+
+                        <TextBlock Text="IP-Whitelist" FontSize="13" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12" Margin="0,4,0,0">
+                            Deine externe IP muss im BL-Consumer-Profile in der
+                            "Allowed IP"-Liste eingetragen sein, sonst antwortet die API mit HTTP 403.
+                        </TextBlock>
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Content="Aktuelle IP anzeigen"
+                                    Command="{Binding ShowExternalIpCommand}"
+                                    Width="200" Margin="0,0,8,0"/>
+                            <TextBlock Text="{Binding BricklinkExternalIp}"
+                                       VerticalAlignment="Center"
+                                       FontFamily="Consolas"/>
+                        </StackPanel>
+
+                        <Separator Margin="0,16,0,16"/>
+
+                        <!-- ===== SEKTION 2: API-Nutzung ===== -->
+                        <TextBlock Text="API-Nutzung"
+                                   FontSize="15" FontWeight="SemiBold"
+                                   Margin="0,0,0,8"/>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Text="Letzte 24h (rolling):"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding RateLimitCalls24h}"/>
+
+                            <TextBlock Grid.Row="1" Text="Heute (seit 00:00):" Margin="0,2,0,0"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,2,0,0"
+                                       Text="{Binding RateLimitCallsToday}"/>
+
+                            <TextBlock Grid.Row="2" Text="Letzte Stunde:" Margin="0,2,0,0"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,2,0,0"
+                                       Text="{Binding RateLimitCallsThisHour}"/>
+
+                            <TextBlock Grid.Row="3" Text="Status:" Margin="0,2,0,0"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Margin="0,2,0,0"
+                                       Text="{Binding RateLimitStateText}" FontWeight="SemiBold"/>
+
+                            <TextBlock Grid.Row="4" Text="Aelteste Call im Window:" Margin="0,2,0,0"/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" Margin="0,2,0,0"
+                                       Text="{Binding RateLimitOldestCallText}"/>
+                        </Grid>
+
+                        <TextBlock Text="Schwellwerte" FontSize="13" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12" Margin="0,4,0,0">
+                            Soft = gelber Toast bei Erreichen. Hard = keine API-Calls mehr (nur Cache).
+                            BL-Limit (fix): 5000 Calls / 24h.
+                        </TextBlock>
+
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Text="Soft-Threshold:" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="0" Grid.Column="1"
+                                     Text="{Binding BricklinkSoftThreshold, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="Bei diesem Stand kommt eine gelbe Warnung. Default 1000."/>
+
+                            <TextBlock Grid.Row="1" Text="Hard-Threshold:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4,0,0"
+                                     Text="{Binding BricklinkHardThreshold, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="Hard-Stop: ab hier nur noch Cache, keine API-Calls. Default 4500, max 4900."/>
+
+                            <TextBlock Grid.Row="2" Text="BL-Limit (fix):" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,4,0,0"
+                                       Text="{Binding BricklinkRealLimit}" Foreground="Gray"/>
+                        </Grid>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Content="Schwellwerte speichern"
+                                    Command="{Binding SaveRateLimitThresholdsCommand}"
+                                    Width="220"/>
+                            <TextBlock Text="{Binding RateLimitSaveMessage}"
+                                       VerticalAlignment="Center" Margin="12,0,0,0"
+                                       FontStyle="Italic" Foreground="Gray"/>
+                        </StackPanel>
+
+                        <Separator Margin="0,16,0,16"/>
+
+                        <!-- ===== SEKTION 3: Preise (ohne Cache-Sektionen) ===== -->
+                        <TextBlock Text="Preise"
+                                   FontSize="15" FontWeight="SemiBold"
+                                   Margin="0,0,0,4"/>
+
+                        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Gray" Margin="0,0,0,8"
+                                   Text="Bestimmt, woher die Preise fuer die Verkaufsempfehlung im Detail-Dialog kommen."/>
+
+                        <RadioButton Content="Keine Preise"
+                                     GroupName="PriceProviderBl"
+                                     IsChecked="{Binding IsPriceProviderNone, Mode=OneWay}"
+                                     Click="PriceProviderNone_Click"
+                                     Margin="0,0,0,4"/>
+                        <RadioButton Content="BrickLink-API (benoetigt BL-Tokens, siehe oben)"
+                                     GroupName="PriceProviderBl"
+                                     IsChecked="{Binding IsPriceProviderBricklink, Mode=OneWay}"
+                                     Click="PriceProviderBricklink_Click"
+                                     Margin="0,0,0,12"/>
+
+                        <StackPanel Visibility="{Binding IsPriceProviderBricklink, Converter={StaticResource BoolToVisibility}}">
+
+                            <TextBlock Text="BL-API-Filter" FontSize="13" FontWeight="SemiBold"
+                                       Margin="0,4,0,6"/>
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Guide-Typ:"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <ComboBox Grid.Row="0" Grid.Column="1" Margin="0,0,0,4"
+                                          SelectedValue="{Binding PriceGuideType, Mode=TwoWay}"
+                                          SelectedValuePath="Tag">
+                                    <ComboBoxItem Content="Sold (was wirklich verkauft wurde)" Tag="sold"/>
+                                    <ComboBoxItem Content="Stock (aktuelle Angebote)" Tag="stock"/>
+                                </ComboBox>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Spalte:"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <ComboBox Grid.Row="1" Grid.Column="1" Margin="0,0,0,4"
+                                          SelectedValue="{Binding PricePriceColumn, Mode=TwoWay}"
+                                          SelectedValuePath="Tag">
+                                    <ComboBoxItem Content="Min" Tag="min"/>
+                                    <ComboBoxItem Content="Avg" Tag="avg"/>
+                                    <ComboBoxItem Content="Qty-Avg (Default)" Tag="qty_avg"/>
+                                    <ComboBoxItem Content="Max" Tag="max"/>
+                                </ComboBox>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Region:"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <ComboBox Grid.Row="2" Grid.Column="1" Margin="0,0,0,4"
+                                          SelectedValue="{Binding PriceRegion, Mode=TwoWay}"
+                                          SelectedValuePath="Tag">
+                                    <ComboBoxItem Content="(global, keine Filterung)" Tag=""/>
+                                    <ComboBoxItem Content="europe" Tag="europe"/>
+                                    <ComboBoxItem Content="north_america" Tag="north_america"/>
+                                    <ComboBoxItem Content="asia" Tag="asia"/>
+                                    <ComboBoxItem Content="south_america" Tag="south_america"/>
+                                    <ComboBoxItem Content="africa" Tag="africa"/>
+                                </ComboBox>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Country-Code (z.B. DE):"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <TextBox Grid.Row="3" Grid.Column="1" Margin="0,0,0,4"
+                                         MaxLength="2"
+                                         Text="{Binding PriceCountryCode, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Lass das Feld leer, wenn du keinen Country-Filter willst."/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Waehrung:"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <TextBox Grid.Row="4" Grid.Column="1" Margin="0,0,0,4"
+                                         MaxLength="3"
+                                         Text="{Binding PriceCurrency, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+
+                            <TextBlock Text="Korrekturfaktoren" FontSize="13" FontWeight="SemiBold"
+                                       Margin="0,4,0,6"/>
+                            <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Gray"
+                                       Margin="0,0,0,6"
+                                       Text="Negative Werte = Abschlag vom BL-Preis (z.B. -10 = 10% weniger)."/>
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Komplett-Figur (%):"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <TextBox Grid.Row="0" Grid.Column="1" Margin="0,0,8,4"
+                                         Text="{Binding PriceCorrectionMinifigPercent, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                                           Text="{Binding MinifigPreviewLabel}"
+                                           Foreground="#1976D2" FontStyle="Italic"
+                                           FontSize="11" Margin="0,0,0,8"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Einzelteile-Summe (%):"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <TextBox Grid.Row="2" Grid.Column="1" Margin="0,0,8,4"
+                                         Text="{Binding PriceCorrectionPartsPercent, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2"
+                                           Text="{Binding PartsPreviewLabel}"
+                                           Foreground="#1976D2" FontStyle="Italic"
+                                           FontSize="11"/>
+                            </Grid>
+
+                            <TextBlock Text="Preise laden" FontSize="13" FontWeight="SemiBold"
+                                       Margin="0,4,0,6"/>
+                            <TextBlock Text="Wann werden die Preise im Sortier-Tab oben rechts geladen?"
+                                       FontSize="11" Foreground="Gray" TextWrapping="Wrap"
+                                       Margin="0,0,0,6"/>
+
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="240"/>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0"
+                                           Text="Komplett-Figur-Preis:"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <ComboBox Grid.Row="0" Grid.Column="1" Margin="0,0,0,4"
+                                          ItemsSource="{Binding PriceLoadModeOptions}"
+                                          SelectedValuePath="Value"
+                                          DisplayMemberPath="Label"
+                                          SelectedValue="{Binding PriceAutoLoadCompletePrice, Mode=TwoWay}"
+                                          ToolTip="Auto = sofort beim Scannen einer Figur. Manuell = erst auf Klick (spart API-Calls)."/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0"
+                                           Text="Einzelteile-Preise:"
+                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
+                                <ComboBox Grid.Row="1" Grid.Column="1" Margin="0,0,0,4"
+                                          ItemsSource="{Binding PriceLoadModeOptions}"
+                                          SelectedValuePath="Value"
+                                          DisplayMemberPath="Label"
+                                          SelectedValue="{Binding PriceAutoLoadPartsPrice, Mode=TwoWay}"
+                                          ToolTip="Auto = sofort beim Scannen. Manuell = erst auf Klick. Unabhaengig vom Komplett-Preis-Setting."/>
+                            </Grid>
+
+                            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
+                                       Margin="0,4,0,0">
+                                <Run Text="Auto:"/>
+                                Preise werden sofort beim Scannen einer Figur geladen.
+                                <LineBreak/>
+                                <Run Text="Manuell:"/>
+                                Preise werden erst auf Klick geladen (spart API-Calls).
+                            </TextBlock>
+
+                            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
+                                       FontStyle="Italic" Margin="0,8,0,0"
+                                       Text="(Cache-Gueltigkeit + Cache-Verwaltung: siehe Tab &quot;Cache&quot;.)"/>
+                        </StackPanel>
+
+                        <Border Background="#E3F2FD" BorderBrush="#1976D2"
+                                BorderThickness="1" CornerRadius="4"
+                                Padding="12" Margin="0,16,0,0"
+                                Visibility="{Binding IsPriceProviderNone, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock TextWrapping="Wrap" FontSize="12">
+                                <Run Text="Hinweis:" FontWeight="SemiBold"/>
+                                Bei "Keine Preise" wird im Detail-Dialog kompletter Figuren keine
+                                Verkaufsempfehlung angezeigt. Alle anderen Funktionen bleiben
+                                unveraendert.
+                            </TextBlock>
+                        </Border>
+
+                        <Separator Margin="0,16,0,16"/>
+
+                        <!-- ===== SEKTION 4: Catalog-Daten ===== -->
+                        <TextBlock Text="Catalog-Daten"
+                                   FontSize="15" FontWeight="SemiBold"
+                                   Margin="0,0,0,4"/>
+
+                        <Border Background="#FFF3E0" BorderBrush="#E65100"
+                                BorderThickness="1" CornerRadius="4"
+                                Padding="12" Margin="0,4,0,12">
+                            <TextBlock TextWrapping="Wrap" FontSize="12">
+                                <Run FontWeight="Bold">Datenquelle &amp; Lizenz</Run>
+                                <LineBreak/><LineBreak/>
+                                BL-Catalog-Daten (Item-Stammdaten und Inventories) sind
+                                Eigentum von BrickLink (bricklink.com). Diese Anwendung
+                                nutzt die Aufbereitung dieser Daten durch BrickStore von
+                                Robert Griebl (brickstore.dev, GPL-3,
+                                github.com/rgriebl/brickstore-database).
+                                <LineBreak/><LineBreak/>
+                                LEGO ist eine Marke der LEGO-Gruppe, die diese Software
+                                weder sponsert noch unterstuetzt.
+                            </TextBlock>
+                        </Border>
+
+                        <TextBlock Text="BrickStore-Daten importieren"
+                                   FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8"/>
+
+                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Foreground="Gray" FontSize="12">
+                            Importiert ca. 18.750 Minifig-Stammdaten und ihre
+                            vollstaendigen Teilelisten. Dauer: 1-3 Minuten.
+                            Empfohlen: Quartal-weise neu importieren.
+                        </TextBlock>
+
+                        <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4"
+                                Padding="12" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock>
+                                    <Run Text="Items im Cache:" Foreground="Gray"/>
+                                    <Run Text="{Binding BlCacheItemsCount, Mode=OneWay}" FontWeight="SemiBold"/>
+                                </TextBlock>
+                                <TextBlock>
+                                    <Run Text="Subsets im Cache:" Foreground="Gray"/>
+                                    <Run Text="{Binding BlCacheSubsetsCount, Mode=OneWay}" FontWeight="SemiBold"/>
+                                </TextBlock>
+                                <TextBlock>
+                                    <Run Text="Cache-Groesse:" Foreground="Gray"/>
+                                    <Run Text="{Binding BlCacheSizeLabel, Mode=OneWay}" FontWeight="SemiBold"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <Button Content="Von GitHub importieren (empfohlen)"
+                                Padding="12,8" HorizontalAlignment="Left"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Click="ImportFromGitHub_Click"
+                                IsEnabled="{Binding IsNotImporting}"
+                                ToolTip="Laed downloads.zip von github.com/rgriebl/brickstore-database und importiert direkt. Internet-Verbindung noetig (~12 MB)."
+                                Margin="0,0,0,8"/>
+
+                        <Expander Header="Aus lokalem Ordner importieren (optional)"
+                                  Margin="0,8,0,0">
+                            <StackPanel Margin="0,8,0,0">
+                                <TextBlock TextWrapping="Wrap" Foreground="Gray"
+                                           FontSize="11" Margin="0,0,0,8">
+                                    Ordner muss enthalten: items/M.xml, items/P.xml, M/*.xml
+                                </TextBlock>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0"
+                                             Text="{Binding LocalImportFolder, UpdateSourceTrigger=PropertyChanged}"
+                                             Margin="0,0,8,0"/>
+                                    <Button Grid.Column="1" Content="..." Width="40"
+                                            Click="BrowseImportFolder_Click"/>
+                                </Grid>
+                                <Button Content="Aus lokalem Ordner importieren"
+                                        Padding="12,8" HorizontalAlignment="Left"
+                                        Click="ImportFromFolder_Click"
+                                        IsEnabled="{Binding IsNotImporting}"
+                                        Margin="0,8,0,0"/>
+                            </StackPanel>
+                        </Expander>
+
+                        <StackPanel Margin="0,16,0,0"
+                                    Visibility="{Binding IsImporting, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="{Binding ImportStatus}"
+                                       FontSize="12" FontWeight="SemiBold"
+                                       TextWrapping="Wrap"/>
+                            <ProgressBar Height="6" Margin="0,6,0,4"
+                                         Minimum="0" Maximum="100"
+                                         Value="{Binding ImportProgress, Mode=OneWay}"/>
+                            <TextBlock FontSize="11" Foreground="Gray"
+                                       HorizontalAlignment="Right"
+                                       Text="{Binding ImportProgress, Mode=OneWay, StringFormat={}{0:F0}%}"/>
+                            <TextBlock FontSize="11" Foreground="Gray"
+                                       FontStyle="Italic" Margin="0,4,0,0"
+                                       TextWrapping="Wrap"
+                                       Text="Import laeuft im Hintergrund. Die App ist nicht eingefroren – bitte warten."/>
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding ImportResultText}"
+                                   TextWrapping="Wrap" FontSize="12"
+                                   Foreground="DarkGreen"
+                                   Margin="0,16,0,0"
+                                   Visibility="{Binding HasImportResult, Converter={StaticResource BoolToVisibility}}"/>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- ============================================ -->
             <!-- TAB 3: BILD-CACHE (Phase 2.5) -->
             <!-- ============================================ -->
