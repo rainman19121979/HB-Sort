@@ -223,6 +223,60 @@ public class BlPriceCacheServiceTests : IDisposable
         Assert.Equal(0, await _sut.GetEntryCountAsync());
     }
 
+    // ===== GuideType-Plumbing-Regression (Bugfix-Phase 8 #2) =====
+    // Diese Tests sichern, dass ein Sold↔Stock-Wechsel des Settings sofort
+    // einen anderen Cache-Key trifft - die App also nicht "im falschen
+    // Topf" sucht oder schreibt. Der eigentliche Code-Pfad ist seit UX#12
+    // korrekt geplumbt; ein Regressions-Test fehlte aber.
+
+    [Fact]
+    public async Task Cache_keys_distinguish_between_GuideType_Sold_and_Stock()
+    {
+        // Zwei Eintraege fuer dasselbe Item, einer pro GuideType.
+        await SeedCacheRawAsync("M", "arc007", 0,
+            guideType: "sold", avg: 11m, fetchedAt: DateTime.UtcNow);
+        await SeedCacheRawAsync("M", "arc007", 0,
+            guideType: "stock", avg: 22m, fetchedAt: DateTime.UtcNow);
+
+        // Settings auf "sold" -> wir muessen den 11er-Eintrag bekommen.
+        _settings.Current.Prices.GuideType = "sold";
+        var soldOutcome = await _sut.GetMinifigPriceAsync("arc007");
+
+        // Settings auf "stock" -> jetzt 22.
+        _settings.Current.Prices.GuideType = "stock";
+        var stockOutcome = await _sut.GetMinifigPriceAsync("arc007");
+
+        Assert.Equal(PriceLookupSource.Cache, soldOutcome.Source);
+        Assert.Equal(11m, soldOutcome.Price!.AvgPrice);
+        Assert.Equal(PriceLookupSource.Cache, stockOutcome.Source);
+        Assert.Equal(22m, stockOutcome.Price!.AvgPrice);
+
+        // Provider darf nicht angefasst worden sein - beide Treffer waren
+        // direkte Cache-Hits unter ihrem jeweiligen Key.
+        Assert.Equal(0, _provider.MinifigCallCount);
+    }
+
+    [Fact]
+    public async Task Switching_GuideType_misses_old_cache_and_triggers_live_call()
+    {
+        // Es existiert nur ein Sold-Eintrag im Cache.
+        await SeedCacheRawAsync("M", "arc007", 0,
+            guideType: "sold", avg: 11m, fetchedAt: DateTime.UtcNow);
+
+        // User wechselt auf "stock" -> kein passender Cache-Eintrag -> Live.
+        _settings.Current.Prices.GuideType = "stock";
+        _provider.NextMinifigPrice = new PriceResult
+        {
+            AvgPrice = 99m, Currency = "EUR", FetchedAt = DateTime.UtcNow
+        };
+
+        var outcome = await _sut.GetMinifigPriceAsync("arc007");
+
+        Assert.Equal(PriceLookupSource.Live, outcome.Source);
+        Assert.Equal(99m, outcome.Price!.AvgPrice);
+        Assert.Equal(1, _provider.MinifigCallCount);
+    }
+
     // ---- Helpers ----
 
     private Task SeedCacheAsync(
@@ -233,6 +287,25 @@ public class BlPriceCacheServiceTests : IDisposable
         return _repo.UpsertPriceAsync(
             itemType, itemNo, colorId,
             cfg.GuideType, "U", cfg.Region, cfg.Currency,
+            new PriceResult
+            {
+                AvgPrice = avg, Currency = cfg.Currency, FetchedAt = fetchedAt
+            });
+    }
+
+    /// <summary>
+    /// Wie SeedCacheAsync, nur dass der GuideType explizit gesetzt wird
+    /// (statt aus den Settings gelesen). So koennen wir gezielt zwei
+    /// Eintraege fuer dasselbe Item unter Sold + Stock anlegen.
+    /// </summary>
+    private Task SeedCacheRawAsync(
+        string itemType, string itemNo, int colorId,
+        string guideType, decimal avg, DateTime fetchedAt)
+    {
+        var cfg = _settings.Current.Prices;
+        return _repo.UpsertPriceAsync(
+            itemType, itemNo, colorId,
+            guideType, "U", cfg.Region, cfg.Currency,
             new PriceResult
             {
                 AvgPrice = avg, Currency = cfg.Currency, FetchedAt = fetchedAt
