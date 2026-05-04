@@ -1120,6 +1120,99 @@ einem Build vor UX X.6.
   (Box 002, Box 005, Box 008)"). Helper-Methode `BuildReleaseBinsLabel`.
 - Singular/Plural je nach Anzahl korrekt formuliert.
 
+#### Audit-Aufraeum-Welle (UX-Iteration X.16, 2026-05-04)
+
+Folge-Iteration zum CODE_AUDIT_REPORT.md (Audit-Stand
+Commit 5d09891c). Es wurden die einfachen, klar umrissenen Findings
+abgearbeitet; die zwei aufwendigeren (K-2 Subscription-Pattern,
+W-5 PersistAndStoreAsync-Tests) wurden bewusst auf eine spaetere
+Iteration verschoben.
+
+**Kritische Findings (alle erledigt):**
+- **K-1** Umlaute/Mojibake: kompletter Sweep ueber `*.cs` und `*.xaml`
+  in HBSort, HBSort.Core und HBSort.Tests. Echte Umlaute durch
+  ae/oe/ue/ss ersetzt; `â€"`-Mojibake und echte Em-/En-Dashes durch
+  ASCII-Minus; Smart-Quotes durch ASCII-Apostroph/Quote. Alle
+  Dateien als UTF-8 ohne BOM. **UI-Symbole (✓ ✕ ⚠ → • × € 📦 ↻)
+  bleiben** — die sind keine Umlaute, sondern bewusste UI-Glyphen.
+  Konvention bestaetigt: Umlaute in Code/UI-Texten = ASCII; nicht-
+  ASCII nur fuer funktionale Symbole.
+- **K-3** FloatingPart-Performance-Index: Composite-Index
+  `(PartNumber, ColorId)` an FloatingPart in
+  `UserDataContext.OnModelCreating` + neue Migration
+  `20260504172934_AddFloatingPartPartColorIndex`. Der haeufige
+  Reverse-Match-Filter im `MinifigPersistenceService` braucht jetzt
+  keinen Sequential Scan mehr. **Hinweis aus dem Audit korrigiert:**
+  `OriginMinifigId` hat *bereits* einen Index aus der Migration
+  `20260502035301_AddOriginMinifigIdToFloatingPart` — das war ein
+  False Positive im Audit-Bericht.
+
+**Wichtige Findings (alle erledigt):**
+- **W-1** `IsCancel + IsDefault` am selben Button entfernt:
+  `BinDetailDialog.xaml:151`, `SupersetsDialog.xaml:117` — beides
+  reine Read-Only-Schliessen-Buttons; nur `IsCancel="True"` reicht.
+- **W-2** Cancel/Schliessen-Konvention in CLAUDE.md festgeschrieben:
+  "Schliessen" fuer Read-Only-Dialoge, "Abbrechen" fuer Editier-
+  Dialoge; primaerer Button rechts mit `IsDefault` + AccentButton-
+  Style; nicht beide Properties am selben Button.
+- **W-3** `AccentButtonStyle` an primaeren Aktions-Buttons ergaenzt:
+  `PartLookupView.xaml:217` "Diese Figur anlegen",
+  `SortingView.xaml:340` "Uebernehmen". CLAUDE.md erweitert um Hinweis
+  auf fehlenden `DangerButtonStyle` fuer destruktive Buttons (TODO).
+- **W-4** Status-Brushes als zentrale Resources: 8 neue
+  `SolidColorBrush`-Eintraege in `App.xaml`
+  (StatusSuccessBrush/StatusWarningBrush/StatusErrorBrush/
+  StatusInfoBrush + die vier Box-Backgrounds). 50 Hex-Vorkommen in
+  8 Views auf `{StaticResource ...}` umgestellt.
+- **W-9** Hilfe `04-export-verkauf.md` aktualisiert:
+  Bemerkung-Eingabe-Hinweis raus (UX X.14), neue Sektion zu
+  `<Remarks>`/`<Comments>`-Konvention, Empfehlungs-Banner-Beschreibung
+  durch gruene-Markierung-Beschreibung ersetzt (UX X.15).
+- **W-10** Hilfe `02-sortier-workflow.md` um Smart-Storage-Suggestion
+  ergaenzt (UX X.7) — User wird auf das Stapel-Wachstum-Verhalten
+  hingewiesen.
+
+**Mittlere Findings (groesstenteils erledigt):**
+- **M-1** `ColorMapping.cs` + Tests komplett geloescht (784 + ~120
+  Zeilen). War seit PROMPT 6 nicht mehr im Hauptfluss; Tests sicherten
+  nur sich selbst ab. CLAUDE.md-Erwaehnungen (4 Stellen) korrigiert.
+- **M-6** CLAUDE.md:857: Verweis auf gestrichene
+  `WaitingMinifigsViewModel`-Klasse umformuliert zu historischer
+  Anmerkung mit Hinweis auf UX X.15-Loeschung.
+- **M-7** Doppelte Indizes: **kein Befund** nach Verifikation. Der
+  Audit hatte `HasOne...HasForeignKey...`-Konstrukte als "doppelte
+  HasIndex" interpretiert — sind aber FK-Konfigurationen, von denen
+  EF genau einen Index erzeugt. Snapshot-Check bestaetigt: kein
+  doppelter Index pro Spalte. Kein Code-Aenderung noetig.
+- **M-13** `DialogHeaderFontSize`-Resource (=20) in `App.xaml`;
+  3 Header-Verwendungen umgestellt (MainWindow App-Logo,
+  HelpView-Titel, BuildSuggestionDetailDialog-Titel). LiveStatsView-
+  Stat-Zahlen behalten ihren hardcoded Wert (andere Semantik).
+- **M-14** Padding 10 -> 12 in `BinBulkCreateDialog.xaml:102` (passt
+  zum 0/2/4/6/8/12/16-System).
+- **M-9** Opportunistisch: ein `// PROMPT 6`-Kommentar in
+  `SettingsWindow.xaml:192` durch inhaltliche Beschreibung ersetzt
+  (war beim Status-Brushes-Sweep ohnehin angefasst). PROMPT-
+  Kommentare in Migration-Dateien bleiben — Migrations sind frozen.
+
+**Bewusst aufgeschoben** (eigene Iteration):
+- **K-2** DataChanged-Subscriptions bei den 4 Singleton-VMs
+  (`BuildSuggestionsViewModel`, `LiveStatsViewModel`,
+  `WaitingDetailViewModel`, `RecentScansViewModel`) auf `IDisposable`
+  + Unsubscribe umstellen.
+- **W-5** Theory-Tests fuer `MinifigPersistenceService.PersistAndStoreAsync`
+  (zentrale Domain-Logik, 200+ Zeilen Reverse-Match + RequiredParts-
+  Anlage).
+- **W-6** Tests fuer `PartLookupService`, `BricklinkApiPriceProvider`,
+  `BlBulkImportService`.
+- **W-7** Eigener `BitmapImage`-Creator mit `BitmapCacheOption.OnLoad`
+  im `NullToImageSourceConverter`.
+- **W-8** `PriceSettings.CacheDays` in `BricklinkApiPriceProvider` auf
+  neue TTL-Felder umstellen.
+
+**Tests:** 244/244 gruen (vorher 256 — 12 ColorMapping-Tests sind
+mit M-1 weggefallen). Build sauber.
+
 #### Sortier-Tab UX-Putz (UX-Iteration X.15, 2026-05-04)
 
 Drei kleine UX-Korrekturen im Sortier-Tab:
