@@ -211,10 +211,12 @@ public partial class BsxExportDialog : Window
             return;
         }
 
+        // UX X.14: Remark-Parameter ist weggefallen - <Remarks> kommt jetzt
+        // pro Item aus dem StorageBin-Label (intern), <Comments> aus den
+        // User-Notizen (oeffentlich).
         var options = new BsxExportOptions(
             Condition: GetSelectedTag(ConditionCombo) ?? "U",
-            Status:    GetSelectedTag(StatusCombo)    ?? "I",
-            Remark: string.IsNullOrWhiteSpace(RemarkBox.Text) ? null : RemarkBox.Text.Trim());
+            Status:    GetSelectedTag(StatusCombo)    ?? "I");
 
         try
         {

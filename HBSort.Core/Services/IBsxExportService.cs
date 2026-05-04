@@ -30,6 +30,11 @@ public interface IBsxExportService
 /// <summary>
 /// Optionen fuer einen BSX-Export. Die Defaults entsprechen "gebrauchte
 /// Minifig, ins Inventory aufnehmen, Preis im BrickStore setzen".
+///
+/// UX X.14 (2026-05-04): das frueher hier vorhandene <c>Remark</c>-Feld
+/// wurde entfernt - &lt;Remarks&gt; pro Item wird jetzt automatisch mit
+/// dem Lagerfach-Label aus dem Datenmodell befuellt. Es gibt im UI auch
+/// kein Remark-Eingabefeld mehr.
 /// </summary>
 public record BsxExportOptions(
     /// <summary>"U"=Used, "N"=New (BrickStore-Konvention).</summary>
@@ -37,6 +42,4 @@ public record BsxExportOptions(
     /// <summary>"I"=Include (im Inventory), "X"=Exclude.</summary>
     string Status = "I",
     /// <summary>0 = "Preis spaeter in BrickStore setzen".</summary>
-    decimal DefaultPrice = 0m,
-    /// <summary>Optionaler Remark-Text. Wenn null: "HBSort {Datum}".</summary>
-    string? Remark = null);
+    decimal DefaultPrice = 0m);

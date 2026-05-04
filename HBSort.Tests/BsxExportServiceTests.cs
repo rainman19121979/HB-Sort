@@ -127,17 +127,90 @@ public class BsxExportServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Generate_uses_custom_options_for_status_condition_remark()
+    public async Task Generate_uses_custom_options_for_status_and_condition()
     {
         var ids = await SeedMinifigsAsync(("arc007", "Arctic"));
 
         var xml = await _sut.GenerateBsxAsync(ids, Array.Empty<int>(),
-            new BsxExportOptions(Condition: "N", Status: "X", Remark: "Mein Remark"));
+            new BsxExportOptions(Condition: "N", Status: "X"));
         var item = XDocument.Parse(xml).Root!.Element("Inventory")!.Element("Item")!;
 
         Assert.Equal("N", item.Element("Condition")!.Value);
         Assert.Equal("X", item.Element("Status")!.Value);
-        Assert.Equal("Mein Remark", item.Element("Remarks")!.Value);
+    }
+
+    // ===== UX X.14: Remarks=Bin (intern), Comments=UserNotes (oeffentlich) =====
+
+    [Fact]
+    public async Task Generate_minifig_writes_bin_label_in_Remarks()
+    {
+        var binId = await SeedBinAsync("Box 005");
+        var ids = await SeedMinifigsAsync(("arc007", "Arctic", binId, userNotes: null));
+
+        var xml = await _sut.GenerateBsxAsync(ids, Array.Empty<int>(), new BsxExportOptions());
+        var item = XDocument.Parse(xml).Root!.Element("Inventory")!.Element("Item")!;
+
+        Assert.Equal("Box 005", item.Element("Remarks")!.Value);
+        // Keine Notizen -> kein Comments-Element ueberhaupt.
+        Assert.Null(item.Element("Comments"));
+    }
+
+    [Fact]
+    public async Task Generate_minifig_writes_userNotes_in_Comments()
+    {
+        var binId = await SeedBinAsync("Box 005");
+        var ids = await SeedMinifigsAsync(("arc007", "Arctic", binId, userNotes: "vergilbt"));
+
+        var xml = await _sut.GenerateBsxAsync(ids, Array.Empty<int>(), new BsxExportOptions());
+        var item = XDocument.Parse(xml).Root!.Element("Inventory")!.Element("Item")!;
+
+        Assert.Equal("Box 005", item.Element("Remarks")!.Value);
+        Assert.Equal("vergilbt", item.Element("Comments")!.Value);
+    }
+
+    [Fact]
+    public async Task Generate_floatingPart_writes_bin_label_in_Remarks_and_no_Comments()
+    {
+        // FloatingPart hat im Datenmodell kein Notes-Feld - <Comments>
+        // bleibt daher immer leer und wird weggelassen.
+        var binId = await SeedBinAsync("Box 002");
+        var floatIds = await SeedFloatingsInBinAsync(binId,
+            ("3001", 11, 5, "Brick 2x4", "Black"));
+
+        var xml = await _sut.GenerateBsxAsync(
+            Array.Empty<int>(), floatIds, new BsxExportOptions());
+        var item = XDocument.Parse(xml).Root!.Element("Inventory")!.Element("Item")!;
+
+        Assert.Equal("Box 002", item.Element("Remarks")!.Value);
+        Assert.Null(item.Element("Comments"));
+    }
+
+    [Fact]
+    public async Task Generate_minifig_without_bin_or_notes_omits_both_fields()
+    {
+        // Defensiv: Figur ohne Bin und ohne UserNotes -> keine Remarks/Comments.
+        var ids = await SeedMinifigsAsync(("arc007", "Arctic", binId: null, userNotes: null));
+
+        var xml = await _sut.GenerateBsxAsync(ids, Array.Empty<int>(), new BsxExportOptions());
+        var item = XDocument.Parse(xml).Root!.Element("Inventory")!.Element("Item")!;
+
+        Assert.Null(item.Element("Remarks"));
+        Assert.Null(item.Element("Comments"));
+    }
+
+    [Fact]
+    public async Task Generate_xml_does_not_contain_HBSort_signature_or_filename_in_text_fields()
+    {
+        // Frueher hat HBSort " HBSort {Datum}" automatisch in <Remarks>
+        // geschrieben - das war im oeffentlichen Bereich der BSX-Datei
+        // sichtbar fuer Kaeufer. Jetzt darf nichts derartiges mehr drin sein.
+        var binId = await SeedBinAsync("Box 005");
+        var ids = await SeedMinifigsAsync(("arc007", "Arctic", binId, userNotes: null));
+
+        var xml = await _sut.GenerateBsxAsync(ids, Array.Empty<int>(), new BsxExportOptions());
+
+        Assert.DoesNotContain("HBSort", xml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(".bsx", xml, StringComparison.OrdinalIgnoreCase);
     }
 
     // ====================================================================
@@ -286,7 +359,21 @@ public class BsxExportServiceTests : IDisposable
 
     // --- Helpers ---
 
-    /// <summary>Legt Test-Minifigs an und gibt deren EF-IDs zurueck.</summary>
+    /// <summary>Legt einen Test-Bin an und gibt die Id zurueck.</summary>
+    private async Task<int> SeedBinAsync(string label)
+    {
+        await using var ctx = await _factory.CreateDbContextAsync();
+        var bin = new StorageBin
+        {
+            Label = label,
+            CreatedAt = DateTime.UtcNow
+        };
+        ctx.StorageBins.Add(bin);
+        await ctx.SaveChangesAsync();
+        return bin.Id;
+    }
+
+    /// <summary>Legt Test-Minifigs an und gibt deren EF-IDs zurueck (kein Bin/Notes).</summary>
     private async Task<int[]> SeedMinifigsAsync(params (string blId, string name)[] minifigs)
     {
         await using var ctx = await _factory.CreateDbContextAsync();
@@ -308,20 +395,50 @@ public class BsxExportServiceTests : IDisposable
         return ids.ToArray();
     }
 
-    /// <summary>Legt Test-FloatingParts an und gibt deren EF-IDs zurueck.</summary>
+    /// <summary>
+    /// UX X.14-Helper: Test-Minifigs mit Bin-Zuordnung und optionalen UserNotes.
+    /// </summary>
+    private async Task<int[]> SeedMinifigsAsync(
+        params (string blId, string name, int? binId, string? userNotes)[] minifigs)
+    {
+        await using var ctx = await _factory.CreateDbContextAsync();
+        var ids = new List<int>();
+        foreach (var (blId, name, binId, userNotes) in minifigs)
+        {
+            var m = new TrackedMinifig
+            {
+                BricklinkId = blId,
+                FigNum = blId,
+                Name = name,
+                CreatedAt = DateTime.UtcNow,
+                Status = TrackedMinifigStatus.Complete,
+                StorageBinId = binId,
+                UserNotes = userNotes
+            };
+            ctx.TrackedMinifigs.Add(m);
+            await ctx.SaveChangesAsync();
+            ids.Add(m.Id);
+        }
+        return ids.ToArray();
+    }
+
+    /// <summary>
+    /// Legt Test-FloatingParts an. Bin wird automatisch angelegt damit der
+    /// FK auf StorageBin nicht null ist (im Datenmodell ist StorageBinId
+    /// non-null fuer FloatingPart).
+    /// </summary>
     private async Task<int[]> SeedFloatingsAsync(
         params (string partNo, int colorId, int qty, string partName, string colorName)[] floats)
     {
-        await using var ctx = await _factory.CreateDbContextAsync();
-        // Wir brauchen ein Bin damit das FloatingPart einen FK hat.
-        var bin = new StorageBin
-        {
-            Label = $"TestBin-{Guid.NewGuid():N}",
-            CreatedAt = DateTime.UtcNow
-        };
-        ctx.StorageBins.Add(bin);
-        await ctx.SaveChangesAsync();
+        var binId = await SeedBinAsync($"TestBin-{Guid.NewGuid():N}");
+        return await SeedFloatingsInBinAsync(binId, floats);
+    }
 
+    /// <summary>UX X.14-Helper: Floating-Parts in ein konkretes Bin anlegen.</summary>
+    private async Task<int[]> SeedFloatingsInBinAsync(int binId,
+        params (string partNo, int colorId, int qty, string partName, string colorName)[] floats)
+    {
+        await using var ctx = await _factory.CreateDbContextAsync();
         var ids = new List<int>();
         foreach (var (partNo, colorId, qty, partName, colorName) in floats)
         {
@@ -332,7 +449,7 @@ public class BsxExportServiceTests : IDisposable
                 Quantity = qty,
                 PartName = partName,
                 ColorName = colorName,
-                StorageBinId = bin.Id,
+                StorageBinId = binId,
                 AddedAt = DateTime.UtcNow
             };
             ctx.FloatingParts.Add(fp);

@@ -127,7 +127,9 @@
             </ScrollViewer>
         </Border>
 
-        <!-- Optionen -->
+        <!-- Optionen
+             UX X.14: Remark-Eingabefeld entfernt - <Remarks> wird jetzt
+             pro Item automatisch mit dem Lagerfach-Label befuellt. -->
         <Grid Grid.Row="2" Margin="0,12,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
@@ -135,32 +137,21 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0" Grid.Column="0" Text="Condition:"
+            <TextBlock Grid.Column="0" Text="Condition:"
                        VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <ComboBox Grid.Row="0" Grid.Column="1" x:Name="ConditionCombo"
-                      Margin="0,0,16,4">
+            <ComboBox Grid.Column="1" x:Name="ConditionCombo"
+                      Margin="0,0,16,0">
                 <ComboBoxItem Content="Used (U)" Tag="U" IsSelected="True"/>
                 <ComboBoxItem Content="New (N)"  Tag="N"/>
             </ComboBox>
 
-            <TextBlock Grid.Row="0" Grid.Column="2" Text="Status:"
+            <TextBlock Grid.Column="2" Text="Status:"
                        VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <ComboBox Grid.Row="0" Grid.Column="3" x:Name="StatusCombo"
-                      Margin="0,0,0,4">
+            <ComboBox Grid.Column="3" x:Name="StatusCombo">
                 <ComboBoxItem Content="Include (I)" Tag="I" IsSelected="True"/>
                 <ComboBoxItem Content="Exclude (X)" Tag="X"/>
             </ComboBox>
-
-            <TextBlock Grid.Row="1" Grid.Column="0" Text="Remark:"
-                       VerticalAlignment="Center" Margin="0,4,8,0"/>
-            <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3"
-                     x:Name="RemarkBox" Margin="0,4,0,0"
-                     ToolTip="Optional. Wird in das Remarks-Feld jeder Item-Zeile geschrieben. Leer = HBSort {Datum}."/>
         </Grid>
 
         <!-- Speicherort -->

@@ -71,17 +71,21 @@ public class BsxExportService : IBsxExportService
 
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
 
-        // Minifigs laden + in der ID-Reihenfolge ordnen.
+        // Minifigs laden + StorageBin mitziehen damit wir das Bin-Label
+        // pro Item in <Remarks> schreiben koennen (intern, nur Verkaeufer
+        // sieht das in BrickStore).
         var minifigs = minifigIds.Count == 0
             ? new List<Models.TrackedMinifig>()
             : await ctx.TrackedMinifigs.AsNoTracking()
+                .Include(m => m.StorageBin)
                 .Where(m => minifigIds.Contains(m.Id))
                 .ToListAsync(ct);
 
-        // Einzelteile laden + in der ID-Reihenfolge ordnen.
+        // Einzelteile dito mit StorageBin-Include.
         var floats = floatIds.Count == 0
             ? new List<Models.FloatingPart>()
             : await ctx.FloatingParts.AsNoTracking()
+                .Include(p => p.StorageBin)
                 .Where(p => floatIds.Contains(p.Id))
                 .ToListAsync(ct);
 
@@ -112,8 +116,16 @@ public class BsxExportService : IBsxExportService
 
         var inventory = new XElement("Inventory",
             new XAttribute("Currency", currency));
-        var nowStr = DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-        var remark = options.Remark ?? $"HBSort {nowStr}";
+
+        // UX X.14 (2026-05-04): BrickStore-Konvention fuer Notiz-Felder:
+        //   <Remarks>  = INTERN, nur Verkaeufer sieht das       -> Lagerfach
+        //   <Comments> = OEFFENTLICH, jeder Kaeufer sieht das   -> User-Notiz
+        // Beide Felder werden nur geschrieben wenn ein Wert vorhanden ist
+        // (BrickStore-Konvention: leere optionale Felder weglassen, das
+        // Reference-BSX aus BrickStore selbst enthaelt sie nur bei Inhalt).
+        // Frueher stand in <Remarks> ein automatischer "HBSort {Datum}"-
+        // Text - das war oeffentlich eingebraendete Reklame und wurde
+        // entfernt (siehe UX X.14).
 
         // 1) Minifigs (ItemTypeID=M)
         foreach (var m in orderedMinifigs)
@@ -133,7 +145,7 @@ public class BsxExportService : IBsxExportService
                 Log.Debug(ex, "BSX-Export: Cache-Lookup fuer Minifig {Bl} fehlgeschlagen", blId);
             }
 
-            inventory.Add(new XElement("Item",
+            var item = new XElement("Item",
                 new XElement("ItemID", blId),
                 new XElement("ItemTypeID", "M"),
                 new XElement("ColorID", 0),
@@ -146,8 +158,10 @@ public class BsxExportService : IBsxExportService
                 new XElement("Qty", 1),
                 new XElement("Price", options.DefaultPrice
                     .ToString("F4", CultureInfo.InvariantCulture)),
-                new XElement("Condition", options.Condition),
-                new XElement("Remarks", remark)));
+                new XElement("Condition", options.Condition));
+
+            AppendRemarksAndComments(item, m.StorageBin?.Label, m.UserNotes);
+            inventory.Add(item);
         }
 
         // 2) Einzelteile (ItemTypeID=P)
@@ -171,7 +185,7 @@ public class BsxExportService : IBsxExportService
             var colorName = color?.Name ?? fp.ColorName;
             if (string.IsNullOrWhiteSpace(colorName)) colorName = $"Color {fp.ColorId}";
 
-            inventory.Add(new XElement("Item",
+            var item = new XElement("Item",
                 new XElement("ItemID", fp.PartNumber),
                 new XElement("ItemTypeID", "P"),
                 new XElement("ColorID", fp.ColorId),
@@ -184,8 +198,12 @@ public class BsxExportService : IBsxExportService
                 new XElement("Qty", fp.Quantity),
                 new XElement("Price", options.DefaultPrice
                     .ToString("F4", CultureInfo.InvariantCulture)),
-                new XElement("Condition", options.Condition),
-                new XElement("Remarks", remark)));
+                new XElement("Condition", options.Condition));
+
+            // FloatingPart hat kein User-Notes-Feld im Datenmodell, daher
+            // bleibt <Comments> hier immer leer (= weggelassen).
+            AppendRemarksAndComments(item, fp.StorageBin?.Label, userNotes: null);
+            inventory.Add(item);
         }
 
         var doc = new XDocument(
@@ -218,5 +236,20 @@ public class BsxExportService : IBsxExportService
         // ToArray statt GetBuffer, damit nur die wirklich beschriebenen Bytes
         // zurueckkommen - GetBuffer wuerde Kapazitaets-Padding mitliefern.
         return Encoding.UTF8.GetString(ms.ToArray());
+    }
+
+    /// <summary>
+    /// UX X.14: schreibt &lt;Remarks&gt; (intern, Lagerfach-Label) und
+    /// &lt;Comments&gt; (oeffentlich, User-Notiz) - aber nur wenn der Wert
+    /// nicht leer ist. Leere optionale Felder werden weggelassen, wie es
+    /// auch BrickStore selbst beim Export macht.
+    /// </summary>
+    private static void AppendRemarksAndComments(
+        XElement item, string? binLabel, string? userNotes)
+    {
+        if (!string.IsNullOrWhiteSpace(binLabel))
+            item.Add(new XElement("Remarks", binLabel.Trim()));
+        if (!string.IsNullOrWhiteSpace(userNotes))
+            item.Add(new XElement("Comments", userNotes.Trim()));
     }
 }
