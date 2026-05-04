@@ -943,6 +943,47 @@ kennt den Wert nicht und Brickstore importiert auch ohne. Der
 - `Inventory`-Tag hat Currency-Attribut aus Settings (Test mit "USD").
 - Bei leerer Settings-Currency Fallback auf "EUR".
 
+#### Phase 7-Iteration (UX X.14, 2026-05-04) — Remarks/Comments-Konvention
+
+BrickStore unterscheidet beim BSX-Format zwischen zwei Notiz-Feldern
+mit unterschiedlicher Sichtbarkeit:
+- `<Remarks>`  = **INTERN**. Nur der Verkaeufer sieht das in seinem
+  BrickStore. Geeignet fuer Lagerort, interne Codes, Notizen die der
+  Kaeufer NICHT lesen soll.
+- `<Comments>` = **OEFFENTLICH**. Jeder Kaeufer sieht das in der
+  Listing-Oberflaeche. Geeignet fuer Zustand-Beschreibungen
+  ("vergilbt", "leichte Gebrauchsspuren").
+
+HBSort-Mapping pro Item:
+
+| Item-Typ | `<Remarks>` (intern) | `<Comments>` (oeffentlich) |
+|---|---|---|
+| TrackedMinifig (Komplett) | `StorageBin.Label` | `UserNotes` (Notiz-Feld in MinifigDetailView) |
+| FloatingPart (Einzelteil) | `StorageBin.Label` | (kein Notes-Feld im Datenmodell, immer leer) |
+
+**Beide Elemente werden nur geschrieben wenn ein Wert vorhanden ist** -
+analog zu Reference-BSX-Dateien aus BrickStore, die leere optionale
+Felder ebenfalls weglassen. Implementation: Helper-Methode
+`AppendRemarksAndComments` in `BsxExportService`.
+
+Was vorher anders war:
+- `<Remarks>` enthielt einen automatischen "HBSort {Datum}"-Text. Das
+  war oeffentlich sichtbare Reklame in einem internen Feld - falsch in
+  doppelter Hinsicht.
+- Im Export-Dialog gab's ein Eingabefeld "Remark" das in dasselbe Feld
+  geschrieben hat. Das ist mit der Konvention raus, weil <Remarks> jetzt
+  pro Item automatisch das Lagerfach traegt.
+- `<Comments>` wurde nie geschrieben.
+
+Convention fuer kuenftige BSX-Erweiterungen:
+- HBSort-spezifische Texte (Tool-Name, Datum, Datei-Name) duerfen in
+  KEINEM XML-Feld auftauchen, auch nicht als Default. Tests
+  `Generate_xml_does_not_contain_HBSort_signature_or_filename_in_text_fields`
+  sichert das gegen Regression.
+- Wenn fuer FloatingPart spaeter ein Notes-Feld im Datenmodell ergaenzt
+  wird, kann es 1:1 in `<Comments>` mit einfliessen - der Helper ist
+  schon vorbereitet (`userNotes`-Parameter).
+
 #### Phase 7-Bugfix (UX-Iteration X.13b, 2026-05-04) — Lagerliste-Selektion ueber Property-Setter
 
 Bug: Klick auf eine einzelne Checkbox in der Lagerliste hat zwar den
