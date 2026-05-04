@@ -264,23 +264,33 @@ public partial class BsxExportDialog : Window
     {
         try
         {
-            // Vorab-Berechnung ueber den IStorageBinService - jetzt mit beiden
+            // Vorab-Berechnung ueber den IStorageBinService - mit beiden
             // ID-Listen, damit ein Bin nur dann als "wird leer" gilt wenn nach
             // dem Cleanup weder Minifigs noch FloatingParts mehr drin sind.
             var emptyBins = await _binService.FindBinsThatWouldBeEmptyAsync(
                 _minifigIds, _floatingIds);
             _emptyBinIdsAfterExport = emptyBins.Select(b => b.Id).ToList();
 
-            CleanupHeader.Text =
-                $"Export erfolgreich ({_minifigIds.Count} Figur(en) + " +
-                $"{_floatingIds.Count} Einzelteil-Eintraege -> {Path.GetFileName(_writtenPath)}).";
+            // UX X.13c: Header-Text gestrafft. Statt
+            // "Export erfolgreich (0 Figur(en) + 3 Einzelteil-Eintraege -> ...)"
+            // jetzt eine pro Item-Typ passende Variante - 0-Mengen werden nicht
+            // erwaehnt, das spart visuellen Laerm.
+            CleanupHeader.Text = "Export erfolgreich";
+            var fileName = Path.GetFileName(_writtenPath) ?? "(unbekannte Datei)";
+            var bodyParts = new List<string>();
+            if (_minifigIds.Count > 0)
+                bodyParts.Add($"{_minifigIds.Count} {(_minifigIds.Count == 1 ? "Figur" : "Figuren")}");
+            if (_floatingIds.Count > 0)
+                bodyParts.Add($"{_floatingIds.Count} {(_floatingIds.Count == 1 ? "Einzelteil" : "Einzelteile")}");
+            var bodyHead = bodyParts.Count == 0 ? "Nichts wurde" : string.Join(" + ", bodyParts) + " wurden";
             CleanupBody.Text =
-                "Sollen die exportierten Items jetzt aus HB-Sort entfernt werden? " +
-                "Floating-Parts mit Origin-Verbindung bleiben als lose Teile bestehen, " +
-                "die explizit ausgewaehlten Einzelteile werden komplett geloescht.";
-            ReleaseBinsLabel.Text = _emptyBinIdsAfterExport.Count > 0
-                ? $"Auch leere Lagerfaecher freigeben ({_emptyBinIdsAfterExport.Count} Faecher waeren leer)"
-                : "Auch leere Lagerfaecher freigeben (keine Faecher wuerden leer)";
+                $"{bodyHead} in {fileName} exportiert.\n\n" +
+                "Sollen die exportierten Items jetzt aus HB-Sort entfernt werden?\n\n" +
+                "(Bei \"Beibehalten\" bleiben sie in HB-Sort und koennen erneut exportiert werden.)";
+
+            // UX X.13c: Checkbox-Label zeigt die konkreten Bin-Namen - das ist
+            // viel informativer als nur eine Zahl.
+            ReleaseBinsLabel.Text = BuildReleaseBinsLabel(emptyBins);
             ReleaseBinsCheckbox.IsEnabled = _emptyBinIdsAfterExport.Count > 0;
             ReleaseBinsCheckbox.IsChecked = _emptyBinIdsAfterExport.Count > 0;
 
@@ -295,6 +305,34 @@ public partial class BsxExportDialog : Window
             CleanupPanel.Visibility = Visibility.Visible;
             ActionPanel.Visibility = Visibility.Collapsed;
         }
+    }
+
+    /// <summary>
+    /// UX X.13c: baut das Label fuer die "Lagerfaecher freigeben"-Checkbox.
+    ///   - 0 Bins:  "(keine Lagerfaecher wuerden frei)"
+    ///   - 1 Bin:   "Box 002 freigeben (wuerde leer)"
+    ///   - 2-3 Bins:"3 Lagerfaecher freigeben (Box 002, Box 005, Box 008)"
+    ///   - 4+ Bins: "5 Lagerfaecher freigeben (Box 002, Box 005, Box 008 ...)"
+    /// Bin-Namen aus dem Service-Result statt nur Anzahl - das ist viel
+    /// informativer fuer den User der jetzt sofort sieht WELCHE Faecher.
+    /// </summary>
+    private static string BuildReleaseBinsLabel(List<HBSort.Core.Models.StorageBin> emptyBins)
+    {
+        if (emptyBins.Count == 0)
+            return "(keine Lagerfaecher wuerden frei)";
+
+        var labels = emptyBins.Select(b => b.Label).ToList();
+
+        if (labels.Count == 1)
+            return $"{labels[0]} freigeben (wuerde leer)";
+
+        // Bei mehr als 3 nur die ersten 3 zeigen + "..."
+        const int maxShown = 3;
+        var shown = labels.Count <= maxShown
+            ? string.Join(", ", labels)
+            : string.Join(", ", labels.Take(maxShown)) + " ...";
+
+        return $"{labels.Count} Lagerfaecher freigeben ({shown})";
     }
 
     private void KeepFigures_Click(object sender, RoutedEventArgs e)
