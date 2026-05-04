@@ -69,6 +69,90 @@ public class InventoryListViewModelTests : IDisposable
         Assert.Equal(1, _sut.SelectedExportableCount);
     }
 
+    // ===== UX X.13b: realistische Property-getriebene Selektion =====
+    // Der echte Pfad bei einem Checkbox-Klick im DataGrid ist:
+    //   IsChecked-Toggle -> TwoWay-Binding setzt InventoryRowItem.IsSelected
+    //   -> Property-Setter feuert SelectionChanged -> VM ruft RecalculateSelection
+    // Diese Tests setzen IsSelected DIREKT (ohne manuelles RecalculateSelection)
+    // und pruefen ob der Counter trotzdem stimmt. Das fangen die alten Tests
+    // nicht ab, weil sie immer manuell RecalculateSelection() aufgerufen haben.
+
+    [Fact]
+    public void Setting_IsSelected_directly_updates_SelectedExportableCount()
+    {
+        var floating = MakeFloating(id: 1);
+        _sut.Items.Add(floating);
+
+        // KEIN manuelles RecalculateSelection - genau wie bei einem User-Klick.
+        floating.IsSelected = true;
+
+        Assert.Equal(1, _sut.SelectedExportableCount);
+        Assert.True(_sut.HasSelectedExportables);
+    }
+
+    [Fact]
+    public void Setting_IsSelected_on_multiple_rows_increments_count()
+    {
+        var f1 = MakeFloating(id: 1);
+        var f2 = MakeFloating(id: 2);
+        var c1 = MakeComplete(id: 3);
+        _sut.Items.Add(f1);
+        _sut.Items.Add(f2);
+        _sut.Items.Add(c1);
+
+        f1.IsSelected = true;
+        f2.IsSelected = true;
+        c1.IsSelected = true;
+
+        Assert.Equal(3, _sut.SelectedExportableCount);
+    }
+
+    [Fact]
+    public void Unsetting_IsSelected_decrements_count()
+    {
+        var f1 = MakeFloating(id: 1);
+        var f2 = MakeFloating(id: 2);
+        _sut.Items.Add(f1);
+        _sut.Items.Add(f2);
+        f1.IsSelected = true;
+        f2.IsSelected = true;
+        Assert.Equal(2, _sut.SelectedExportableCount);
+
+        f1.IsSelected = false;
+
+        Assert.Equal(1, _sut.SelectedExportableCount);
+    }
+
+    [Fact]
+    public void Setting_IsSelected_fires_PropertyChanged_for_SelectedExportableCount()
+    {
+        var floating = MakeFloating(id: 1);
+        _sut.Items.Add(floating);
+
+        var raised = new List<string?>();
+        _sut.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        floating.IsSelected = true;
+
+        Assert.Contains(nameof(_sut.SelectedExportableCount), raised);
+        Assert.Contains(nameof(_sut.HasSelectedExportables), raised);
+    }
+
+    [Fact]
+    public void Removing_a_row_unsubscribes_so_late_changes_are_ignored()
+    {
+        // Wenn eine Zeile aus Items entfernt wird (z.B. nach Reload), darf ein
+        // spaeteres IsSelected-Toggle den Counter nicht mehr beeinflussen -
+        // sonst kriegen wir Geister-Selektionen aus alten Items.
+        var floating = MakeFloating(id: 1);
+        _sut.Items.Add(floating);
+        _sut.Items.Remove(floating);
+
+        floating.IsSelected = true;
+
+        Assert.Equal(0, _sut.SelectedExportableCount);
+    }
+
     [Fact]
     public void OnlyCompleteSelected_HasSelectedExportables_isTrue()
     {

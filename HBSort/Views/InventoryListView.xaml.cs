@@ -40,15 +40,6 @@ public partial class InventoryListView : UserControl
     }
 
     /// <summary>
-    /// Nach jedem Klick auf eine Auswahl-Checkbox (Komplett-Figur ODER Einzelteil)
-    /// den globalen Counter (SelectedExportableCount) im VM neu berechnen.
-    /// </summary>
-    private void CompleteSelect_Click(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is InventoryListViewModel vm) vm.RecalculateSelection();
-    }
-
-    /// <summary>
     /// Phase 7 + UX X.6: oeffnet den BSX-Export-Dialog mit den aktuell selektierten
     /// kompletten Figuren UND Einzelteilen. Beide Listen werden separat an den
     /// Dialog uebergeben - der zeigt sie in zwei Sektionen an und exportiert beides

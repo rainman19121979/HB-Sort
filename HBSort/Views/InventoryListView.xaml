@@ -140,8 +140,17 @@
                 <DataGridTemplateColumn Header="Aus..." Width="60" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
+                            <!--
+                                UX X.13b (Bugfix): Click-Handler weg. Selektion
+                                laeuft jetzt ueber den IsSelected-Setter im
+                                ViewModel-Item -> SelectionChanged-Event ->
+                                Parent-VM-RecalculateSelection. WPF-DataGrid
+                                mit IsReadOnly=True frisst den CheckBox-Click-
+                                Event nicht zuverlaessig; der Property-Pfad
+                                triggert dagegen unabhaengig von Maus/Tastatur/
+                                Code-Set immer.
+                            -->
                             <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                      Click="CompleteSelect_Click"
                                       HorizontalAlignment="Center"
                                       VerticalAlignment="Center"
                                       ToolTip="Fuer BSX-Export auswaehlen">

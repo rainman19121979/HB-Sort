@@ -140,6 +140,12 @@ public partial class InventoryListViewModel : ObservableObject
         ItemsView = CollectionViewSource.GetDefaultView(Items);
         ItemsView.Filter = RowFilter;
 
+        // UX X.13b (Bugfix): Auf jede Row die in Items reinkommt subscriben,
+        // damit ihr SelectionChanged-Event den Counter neu berechnet. Bei
+        // Remove/Reset wieder unsubscriben - sonst halten alte Items das VM
+        // wachsam und veraltete Selektionen koennten den Counter verfaelschen.
+        Items.CollectionChanged += OnItemsCollectionChanged;
+
         // Auto-Refresh
         persistence.DataChanged += (_, _) =>
         {
@@ -150,6 +156,29 @@ public partial class InventoryListViewModel : ObservableObject
                 _ = LoadAsync();
         };
     }
+
+    private void OnItemsCollectionChanged(
+        object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        // Add/Remove: punktgenau subscriben/unsubscriben.
+        if (e.NewItems != null)
+            foreach (InventoryRowItem r in e.NewItems)
+                r.SelectionChanged += OnRowSelectionChanged;
+        if (e.OldItems != null)
+            foreach (InventoryRowItem r in e.OldItems)
+                r.SelectionChanged -= OnRowSelectionChanged;
+
+        // Reset (z.B. Items.Clear()): Items-Snapshot ist hier leer, wir
+        // koennen die alten Subscriptions nicht mehr enumerieren. Das ist
+        // ok weil die Rows danach nicht mehr referenziert sind und der GC
+        // sie samt ihrer Event-Subscriptions abraeumt - solange das VM
+        // selbst nicht laenger lebt als die Rows. Im normalen LoadAsync-
+        // Pfad rufen wir aber Items.Remove pro Item statt Clear; Reset
+        // tritt hier praktisch nicht auf.
+    }
+
+    private void OnRowSelectionChanged(object? sender, EventArgs e)
+        => RecalculateSelection();
 
     partial void OnSearchTextChanged(string value) => RefreshView();
     partial void OnShowCompleteChanged(bool value) => RefreshView();
@@ -386,6 +415,26 @@ public partial class InventoryRowItem : ObservableObject
     /// </summary>
     [ObservableProperty]
     private bool _isSelected;
+
+    /// <summary>
+    /// UX X.13b (Bugfix): wird gefeuert sobald sich <see cref="IsSelected"/>
+    /// aendert - egal ob durch User-Klick (TwoWay-Binding), Bulk-Aktion oder
+    /// Code-set. Das uebergeordnete <c>InventoryListViewModel</c> abonniert das
+    /// und ruft <c>RecalculateSelection()</c> auf. So entkoppeln wir den
+    /// Selektions-Pfad vom Click-Handler im Code-Behind, der bei
+    /// IsReadOnly-DataGrid + CheckBox-Cell-Template nicht zuverlaessig feuert.
+    /// </summary>
+    public event EventHandler? SelectionChanged;
+
+    /// <summary>
+    /// CommunityToolkit-Mvvm-Hook: ruft sich selbststaendig nach dem Setter
+    /// von IsSelected. Wir feuern hier das SelectionChanged-Event damit der
+    /// Parent-VM den Counter neu berechnen kann.
+    /// </summary>
+    partial void OnIsSelectedChanged(bool value)
+    {
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     public static InventoryRowItem FromMinifig(TrackedMinifig m, int rowNum)
     {
