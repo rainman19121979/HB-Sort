@@ -21,9 +21,11 @@ namespace HBSort.ViewModels;
 /// Bewusst klein gehalten: keine Suche, kein Caching - die Inhalte sind
 /// klein (paar Kilobyte pro Kapitel) und das Rendering ist instant.
 ///
-/// TODO (spaetere Iteration): Such-Funktion ueber Kapitel-Inhalte. Idee:
+/// TODO 2026-05 (UX-Politur): Such-Funktion ueber Kapitel-Inhalte. Idee:
 /// Eingabefeld in der Sidebar -> filtere Kapitel deren Markdown-Quelltext
-/// (case-insensitive) den Suchstring enthaelt.
+/// (case-insensitive) den Suchstring enthaelt; Treffer-Kapitel oben in der
+/// Liste, andere ausgrauen. Bewusst aufgeschoben weil 7 Kapitel zur Zeit
+/// auch ohne Suche gut ueberschaubar sind.
 /// </summary>
 public partial class HelpViewModel : ObservableObject
 {

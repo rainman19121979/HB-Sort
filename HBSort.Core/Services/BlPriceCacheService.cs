@@ -23,11 +23,13 @@ public class BlPriceCacheService : IBlPriceCacheService
 {
     /// <summary>
     /// User-sichtbarer Hinweis-Text wenn der Provider in den Settings noch
-    /// auf "None" steht (Default fuer Neuinstallationen). Plan C.
-    /// TODO (spaetere Iteration): klickbarer "Einstellungen oeffnen"-Button
+    /// auf "None" steht (Default fuer Neuinstallationen).
+    ///
+    /// TODO 2026-05 (UX-Politur): klickbarer "Einstellungen oeffnen"-Button
     /// in der MinifigPriceView, der den Settings-Dialog auf den Preise-Tab
-    /// vorgewaehlt oeffnet. Dafuer waere ein INavigationService noetig - im
-    /// aktuellen Bugfix-Scope absichtlich weggelassen.
+    /// vorgewaehlt oeffnet. Braucht einen INavigationService den Core-Services
+    /// nicht direkt referenzieren sollten (UI-Konzern). Bewusst aufgeschoben
+    /// auf eine eigene Iteration; aktuell ist der Hinweistext der Workaround.
     /// </summary>
     public const string ProviderNotConfiguredMessage =
         "Preise nicht verfuegbar - Provider noch nicht eingerichtet. " +
