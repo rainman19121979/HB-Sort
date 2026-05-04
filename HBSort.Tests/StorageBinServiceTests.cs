@@ -266,6 +266,114 @@ public class StorageBinServiceTests : IDisposable
         Assert.Single(resultBoth);
     }
 
+    // ===== UX X.13c (User-Bug-Repro): 3 FloatingParts + 0 Minifigs =====
+    // Genau das vom User per Screenshot gemeldete Szenario - drei Einzelteile
+    // in einem Lagerfach, kein Minifig drin. Vor-Pruefung muss das Bin als
+    // "wuerde leer" melden, sonst ist die UI-Checkbox ausgegraut.
+
+    [Fact]
+    public async Task FindBinsThatWouldBeEmpty_three_floatings_no_minifigs()
+    {
+        var bin = await _sut.CreateSingleAsync("Box 002");
+        await SeedFloatingPartInBinAsync(bin.Id, "3001", 5);
+        await SeedFloatingPartInBinAsync(bin.Id, "3024", 3);
+        await SeedFloatingPartInBinAsync(bin.Id, "3622", 1);
+
+        await using var ctx = await _factory.CreateDbContextAsync();
+        var fpIds = await ctx.FloatingParts.Select(p => p.Id).ToListAsync();
+        Assert.Equal(3, fpIds.Count);
+
+        var result = await _sut.FindBinsThatWouldBeEmptyAsync(
+            Array.Empty<int>(), fpIds);
+
+        Assert.Single(result);
+        Assert.Equal("Box 002", result[0].Label);
+    }
+
+    [Fact]
+    public async Task FindBinsThatWouldBeEmpty_skips_bin_with_unrelated_floating_left_behind()
+    {
+        // Realistischer Edge-Case: 3 Einzelteile sollen exportiert werden,
+        // aber im Bin liegt noch ein VIERTES Einzelteil das nicht in der
+        // Export-Liste ist. Das Bin wird also NICHT leer.
+        var bin = await _sut.CreateSingleAsync("Box 002");
+        await SeedFloatingPartInBinAsync(bin.Id, "3001", 5);
+        await SeedFloatingPartInBinAsync(bin.Id, "3024", 3);
+        await SeedFloatingPartInBinAsync(bin.Id, "3622", 1);
+        await SeedFloatingPartInBinAsync(bin.Id, "9999", 1);  // bleibt!
+
+        await using var ctx = await _factory.CreateDbContextAsync();
+        // Nur die ersten 3 in den Export-Pfad geben.
+        var fpIds = await ctx.FloatingParts
+            .Where(p => p.PartNumber != "9999")
+            .Select(p => p.Id)
+            .ToListAsync();
+        Assert.Equal(3, fpIds.Count);
+
+        var result = await _sut.FindBinsThatWouldBeEmptyAsync(
+            Array.Empty<int>(), fpIds);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task FindBinsThatWouldBeEmpty_skips_bin_with_waiting_minifig()
+    {
+        // Box hat einen FloatingPart (wird exportiert) UND eine Wartende
+        // Minifig (bleibt). Das Bin darf NICHT als leer gelten.
+        var bin = await _sut.CreateSingleAsync("Box 002");
+        await SeedFloatingPartInBinAsync(bin.Id, "3001", 5);
+        await SeedMinifigInBinAsync(bin.Id, "arc007", TrackedMinifigStatus.Waiting);
+
+        await using var ctx = await _factory.CreateDbContextAsync();
+        var fpId = (await ctx.FloatingParts.SingleAsync()).Id;
+
+        var result = await _sut.FindBinsThatWouldBeEmptyAsync(
+            Array.Empty<int>(), new[] { fpId });
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task End_to_end_release_after_floating_only_export_marks_bin_as_freed()
+    {
+        // Komplettes End-to-End fuer den User-Pfad:
+        // 1) Box 002 mit 3 FloatingParts.
+        // 2) Vor-Pruefung sagt: Bin wird leer.
+        // 3) FloatingParts loeschen (simuliert RemoveExportedFloatingPartsAsync).
+        // 4) ReleaseBins ruft.
+        // 5) Bin in DB hat FreedAt != null.
+        var bin = await _sut.CreateSingleAsync("Box 002");
+        await SeedFloatingPartInBinAsync(bin.Id, "3001", 5);
+        await SeedFloatingPartInBinAsync(bin.Id, "3024", 3);
+        await SeedFloatingPartInBinAsync(bin.Id, "3622", 1);
+
+        await using (var ctx = await _factory.CreateDbContextAsync())
+        {
+            var fpIds = await ctx.FloatingParts.Select(p => p.Id).ToListAsync();
+
+            // Schritt 2: Vor-Pruefung
+            var preview = await _sut.FindBinsThatWouldBeEmptyAsync(
+                Array.Empty<int>(), fpIds);
+            Assert.Single(preview);
+            Assert.Equal("Box 002", preview[0].Label);
+
+            // Schritt 3: FloatingParts loeschen (vereinfachter Cleanup;
+            // im Production-Code laeuft RemoveExportedFloatingPartsAsync).
+            ctx.FloatingParts.RemoveRange(ctx.FloatingParts);
+            await ctx.SaveChangesAsync();
+        }
+
+        // Schritt 4: ReleaseBins.
+        var released = await _sut.ReleaseBinsAsync(new[] { bin.Id });
+        Assert.Equal(1, released);
+
+        // Schritt 5: FreedAt ist gesetzt.
+        await using var ctx2 = await _factory.CreateDbContextAsync();
+        var fromDb = await ctx2.StorageBins.SingleAsync(b => b.Id == bin.Id);
+        Assert.NotNull(fromDb.FreedAt);
+    }
+
     [Fact]
     public async Task ReleaseBins_sets_FreedAt_only_for_unreleased_bins()
     {
