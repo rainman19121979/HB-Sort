@@ -26,9 +26,13 @@
         <TabControl Grid.Row="0">
 
             <!-- ====================================== -->
-            <!-- TAB 1: ALLGEMEIN (Kamera, Schwellwerte) -->
+            <!-- TAB 1: ERKENNUNG (UX X.11)
+                 Kamera-Auswahl, Erkennungs-Schwellwerte, Timing, Sound.
+                 War frueher der "Allgemein"-Tab; aufgeteilt damit das Thema
+                 fokussiert bleibt. Der Tooltips-Toggle wandert in den
+                 separaten "Darstellung"-Tab. -->
             <!-- ====================================== -->
-            <TabItem Header="Allgemein">
+            <TabItem Header="Erkennung">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
                     <StackPanel>
 
@@ -153,34 +157,33 @@
                                   IsChecked="{Binding SoundEnabled}"
                                   ToolTip="Spielt einen kurzen Ton bei jedem Scan ab. Standard: aus."/>
 
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ====================================== -->
+            <!-- TAB 2: DARSTELLUNG (UX X.11)
+                 Aktuell nur der Tooltips-Toggle. Bewusst eigener Tab statt
+                 Unter-Sektion des Erkennungs-Tabs - Darstellungs-Settings
+                 sind ein anderes Thema und sollen in zukuenftigen Iterationen
+                 hier ergaenzt werden koennen (z.B. Theme-Wahl, Akzentfarbe).
+                 Darstellungsdichte (Compact/Normal/Comfortable) wurde in
+                 dieser Iteration entfernt - das Compact-Profil ist jetzt
+                 fester Stand. -->
+            <!-- ====================================== -->
+            <TabItem Header="Darstellung">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
+                    <StackPanel>
+
+                        <TextBlock Text="Tooltips" FontSize="16" FontWeight="SemiBold"/>
+
                         <CheckBox Content="Tooltips anzeigen"
                                   IsChecked="{Binding ShowTooltips}"
-                                  Margin="0,8,0,0"
+                                  Margin="0,4,0,0"
                                   ToolTip="Zeigt erklaerende Hinweise wenn du mit der Maus ueber Buttons und Felder faehrst."/>
                         <TextBlock Text="Tooltips ueberall in der App. Standard: an. Wirkt sofort, kein Neustart noetig."
                                    Foreground="Gray" FontSize="11" FontStyle="Italic"
                                    Margin="24,0,0,0"/>
-
-                        <!-- Hinweis: BrickLink-Bilder Konfiguration ist jetzt im Tab "Bild-Cache" -->
-                        <TextBlock Text="(Bild-Cache und BrickLink-Bilder: siehe Tab &quot;Bild-Cache&quot;)"
-                                   Foreground="Gray" FontSize="11" FontStyle="Italic"
-                                   Margin="0,4,0,0"/>
-
-                        <!-- Preis-Tool URL (ausgegraut bis Phase 8) -->
-                        <Grid Opacity="0.5" IsEnabled="False">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="150"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Preis-Tool URL:"
-                                       VerticalAlignment="Center"
-                                       ToolTip="Kommt in einer zukuenftigen Version."/>
-                            <TextBox Grid.Column="1"
-                                     Text="{Binding PriceToolUrl}"
-                                     IsReadOnly="True"/>
-                        </Grid>
-                        <TextBlock Text="(Preis-Tool wird in einer zukünftigen Version verfügbar)"
-                                   Foreground="Gray" FontSize="11" FontStyle="Italic"/>
 
                     </StackPanel>
                 </ScrollViewer>
