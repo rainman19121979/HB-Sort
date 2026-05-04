@@ -60,9 +60,21 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="KOMPLETTE FIGUR"
-                           FontSize="10" FontWeight="SemiBold"
-                           Foreground="Gray"/>
+                <StackPanel Grid.Row="0" Orientation="Vertical">
+                    <TextBlock Text="KOMPLETTE FIGUR"
+                               FontSize="10" FontWeight="SemiBold"
+                               Foreground="Gray"/>
+                    <!--
+                        Bugfix Phase-8 #3: Hinweis dass die angezeigten Werte
+                        bereits die User-Korrektur enthalten. Unsichtbar wenn
+                        Korrektur=0.
+                    -->
+                    <TextBlock Text="{Binding MinifigCorrectionHint}"
+                               FontSize="10" Foreground="#1565C0"
+                               FontStyle="Italic" Margin="0,1,0,0"
+                               Visibility="{Binding HasMinifigCorrectionHint,
+                                   Converter={StaticResource BoolToVisibility}}"/>
+                </StackPanel>
 
                 <!-- Loader -->
                 <ProgressBar Grid.Row="1" Height="2" IsIndeterminate="True"
@@ -74,8 +86,10 @@
                 <StackPanel Grid.Row="2" Margin="0,8,0,0"
                             Visibility="{Binding CompleteHasPrice,
                                 Converter={StaticResource BoolToVisibility}}">
+                    <!-- Tooltip zeigt Roh + Korrigiert wenn Korrektur != 0 -->
                     <TextBlock Text="{Binding CompletePriceLabel}"
-                               FontSize="22" FontWeight="SemiBold"/>
+                               FontSize="22" FontWeight="SemiBold"
+                               ToolTip="{Binding CompletePriceTooltip}"/>
                     <TextBlock Text="{Binding CompleteMinMaxLabel}"
                                FontSize="11" Foreground="Gray"
                                Margin="0,2,0,0"/>
@@ -105,9 +119,17 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="EINZELTEILE AUFSUMMIERT"
-                           FontSize="10" FontWeight="SemiBold"
-                           Foreground="Gray"/>
+                <StackPanel Grid.Row="0" Orientation="Vertical">
+                    <TextBlock Text="EINZELTEILE AUFSUMMIERT"
+                               FontSize="10" FontWeight="SemiBold"
+                               Foreground="Gray"/>
+                    <!-- Bugfix Phase-8 #3: dito wie linke Haelfte. -->
+                    <TextBlock Text="{Binding PartsCorrectionHint}"
+                               FontSize="10" Foreground="#1565C0"
+                               FontStyle="Italic" Margin="0,1,0,0"
+                               Visibility="{Binding HasPartsCorrectionHint,
+                                   Converter={StaticResource BoolToVisibility}}"/>
+                </StackPanel>
 
                 <ProgressBar Grid.Row="1" Height="2" IsIndeterminate="True"
                              Margin="0,4,0,0"
@@ -120,7 +142,8 @@
                     <ItemsControl ItemsSource="{Binding PartRows}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Grid Margin="0,0,0,2">
+                                <Grid Margin="0,0,0,2"
+                                      ToolTip="{Binding UnitPriceTooltip}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>

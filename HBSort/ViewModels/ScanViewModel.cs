@@ -807,7 +807,7 @@ public partial class ScanViewModel : ObservableObject
                     QuantityNeeded: p.Quantity,
                     PartName: p.PartName))
                 .ToList();
-            PriceInfo = new MinifigPriceViewModel(_priceCache, bricklinkId, priceSubsets);
+            PriceInfo = new MinifigPriceViewModel(_priceCache, _settingsService, bricklinkId, priceSubsets);
             // Fire-and-forget; das VM hat eigene IsLoading-Flags.
             _ = PriceInfo.LoadAsync();
 

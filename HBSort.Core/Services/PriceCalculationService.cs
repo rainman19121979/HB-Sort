@@ -83,17 +83,14 @@ public class PriceCalculationService : IPriceCalculationService
         foreach (var t in partTasks) partPrices.Add(await t);
 
         // Spalte aus Settings ableiten (fuer beide Seiten gleich).
-        decimal? PickValue(PriceResult? p) => p == null ? null : cfg.PriceColumn switch
-        {
-            "min" => p.MinPrice,
-            "avg" => p.AvgPrice,
-            "max" => p.MaxPrice,
-            _     => p.QtyAvgPrice ?? p.AvgPrice    // qty_avg ggf. fallback
-        };
+        // Bugfix Phase-8 #3: liegt jetzt in PriceMath (gemeinsam mit dem
+        // WPF-VM) damit die beiden Pfade nicht auseinanderlaufen koennen.
+        decimal? PickValue(PriceResult? p) => PriceMath.PickValue(p, cfg.PriceColumn);
 
         // Minifig: Roh + Korrektur.
         var minifigRaw = PickValue(minifigPrice);
-        var correctedMinifig = ApplyCorrection(minifigRaw, cfg.CorrectionMinifigPercent);
+        var correctedMinifig = PriceMath.ApplyCorrectionOrZero(
+            minifigRaw ?? 0m, cfg.CorrectionMinifigPercent);
 
         // Parts: Summe ueber alle Required (qty * Preis), null-Werte zaehlen wir mit.
         decimal? partsRawSum = null;
@@ -114,7 +111,7 @@ public class PriceCalculationService : IPriceCalculationService
             }
         }
         var correctedParts = partsRawSum.HasValue
-            ? ApplyCorrection(partsRawSum.Value, cfg.CorrectionPartsPercent)
+            ? PriceMath.ApplyCorrectionOrZero(partsRawSum.Value, cfg.CorrectionPartsPercent)
             : 0m;
 
         // Empfehlung. Nur wenn beide Seiten Daten haben.
@@ -155,11 +152,4 @@ public class PriceCalculationService : IPriceCalculationService
         };
     }
 
-    /// <summary>Wendet einen Prozent-Korrekturfaktor an (-10 = 10% Abschlag).</summary>
-    private static decimal ApplyCorrection(decimal? raw, decimal correctionPercent)
-    {
-        if (!raw.HasValue) return 0m;
-        var factor = 1m + correctionPercent / 100m;
-        return Math.Round(raw.Value * factor, 2, MidpointRounding.AwayFromZero);
-    }
 }
