@@ -4,21 +4,19 @@
              xmlns:views="clr-namespace:HBSort.Views"
              xmlns:b="clr-namespace:HBSort.Behaviors">
     <!--
-        Phase X: extrahierte UserControl fuer den Sortier-Tab im Hauptfenster.
-        DataContext wird vom Parent (MainWindow / TabItem) geerbt = MainViewModel.
-        GridSplitter-Persistierung (col/row-Sizes) erfolgt im Code-Behind via App.Services.
+        Sortier-Tab-Layout (UX X.19 Teil 3a refactor).
+
+        Outer-Grid: 1 Row, 5 Spalten (Col / Splitter / Col / Splitter / Col).
+        Jede der 3 Inhalts-Spalten ist ein eigenes Subgrid mit 3 Zeilen
+        (oben / Splitter / unten), sodass die Hoehen pro Spalte unabhaengig
+        verschiebbar sind.
+
+        Persistierung (UX X.19 Teil 3b): die Splitter-Verhaeltnisse werden
+        beim DragCompleted in AppSettings.SortingTabLayout gespeichert und
+        beim Loaded auf die GridDefinitions angewendet (siehe Code-Behind).
     -->
     <Grid x:Name="MainQuadrantsGrid">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="65*" x:Name="TopRow"/>
-            <RowDefinition Height="5"/>
-            <RowDefinition Height="35*" x:Name="BottomRow"/>
-        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <!-- 3 gleich breite Spalten (UX-Iteration X.4):
-                 LeftCol  = Webcam + Brickognize-Vorschlaege
-                 MidCol   = MinifigDetail / PartLookup + Tabs
-                 RightCol = neue freie Boxen (Inhalt kommt spaeter) -->
             <ColumnDefinition Width="*" x:Name="LeftCol"/>
             <ColumnDefinition Width="5"/>
             <ColumnDefinition Width="*" x:Name="MidCol"/>
@@ -26,435 +24,409 @@
             <ColumnDefinition Width="*" x:Name="RightCol"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Vertikaler Splitter zwischen Col1 und Col2 -->
-        <GridSplitter Grid.Row="0" Grid.RowSpan="3" Grid.Column="1"
+        <!-- ===== Vertikale Splitter zwischen den drei Spalten ===== -->
+        <GridSplitter Grid.Column="1"
                       Width="5"
                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                       Background="Transparent"
                       ShowsPreview="True"
                       ResizeBehavior="PreviousAndNext"
                       Cursor="SizeWE"
-                      DragCompleted="ColumnSplitter_DragCompleted"/>
-
-        <!-- Vertikaler Splitter zwischen Col2 und Col3 -->
-        <GridSplitter Grid.Row="0" Grid.RowSpan="3" Grid.Column="3"
+                      DragCompleted="VerticalSplitter1_DragCompleted"/>
+        <GridSplitter Grid.Column="3"
                       Width="5"
                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                       Background="Transparent"
                       ShowsPreview="True"
                       ResizeBehavior="PreviousAndNext"
                       Cursor="SizeWE"
-                      DragCompleted="ColumnSplitter2_DragCompleted"/>
+                      DragCompleted="VerticalSplitter2_DragCompleted"/>
 
-        <!-- UX X.18: Horizontaler Splitter zwischen den 65*/35*-Outer-Rows.
-             Erstreckt sich nur ueber Col0 + Col2 (Spalte 1+2). Spalte 3 hat
-             ein eigenes Subgrid mit RowSpan=3 und einen eigenen horizontalen
-             Splitter im Subgrid (siehe unten). Der Splitter persistiert das
-             Verhaeltnis aktuell NICHT - das ist eine bewusste Vereinfachung,
-             damit der User es nur situativ verschieben kann; beim naechsten
-             Start ist wieder 65/35. -->
-        <GridSplitter Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
-                      Height="5"
-                      HorizontalAlignment="Stretch" VerticalAlignment="Center"
-                      Background="Transparent"
-                      ShowsPreview="True"
-                      ResizeBehavior="PreviousAndNext"
-                      Cursor="SizeNS"/>
-
-        <!-- ===== OBEN-LINKS (R0,C0): Webcam-Bereich ===== -->
-        <Border Grid.Row="0" Grid.Column="0"
-                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                BorderThickness="1" CornerRadius="4" Padding="8">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <Image Grid.Row="0"
-                       Source="{Binding ScanViewModel.CurrentFrame}"
-                       Stretch="Uniform"
-                       MinHeight="240" MaxHeight="600"
-                       RenderOptions.BitmapScalingMode="NearestNeighbor"
-                       ToolTip="Live-Bild deiner USB-Webcam. Halte hier Teile oder Figuren rein."/>
-
-                <TextBlock Grid.Row="0"
-                           Text="Kein Kamerabild verfuegbar"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center"
-                           FontSize="16" Foreground="Gray"
-                           Visibility="{Binding ScanViewModel.IsCameraRunning,
-                               Converter={StaticResource InverseBoolToVisibility}}"/>
-
-                <!-- Steuerleiste: Kamera- und Modus-Auswahl wurden entfernt
-                     (Kamera nur noch in Settings, Modus fest auf Auto). -->
-                <StackPanel Grid.Row="1" Margin="8">
-                    <Button Content="Scannen (Leertaste)"
-                            Command="{Binding ScanViewModel.PerformScanCommand}"
-                            IsEnabled="{Binding ScanViewModel.CanScan}"
-                            HorizontalAlignment="Stretch"
-                            Margin="0,0,0,4"
-                            ToolTip="Druecke die Leertaste oder klick hier, um zu scannen."/>
-
-                    <TextBlock Text="{Binding ScanViewModel.ScanStatusText}"
-                               Foreground="Gray" FontSize="12"
-                               HorizontalAlignment="Center"/>
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <!-- ===== OBEN-RECHTS (R0,C2): Aktive Figur (MinifigDetailView) ===== -->
-        <Border Grid.Row="0" Grid.Column="2"
-                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                BorderThickness="1" CornerRadius="4">
-            <Grid>
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <StackPanel.Style>
-                        <Style TargetType="StackPanel">
-                            <Setter Property="Visibility" Value="Visible"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding ScanViewModel.HasPendingMinifig}" Value="True">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding ScanViewModel.HasPendingPart}" Value="True">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </StackPanel.Style>
-                    <TextBlock Text="Scanne eine Figur oder ein Teil"
-                               FontSize="13"
-                               FontWeight="SemiBold"
-                               HorizontalAlignment="Center"
-                               Foreground="Gray"/>
-                    <TextBlock Text="Druecke Leertaste oder klicke 'Scannen'"
-                               FontSize="10"
-                               Foreground="Gray"
-                               HorizontalAlignment="Center"
-                               Margin="0,4,0,0"/>
-                </StackPanel>
-
-                <!--
-                    Kein aeusserer ScrollViewer hier! MinifigDetailView hat intern
-                    bereits einen ScrollViewer nur fuer die Teileliste (MaxHeight 320).
-                    Ein zweiter ScrollViewer wuerde dazu fuehren dass die Footer-
-                    Buttons (Verwerfen / In-Fach-legen) aus dem sichtbaren Bereich
-                    scrollen.
-                -->
-                <ContentControl Padding="6"
-                                DataContext="{Binding ScanViewModel.PendingMinifig}"
-                                Visibility="{Binding DataContext.ScanViewModel.HasPendingMinifig,
-                                    RelativeSource={RelativeSource AncestorType=Grid},
-                                    Converter={StaticResource BoolToVisibility}}">
-                    <views:MinifigDetailView/>
-                </ContentControl>
-
-                <!-- PartLookupView kein aeusserer ScrollViewer - die View hat intern
-                     einen ScrollViewer fuer den Wartende-/BL-Catalog-Block, damit die
-                     Aktion-Buttons unten immer sichtbar bleiben.
-                     Content (statt DataContext) damit Visibility weiter im MainViewModel-
-                     Kontext gebunden bleibt; ContentTemplate setzt den DataContext fuer
-                     die PartLookupView dann ueber den Content auf PendingPart. -->
-                <ContentControl Content="{Binding ScanViewModel.PendingPart}"
-                                Padding="6"
-                                Visibility="{Binding ScanViewModel.HasPendingPart,
-                                    Converter={StaticResource BoolToVisibility}}">
-                    <ContentControl.ContentTemplate>
-                        <DataTemplate>
-                            <views:PartLookupView/>
-                        </DataTemplate>
-                    </ContentControl.ContentTemplate>
-                </ContentControl>
-            </Grid>
-        </Border>
-
-        <!-- ===== UNTEN-LINKS (R2,C0): Brickognize-Vorschlaege ===== -->
-        <Border Grid.Row="2" Grid.Column="0"
-                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                BorderThickness="1" CornerRadius="4"
-                Padding="8">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-
-                <TextBlock Grid.Row="0" Text="BRICKOGNIZE-VORSCHLAEGE"
-                           FontSize="13" FontWeight="SemiBold"
-                           Margin="0,0,0,8"/>
-
-                <TextBlock Grid.Row="1"
-                           Text="Hier erscheinen die Brickognize-Vorschlaege nach einem Scan"
-                           Foreground="Gray" FontStyle="Italic"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                           Visibility="{Binding ScanViewModel.HasResults,
-                               Converter={StaticResource InverseBoolToVisibility}}"/>
-
-                <Grid Grid.Row="1"
-                      Visibility="{Binding ScanViewModel.HasResults, Converter={StaticResource BoolToVisibility}}">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-
-                    <Grid Grid.Row="0" Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0"
-                                   Text="{Binding ScanViewModel.ResultHeadlineText}"
-                                   FontSize="11"
-                                   FontWeight="SemiBold"/>
-                        <Button Grid.Column="1"
-                                Content="Manuelle Suche..."
-                                Visibility="{Binding ScanViewModel.ShowSearchFallback, Converter={StaticResource BoolToVisibility}}"
-                                Click="SearchFallback_Click"
-                                ToolTip="Oeffnet eine manuelle Suche fuer den Fall, dass Brickognize nichts erkannt hat."/>
-                    </Grid>
-
-                    <Border Grid.Row="1" Margin="0,0,0,8"
-                            Padding="8"
-                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                            BorderThickness="1" CornerRadius="4"
-                            Visibility="{Binding ScanViewModel.HasColors,
-                                 Converter={StaticResource BoolToVisibility}}">
-                        <StackPanel>
-                            <TextBlock Text="Erkannte Farbe(n)"
-                                       FontSize="10"
-                                       FontWeight="SemiBold"
-                                       Margin="0,0,0,6"/>
-                            <ItemsControl ItemsSource="{Binding ScanViewModel.RecognizedColors}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal"/>
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Margin="0,0,12,0"
-                                                Padding="6,4"
-                                                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                                                BorderThickness="1"
-                                                CornerRadius="4">
-                                            <StackPanel Orientation="Horizontal">
-                                                <Border Width="20" Height="20"
-                                                        Background="{Binding SwatchBrush}"
-                                                        BorderBrush="Black" BorderThickness="1"
-                                                        Margin="0,0,8,0"/>
-                                                <TextBlock Text="{Binding DisplayLabel}"
-                                                           VerticalAlignment="Center"
-                                                           Margin="0,0,8,0"/>
-                                                <TextBlock Text="{Binding ScoreText}"
-                                                           FontWeight="SemiBold"
-                                                           VerticalAlignment="Center"
-                                                           Foreground="Gray"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </Border>
-
-                    <!--
-                        UX X.15 Teil 2: Klick-Trennung zwischen Bild-Zoom und
-                        Auswahl. Vorher war das ganze Border als MouseLeftButtonUp-
-                        Click markiert; das hat sich mit dem Image-Zoom (b:ImageZoom)
-                        ueberlappt - Klick aufs Bild loeste theoretisch beides aus.
-                        Jetzt:
-                          - Bild -> nur Zoom-Overlay (ToolTip "Vergroessern")
-                          - "Uebernehmen"-Button -> SelectCardAsync (ToolTip
-                            "Diese Erkennung uebernehmen")
-                          - Karten-Hintergrund neutral, kein Cursor=Hand mehr.
-                          - Gruener Border bei IsSelected bleibt.
-                    -->
-                    <ItemsControl Grid.Row="2" ItemsSource="{Binding ScanViewModel.ResultCards}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <UniformGrid Rows="1" Columns="3"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <!--
-                                    Audit W-11: Border-Optik kommt jetzt rein
-                                    aus DataTriggers auf bool-Properties; das
-                                    ScanResultCard-VM hat keine WPF-Brush-
-                                    Properties mehr.
-                                    Defaults: graue duenne Linie. Bei IsTopHit
-                                    oder IsSelected: gruener 3px-Border.
-                                -->
-                                <Border CornerRadius="4"
-                                        Padding="6" Margin="4"
-                                        Background="Transparent">
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Setter Property="BorderBrush"
-                                                    Value="{DynamicResource SystemControlForegroundBaseLowBrush}"/>
-                                            <Setter Property="BorderThickness" Value="1"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsTopHit}" Value="True">
-                                                    <Setter Property="BorderBrush" Value="#4CAF50"/>
-                                                    <Setter Property="BorderThickness" Value="3"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                    <Setter Property="BorderBrush" Value="#4CAF50"/>
-                                                    <Setter Property="BorderThickness" Value="3"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <!--
-                                                Bild-Zeile: "*" statt fixer Hoehe, damit das Bild
-                                                mit dem verfuegbaren Platz mitskaliert und nicht
-                                                abgeschnitten wird wenn das Fenster klein ist.
-                                                MaxHeight begrenzt es nach oben auf 200px.
-                                            -->
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-
-                                        <Image Grid.Row="0"
-                                               Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
-                                               Stretch="Uniform"
-                                               MaxHeight="200"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               b:ImageZoom.IsEnabled="True"
-                                               ToolTip="Vergroessern"/>
-
-                                        <TextBlock Grid.Row="1"
-                                                   Text="{Binding Name}"
-                                                   FontSize="11"
-                                                   FontWeight="SemiBold"
-                                                   TextWrapping="Wrap"
-                                                   Margin="0,8,0,0"/>
-
-                                        <Grid Grid.Row="2" Margin="0,4,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0"
-                                                       Text="{Binding TypeLabel}"
-                                                       Foreground="Gray"
-                                                       FontSize="10"/>
-                                            <TextBlock Grid.Column="1"
-                                                       Text="{Binding ScoreText}"
-                                                       FontSize="10"
-                                                       FontWeight="SemiBold"/>
-                                        </Grid>
-
-                                        <TextBlock Grid.Row="3"
-                                                   Text="{Binding HighlightLabel}"
-                                                   FontSize="10"
-                                                   Foreground="#4CAF50"
-                                                   FontWeight="SemiBold" Margin="0,4,0,0"/>
-
-                                        <Button Grid.Row="4"
-                                                Content="Uebernehmen"
-                                                Tag="{Binding Rank}"
-                                                Click="SelectCard_Click"
-                                                Margin="0,6,0,0"
-                                                Padding="0,4"
-                                                HorizontalAlignment="Stretch"
-                                                Style="{StaticResource AccentButtonStyle}"
-                                                ToolTip="Diese Erkennung uebernehmen"/>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </Grid>
-            </Grid>
-        </Border>
-
-        <!-- ===== UNTEN-MITTE (R2,C2): TabControl mit 3 Ansichten =====
-             Tab-Auswahl wird via MainViewModel.BottomRightSelectedTabIndex an
-             AppSettings persistiert; jeder Tab kapselt sein eigenes UserControl
-             mit dem zugehoerigen ViewModel als DataContext.
-             UX X.15: "Lagerfaecher"-Tab entfernt (volle Lagerliste im Top-Tab).
-             UX X.18: "Was kann ich bauen?"-Tab entfernt - die View lebt jetzt
-             dauerhaft in Spalte 3 oben. -->
-        <Border Grid.Row="2" Grid.Column="2"
-                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                BorderThickness="1" CornerRadius="4"
-                Padding="0">
-            <TabControl x:Name="BottomRightTabs"
-                        SelectedIndex="{Binding BottomRightSelectedTabIndex, Mode=TwoWay}"
-                        BorderThickness="0"
-                        Background="Transparent">
-
-                <TabItem Header="Live-Stats"
-                         ToolTip="Heutige + 7-Tage-Stats + aktueller Bestand + Streak.">
-                    <ContentControl Content="{Binding LiveStats}">
-                        <ContentControl.ContentTemplate>
-                            <DataTemplate>
-                                <views:LiveStatsView/>
-                            </DataTemplate>
-                        </ContentControl.ContentTemplate>
-                    </ContentControl>
-                </TabItem>
-
-                <TabItem Header="Wartende-Detail"
-                         ToolTip="Liste aller wartenden Figuren mit den fehlenden Teilen pro Figur.">
-                    <ContentControl Content="{Binding WaitingDetail}">
-                        <ContentControl.ContentTemplate>
-                            <DataTemplate>
-                                <views:WaitingDetailView/>
-                            </DataTemplate>
-                        </ContentControl.ContentTemplate>
-                    </ContentControl>
-                </TabItem>
-
-                <TabItem Header="Letzte Scans"
-                         ToolTip="Top-50 Scan-Events chronologisch absteigend.">
-                    <ContentControl Content="{Binding RecentScans}">
-                        <ContentControl.ContentTemplate>
-                            <DataTemplate>
-                                <views:RecentScansView/>
-                            </DataTemplate>
-                        </ContentControl.ContentTemplate>
-                    </ContentControl>
-                </TabItem>
-            </TabControl>
-        </Border>
-
-        <!-- ===== SPALTE 3 (UX-Iteration X.18) =====
-             Subgrid mit eigenem 65*/35*-Verhaeltnis (analog Spalten 1+2).
-             - Oben (groesser): BuildSuggestionsView ("Was kann ich bauen?").
-             - Unten (kleiner): MinifigPriceView (BL-Preise, kontextabhaengig).
-             Eigener horizontaler Splitter in der mittleren 5px-Row, damit der
-             User die Hoehen unabhaengig von Spalte 1+2 verschieben kann. -->
-        <Grid Grid.Row="0" Grid.RowSpan="3" Grid.Column="4">
+        <!-- ============================================================ -->
+        <!-- ===== SPALTE 1: Webcam (oben) + Brickognize (unten) ===== -->
+        <!-- ============================================================ -->
+        <Grid Grid.Column="0">
             <Grid.RowDefinitions>
-                <RowDefinition Height="65*"/>
+                <RowDefinition Height="65*" x:Name="Col1TopRow"/>
                 <RowDefinition Height="5"/>
-                <RowDefinition Height="35*"/>
+                <RowDefinition Height="35*" x:Name="Col1BotRow"/>
             </Grid.RowDefinitions>
 
-            <!-- Horizontaler Splitter zwischen oberer und unterer Box. -->
             <GridSplitter Grid.Row="1"
                           Height="5"
                           HorizontalAlignment="Stretch" VerticalAlignment="Center"
                           Background="Transparent"
                           ShowsPreview="True"
                           ResizeBehavior="PreviousAndNext"
-                          Cursor="SizeNS"/>
+                          Cursor="SizeNS"
+                          DragCompleted="Col1HorizontalSplitter_DragCompleted"/>
 
-            <!-- Obere Box (groesser) - UX X.18: BuildSuggestionsView ("Was kann
-                 ich bauen?") - vorher als Tab in der Mitten-Spalte unten,
-                 jetzt dauerhaft sichtbar in Spalte 3 oben. Refreshed sich
-                 ueber das DataChanged-Event des MinifigPersistenceService
-                 (siehe BuildSuggestionsViewModel ctor). Kein Visibility-
-                 Trigger - immer angezeigt, auch ohne Pending-Minifig. -->
+            <!-- ===== OBEN: Webcam-Bereich ===== -->
+            <Border Grid.Row="0"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                    BorderThickness="1" CornerRadius="4" Padding="8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Image Grid.Row="0"
+                           Source="{Binding ScanViewModel.CurrentFrame}"
+                           Stretch="Uniform"
+                           MinHeight="240" MaxHeight="600"
+                           RenderOptions.BitmapScalingMode="NearestNeighbor"
+                           ToolTip="Live-Bild deiner USB-Webcam. Halte hier Teile oder Figuren rein."/>
+
+                    <TextBlock Grid.Row="0"
+                               Text="Kein Kamerabild verfuegbar"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="16" Foreground="Gray"
+                               Visibility="{Binding ScanViewModel.IsCameraRunning,
+                                   Converter={StaticResource InverseBoolToVisibility}}"/>
+
+                    <StackPanel Grid.Row="1" Margin="8">
+                        <Button Content="Scannen (Leertaste)"
+                                Command="{Binding ScanViewModel.PerformScanCommand}"
+                                IsEnabled="{Binding ScanViewModel.CanScan}"
+                                HorizontalAlignment="Stretch"
+                                Margin="0,0,0,4"
+                                ToolTip="Druecke die Leertaste oder klick hier, um zu scannen."/>
+
+                        <TextBlock Text="{Binding ScanViewModel.ScanStatusText}"
+                                   Foreground="Gray" FontSize="12"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ===== UNTEN: Brickognize-Vorschlaege ===== -->
+            <Border Grid.Row="2"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                    BorderThickness="1" CornerRadius="4"
+                    Padding="8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="BRICKOGNIZE-VORSCHLAEGE"
+                               FontSize="13" FontWeight="SemiBold"
+                               Margin="0,0,0,8"/>
+
+                    <TextBlock Grid.Row="1"
+                               Text="Hier erscheinen die Brickognize-Vorschlaege nach einem Scan"
+                               Foreground="Gray" FontStyle="Italic"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Visibility="{Binding ScanViewModel.HasResults,
+                                   Converter={StaticResource InverseBoolToVisibility}}"/>
+
+                    <Grid Grid.Row="1"
+                          Visibility="{Binding ScanViewModel.HasResults, Converter={StaticResource BoolToVisibility}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0" Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding ScanViewModel.ResultHeadlineText}"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"/>
+                            <Button Grid.Column="1"
+                                    Content="Manuelle Suche..."
+                                    Visibility="{Binding ScanViewModel.ShowSearchFallback, Converter={StaticResource BoolToVisibility}}"
+                                    Click="SearchFallback_Click"
+                                    ToolTip="Oeffnet eine manuelle Suche fuer den Fall, dass Brickognize nichts erkannt hat."/>
+                        </Grid>
+
+                        <Border Grid.Row="1" Margin="0,0,0,8"
+                                Padding="8"
+                                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                BorderThickness="1" CornerRadius="4"
+                                Visibility="{Binding ScanViewModel.HasColors,
+                                     Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel>
+                                <TextBlock Text="Erkannte Farbe(n)"
+                                           FontSize="10"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,6"/>
+                                <ItemsControl ItemsSource="{Binding ScanViewModel.RecognizedColors}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,0,12,0"
+                                                    Padding="6,4"
+                                                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="4">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Border Width="20" Height="20"
+                                                            Background="{Binding SwatchBrush}"
+                                                            BorderBrush="Black" BorderThickness="1"
+                                                            Margin="0,0,8,0"/>
+                                                    <TextBlock Text="{Binding DisplayLabel}"
+                                                               VerticalAlignment="Center"
+                                                               Margin="0,0,8,0"/>
+                                                    <TextBlock Text="{Binding ScoreText}"
+                                                               FontWeight="SemiBold"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="Gray"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                        <!--
+                            UX X.15 Teil 2: Klick-Trennung Bild-Zoom vs. Auswahl.
+                            Image -> Zoom-Overlay; "Uebernehmen"-Button -> SelectCardAsync.
+                        -->
+                        <ItemsControl Grid.Row="2" ItemsSource="{Binding ScanViewModel.ResultCards}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Rows="1" Columns="3"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border CornerRadius="4"
+                                            Padding="6" Margin="4"
+                                            Background="Transparent">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="BorderBrush"
+                                                        Value="{DynamicResource SystemControlForegroundBaseLowBrush}"/>
+                                                <Setter Property="BorderThickness" Value="1"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsTopHit}" Value="True">
+                                                        <Setter Property="BorderBrush" Value="#4CAF50"/>
+                                                        <Setter Property="BorderThickness" Value="3"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                        <Setter Property="BorderBrush" Value="#4CAF50"/>
+                                                        <Setter Property="BorderThickness" Value="3"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="*"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <Image Grid.Row="0"
+                                                   Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
+                                                   Stretch="Uniform"
+                                                   MaxHeight="200"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   b:ImageZoom.IsEnabled="True"
+                                                   ToolTip="Vergroessern"/>
+
+                                            <TextBlock Grid.Row="1"
+                                                       Text="{Binding Name}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,8,0,0"/>
+
+                                            <Grid Grid.Row="2" Margin="0,4,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding TypeLabel}"
+                                                           Foreground="Gray"
+                                                           FontSize="10"/>
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding ScoreText}"
+                                                           FontSize="10"
+                                                           FontWeight="SemiBold"/>
+                                            </Grid>
+
+                                            <TextBlock Grid.Row="3"
+                                                       Text="{Binding HighlightLabel}"
+                                                       FontSize="10"
+                                                       Foreground="#4CAF50"
+                                                       FontWeight="SemiBold" Margin="0,4,0,0"/>
+
+                                            <Button Grid.Row="4"
+                                                    Content="Uebernehmen"
+                                                    Tag="{Binding Rank}"
+                                                    Click="SelectCard_Click"
+                                                    Margin="0,6,0,0"
+                                                    Padding="0,4"
+                                                    HorizontalAlignment="Stretch"
+                                                    Style="{StaticResource AccentButtonStyle}"
+                                                    ToolTip="Diese Erkennung uebernehmen"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- ============================================================ -->
+        <!-- ===== SPALTE 2: MinifigDetail/PartLookup + Tab-Reihe ===== -->
+        <!-- ============================================================ -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="65*" x:Name="Col2TopRow"/>
+                <RowDefinition Height="5"/>
+                <RowDefinition Height="35*" x:Name="Col2BotRow"/>
+            </Grid.RowDefinitions>
+
+            <GridSplitter Grid.Row="1"
+                          Height="5"
+                          HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                          Background="Transparent"
+                          ShowsPreview="True"
+                          ResizeBehavior="PreviousAndNext"
+                          Cursor="SizeNS"
+                          DragCompleted="Col2HorizontalSplitter_DragCompleted"/>
+
+            <!-- ===== OBEN: Aktive Figur (MinifigDetail/PartLookup) ===== -->
+            <Border Grid.Row="0"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                    BorderThickness="1" CornerRadius="4">
+                <Grid>
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ScanViewModel.HasPendingMinifig}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding ScanViewModel.HasPendingPart}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock Text="Scanne eine Figur oder ein Teil"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"
+                                   Foreground="Gray"/>
+                        <TextBlock Text="Druecke Leertaste oder klicke 'Scannen'"
+                                   FontSize="10"
+                                   Foreground="Gray"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
+
+                    <ContentControl Padding="6"
+                                    DataContext="{Binding ScanViewModel.PendingMinifig}"
+                                    Visibility="{Binding DataContext.ScanViewModel.HasPendingMinifig,
+                                        RelativeSource={RelativeSource AncestorType=Grid},
+                                        Converter={StaticResource BoolToVisibility}}">
+                        <views:MinifigDetailView/>
+                    </ContentControl>
+
+                    <ContentControl Content="{Binding ScanViewModel.PendingPart}"
+                                    Padding="6"
+                                    Visibility="{Binding ScanViewModel.HasPendingPart,
+                                        Converter={StaticResource BoolToVisibility}}">
+                        <ContentControl.ContentTemplate>
+                            <DataTemplate>
+                                <views:PartLookupView/>
+                            </DataTemplate>
+                        </ContentControl.ContentTemplate>
+                    </ContentControl>
+                </Grid>
+            </Border>
+
+            <!-- ===== UNTEN: TabControl mit 3 Ansichten =====
+                 Tab-Auswahl wird via MainViewModel.BottomRightSelectedTabIndex
+                 an AppSettings persistiert. -->
+            <Border Grid.Row="2"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                    BorderThickness="1" CornerRadius="4"
+                    Padding="0">
+                <TabControl x:Name="BottomRightTabs"
+                            SelectedIndex="{Binding BottomRightSelectedTabIndex, Mode=TwoWay}"
+                            BorderThickness="0"
+                            Background="Transparent">
+
+                    <TabItem Header="Live-Stats"
+                             ToolTip="Heutige + 7-Tage-Stats + aktueller Bestand + Streak.">
+                        <ContentControl Content="{Binding LiveStats}">
+                            <ContentControl.ContentTemplate>
+                                <DataTemplate>
+                                    <views:LiveStatsView/>
+                                </DataTemplate>
+                            </ContentControl.ContentTemplate>
+                        </ContentControl>
+                    </TabItem>
+
+                    <TabItem Header="Wartende-Detail"
+                             ToolTip="Liste aller wartenden Figuren mit den fehlenden Teilen pro Figur.">
+                        <ContentControl Content="{Binding WaitingDetail}">
+                            <ContentControl.ContentTemplate>
+                                <DataTemplate>
+                                    <views:WaitingDetailView/>
+                                </DataTemplate>
+                            </ContentControl.ContentTemplate>
+                        </ContentControl>
+                    </TabItem>
+
+                    <TabItem Header="Letzte Scans"
+                             ToolTip="Top-50 Scan-Events chronologisch absteigend.">
+                        <ContentControl Content="{Binding RecentScans}">
+                            <ContentControl.ContentTemplate>
+                                <DataTemplate>
+                                    <views:RecentScansView/>
+                                </DataTemplate>
+                            </ContentControl.ContentTemplate>
+                        </ContentControl>
+                    </TabItem>
+                </TabControl>
+            </Border>
+        </Grid>
+
+        <!-- ============================================================ -->
+        <!-- ===== SPALTE 3: BuildSuggestions + MinifigPriceView ===== -->
+        <!-- ============================================================ -->
+        <Grid Grid.Column="4">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="65*" x:Name="Col3TopRow"/>
+                <RowDefinition Height="5"/>
+                <RowDefinition Height="35*" x:Name="Col3BotRow"/>
+            </Grid.RowDefinitions>
+
+            <GridSplitter Grid.Row="1"
+                          Height="5"
+                          HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                          Background="Transparent"
+                          ShowsPreview="True"
+                          ResizeBehavior="PreviousAndNext"
+                          Cursor="SizeNS"
+                          DragCompleted="Col3HorizontalSplitter_DragCompleted"/>
+
+            <!-- ===== OBEN: BuildSuggestionsView ("Was kann ich bauen?") ===== -->
             <Border Grid.Row="0"
                     BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                     BorderThickness="1" CornerRadius="4"
@@ -468,9 +440,7 @@
                 </ContentControl>
             </Border>
 
-            <!-- Untere Box (kleiner) - UX X.18: BL-Preise gewandert von oben.
-                 Sichtbar wenn Pending-Minifig aktiv; sonst Idle/leer-Zustand
-                 (kommt aus dem MinifigPriceView selbst). -->
+            <!-- ===== UNTEN: MinifigPriceView (BL-Preise) ===== -->
             <Border Grid.Row="2"
                     BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                     BorderThickness="1" CornerRadius="4"

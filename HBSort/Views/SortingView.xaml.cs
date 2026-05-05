@@ -9,13 +9,15 @@ using Microsoft.Extensions.DependencyInjection;
 namespace HBSort.Views;
 
 /// <summary>
-/// UserControl fuer den Sortier-Tab im Hauptfenster (Phase X).
-/// Beinhaltet das 2x2-Quadranten-Layout (Webcam / Detail / Brickognize / Lagerfaecher).
+/// UserControl fuer den Sortier-Tab im Hauptfenster.
 ///
-/// DataContext wird vom Parent (TabItem) geerbt = MainViewModel.
+/// Layout (UX X.19 Teil 3a): Outer-Grid mit drei Inhalts-Spalten + zwei
+/// vertikalen Splittern. Jede der drei Spalten ist ein eigenes Subgrid mit
+/// 65*/5/35*-RowDefinitions und einem eigenen horizontalen Splitter -
+/// damit kann der User die Hoehen pro Spalte unabhaengig verstellen.
 ///
-/// Click-Handler operieren auf den ViewModels via DataContext und auf dem
-/// parent Window via Window.GetWindow(this) - damit Dialoge ein Owner haben.
+/// Persistierung: alle 5 Splitter-Verhaeltnisse werden in
+/// AppSettings.WindowState gespeichert (UX X.19 Teil 3b, naechster Commit).
 /// </summary>
 public partial class SortingView : UserControl
 {
@@ -34,10 +36,6 @@ public partial class SortingView : UserControl
         ApplySplitterRatios();
     }
 
-    // (Kamera-/Modus-Auswahl-Handler entfernt: Kamera nur noch in Settings,
-    //  ScanMode fest auf Auto. SwitchCameraAsync-Command bleibt im VM fuer
-    //  die Settings-UI; IsModeAuto/Minifig/Part-Properties auch.)
-
     /// <summary>Such-Fallback (in Phase 5+ implementiert).</summary>
     private void SearchFallback_Click(object sender, RoutedEventArgs e)
     {
@@ -46,8 +44,6 @@ public partial class SortingView : UserControl
 
     /// <summary>
     /// UX X.15: Click auf den "Uebernehmen"-Button einer Top-3-Karte.
-    /// Vorher hing der Click am ganzen Border und ueberlappte sich mit dem
-    /// Image-Zoom; jetzt ist die Auswahl explizit.
     /// </summary>
     private void SelectCard_Click(object sender, RoutedEventArgs e)
     {
@@ -59,13 +55,12 @@ public partial class SortingView : UserControl
 
     // ====================================================================
     // GridSplitter Persistierung
+    // (Implementierung kommt in UX X.19 Teil 3b - hier nur die Handler-
+    // Stubs, damit die XAML-Refs nicht ins Leere zeigen.)
     // ====================================================================
 
-    /// <summary>
-    /// Splitter zwischen Col1 (Webcam) und Col2 (Detail). Persistiert das
-    /// Verhaeltnis Col1 / Total in WindowState.SplitterColumnRatio.
-    /// </summary>
-    private void ColumnSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
+    /// <summary>Vertikaler Splitter zwischen Spalte 1 und 2.</summary>
+    private void VerticalSplitter1_DragCompleted(object sender, DragCompletedEventArgs e)
     {
         var settingsService = Service<ISettingsService>();
         var total = LeftCol.ActualWidth + MidCol.ActualWidth + RightCol.ActualWidth;
@@ -78,11 +73,8 @@ public partial class SortingView : UserControl
         _ = settingsService.SaveAsync();
     }
 
-    /// <summary>
-    /// Splitter zwischen Col2 (Detail) und Col3 (neue Boxen). Persistiert
-    /// beide Anteile damit die Wiederherstellung konsistent bleibt.
-    /// </summary>
-    private void ColumnSplitter2_DragCompleted(object sender, DragCompletedEventArgs e)
+    /// <summary>Vertikaler Splitter zwischen Spalte 2 und 3.</summary>
+    private void VerticalSplitter2_DragCompleted(object sender, DragCompletedEventArgs e)
     {
         var settingsService = Service<ISettingsService>();
         var total = LeftCol.ActualWidth + MidCol.ActualWidth + RightCol.ActualWidth;
@@ -93,13 +85,31 @@ public partial class SortingView : UserControl
         settingsService.Current.WindowState.SplitterColumnRatio2 =
             MidCol.ActualWidth / total;
         _ = settingsService.SaveAsync();
+    }
+
+    /// <summary>Horizontaler Splitter in Spalte 1 (zwischen Webcam und Brickognize).</summary>
+    private void Col1HorizontalSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        // Persistierung folgt in Teil 3b.
+    }
+
+    /// <summary>Horizontaler Splitter in Spalte 2 (zwischen Detail und Tabs).</summary>
+    private void Col2HorizontalSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        // Persistierung folgt in Teil 3b.
+    }
+
+    /// <summary>Horizontaler Splitter in Spalte 3 (zwischen BuildSuggestions und Preise).</summary>
+    private void Col3HorizontalSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        // Persistierung folgt in Teil 3b.
     }
 
     /// <summary>
     /// Stellt die gespeicherten Spalten-Verhaeltnisse wieder her. Drei Spalten:
     /// Col1, Col2 explizit, Col3 ergibt sich als Rest. Werte werden auf
     /// [0.1 .. 0.8] gekappt, damit eine Spalte nicht komplett verschwindet.
-    /// Das Zeilen-Verhaeltnis (65/35) ist fix aus den XAML-Defaults.
+    /// Horizontale Splitter-Verhaeltnisse werden in Teil 3b ergaenzt.
     /// </summary>
     private void ApplySplitterRatios()
     {
