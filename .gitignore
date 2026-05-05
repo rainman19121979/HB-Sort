@@ -44,9 +44,28 @@ secrets.json
 .env.local
 
 # ============================================
-# Claude Code lokale Settings
+# Claude Code & AI-Tooling (interne Entwicklungs-Workflows)
 # ============================================
-.claude/settings.local.json
+# Kompletter .claude-State raus - enthaelt Session-Daten, Memory-Files
+# und projektinterne Settings die nichts im Public-Repo zu suchen haben.
+.claude/
+.claude/**
+
+# CLAUDE.md ist die interne Architektur-/UX-Iterations-Doku. Sehr
+# nuetzlich fuer die Entwicklung, aber:
+# - sehr detaillierte Implementierungs-Hinweise (Overload fuer Besucher)
+# - Workflow-Historie (UX X.4 .. X.20 etc.) interessiert nur uns
+# - kann historische Zwischenstaende enthalten die irrefuehrend wirken
+# Public-Variante (Architektur-Auszug) kann spaeter als ARCHITECTURE.md
+# nachgereicht werden.
+CLAUDE.md
+
+# Andere AI-Tooling-Files (falls jemand mit Cursor/Aider/Copilot arbeitet).
+PROMPT_*.md
+.cursor/
+.cursorrules
+.aider*
+.github/copilot-instructions.md
 
 # ============================================
 # Rebrickable-Seed-Daten in PROMPT 6 (2026-05-02) entfernt; Eintraege bleiben
