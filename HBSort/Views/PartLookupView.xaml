@@ -256,61 +256,82 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- ===== ALTERNATIVEN-HEADER ===== -->
-            <StackPanel Grid.Row="3" Margin="0,12,0,0">
-                <Separator/>
-                <TextBlock Text="ALTERNATIVEN" Margin="0,8,0,4"
-                           FontSize="10" FontWeight="SemiBold"/>
-                <TextBlock Text="Als Einzelteil lagern in:"
-                           FontSize="10" Foreground="Gray"/>
-                <!--
-                    UX-Iteration X.7: Smart-Storage-Hint. Erscheint nur wenn das
-                    Teil bereits in einem Fach mit gleicher Farbe liegt - der
-                    User soll wissen warum gerade dieses Fach vorgewaehlt ist.
-                -->
-                <TextBlock Text="{Binding MatchingFloatingBinHintText}"
-                           FontSize="9"
-                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                           FontStyle="Italic"
-                           Margin="0,2,0,0"
-                           Visibility="{Binding HasMatchingFloatingBin,
-                                Converter={StaticResource BoolToVisibility}}"/>
-            </StackPanel>
-
             <!--
-                Lagern + Verwerfen in einer Zeile, damit beide Buttons
-                immer zusammen sichtbar sind und der User nicht scrollen muss.
-                Grid.Row="5" entfaellt dadurch.
+                UX X.20 Teil 4: Lagerfach-Bereich prominenter. Vorher waren
+                Smart-Storage-Hint und Dropdown optisch entkoppelt; jetzt in
+                EINEM Border mit InfoBox-Hintergrund (helles Blau). Damit ist
+                klar dass Hinweis und Auswahl thematisch zusammengehoeren -
+                und der User uebersieht das Dropdown nicht mehr.
+                Grid.Row=3 (alter Alternativen-Header) zusammengefuehrt mit
+                dem alten Grid.Row=4 (Eingabezeile).
             -->
-            <Grid Grid.Row="4" Margin="0,4,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="80"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <ComboBox Grid.Column="0" MinWidth="140"
-                          ItemsSource="{Binding AvailableBins}"
-                          SelectedItem="{Binding SelectedFloatingBin}"
-                          DisplayMemberPath="Label"/>
-                <TextBlock Grid.Column="1" Text="Anzahl:"
-                           VerticalAlignment="Center" Margin="12,0,6,0"
-                           Foreground="Gray"
-                           FontSize="10"/>
-                <TextBox Grid.Column="2"
-                         Text="{Binding FloatingQuantity, UpdateSourceTrigger=PropertyChanged}"
-                         ToolTip="Wieviele Stueck dieses Teils legst du gerade ab?"/>
-                <Button Grid.Column="3" Content="Lagern" Width="90"
-                        Margin="8,0,0,0"
-                        Click="StoreFloating_Click"
-                        Style="{StaticResource AccentButtonStyle}"
-                        ToolTip="Teil als Einzelteil im gewaehlten Fach lagern"/>
-                <Button Grid.Column="4" Content="Verwerfen" Width="90"
-                        Margin="8,0,0,0"
-                        Click="Discard_Click"
-                        ToolTip="Scan verwerfen ohne zu speichern"/>
-            </Grid>
+            <Border Grid.Row="3" Grid.RowSpan="2"
+                    Margin="0,12,0,0"
+                    Background="{StaticResource InfoBoxBackground}"
+                    BorderBrush="{StaticResource StatusInfoBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="10">
+                <StackPanel>
+                    <TextBlock FontSize="11" FontWeight="SemiBold"
+                               Foreground="{StaticResource StatusInfoBrush}"
+                               Margin="0,0,0,2">
+                        <Run Text="📦"/>
+                        <Run Text="Als Einzelteil lagern in:"/>
+                    </TextBlock>
+
+                    <!--
+                        Smart-Storage-Hint (UX X.7). Steht jetzt im selben
+                        Container und teilt sich die Akzentfarbe.
+                    -->
+                    <TextBlock Text="{Binding MatchingFloatingBinHintText}"
+                               FontSize="10"
+                               Foreground="{StaticResource StatusInfoBrush}"
+                               FontStyle="Italic"
+                               Margin="0,0,0,6"
+                               Visibility="{Binding HasMatchingFloatingBin,
+                                    Converter={StaticResource BoolToVisibility}}"/>
+
+                    <!-- Eingabezeile: groesseres Dropdown + Anzahl + Aktionen. -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <!--
+                            MinHeight=34 macht das Dropdown ~1.3x hoeher als
+                            ModernWpf-Default (rund 26px) - aktive Eingabe-
+                            Erwartung optisch betonen.
+                        -->
+                        <ComboBox Grid.Column="0" MinWidth="180" MinHeight="34"
+                                  FontSize="13"
+                                  ItemsSource="{Binding AvailableBins}"
+                                  SelectedItem="{Binding SelectedFloatingBin}"
+                                  DisplayMemberPath="Label"
+                                  ToolTip="Wo soll das Teil hin?"/>
+                        <TextBlock Grid.Column="1" Text="Anzahl:"
+                                   VerticalAlignment="Center" Margin="12,0,6,0"
+                                   Foreground="Gray"
+                                   FontSize="11"/>
+                        <TextBox Grid.Column="2" MinHeight="34"
+                                 FontSize="13"
+                                 Text="{Binding FloatingQuantity, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="Wieviele Stueck dieses Teils legst du gerade ab?"/>
+                        <Button Grid.Column="3" Content="Lagern" Width="100" MinHeight="34"
+                                Margin="8,0,0,0"
+                                Click="StoreFloating_Click"
+                                Style="{StaticResource AccentButtonStyle}"
+                                ToolTip="Teil als Einzelteil im gewaehlten Fach lagern"/>
+                        <Button Grid.Column="4" Content="Verwerfen" Width="100" MinHeight="34"
+                                Margin="8,0,0,0"
+                                Click="Discard_Click"
+                                ToolTip="Scan verwerfen ohne zu speichern"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
         </Grid>
     </Border>
 </UserControl>

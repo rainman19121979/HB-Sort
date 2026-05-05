@@ -240,34 +240,51 @@
                              ToolTip="Optionale Notiz zur Figur (z.B. 'Helm fehlt original')"/>
                 </Grid>
 
-                <!-- Lagerfach + Buttons -->
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="80"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+                <!--
+                    UX X.20 Teil 4: Lagerfach-Bereich prominenter. Akzentfarben-
+                    Border um Dropdown + Aktionen, Box-Icon vor dem Label,
+                    groesseres Dropdown (MinHeight 34, FontSize 13) - der User
+                    sieht jetzt klar dass das die naechste Entscheidung ist.
+                -->
+                <Border Background="{StaticResource InfoBoxBackground}"
+                        BorderBrush="{StaticResource StatusInfoBrush}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
 
-                    <TextBlock Grid.Column="0" Text="Lagerfach:"
-                               VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <ComboBox Grid.Column="1"
-                              ItemsSource="{Binding AvailableBins}"
-                              SelectedItem="{Binding SelectedBin}"
-                              DisplayMemberPath="Label"
-                              ToolTip="Fach in das die Figur gelegt wird (Default: erstes freies Fach)"/>
+                        <TextBlock Grid.Column="0"
+                                   FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{StaticResource StatusInfoBrush}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0">
+                            <Run Text="📦"/>
+                            <Run Text="Lagerfach:"/>
+                        </TextBlock>
+                        <ComboBox Grid.Column="1" MinHeight="34" FontSize="13"
+                                  ItemsSource="{Binding AvailableBins}"
+                                  SelectedItem="{Binding SelectedBin}"
+                                  DisplayMemberPath="Label"
+                                  ToolTip="Fach in das die Figur gelegt wird (Default: erstes freies Fach)"/>
 
-                    <!-- Buttons rechtsbuendig -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal"
-                                HorizontalAlignment="Right" Margin="12,0,0,0">
-                        <Button Content="Verwerfen" Width="100"
-                                Click="Discard_Click"
-                                Margin="0,0,8,0"/>
-                        <Button Content="{Binding PersistButtonText}" MinWidth="160"
-                                Style="{StaticResource AccentButtonStyle}"
-                                IsEnabled="{Binding CanPersist}"
-                                Click="Persist_Click"/>
-                    </StackPanel>
-                </Grid>
+                        <!-- Buttons rechtsbuendig -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                    HorizontalAlignment="Right" Margin="12,0,0,0">
+                            <Button Content="Verwerfen" Width="100" MinHeight="34"
+                                    Click="Discard_Click"
+                                    Margin="0,0,8,0"/>
+                            <Button Content="{Binding PersistButtonText}" MinWidth="160" MinHeight="34"
+                                    Style="{StaticResource AccentButtonStyle}"
+                                    IsEnabled="{Binding CanPersist}"
+                                    Click="Persist_Click"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
             </StackPanel>
         </Grid>
     </Border>
