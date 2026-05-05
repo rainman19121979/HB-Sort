@@ -27,7 +27,7 @@
   <ItemGroup>
     <!-- CommunityToolkit.Mvvm: Microsoft-Bibliothek die MVVM-Boilerplate reduziert
          (ObservableObject, RelayCommand etc.) -->
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
 
     <!-- ModernWpfUI: Bringt das moderne Windows-Look-and-Feel (Hell/Dunkel-Theme)
          automatisch passend zum System-Theme -->
