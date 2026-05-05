@@ -90,6 +90,11 @@ Resources/
 /HBSort/Resources/*
 !/HBSort/Resources/Help/
 !/HBSort/Resources/Help/**
+# UX X.20+: app.ico (ApplicationIcon) und logo.png (Header) sind essentiell
+# fuer den Build und das App-Branding - die werden ins Repo aufgenommen.
+# Andere lokale Resources (Screenshots, Mockups etc.) bleiben weiter excluded.
+!/HBSort/Resources/app.ico
+!/HBSort/Resources/logo.png
 
 # ============================================
 # Lokale App-Daten (KRITISCH - duerfen nie ins Repo)
