@@ -133,5 +133,30 @@ public class WindowState
     public double SplitterColumnRatio2 { get; set; } = 1.0 / 3.0;
 
     /// <summary>Anteil der oberen Zeile am 2x2-Layout (0..1). Default 0.6.</summary>
+    /// <remarks>
+    /// DEPRECATED ab UX X.19 Teil 3b: das alte 2x2-Layout hatte EIN
+    /// gemeinsames oben/unten-Verhaeltnis. Jetzt hat jede der drei Spalten
+    /// ihr eigenes (siehe Column1HorizontalSplitterRatio etc.). Wird beim
+    /// Laden ignoriert; alte settings.json laedt trotzdem sauber, weil
+    /// System.Text.Json unbekannte oder ueberzaehlige Properties uebergeht.
+    /// </remarks>
     public double SplitterRowRatio { get; set; } = 0.6;
+
+    /// <summary>
+    /// UX X.19 Teil 3b: Anteil der oberen Box (Webcam) in Spalte 1.
+    /// Wert 0..1. Default 0.65 entspricht dem bisherigen 65/35-Layout.
+    /// </summary>
+    public double Column1HorizontalSplitterRatio { get; set; } = 0.65;
+
+    /// <summary>
+    /// UX X.19 Teil 3b: Anteil der oberen Box (MinifigDetail/PartLookup)
+    /// in Spalte 2. Default 0.65.
+    /// </summary>
+    public double Column2HorizontalSplitterRatio { get; set; } = 0.65;
+
+    /// <summary>
+    /// UX X.19 Teil 3b: Anteil der oberen Box (BuildSuggestions) in Spalte 3.
+    /// Default 0.65.
+    /// </summary>
+    public double Column3HorizontalSplitterRatio { get; set; } = 0.65;
 }
