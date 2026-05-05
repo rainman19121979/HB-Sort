@@ -1120,6 +1120,47 @@ einem Build vor UX X.6.
   (Box 002, Box 005, Box 008)"). Helper-Methode `BuildReleaseBinsLabel`.
 - Singular/Plural je nach Anzahl korrekt formuliert.
 
+#### Sortier-Tab Layout final (UX-Iteration X.18, 2026-05-05)
+
+Sortier-Tab final als 3 gleich breite Spalten mit klar verteilten
+Inhalten. Das Layout ist nach dieser Iteration die Referenz-Anordnung;
+kuenftige Aenderungen am Sortier-Tab sollten diese Tabelle aktualisieren.
+
+**Endgueltige Spalten-/Box-Belegung:**
+
+| Spalte | Oben (R0, ~65%) | Unten (R2, ~35%) |
+|---|---|---|
+| **1 (Col0)** | Webcam-Live + Scannen-Button | Brickognize-Top-3-Karten (mit Uebernehmen-Button + ImageZoom auf Bild) |
+| **2 (Col2)** | MinifigDetailView (Pending-Minifig) ODER PartLookupView (Pending-Part), kontextabhaengig | TabControl: **Live-Stats / Wartende-Detail / Letzte Scans** (3 Tabs) |
+| **3 (Col4)** | **BuildSuggestionsView** ("Was kann ich bauen?", dauerhaft sichtbar) | **MinifigPriceView** (BL-Preise, sichtbar wenn Pending-Minifig aktiv) |
+
+**Aenderungen gegenueber UX X.16/X.17:**
+- *Inhaltstausch in Spalte 3*: Preise gewandert von oben nach unten;
+  obere Box jetzt mit BuildSuggestionsView befuellt.
+- *Tab-Reihe in Spalte 2 reduziert*: "Was kann ich bauen?"-Tab raus
+  (Inhalt jetzt dauerhaft in Spalte 3 oben). Verbleibende Tabs:
+  Live-Stats, Wartende-Detail, Letzte Scans (Indizes 0-2).
+- *BottomRightTabIndex-Migration*: alte Werte aus settings.json
+  (UX X.15: 0..4, UX X.16: 0..3) werden auf [0..2] geclampt - ueber
+  einen Tab hinausgehende Werte landen auf Live-Stats (= Index 0).
+- *Horizontale GridSplitter ergaenzt*: Outer-Splitter ueber Col0+Col2
+  (Spalte 1+2 gemeinsam) und Inner-Splitter im Col4-Subgrid (Spalte 3
+  unabhaengig). Beide ohne Persistierung - beim naechsten App-Start
+  ist wieder 65/35.
+- *Spaltenbreiten*: alle drei Spalten Width="*", Default-Verhaeltnis
+  in `AppSettings.WindowState.SplitterColumnRatio`/`Ratio2` ist
+  jeweils 1/3 - 3 gleich breite Spalten beim Erststart, durch die
+  vertikalen Splitter individuell anpassbar (Verhaeltnis persistiert).
+
+**BuildSuggestionsView-Refresh-Verhalten**: Singleton-VM aus dem
+DI-Container. Konstruktor abonniert `IMinifigPersistenceService.
+DataChanged` - die Liste aktualisiert sich automatisch nach jedem
+Scan/Lager/Komplettiere. Seit Audit K-2 (UX X.17) mit IDisposable +
+Unsubscribe abgesichert.
+
+**Toter Code**: kein Cleanup noetig - BinOverviewView und
+WaitingMinifigsViewModel waren bereits in UX X.15 entfernt.
+
 #### Audit-Restwelle (UX-Iteration X.17, 2026-05-04)
 
 Folge-Iteration zu UX X.16. Alle in der Vorrunde aufgeschobenen Audit-
