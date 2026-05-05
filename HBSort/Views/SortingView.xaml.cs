@@ -83,139 +83,97 @@ public partial class SortingView : UserControl
     // GridSplitter Persistierung
     // ====================================================================
 
+    // ====================================================================
+    // UX-Iteration X.22 Fix (2026-05-05): WPF GridSplitter feuert
+    // DragCompleted BEVOR der Layout-Pass die ActualHeight/ActualWidth-
+    // Werte aktualisiert hat. Praxis-Befund 2026-05-05 20:08:56:
+    //   ComputeRowRatio direkt: TopActual=584 BotActual=314 (Default!)
+    //   Via Dispatcher 34ms spaeter: TopActual=400 BotActual=498 (echt)
+    // Hypothese C aus den Diagnose-Logs eindeutig bestaetigt.
+    //
+    // Loesung: Compute + Save in jedem DragCompleted-Handler via
+    // Dispatcher.BeginInvoke(DispatcherPriority.Loaded, ...) verzoegern,
+    // damit WPF zuerst sein Layout-Update abschliesst.
+    // ====================================================================
+
     /// <summary>
     /// Vertikaler Splitter zwischen Spalte 1 und 2. Persistiert beide
     /// Spalten-Verhaeltnisse, damit die Wiederherstellung konsistent ist.
+    /// Save via Dispatcher (siehe X.22-Kommentar oben).
     /// </summary>
     private void VerticalSplitter1_DragCompleted(object sender, DragCompletedEventArgs e)
-        => SaveColumnRatios();
+    {
+        Log.Information("[SPLITTER] VerticalSplitter1_DragCompleted FIRED - scheduling Save via Dispatcher");
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(SaveColumnRatios));
+    }
 
     /// <summary>Vertikaler Splitter zwischen Spalte 2 und 3.</summary>
     private void VerticalSplitter2_DragCompleted(object sender, DragCompletedEventArgs e)
-        => SaveColumnRatios();
+    {
+        Log.Information("[SPLITTER] VerticalSplitter2_DragCompleted FIRED - scheduling Save via Dispatcher");
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(SaveColumnRatios));
+    }
 
     /// <summary>Horizontaler Splitter in Spalte 1 (Webcam / Brickognize).</summary>
     private void Col1HorizontalSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
     {
-        Log.Information("[SPLITTER] Col1HorizontalSplitter_DragCompleted FIRED");
-        DiagnoseDragCompleted(sender, columnNumber: 1, Col1TopRow, Col1BotRow);
-
-        var ratio = ComputeRowRatio(Col1TopRow, Col1BotRow, columnNumber: 1);
-        if (ratio.HasValue)
+        Log.Information("[SPLITTER] Col1HorizontalSplitter_DragCompleted FIRED - scheduling Save via Dispatcher");
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
         {
-            var settings = Service<ISettingsService>();
-            settings.Current.WindowState.Column1HorizontalSplitterRatio = ratio.Value;
-            Log.Information("[SPLITTER] SettingsSaveAsync invoked col=1 ratio={Ratio}", ratio.Value);
-            _ = settings.SaveAsync();
-        }
-        else
-        {
-            Log.Information("[SPLITTER] Col1 ratio=null -> kein Save");
-        }
+            var ratio = ComputeRowRatio(Col1TopRow, Col1BotRow, columnNumber: 1);
+            if (ratio.HasValue)
+            {
+                var settings = Service<ISettingsService>();
+                settings.Current.WindowState.Column1HorizontalSplitterRatio = ratio.Value;
+                Log.Information("[SPLITTER] SettingsSaveAsync invoked col=1 ratio={Ratio}", ratio.Value);
+                _ = settings.SaveAsync();
+            }
+            else
+            {
+                Log.Information("[SPLITTER] Col1 ratio=null -> kein Save");
+            }
+        }));
     }
 
     /// <summary>Horizontaler Splitter in Spalte 2 (Detail / Tabs).</summary>
     private void Col2HorizontalSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
     {
-        Log.Information("[SPLITTER] Col2HorizontalSplitter_DragCompleted FIRED");
-        DiagnoseDragCompleted(sender, columnNumber: 2, Col2TopRow, Col2BotRow);
-
-        var ratio = ComputeRowRatio(Col2TopRow, Col2BotRow, columnNumber: 2);
-        if (ratio.HasValue)
+        Log.Information("[SPLITTER] Col2HorizontalSplitter_DragCompleted FIRED - scheduling Save via Dispatcher");
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
         {
-            var settings = Service<ISettingsService>();
-            settings.Current.WindowState.Column2HorizontalSplitterRatio = ratio.Value;
-            Log.Information("[SPLITTER] SettingsSaveAsync invoked col=2 ratio={Ratio}", ratio.Value);
-            _ = settings.SaveAsync();
-        }
-        else
-        {
-            Log.Information("[SPLITTER] Col2 ratio=null -> kein Save");
-        }
+            var ratio = ComputeRowRatio(Col2TopRow, Col2BotRow, columnNumber: 2);
+            if (ratio.HasValue)
+            {
+                var settings = Service<ISettingsService>();
+                settings.Current.WindowState.Column2HorizontalSplitterRatio = ratio.Value;
+                Log.Information("[SPLITTER] SettingsSaveAsync invoked col=2 ratio={Ratio}", ratio.Value);
+                _ = settings.SaveAsync();
+            }
+            else
+            {
+                Log.Information("[SPLITTER] Col2 ratio=null -> kein Save");
+            }
+        }));
     }
 
     /// <summary>Horizontaler Splitter in Spalte 3 (BuildSuggestions / Preise).</summary>
     private void Col3HorizontalSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
     {
-        Log.Information("[SPLITTER] Col3HorizontalSplitter_DragCompleted FIRED");
-        DiagnoseDragCompleted(sender, columnNumber: 3, Col3TopRow, Col3BotRow);
-
-        var ratio = ComputeRowRatio(Col3TopRow, Col3BotRow, columnNumber: 3);
-        if (ratio.HasValue)
-        {
-            var settings = Service<ISettingsService>();
-            settings.Current.WindowState.Column3HorizontalSplitterRatio = ratio.Value;
-            Log.Information("[SPLITTER] SettingsSaveAsync invoked col=3 ratio={Ratio}", ratio.Value);
-            _ = settings.SaveAsync();
-        }
-        else
-        {
-            Log.Information("[SPLITTER] Col3 ratio=null -> kein Save");
-        }
-    }
-
-    /// <summary>
-    /// Diagnose-Helfer fuer Hypothesen B + C. Wird in jedem
-    /// Col[N]HorizontalSplitter_DragCompleted aufgerufen.
-    ///
-    /// Hypothese B: zeigt die x:Name-Referenz (top/bot) auf das gleiche
-    /// RowDefinition-Objekt, das auch im Parent-Grid des Splitters steht?
-    /// Falls nein: x:Name ist auf eine andere RowDefinition gemappt als
-    /// der Splitter manipuliert.
-    ///
-    /// Hypothese C: ist die ActualHeight zum Zeitpunkt des DragCompleted-
-    /// Events bereits aktualisiert? Wir lesen die Werte direkt UND erneut
-    /// per Dispatcher.BeginInvoke mit drei verschiedenen Prioritaeten.
-    /// Wenn ein spaeterer Read andere Werte liefert: Layout-Pass-Race.
-    /// </summary>
-    private void DiagnoseDragCompleted(object sender, int columnNumber,
-        RowDefinition top, RowDefinition bot)
-    {
-        // Hypothese B: x:Name vs Parent-Grid-RowDefinitions
-        Log.Information("[DIAG-B] Col{N} via x:Name TopActual={T} BotActual={B}",
-            columnNumber, top.ActualHeight, bot.ActualHeight);
-
-        if (sender is GridSplitter splitter && splitter.Parent is Grid subGrid)
-        {
-            Log.Information("[DIAG-B] Col{N} via Parent.Rows.Count={C}",
-                columnNumber, subGrid.RowDefinitions.Count);
-            if (subGrid.RowDefinitions.Count >= 3)
-            {
-                var parentTop = subGrid.RowDefinitions[0];
-                var parentBot = subGrid.RowDefinitions[2];
-                Log.Information("[DIAG-B] Col{N} Parent.Rows[0].ActualHeight={A0} Rows[2].ActualHeight={A2}",
-                    columnNumber, parentTop.ActualHeight, parentBot.ActualHeight);
-                Log.Information("[DIAG-B] Col{N} HashCheck topX={Tx} parentTop={Pt} -> SameRef={Same}",
-                    columnNumber, top.GetHashCode(), parentTop.GetHashCode(),
-                    ReferenceEquals(top, parentTop));
-                Log.Information("[DIAG-B] Col{N} HashCheck botX={Bx} parentBot={Pb} -> SameRef={Same}",
-                    columnNumber, bot.GetHashCode(), parentBot.GetHashCode(),
-                    ReferenceEquals(bot, parentBot));
-            }
-        }
-        else
-        {
-            Log.Information("[DIAG-B] Col{N} sender ist kein GridSplitter mit Grid-Parent (Sender={S})",
-                columnNumber, sender?.GetType().Name ?? "null");
-        }
-
-        // Hypothese C: Layout-Pass-Race - lesen wir nochmal spaeter
-        var topRef = top;
-        var botRef = bot;
-        Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
-        {
-            Log.Information("[DIAG-C] Col{N} via BeginInvoke Input: TopActual={T} BotActual={B}",
-                columnNumber, topRef.ActualHeight, botRef.ActualHeight);
-        }));
+        Log.Information("[SPLITTER] Col3HorizontalSplitter_DragCompleted FIRED - scheduling Save via Dispatcher");
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
         {
-            Log.Information("[DIAG-C] Col{N} via BeginInvoke Loaded: TopActual={T} BotActual={B}",
-                columnNumber, topRef.ActualHeight, botRef.ActualHeight);
-        }));
-        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
-        {
-            Log.Information("[DIAG-C] Col{N} via BeginInvoke Background: TopActual={T} BotActual={B}",
-                columnNumber, topRef.ActualHeight, botRef.ActualHeight);
+            var ratio = ComputeRowRatio(Col3TopRow, Col3BotRow, columnNumber: 3);
+            if (ratio.HasValue)
+            {
+                var settings = Service<ISettingsService>();
+                settings.Current.WindowState.Column3HorizontalSplitterRatio = ratio.Value;
+                Log.Information("[SPLITTER] SettingsSaveAsync invoked col=3 ratio={Ratio}", ratio.Value);
+                _ = settings.SaveAsync();
+            }
+            else
+            {
+                Log.Information("[SPLITTER] Col3 ratio=null -> kein Save");
+            }
         }));
     }
 
@@ -276,46 +234,14 @@ public partial class SortingView : UserControl
         if (c1 + c2 > 0.9) { c1 = c2 = 1.0 / 3.0; }
         var c3 = 1.0 - c1 - c2;
 
-        Log.Information("[SPLITTER] BEFORE Vertical LeftActual={L} MidActual={M} RightActual={R}",
-            LeftCol.ActualWidth, MidCol.ActualWidth, RightCol.ActualWidth);
-
         LeftCol.Width = new GridLength(c1, GridUnitType.Star);
         MidCol.Width = new GridLength(c2, GridUnitType.Star);
         RightCol.Width = new GridLength(c3, GridUnitType.Star);
 
         // --- Horizontale Splitter pro Spalte ---
-        Log.Information("[SPLITTER] BEFORE Col=1 TopActual={T} BotActual={B}",
-            Col1TopRow.ActualHeight, Col1BotRow.ActualHeight);
-        Log.Information("[SPLITTER] ApplyRatios Col=1 loaded={R}", ws.Column1HorizontalSplitterRatio);
         ApplyRowRatio(Col1TopRow, Col1BotRow, ws.Column1HorizontalSplitterRatio);
-        Log.Information("[SPLITTER] AFTER Col=1 TopActual={T} BotActual={B}",
-            Col1TopRow.ActualHeight, Col1BotRow.ActualHeight);
-
-        Log.Information("[SPLITTER] BEFORE Col=2 TopActual={T} BotActual={B}",
-            Col2TopRow.ActualHeight, Col2BotRow.ActualHeight);
-        Log.Information("[SPLITTER] ApplyRatios Col=2 loaded={R}", ws.Column2HorizontalSplitterRatio);
         ApplyRowRatio(Col2TopRow, Col2BotRow, ws.Column2HorizontalSplitterRatio);
-        Log.Information("[SPLITTER] AFTER Col=2 TopActual={T} BotActual={B}",
-            Col2TopRow.ActualHeight, Col2BotRow.ActualHeight);
-
-        Log.Information("[SPLITTER] BEFORE Col=3 TopActual={T} BotActual={B}",
-            Col3TopRow.ActualHeight, Col3BotRow.ActualHeight);
-        Log.Information("[SPLITTER] ApplyRatios Col=3 loaded={R}", ws.Column3HorizontalSplitterRatio);
         ApplyRowRatio(Col3TopRow, Col3BotRow, ws.Column3HorizontalSplitterRatio);
-        Log.Information("[SPLITTER] AFTER Col=3 TopActual={T} BotActual={B}",
-            Col3TopRow.ActualHeight, Col3BotRow.ActualHeight);
-
-        // Hypothese A: zeigen die x:Name-Felder auf unterschiedliche
-        // RowDefinition-Instanzen, oder hat das inkrementelle Build-System
-        // die Generierung kaputtgemacht?
-        Log.Information("[DIAG-A] Col1TopRow.GetHashCode={H1} Col2TopRow.GetHashCode={H2} Col3TopRow.GetHashCode={H3}",
-            Col1TopRow?.GetHashCode() ?? -1,
-            Col2TopRow?.GetHashCode() ?? -1,
-            Col3TopRow?.GetHashCode() ?? -1);
-        Log.Information("[DIAG-A] Col1BotRow.GetHashCode={H1} Col2BotRow.GetHashCode={H2} Col3BotRow.GetHashCode={H3}",
-            Col1BotRow?.GetHashCode() ?? -1,
-            Col2BotRow?.GetHashCode() ?? -1,
-            Col3BotRow?.GetHashCode() ?? -1);
     }
 
     /// <summary>
