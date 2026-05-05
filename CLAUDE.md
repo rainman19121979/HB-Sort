@@ -1120,6 +1120,90 @@ einem Build vor UX X.6.
   (Box 002, Box 005, Box 008)"). Helper-Methode `BuildReleaseBinsLabel`.
 - Singular/Plural je nach Anzahl korrekt formuliert.
 
+#### Sortier-Tab UX-Politur (UX-Iteration X.19, 2026-05-05)
+
+Drei Verbesserungen am Sortier-Tab nach UX X.18.
+
+**Teil 1 — Lagerfach-Badge in PartLookupView**
+- In der "PASSENDE WARTENDE FIGUREN"-Liste rueckte das Bin-Label
+  ("(Box 005)") aus dem Klammer-Suffix in ein eigenes Badge zwischen
+  Mittelspalte und "Zuordnen"-Button.
+- Badge-Optik: Hintergrund `InfoBoxBackground` (#E3F2FD), 1px Border in
+  `StatusInfoBrush` (#1976D2), 📦-Icon + Bin-Label fett (FontSize 12).
+- Tooltip: "In dieses Fach gehoert die Figur - dort das gerade gescannte
+  Teil ablegen."
+- Konsistent gestylt in `WaitingDetailView.xaml` (siehe Teil 2).
+
+**Teil 2 — Klick auf Wartende-Detail-Karte oeffnet MinifigSummaryDialog**
+- Karten im Wartende-Detail-Tab sind jetzt klickbar (Cursor=Hand,
+  Hover-Background-Wechsel, ToolTip "Details anzeigen"). Klick oeffnet
+  denselben Dialog wie der "Details"-Button in der Lagerliste.
+- Bild-Klicks gehen weiter ans `b:ImageZoom`-Behavior - das setzt schon
+  `e.Handled=true`, kein Doppelfeuern auf den Border.
+- Inline-Bin-Run aus dem Sub-Header rausgeflogen, durch ein Badge
+  (gleiche Optik wie Teil 1) ersetzt.
+- Code-Behind: `WaitingDetailView.xaml.cs::Card_Click` macht
+  `Service<T>()`-Lookup analog zu `InventoryListView.Details_Click`.
+  Wenn das zur dritten/vierten Stelle wird, lohnt sich ein Helper -
+  aktuell sind es nur zwei Aufrufstellen.
+
+**Teil 3 — Splitter pro Spalte unabhaengig + persistent**
+
+*Layout-Refactor (Teil 3a):*
+Vorher hatte das Outer-Grid 3 Rows + 5 Cols, mit einem GridSplitter in
+Row 1 ueber ColumnSpan=3 - Spalten 1+2 teilten sich also einen
+horizontalen Splitter. Spalte 3 hatte ein eigenes Subgrid mit eigenem
+Splitter.
+
+Jetzt einheitlich: Outer-Grid hat 1 Row + 5 Cols. Jede der drei
+Inhalts-Spalten ist ein eigenes Subgrid mit `65*/5/35*`-RowDefinitions
+und einem eigenen GridSplitter. Damit kann der User die Hoehen pro
+Spalte unabhaengig verschieben.
+
+x:Name auf den Subgrid-Rows (`Col1TopRow`/`Col1BotRow`/`Col2TopRow`/
+`Col2BotRow`/`Col3TopRow`/`Col3BotRow`) damit der Code-Behind sie
+referenzieren kann.
+
+*Persistierung (Teil 3b):*
+Drei neue Properties in `AppSettings.WindowState`:
+- `Column1HorizontalSplitterRatio` (Anteil obere Box in Spalte 1, 0..1)
+- `Column2HorizontalSplitterRatio`
+- `Column3HorizontalSplitterRatio`
+Default jeweils `0.65` (entspricht 65/35-Layout).
+
+`SplitterRowRatio` aus Phase 4 ist als DEPRECATED markiert - das war
+ein gemeinsames Verhaeltnis fuer das alte 2x2-Layout, wird durch die
+drei Pro-Spalten-Werte abgeloest. Bleibt im POCO erhalten damit alte
+settings.json beim Laden keinen Crash macht.
+
+Persistierungs-Mechanik:
+- Bei jedem `DragCompleted` der drei horizontalen Splitter:
+  Top-Row.ActualHeight / (Top + Bot).ActualHeight rechnen, in Settings
+  schreiben, `_ = SaveAsync()` (fire-and-forget).
+- Beim `Loaded`-Event: `ApplySplitterRatios` setzt die `RowDefinition.
+  Height` jeder Spalte aus den Settings.
+- Defensiv: `ClampOrDefault` faengt `NaN`, Infinity und Out-of-Range-
+  Werte ([0.05..0.95] erlaubt) ab und faellt auf Default 0.65 zurueck.
+
+Backwards-Compat:
+- Alte settings.json ohne diese Properties laedt sauber - System.Text.
+  Json belaesst fehlende Felder auf POCO-Default.
+- settings.json mit unbekannten Zukunftsfeldern wird tolerant
+  geladen (Test in `WindowStateSplitterRatiosTests`).
+
+**Tests (9 neu in `WindowStateSplitterRatiosTests.cs`):**
+- Defaults = 0.65 fuer alle drei Spalten.
+- Alte JSON ohne horizontale Properties laedt mit Defaults.
+- Round-Trip erhaelt gesetzte Werte.
+- Tolerantes Laden bei unbekannten Zukunftsfeldern.
+- Out-of-range-Werte (negativ, > 1, ueber/unter Min/Max) round-trippen
+  ohne Crash; Clamping passiert beim Apply im Code-Behind.
+
+NaN/Infinity koennen vom JsonSerializer per Default nicht serialisiert
+werden, lassen sich also nicht aus normalen Schreibvorgaengen in der
+settings.json landen. Der `ClampOrDefault`-Pfad faengt sie trotzdem
+ab als Defensiv-Schutz; ein UI-Test dafuer waere disproportional.
+
 #### Sortier-Tab Layout final (UX-Iteration X.18, 2026-05-05)
 
 Sortier-Tab final als 3 gleich breite Spalten mit klar verteilten
