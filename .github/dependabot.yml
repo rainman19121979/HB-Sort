@@ -15,6 +15,12 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    # Markdig-Major-Bumps blockieren: Markdig.Wpf 0.5.0.1 ist gegen Markdig 0.x
+    # gebaut und hat keine 1.x-kompatible Version. Patch- und Minor-Updates
+    # innerhalb von 0.x werden weiter aufgemacht.
+    ignore:
+      - dependency-name: "Markdig"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
