@@ -73,6 +73,41 @@ Resources/
 !/HBSort/Resources/Help/**
 
 # ============================================
+# Lokale App-Daten (KRITISCH - duerfen nie ins Repo)
+# ============================================
+# SQLite-Datenbanken (userdata.db, bl_cache.db, etc.) - enthalten
+# persoenliche Sortier-Daten und API-Cache. Auch Sidecar-Files (-shm/-wal).
+*.db
+*.db-shm
+*.db-wal
+
+# settings.json enthaelt DPAPI-verschluesselte BL-Tokens. Auch wenn
+# der Inhalt kryptografisch geschuetzt ist: gehoert nicht ins Repo.
+settings.json
+
+# User-Bilder + Scan-Snapshots, falls sie im Projekt-Ordner landen
+# (Default-Pfad ist AppData, aber defensiv ausschliessen).
+images/
+scans/
+
+# Migrations-Marker aus dem LegoMinifigSorter-Rename-Schritt.
+MIGRATED_TO_HBSort.txt
+
+# ============================================
+# Publish-Output (Release-Builds)
+# ============================================
+# dotnet publish landet hier (Self-Contained-Builds, mehrere 100 MB).
+publish/
+
+# ============================================
+# Interne Berichte (nicht fuer Public-Repo)
+# ============================================
+CODE_AUDIT_REPORT.md
+CODE_CHECK_REPORT.md
+HBSort_Test_Checkliste.pdf
+*.pdf
+
+# ============================================
 # Logs
 # ============================================
 *.log
@@ -84,6 +119,8 @@ logs/
 TestResults/
 coverage/
 *.trx
+*.coverage
+*.coveragexml
 
 # ============================================
 # Temporary / Backup
