@@ -22,13 +22,18 @@ on:
 permissions:
   contents: write   # benoetigt fuer das Anlegen des Releases
 
+# Node-24-Opt-in fuer alle JavaScript-Actions (siehe build.yml).
+# softprops/action-gh-release@v2 ist eine JS-Action und profitiert davon.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   release:
     runs-on: windows-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Volle Historie noetig fuer "git describe" + Release-Notes-Generation.
           fetch-depth: 0
