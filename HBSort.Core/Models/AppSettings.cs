@@ -35,9 +35,6 @@ public class AppSettings
     /// <summary>Pause zwischen zwei Scans in Millisekunden (verhindert Doppelscans)</summary>
     public int ScanCooldownMs { get; set; } = 1000;
 
-    /// <summary>Wie lange das Bild nach dem Scan eingefroren wird (in Millisekunden)</summary>
-    public int FreezeFrameMs { get; set; } = 1000;
-
     /// <summary>Sound-Effekte an/aus (Default: aus)</summary>
     public bool SoundEnabled { get; set; } = false;
 

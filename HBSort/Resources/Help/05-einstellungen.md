@@ -16,9 +16,6 @@ in der Header-Leiste. Sie sind in Tabs gegliedert.
     als "nicht erkannt".
 - **Scan-Cooldown** - Pause zwischen zwei Scans, verhindert
   Doppelscans (Default 1000 ms).
-- **Freeze-Frame-Dauer** - wie lange das Bild nach dem Scan eingefroren
-  bleibt (Default 1000 ms).
-- **UI-Dichte** - Kompakt / Normal / Komfortabel.
 - **Sound-Effekte** - akustisches Feedback (Default aus).
 - **Tooltips anzeigen** - blendet alle Tooltips aus, falls sie dich
   stoeren. Default an.

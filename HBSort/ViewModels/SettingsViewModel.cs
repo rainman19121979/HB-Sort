@@ -62,9 +62,6 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private int _scanCooldownMs;
 
-    [ObservableProperty]
-    private int _freezeFrameMs;
-
     // --- Sonstiges ---
 
     [ObservableProperty]
@@ -316,7 +313,6 @@ public partial class SettingsViewModel : ObservableObject
         ScoreThresholdMin = s.ScoreThresholdMin;
         ScoreThresholdShowSelection = s.ScoreThresholdShowSelection;
         ScanCooldownMs = s.ScanCooldownMs;
-        FreezeFrameMs = s.FreezeFrameMs;
         SoundEnabled = s.SoundEnabled;
         ShowTooltips = s.ShowTooltips;
         PreferBricklinkImages = s.ImageCache.PreferBricklinkImages;
@@ -356,7 +352,6 @@ public partial class SettingsViewModel : ObservableObject
         s.ScoreThresholdMin = ScoreThresholdMin;
         s.ScoreThresholdShowSelection = ScoreThresholdShowSelection;
         s.ScanCooldownMs = ScanCooldownMs;
-        s.FreezeFrameMs = FreezeFrameMs;
         s.SoundEnabled = SoundEnabled;
         s.ShowTooltips = ShowTooltips;
         s.ImageCache.PreferBricklinkImages = PreferBricklinkImages;

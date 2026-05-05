@@ -121,31 +121,16 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="60"/>
                             </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition/>
-                                <RowDefinition/>
-                            </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" Text="Scan-Cooldown:"
+                            <TextBlock Text="Scan-Cooldown:"
                                        VerticalAlignment="Center"
                                        ToolTip="Pause zwischen zwei Scans (verhindert Doppelscans)"/>
-                            <Slider Grid.Row="0" Grid.Column="1"
+                            <Slider Grid.Column="1"
                                     Minimum="500" Maximum="3000"
                                     Value="{Binding ScanCooldownMs}"
                                     TickFrequency="100" IsSnapToTickEnabled="True"/>
-                            <TextBlock Grid.Row="0" Grid.Column="2"
+                            <TextBlock Grid.Column="2"
                                        Text="{Binding ScanCooldownMs, StringFormat='{}{0} ms'}"
-                                       VerticalAlignment="Center" HorizontalAlignment="Right"/>
-
-                            <TextBlock Grid.Row="1" Text="Freeze-Dauer:"
-                                       VerticalAlignment="Center" Margin="0,8,0,0"
-                                       ToolTip="Wie lange das Bild nach dem Scan eingefroren bleibt"/>
-                            <Slider Grid.Row="1" Grid.Column="1" Margin="0,8,0,0"
-                                    Minimum="500" Maximum="3000"
-                                    Value="{Binding FreezeFrameMs}"
-                                    TickFrequency="100" IsSnapToTickEnabled="True"/>
-                            <TextBlock Grid.Row="1" Grid.Column="2" Margin="0,8,0,0"
-                                       Text="{Binding FreezeFrameMs, StringFormat='{}{0} ms'}"
                                        VerticalAlignment="Center" HorizontalAlignment="Right"/>
                         </Grid>
 
