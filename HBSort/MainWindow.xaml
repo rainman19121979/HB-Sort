@@ -200,14 +200,32 @@
                       IsHitTestVisible="False">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
+                    <!--
+                        UX X.20 Teil 5: Toasts mit optionalem Item-Bild links.
+                        HasImage steuert die Visibility - bei Toasts ohne Bild
+                        bleibt das Layout schmal wie vorher.
+                    -->
                     <Border Background="{Binding Kind, Converter={StaticResource ToastKindToBrush}}"
                             CornerRadius="6" Padding="14,10" Margin="0,4"
-                            MinWidth="280" MaxWidth="420"
+                            MinWidth="280" MaxWidth="440"
                             Effect="{x:Null}">
-                        <TextBlock Text="{Binding Message}"
-                                   Foreground="White"
-                                   FontSize="13"
-                                   TextWrapping="Wrap"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Image Grid.Column="0"
+                                   Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
+                                   Width="32" Height="32" Stretch="Uniform"
+                                   Margin="0,0,10,0"
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding HasImage, Converter={StaticResource BoolToVisibility}}"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Message}"
+                                       Foreground="White"
+                                       FontSize="13"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
                     </Border>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>

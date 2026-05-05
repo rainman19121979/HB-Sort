@@ -105,8 +105,10 @@ public partial class PartLookupView : UserControl
                 vm.PartName, vm.ColorName,
                 vm.FloatingQuantity, vm.SelectedFloatingBin.Id);
 
+            // UX X.20 Teil 5: Toast mit Item-Bild + neue Wortwahl "eingelagert".
             notif.ShowSuccess(
-                $"{vm.FloatingQuantity}x '{vm.PartName}' im Fach '{vm.SelectedFloatingBin.Label}' gelagert.");
+                $"{vm.FloatingQuantity}x '{vm.PartName}' in {vm.SelectedFloatingBin.Label} eingelagert.",
+                vm.ImageUrl);
 
             var scan = GetScanViewModel();
             if (scan != null) scan.PendingPart = null;

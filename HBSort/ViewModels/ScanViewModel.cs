@@ -1200,22 +1200,27 @@ public partial class ScanViewModel : ObservableObject
 
             var result = await _persistenceService.PersistAndStoreAsync(input);
 
-            // Toast je nach Ergebnis (Phase 6: Komplettierungs-Toast einheitlich).
+            // UX X.20 Teil 5: Toast mit Item-Bild. Bei Auto-Komplettierung
+            // kombinierter Hinweis ("komplett in Box X").
+            var toastImage = pending.ImageUrl;
             if (result.IsFullyComplete)
             {
                 _notifications.ShowSuccess(
-                    $"Figur '{pending.Name}' ist komplett!");
+                    $"Figur '{pending.Name}' komplett in {pending.SelectedBin?.Label ?? "(kein Fach)"}!",
+                    toastImage);
             }
             else if (result.ReverseMatchedFloating > 0)
             {
                 _notifications.ShowSuccess(
-                    $"Figur '{pending.Name}' im Fach '{pending.SelectedBin.Label}' angelegt. " +
-                    $"{result.ReverseMatchedFloating} passende Teil(e) aus dem Pool uebernommen.");
+                    $"'{pending.Name}' in {pending.SelectedBin?.Label} eingelagert. " +
+                    $"{result.ReverseMatchedFloating} passende Teil(e) aus dem Pool uebernommen.",
+                    toastImage);
             }
             else
             {
                 _notifications.ShowSuccess(
-                    $"Figur '{pending.Name}' im Fach '{pending.SelectedBin.Label}' angelegt.");
+                    $"'{pending.Name}' in {pending.SelectedBin?.Label} eingelagert.",
+                    toastImage);
             }
 
             // Pending ausblenden, Top-3 wiederherstellen
