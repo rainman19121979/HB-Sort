@@ -48,8 +48,13 @@ jobs:
           echo "version=$version" >> $env:GITHUB_OUTPUT
           Write-Host "Release-Version: $version"
 
+      # Hinweis: HBSort.slnx ist das neue XML-Solution-Format (ab .NET 9 SDK).
+      # Der GitHub-Runner mit dotnet 8.0.x kennt es nicht - wir restoren das
+      # csproj direkt; das dotnet publish unten zieht die Dependencies
+      # (HBSort.Core) ohnehin transitiv mit.
+
       - name: Restore
-        run: dotnet restore HBSort.slnx
+        run: dotnet restore HBSort/HBSort.csproj
 
       - name: Publish (win-x64 self-contained)
         # Single-File mit IncludeNativeLibrariesForSelfExtract=true, damit
