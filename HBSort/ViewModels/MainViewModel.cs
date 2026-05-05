@@ -136,10 +136,22 @@ public partial class MainViewModel : ObservableObject
         _rateLimiter = rateLimiter;
 
         // Letzten Tab-Index (variables Feld unten rechts) aus den Settings laden.
-        // Default 0 (= Lagerfaecher). Direkt auf das Backing-Field, damit der
+        // Default 0 (Live-Stats). Direkt auf das Backing-Field, damit der
         // OnXxxChanged-Hook nicht direkt beim Laden ein Save triggert.
+        //
+        // Die Tab-Reihe hat heute drei Tabs (UX X.18):
+        //   0 = Live-Stats, 1 = Wartende-Detail, 2 = Letzte Scans.
+        //
+        // Migration aelterer settings.json:
+        //   UX X.15 hatte 5 Tabs (0=Lagerfaecher, 1=Was kann ich bauen?, ...)
+        //   UX X.16 hatte 4 Tabs (0=Was kann ich bauen?, 1=Live-Stats, ...)
+        //   UX X.18 hat  3 Tabs (0=Live-Stats, ...)
+        // Wir clampen alte Werte einfach auf den heutigen Bereich [0..2];
+        // damit landen "Was kann ich bauen?"-Werte auf Live-Stats - der User
+        // verliert nichts inhaltlich, weil die Build-Suggestions jetzt
+        // dauerhaft in Spalte 3 oben sichtbar sind.
         var savedTabIndex = settingsService.Current.BottomRightTabIndex ?? 0;
-        if (savedTabIndex < 0 || savedTabIndex > 4) savedTabIndex = 0;
+        if (savedTabIndex < 0 || savedTabIndex > 2) savedTabIndex = 0;
         _bottomRightSelectedTabIndex = savedTabIndex;
 
         var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
