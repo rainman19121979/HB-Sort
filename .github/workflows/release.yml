@@ -23,7 +23,7 @@ permissions:
   contents: write   # benoetigt fuer das Anlegen des Releases
 
 # Node-24-Opt-in fuer alle JavaScript-Actions (siehe build.yml).
-# softprops/action-gh-release@v2 ist eine JS-Action und profitiert davon.
+# softprops/action-gh-release@v3 ist eine JS-Action und profitiert davon.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -107,7 +107,7 @@ jobs:
           Write-Host "Release-Notes generiert ($($notes.Length) Zeichen)."
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: HBSort-${{ steps.version.outputs.version }}-win-x64.zip
           body_path: release_notes.md
