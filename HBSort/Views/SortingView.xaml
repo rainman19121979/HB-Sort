@@ -429,11 +429,10 @@
             </TabControl>
         </Border>
 
-        <!-- ===== SPALTE 3 (UX-Iteration X.4) =====
-             Zwei vertikal gestapelte leere Borders. Inhalte kommen spaeter -
-             Layout schon mal vorbereitet. Innerer Grid mit 65*/35* fuer das
-             Verhaeltnis (analog zur Haupt-Zeile). Borders bleiben absichtlich
-             ohne Inhalt und ohne Platzhalter-Text. -->
+        <!-- ===== SPALTE 3 (UX-Iteration X.18) =====
+             Subgrid mit eigenem 65*/35*-Verhaeltnis (analog Spalten 1+2).
+             - Oben (groesser): kommt im naechsten Commit (BuildSuggestionsView).
+             - Unten (kleiner): MinifigPriceView (von oben hierhin verschoben). -->
         <Grid Grid.Row="0" Grid.RowSpan="3" Grid.Column="4">
             <Grid.RowDefinitions>
                 <RowDefinition Height="65*"/>
@@ -441,9 +440,15 @@
                 <RowDefinition Height="35*"/>
             </Grid.RowDefinitions>
 
-            <!-- Obere Box (groesser) - UX#12: BL-Preise wenn eine Minifig gerade
-                 gescannt ist. Bei Pending-Part oder kein Pending: Box bleibt leer. -->
+            <!-- Obere Box (groesser) - Inhalt folgt im naechsten Commit. -->
             <Border Grid.Row="0"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                    BorderThickness="1" CornerRadius="4"/>
+
+            <!-- Untere Box (kleiner) - UX X.18: BL-Preise gewandert von oben.
+                 Sichtbar wenn Pending-Minifig aktiv; sonst Idle/leer-Zustand
+                 (kommt aus dem MinifigPriceView selbst). -->
+            <Border Grid.Row="2"
                     BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                     BorderThickness="1" CornerRadius="4"
                     Padding="8">
@@ -457,11 +462,6 @@
                     </ContentControl.ContentTemplate>
                 </ContentControl>
             </Border>
-
-            <!-- Untere Box (kleiner) - aktuell leer, Inhalt folgt spaeter -->
-            <Border Grid.Row="2"
-                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                    BorderThickness="1" CornerRadius="4"/>
         </Grid>
     </Grid>
 </UserControl>
