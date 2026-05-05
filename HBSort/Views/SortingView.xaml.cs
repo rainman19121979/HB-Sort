@@ -98,6 +98,8 @@ public partial class SortingView : UserControl
     private void Col1HorizontalSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
     {
         Log.Information("[SPLITTER] Col1HorizontalSplitter_DragCompleted FIRED");
+        DiagnoseDragCompleted(sender, columnNumber: 1, Col1TopRow, Col1BotRow);
+
         var ratio = ComputeRowRatio(Col1TopRow, Col1BotRow, columnNumber: 1);
         if (ratio.HasValue)
         {
@@ -116,6 +118,8 @@ public partial class SortingView : UserControl
     private void Col2HorizontalSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
     {
         Log.Information("[SPLITTER] Col2HorizontalSplitter_DragCompleted FIRED");
+        DiagnoseDragCompleted(sender, columnNumber: 2, Col2TopRow, Col2BotRow);
+
         var ratio = ComputeRowRatio(Col2TopRow, Col2BotRow, columnNumber: 2);
         if (ratio.HasValue)
         {
@@ -134,6 +138,8 @@ public partial class SortingView : UserControl
     private void Col3HorizontalSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
     {
         Log.Information("[SPLITTER] Col3HorizontalSplitter_DragCompleted FIRED");
+        DiagnoseDragCompleted(sender, columnNumber: 3, Col3TopRow, Col3BotRow);
+
         var ratio = ComputeRowRatio(Col3TopRow, Col3BotRow, columnNumber: 3);
         if (ratio.HasValue)
         {
@@ -146,6 +152,71 @@ public partial class SortingView : UserControl
         {
             Log.Information("[SPLITTER] Col3 ratio=null -> kein Save");
         }
+    }
+
+    /// <summary>
+    /// Diagnose-Helfer fuer Hypothesen B + C. Wird in jedem
+    /// Col[N]HorizontalSplitter_DragCompleted aufgerufen.
+    ///
+    /// Hypothese B: zeigt die x:Name-Referenz (top/bot) auf das gleiche
+    /// RowDefinition-Objekt, das auch im Parent-Grid des Splitters steht?
+    /// Falls nein: x:Name ist auf eine andere RowDefinition gemappt als
+    /// der Splitter manipuliert.
+    ///
+    /// Hypothese C: ist die ActualHeight zum Zeitpunkt des DragCompleted-
+    /// Events bereits aktualisiert? Wir lesen die Werte direkt UND erneut
+    /// per Dispatcher.BeginInvoke mit drei verschiedenen Prioritaeten.
+    /// Wenn ein spaeterer Read andere Werte liefert: Layout-Pass-Race.
+    /// </summary>
+    private void DiagnoseDragCompleted(object sender, int columnNumber,
+        RowDefinition top, RowDefinition bot)
+    {
+        // Hypothese B: x:Name vs Parent-Grid-RowDefinitions
+        Log.Information("[DIAG-B] Col{N} via x:Name TopActual={T} BotActual={B}",
+            columnNumber, top.ActualHeight, bot.ActualHeight);
+
+        if (sender is GridSplitter splitter && splitter.Parent is Grid subGrid)
+        {
+            Log.Information("[DIAG-B] Col{N} via Parent.Rows.Count={C}",
+                columnNumber, subGrid.RowDefinitions.Count);
+            if (subGrid.RowDefinitions.Count >= 3)
+            {
+                var parentTop = subGrid.RowDefinitions[0];
+                var parentBot = subGrid.RowDefinitions[2];
+                Log.Information("[DIAG-B] Col{N} Parent.Rows[0].ActualHeight={A0} Rows[2].ActualHeight={A2}",
+                    columnNumber, parentTop.ActualHeight, parentBot.ActualHeight);
+                Log.Information("[DIAG-B] Col{N} HashCheck topX={Tx} parentTop={Pt} -> SameRef={Same}",
+                    columnNumber, top.GetHashCode(), parentTop.GetHashCode(),
+                    ReferenceEquals(top, parentTop));
+                Log.Information("[DIAG-B] Col{N} HashCheck botX={Bx} parentBot={Pb} -> SameRef={Same}",
+                    columnNumber, bot.GetHashCode(), parentBot.GetHashCode(),
+                    ReferenceEquals(bot, parentBot));
+            }
+        }
+        else
+        {
+            Log.Information("[DIAG-B] Col{N} sender ist kein GridSplitter mit Grid-Parent (Sender={S})",
+                columnNumber, sender?.GetType().Name ?? "null");
+        }
+
+        // Hypothese C: Layout-Pass-Race - lesen wir nochmal spaeter
+        var topRef = top;
+        var botRef = bot;
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+        {
+            Log.Information("[DIAG-C] Col{N} via BeginInvoke Input: TopActual={T} BotActual={B}",
+                columnNumber, topRef.ActualHeight, botRef.ActualHeight);
+        }));
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        {
+            Log.Information("[DIAG-C] Col{N} via BeginInvoke Loaded: TopActual={T} BotActual={B}",
+                columnNumber, topRef.ActualHeight, botRef.ActualHeight);
+        }));
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+        {
+            Log.Information("[DIAG-C] Col{N} via BeginInvoke Background: TopActual={T} BotActual={B}",
+                columnNumber, topRef.ActualHeight, botRef.ActualHeight);
+        }));
     }
 
     /// <summary>
@@ -233,6 +304,18 @@ public partial class SortingView : UserControl
         ApplyRowRatio(Col3TopRow, Col3BotRow, ws.Column3HorizontalSplitterRatio);
         Log.Information("[SPLITTER] AFTER Col=3 TopActual={T} BotActual={B}",
             Col3TopRow.ActualHeight, Col3BotRow.ActualHeight);
+
+        // Hypothese A: zeigen die x:Name-Felder auf unterschiedliche
+        // RowDefinition-Instanzen, oder hat das inkrementelle Build-System
+        // die Generierung kaputtgemacht?
+        Log.Information("[DIAG-A] Col1TopRow.GetHashCode={H1} Col2TopRow.GetHashCode={H2} Col3TopRow.GetHashCode={H3}",
+            Col1TopRow?.GetHashCode() ?? -1,
+            Col2TopRow?.GetHashCode() ?? -1,
+            Col3TopRow?.GetHashCode() ?? -1);
+        Log.Information("[DIAG-A] Col1BotRow.GetHashCode={H1} Col2BotRow.GetHashCode={H2} Col3BotRow.GetHashCode={H3}",
+            Col1BotRow?.GetHashCode() ?? -1,
+            Col2BotRow?.GetHashCode() ?? -1,
+            Col3BotRow?.GetHashCode() ?? -1);
     }
 
     /// <summary>
