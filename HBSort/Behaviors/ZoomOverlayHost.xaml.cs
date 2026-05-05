@@ -8,12 +8,12 @@ namespace HBSort.Behaviors;
 /// <summary>
 /// Code-Behind fuer den ZoomOverlayHost. Wird vom ImageZoom-Helper aufgerufen
 /// (siehe ImageZoom.cs::Show), zeigt das uebergebene Bild gross an und sorgt
-/// dafuer dass Klick ausserhalb / ESC / X-Button das Overlay wieder schliesst.
+/// dafuer dass Klick irgendwo im Popup oder ESC das Overlay wieder schliesst.
 ///
-/// "Klick ausserhalb des Bildes" wird so erkannt: der schwarze Hintergrund-Grid
-/// hat einen MouseLeftButtonUp-Handler der schliesst; alles auf dem Bild oder
-/// dem inneren Border ruft einen anderen Handler auf der das Event als handled
-/// markiert (so wird das Schliessen unterdrueckt).
+/// UX X.20 Teil 3: Klick IRGENDWO im Popup-Bereich schliesst (vorher: nur
+/// dunkler Hintergrund + ESC; Bild-Klick war No-op). Der innere Border-Handler
+/// wurde entfernt; Klick auf Bild oder Border bubblet jetzt zum Hintergrund-
+/// Grid und schliesst dort.
 /// </summary>
 public partial class ZoomOverlayHost : UserControl
 {
@@ -40,20 +40,14 @@ public partial class ZoomOverlayHost : UserControl
         ZoomedImage.Source = null;
     }
 
-    /// <summary>Klick auf den dunklen Hintergrund -> schliessen.</summary>
+    /// <summary>
+    /// UX X.20 Teil 3: Klick IRGENDWO im Overlay schliesst. Da der innere
+    /// Border und das Bild selbst keinen eigenen MouseLeftButtonUp-Handler
+    /// mehr haben, bubblet jeder Klick zum Hintergrund-Grid und landet hier.
+    /// </summary>
     private void Background_MouseUp(object sender, MouseButtonEventArgs e)
     {
         Hide();
-        e.Handled = true;
-    }
-
-    /// <summary>
-    /// Klick auf den inneren Border oder das Bild selbst: NICHT schliessen.
-    /// Wir markieren das Event als handled damit der Background-Handler
-    /// nicht auch noch greift (Event-Bubbling).
-    /// </summary>
-    private void Border_MouseUp(object sender, MouseButtonEventArgs e)
-    {
         e.Handled = true;
     }
 

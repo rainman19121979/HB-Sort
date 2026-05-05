@@ -5,29 +5,30 @@
              Focusable="True"
              KeyDown="OnKeyDown">
     <!--
-        Modal-Overlay fuer Bilder (UX-Iteration X.4). Wird ins MainWindow als
-        oberste Schicht gelegt. Bei aktivem Overlay halbtransparenter Hintergrund
-        + grosses Bild + X-Button zum Schliessen.
+        Modal-Overlay fuer Bilder. UX X.20 Teil 3: Klick IRGENDWO im Popup
+        schliesst es (Hintergrund, Bild, Border-Padding, X-Button). Vorher
+        schloss nur der dunkle Hintergrund + ESC-Taste; ein Klick aufs
+        Bild war ein No-op.
 
-        Schliessen: Klick ausserhalb des Bildes, ESC-Taste, X-Button.
-
-        Statt eines Converters nutzen wir Margin auf dem Bild-Border, damit
-        rundherum ~10% Luft bleibt - das ergibt visuell die geforderten "~80%
-        der Fensterflaeche" ohne zusaetzliche Converter-Dependency.
+        Wir lassen den X-Button als visuelles Affordance drin - User die
+        nicht wissen "klick irgendwo schliesst das" finden ihn intuitiv.
     -->
-    <Grid Background="#B0000000" MouseLeftButtonUp="Background_MouseUp">
+    <Grid Background="#B0000000"
+          MouseLeftButtonUp="Background_MouseUp"
+          ToolTip="Klick irgendwo zum Schliessen">
         <Border Margin="60"
                 HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                 Background="#22000000" CornerRadius="6"
-                Padding="12"
-                MouseLeftButtonUp="Border_MouseUp">
+                Padding="12">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <!-- X-Button oben rechts -->
+                <!-- X-Button oben rechts. Cursor=Hand und eigener Click-Handler;
+                     wir verhindern das Bubbling NICHT mehr - selbst wenn der
+                     Hintergrund-Handler greift, das Resultat ist dasselbe. -->
                 <Button Grid.Row="0" Content="✕"
                         HorizontalAlignment="Right"
                         Width="32" Height="32"
@@ -38,10 +39,10 @@
                         Click="Close_Click"
                         ToolTip="Schliessen (ESC)"/>
 
-                <!-- Das vergroesserte Bild. Source wird im Code-Behind gesetzt. -->
+                <!-- Das vergroesserte Bild. Klick darauf schliesst auch.
+                     Source wird im Code-Behind gesetzt. -->
                 <Image x:Name="ZoomedImage" Grid.Row="1"
-                       Stretch="Uniform"
-                       MouseLeftButtonUp="Border_MouseUp"/>
+                       Stretch="Uniform"/>
             </Grid>
         </Border>
     </Grid>
