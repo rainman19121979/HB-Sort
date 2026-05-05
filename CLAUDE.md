@@ -1120,6 +1120,137 @@ einem Build vor UX X.6.
   (Box 002, Box 005, Box 008)"). Helper-Methode `BuildReleaseBinsLabel`.
 - Singular/Plural je nach Anzahl korrekt formuliert.
 
+#### Detail-Popups + Lagerfach-Optik + Shortcuts (UX-Iteration X.20, 2026-05-05)
+
+Sieben Verbesserungen rund um den Sortier-Tab, das Figur-Detail-Popup
+und das globale Tastatur-System.
+
+**Teil 1 — Einzelteil-Detail-Popup als eigener Dialog**
+- Neuer `FloatingPartDetailDialog` (Window) ersetzt die alte
+  `IDialogService.ShowInfoAsync`-Plain-Text-Variante in der Lagerliste.
+- Layout im Stil von `MinifigSummaryDialog`: Bild oben links (100x100,
+  klickbar), Header rechts mit Name + BL-Part-ID + Lagerfach-Badge,
+  Eigenschaften-Block mit Color-Swatch + Anzahl, Schliessen-Button
+  unten rechts (`IsCancel="True"`).
+- Bild laed async ueber `IPartImageProvider` mit
+  `BitmapCacheOption.OnLoad` (analog Audit W-7).
+
+**Teil 2 — Name+Bild-Konvention an fehlenden Stellen**
+- Bestandsaufnahme der Verdachts-Stellen, konkret angefasst:
+  - `RecentScansView` ("Letzte Scans"-Tab): pro Eintrag ein 28x28-
+    Thumbnail links, async via `IPartImageProvider` geladen.
+    `ScanEventDisplay` ist jetzt `ObservableObject` mit
+    `[ObservableProperty] _imageUrl`.
+- Bewusst NICHT angefasst:
+  - LiveStatsView (zeigt nur Counter).
+  - WaitingDetailView fehlende-Teile-Liste (Bewusst kompakt -
+    7 Mini-Bilder pro Karte schaedigen die Lesbarkeit).
+  - Status-Bar / Dropdown-Listen (kein Item-Bezug).
+- Toasts: bereits in Teil 5 mit Bild-Support ausgestattet.
+
+**Teil 3 — Zoom-Popup ueberall klickbar**
+- Klick IRGENDWO im Overlay schliesst (vorher: nur dunkler Hintergrund
+  + ESC; Bild-Klick war No-op).
+- Inneren Border_MouseUp-Handler entfernt; alle Klicks bubblen
+  ungehindert zum Hintergrund-Grid und schliessen dort.
+- Tooltip am Hintergrund "Klick irgendwo zum Schliessen".
+
+**Teil 4 — Lagerfach-Bereich prominenter**
+- In `MinifigDetailView` und `PartLookupView` ist der Lagerfach-
+  Bereich jetzt in einem InfoBox-Border (helles Blau,
+  StatusInfoBrush) - klar abgesetzt vom Rest der View.
+- Box-Icon (📦) vor dem Label, Akzentfarbe.
+- Dropdown auf MinHeight=34 + FontSize=13 (~1.3x Default).
+- In PartLookupView wandert der Smart-Storage-Hint (UX X.7) in
+  denselben Container - thematische Verbindung visuell sichtbar.
+
+**Teil 5 — Bestaetigungs-Toast nach Einlagern (mit Bild)**
+- `INotificationService.ShowSuccess(message, imageUrl=null)` mit
+  optionalem Item-Bild.
+- `ToastItem.ImageUrl` + `HasImage` (Binding-freundlich).
+- MainWindow-ToastTemplate: 32x32-Image links + Text rechts;
+  HasImage steuert Visibility - Toasts ohne Bild bleiben schmal.
+- Nach erfolgreichem Einlagern Toast in der Form
+  "{Name} in {Bin} eingelagert" mit dem Item-Bild.
+- Bei Auto-Komplettierung (durch Reverse-Match): kombinierter Toast
+  "{Name} komplett in {Bin}!" - kein zweiter Toast.
+
+**Teil 6 — Shortcut-System (Leertaste-Fix + Tab-Wechsel)**
+
+*6a Leertaste-Bug:* `PreviewKeyDown`-Handler im MainWindow faengt
+Space VOR der Standard-WPF-Logik ab. Border/RadioButton/TabItem
+haben sonst eigene Space-Aktionen, die InputBindings ueberlaufen.
+`IsTextInputFocused`-Check (TextBox/PasswordBox/editierbare ComboBox)
+laesst Leerzeichen in Eingabefeldern unangetastet.
+
+*6b Tab-Wechsel + Settings:*
+| Shortcut | Aktion | Implementierung |
+|---|---|---|
+| Leertaste | Scan ausloesen | PreviewKeyDown (siehe oben) |
+| `Q` | Mehrfach-Scan-Dialog | bestand schon |
+| `Strg+Z` | Letzten Scan undo | bestand schon |
+| `F1` | Hilfe-Tab | bestand schon |
+| `Strg+S` | Sortieren-Tab | NEU |
+| `Strg+L` | Lagerliste-Tab | NEU |
+| `Strg+H` | Hilfe-Tab (Strg-Variante) | NEU |
+| `Strg+,` | Einstellungen | NEU (`OpenSettingsRequested`-Event vom VM) |
+| `Esc` | Modal-Dialog/Zoom-Popup schliessen | bestand (DialogService + ZoomOverlayHost) |
+
+*6c Hilfe-Doku:* `06-tipps.md` Tastatur-Kuerzel-Tabelle erweitert.
+
+**Bewusst NICHT umgesetzt** (Konflikt mit Standard-WPF/TextBox):
+- Ziffern 1/2/3 fuer Top-Treffer-Auswahl (TextBox-Eingabe-Konflikt)
+- +/- fuer Anzahl-Felder (TextBox)
+- Pfeiltasten / Pos1 / Ende (WPF-Listen + TextBox-Standard)
+- Entf-Taste fuer Lagerliste-Loeschen (TextBox-Standard)
+- F5 (Refresh) (Use-Case mehrdeutig)
+
+Diese Shortcuts wuerden Standard-Workflows brechen. Bei Bedarf
+einzeln nachruesten - dann aber mit eigenem Konflikt-Handling
+pro Tab.
+
+**Teil 7 — Figur-Detail-Popup vereinheitlicht**
+
+EINE Ansicht fuer wartende UND komplette Figuren, Status leitet sich
+live aus den Haekchen ab.
+
+*7a Layout:* Header + Haekchen-Liste + Verschieben-Combo + Buttons
+(Loeschen/Zerlegen/Verschieben/Schliessen) sind IMMER sichtbar.
+Status-Badge im Header reagiert live ("✓ KOMPLETT" gruen vs
+"WARTEND" orange).
+
+*7c "Wieder oeffnen"-Button entfernt:* aus XAML + Code-Behind
+(Reopen_Click). Status-Reset laeuft jetzt automatisch ueber das
+Toggling der Teile-Haekchen.
+
+*7d Verkaufsempfehlungs-Block entfernt:* aus
+`MinifigSummaryDialog.xaml` + `MinifigSummaryViewModel`. Die Live-
+Preise leben weiter in der `MinifigPriceView` im Sortier-Tab
+(Spalte 3 unten). `PriceCalculationService` bleibt im Core (treibt
+die MinifigPriceView). Korrektur zum Auftrag: der Service war NICHT
+schon entfernt - das war der Hintergrund-Eindruck im Audit; nur
+der UI-Block im Summary-Dialog war redundant.
+
+`MinifigSummaryViewModel`-ctor: `priceCalc` + `settings`-Parameter
+entfernt. Zwei Aufrufer (InventoryListView, WaitingDetailView)
+angepasst.
+
+*7e Statistik + Audit bei Status-Wechsel:*
+`PartLookupService.UnassignPartFromMinifigAsync` erweitert:
+- Wenn Status vorher Complete war: `DailyStats[CompletedAt-Date]
+  .MinifigsCompletedCount--` (best-effort).
+- ScanEvent-ResultDescription enthaelt "Status: Komplett -> Wartend".
+
+Tests (`PartLookupServiceTests`, 2 neu):
+- `UnassignPart_reverting_complete_decrements_DailyStats_and_writes_audit_event`
+- `UnassignPart_on_waiting_minifig_does_not_touch_DailyStats`
+
+*7f Edge-Case "alle Haekchen weg":* Figur bleibt als Wartende mit
+QuantityCollected=0 ueberall. Kein zusaetzlicher Hinweis-Text -
+Fortschrittsbalken auf 0 + WARTEND-Badge sind selbsterklaerend.
+
+Build sauber, 316/316 Tests gruen (vorher 314 + 2 neu).
+
 #### Sortier-Tab UX-Politur (UX-Iteration X.19, 2026-05-05)
 
 Drei Verbesserungen am Sortier-Tab nach UX X.18.
