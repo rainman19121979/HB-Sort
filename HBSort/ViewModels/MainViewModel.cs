@@ -181,6 +181,30 @@ public partial class MainViewModel : ObservableObject
         MainTabIndex = 2;
     }
 
+    // UX X.20 Teil 6: zusaetzliche globale Shortcuts.
+    // Tab-Wechsel - werden von KeyBindings im MainWindow.xaml getriggert
+    // (Strg+S / Strg+L / Strg+H).
+
+    /// <summary>Strg+S: Sortieren-Tab.</summary>
+    [RelayCommand] public void SwitchToSortingTab()   => MainTabIndex = 0;
+
+    /// <summary>Strg+L: Lagerliste-Tab.</summary>
+    [RelayCommand] public void SwitchToInventoryTab() => MainTabIndex = 1;
+
+    /// <summary>Strg+H: Hilfe-Tab (gleiche Aktion wie OpenHelp/F1, aber
+    /// eigener Command-Name fuer den Strg+H-Shortcut).</summary>
+    [RelayCommand] public void SwitchToHelpTab()      => MainTabIndex = 2;
+
+    /// <summary>
+    /// Strg+Komma: Einstellungen oeffnen. Wir feuern ein Event, das das
+    /// MainWindow auffaengt und den SettingsDialog oeffnet - das VM darf
+    /// kein Window direkt instanziieren.
+    /// </summary>
+    public event EventHandler? OpenSettingsRequested;
+
+    [RelayCommand]
+    public void OpenSettings() => OpenSettingsRequested?.Invoke(this, EventArgs.Empty);
+
     /// <summary>
     /// Liest den aktuellen RateLimitStatus und aktualisiert die UI-Properties.
     /// Wird bei jedem API-Call (via Event) und alle 60s (via Timer) aufgerufen.

@@ -30,6 +30,10 @@ public partial class MainWindow : Window
         _notifications = notifications;
 
         DataContext = _viewModel;
+
+        // UX X.20 Teil 6: Strg+, oeffnet Einstellungen. Das VM feuert das Event,
+        // weil es nicht selbst Window-Instanzen erstellen darf.
+        _viewModel.OpenSettingsRequested += (_, _) => OpenSettings_Click(this, new RoutedEventArgs());
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -58,6 +62,47 @@ public partial class MainWindow : Window
     {
         FocusTrap.Focus();
         Keyboard.Focus(FocusTrap);
+    }
+
+    /// <summary>
+    /// UX X.20 Teil 6a: Leertaste-Bug. Wenn der User auf eine Karte (Border),
+    /// einen RadioButton oder einen TabItem-Header klickt, behaelt das
+    /// Element den Tastatur-Fokus. Die Window.InputBinding fuer Space greift
+    /// dann NICHT, weil Border/RadioButton/TabItem die Leertaste als eigene
+    /// Aktion behandeln (Toggle / IsChecked / SelectedItem-Cycle).
+    ///
+    /// Der PreviewKeyDown-Handler greift bevor die Standard-WPF-Logik die
+    /// Leertaste an Border etc. weiterleitet. Wir feuern PerformScan und
+    /// markieren das Event als handled - aber NUR wenn das fokussierte
+    /// Element keine echte Text-Eingabe ist (TextBox / PasswordBox /
+    /// editierbare ComboBox), da der User dort sonst kein Leerzeichen mehr
+    /// eingeben koennte.
+    /// </summary>
+    private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Space) return;
+        if (IsTextInputFocused()) return;
+
+        var cmd = _viewModel.ScanViewModel.PerformScanCommand;
+        if (cmd.CanExecute(null))
+        {
+            cmd.Execute(null);
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// True wenn das aktuell tastatur-fokussierte Element echte Texteingabe
+    /// braucht. Wir sperren in dem Fall den Leertaste-Shortcut, damit der
+    /// User dort weiter Leerzeichen tippen kann.
+    /// </summary>
+    private static bool IsTextInputFocused()
+    {
+        var focused = Keyboard.FocusedElement;
+        if (focused is System.Windows.Controls.TextBox) return true;
+        if (focused is System.Windows.Controls.PasswordBox) return true;
+        if (focused is System.Windows.Controls.ComboBox cb && cb.IsEditable) return true;
+        return false;
     }
 
     private void Window_Closing(object sender, CancelEventArgs e)

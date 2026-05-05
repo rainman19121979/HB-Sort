@@ -9,10 +9,20 @@
 | `Strg + Z` | Letzten Scan rueckgaengig machen |
 | `F1` | Hilfe-Tab oeffnen *(diese Ansicht hier)* |
 | `Esc` | Modal-Dialog / Bild-Vergroesserung schliessen |
+| `Strg + S` | Sortieren-Tab aktivieren |
+| `Strg + L` | Lagerliste-Tab aktivieren |
+| `Strg + H` | Hilfe-Tab aktivieren |
+| `Strg + ,` | Einstellungen oeffnen |
 
-> **Hinweis:** Damit die Leertaste sicher feuert, klick einmal in den
-> Webcam-Bereich (oder ein leeres Stueck Hintergrund). Wenn ein
-> Eingabefeld den Fokus hat, geht die Leertaste in das Feld.
+> **Leertaste-Hinweis:** Das Scannen funktioniert auch wenn du gerade
+> auf eine Karte oder einen RadioButton geklickt hast. Nur in
+> Eingabefeldern (Suchfeld, Mengen-Feld, Notizen) bleibt die Leertaste
+> ein normales Leerzeichen.
+
+> **Bewusst weggelassen** (siehe CLAUDE.md UX X.20 Teil 6):
+> Zifferntasten 1/2/3 fuer Top-Treffer, +/- fuer Anzahl-Felder,
+> Pfeiltasten/Pos1/Ende, Entf-Taste fuer Loeschen. Die kollidieren
+> alle mit Standard-WPF-Verhalten in Eingabefeldern und DataGrids.
 
 ## Lagerliste effizient nutzen
 

@@ -12,24 +12,47 @@
         WindowState="Maximized"
         Closing="Window_Closing"
         Loaded="Window_Loaded"
+        PreviewKeyDown="MainWindow_PreviewKeyDown"
         ToolTipService.IsEnabled="{DynamicResource TooltipsEnabled}">
 
     <!--
         Window-weite KeyBindings: feuern unabhaengig vom Fokus eines einzelnen
-        Controls, sobald das Fenster aktiv ist. Loest das Problem, dass die
-        Leertaste zuvor an dem zuletzt fokussierten Button (z.B. "Einstellungen")
-        haengen blieb. Sicherheits-Check fuer TextBox-Fokus geschieht in den
-        Commands selbst (siehe ScanViewModel.PerformScanAsync).
+        Controls, sobald das Fenster aktiv ist. UX X.20 Teil 6: deutlich erweitert.
+
+        Leertaste hat einen ZUSAETZLICHEN PreviewKeyDown-Handler im Code-Behind -
+        siehe MainWindow_PreviewKeyDown -, weil InputBindings nicht greifen wenn
+        ein Border / TabItem / RadioButton den Tastatur-Fokus haelt (das passiert
+        nach Maus-Klicks). Der PreviewKeyDown faengt die Leertaste vor dem
+        Border ab und triggert PerformScan.
+
+        Bewusst NICHT umgesetzt (siehe CLAUDE.md UX X.20 Teil 6 fuer Begruendung):
+          - 1/2/3 (Top-3-Treffer uebernehmen): kollidiert mit TextBox-Eingabe
+            in Anzahl-Feldern
+          - +/- (Anzahl hoch/runter): kollidiert mit TextBox-Eingabe
+          - Pfeiltasten / Pos1 / Ende: WPF-Standard fuer Listen + TextBox -
+            wuerden Standard-Verhalten ueberschreiben
+          - Entf (Lagerliste-Loeschen): kollidiert mit TextBox-Standard
+          - F5 (Refresh): "aktueller Tab" ist mehrdeutig, kein klarer Use-Case
     -->
     <Window.InputBindings>
-        <KeyBinding Key="Space"
-                    Command="{Binding ScanViewModel.PerformScanCommand}"/>
         <KeyBinding Key="Q"
                     Command="{Binding ScanViewModel.OpenQuantityDialogCommand}"/>
         <KeyBinding Modifiers="Control" Key="Z"
                     Command="{Binding ScanViewModel.UndoLastScanCommand}"/>
         <KeyBinding Key="F1"
                     Command="{Binding OpenHelpCommand}"/>
+
+        <!-- UX X.20 Teil 6: Tab-Wechsel via Strg+S/L/H -->
+        <KeyBinding Modifiers="Control" Key="S"
+                    Command="{Binding SwitchToSortingTabCommand}"/>
+        <KeyBinding Modifiers="Control" Key="L"
+                    Command="{Binding SwitchToInventoryTabCommand}"/>
+        <KeyBinding Modifiers="Control" Key="H"
+                    Command="{Binding SwitchToHelpTabCommand}"/>
+
+        <!-- UX X.20 Teil 6: Einstellungen via Strg+Komma (Standard-Konvention). -->
+        <KeyBinding Modifiers="Control" Key="OemComma"
+                    Command="{Binding OpenSettingsCommand}"/>
     </Window.InputBindings>
 
     <Grid>
