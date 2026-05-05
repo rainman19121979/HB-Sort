@@ -19,13 +19,47 @@
             <ItemsControl ItemsSource="{Binding Items}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                                BorderThickness="1" CornerRadius="4"
-                                Padding="6" Margin="0,2">
+                        <!--
+                            UX X.19 Teil 2: Karte ist klickbar -> oeffnet
+                            MinifigSummaryDialog (gleicher Dialog wie der
+                            "Details"-Button in der Lagerliste).
+
+                            Klick-Aufteilung:
+                              - Bild  -> ImageZoom (Vergroesserung). Das
+                                Behavior setzt e.Handled=true, damit der
+                                Klick NICHT zum Border bubblet.
+                              - Border-Hintergrund / Text / Bin-Badge
+                                -> Card_Click im Code-Behind, oeffnet Dialog.
+                              - Tag traegt das Item-Objekt damit der Handler
+                                die Figur identifizieren kann.
+
+                            Hover-Effekt (Background-Wechsel) als visuelles
+                            Feedback dass die Karte klickbar ist.
+                        -->
+                        <Border BorderThickness="1" CornerRadius="4"
+                                Padding="6" Margin="0,2"
+                                Cursor="Hand"
+                                Background="Transparent"
+                                Tag="{Binding}"
+                                MouseLeftButtonUp="Card_Click"
+                                ToolTip="Details anzeigen">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="BorderBrush"
+                                            Value="{DynamicResource SystemControlForegroundBaseLowBrush}"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background"
+                                                    Value="{DynamicResource SystemControlBackgroundChromeMediumBrush}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="40"/>
                                     <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -42,14 +76,31 @@
                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
                                                FontSize="11"/>
                                     <TextBlock FontSize="10" Foreground="Gray">
-                                        <Run Text="{Binding BinLabel, Mode=OneWay}"/>
-                                        <Run Text=" • "/>
                                         <Run Text="{Binding MissingCount, Mode=OneWay}"/>
                                         <Run Text=" Teile fehlen"/>
                                     </TextBlock>
                                 </StackPanel>
 
-                                <ItemsControl Grid.Row="1" Grid.Column="1"
+                                <!--
+                                    Konsistent zu Teil 1: Bin-Badge in Akzent-Farbe.
+                                    Hier kompakter (FontSize 11, kein Padding) weil
+                                    die Karte selbst kleiner ist.
+                                -->
+                                <Border Grid.Row="0" Grid.Column="2"
+                                        Background="{StaticResource InfoBoxBackground}"
+                                        BorderBrush="{StaticResource StatusInfoBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Padding="6,2"
+                                        VerticalAlignment="Top">
+                                    <TextBlock FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{StaticResource StatusInfoBrush}">
+                                        <Run Text="📦"/>
+                                        <Run Text="{Binding BinLabel, Mode=OneWay}"/>
+                                    </TextBlock>
+                                </Border>
+
+                                <ItemsControl Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
                                               ItemsSource="{Binding MissingParts}"
                                               Margin="6,4,0,0">
                                     <ItemsControl.ItemTemplate>
