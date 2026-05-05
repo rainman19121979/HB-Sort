@@ -88,14 +88,13 @@ public partial class InventoryListView : UserControl
         }
         else
         {
-            // Einzelteil-Detail-Popup: kompakte Info ueber DialogService.
-            await Service<IDialogService>().ShowInfoAsync(
-                "Einzelteil-Details",
-                $"Beschreibung: {row.Description}\n" +
-                $"BL-Part-No:   {row.ItemId}\n" +
-                $"Farbe:        {row.ColorName} (BL:{row.ColorId})\n" +
-                $"Anzahl:       {row.Quantity}\n" +
-                $"Lagerfach:    {row.StorageBinLabel}");
+            // UX X.20 Teil 1: Einzelteil-Detail-Popup als eigener Dialog im
+            // Stil des MinifigSummaryDialog (statt der alten Plain-Text-
+            // ShowInfoAsync-Variante).
+            await System.Threading.Tasks.Task.CompletedTask; // Methode bleibt async wegen anderer Pfade.
+            var imgProvider = Service<IPartImageProvider>();
+            var dialog = new FloatingPartDetailDialog(row, imgProvider) { Owner = window };
+            dialog.ShowDialog();
         }
     }
 
