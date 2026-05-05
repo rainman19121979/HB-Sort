@@ -156,28 +156,9 @@ public partial class MinifigSummaryDialog : Window
         }
     }
 
-    /// <summary>
-    /// Phase 6: "Wieder oeffnen" - setzt eine komplette Figur zurueck auf Waiting.
-    /// </summary>
-    private async void Reopen_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var ok = await _persistence.ReopenAsync(_viewModel.MinifigId);
-            if (ok)
-            {
-                _notifications.ShowInfo($"Figur '{_viewModel.Name}' wieder als wartend markiert.");
-                DialogResult = true;
-                Close();
-            }
-        }
-        catch (System.Exception ex)
-        {
-            Log.Error(ex, "Reopen fehlgeschlagen");
-            await App.Services.GetRequiredService<IDialogService>()
-                .ShowErrorAsync("Fehler", ex.Message);
-        }
-    }
+    // UX X.20 Teil 7: "Wieder oeffnen"-Button + Reopen_Click-Handler entfernt.
+    // Status-Wechsel laeuft jetzt automatisch ueber das Toggling der Teile-
+    // Haekchen (siehe PartCheckBox_Click + PartLookupService.UnassignPart...).
 
     private async void Move_Click(object sender, RoutedEventArgs e)
     {

@@ -4,22 +4,34 @@
         xmlns:ui="http://schemas.modernwpf.com/2019"
         xmlns:b="clr-namespace:HBSort.Behaviors"
         ui:WindowHelper.UseModernWindowStyle="True"
-        Title="Wartende Figur"
+        Title="Figur-Detail"
         ToolTipService.IsEnabled="{DynamicResource TooltipsEnabled}"
         Icon="../Resources/app.ico"
-        Width="600" Height="640"
+        Width="600" Height="600"
         WindowStartupLocation="CenterOwner">
+    <!--
+        UX X.20 Teil 7: einheitlicher Detail-Dialog fuer wartende UND komplette
+        Figuren. Statt zwei getrennten Layouts (mit "Wieder oeffnen" / "Verkaufs-
+        empfehlung" bei Complete) gibt es jetzt EINE Ansicht:
+        - Haekchen-Liste pro Teil ist immer sichtbar.
+        - Status-Badge (KOMPLETT / WARTEND) leitet sich live aus den Haekchen ab.
+        - Buttons unten: Loeschen / Zerlegen / Verschieben / Schliessen IMMER
+          sichtbar.
+        - Kein "Wieder oeffnen"-Button mehr - der Status ergibt sich automatisch
+          aus den gesetzten Haekchen.
+        - Keine Verkaufsempfehlung mehr - die lebt jetzt nur in der MinifigPriceView
+          im Sortier-Tab (Spalte 3 unten, UX X.18).
+    -->
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>     <!-- 0: Header -->
             <RowDefinition Height="Auto"/>     <!-- 1: Notizen -->
             <RowDefinition Height="*"/>        <!-- 2: Teileliste -->
-            <RowDefinition Height="Auto"/>     <!-- 3: Verschieben-Combo (nur Waiting) -->
-            <RowDefinition Height="Auto"/>     <!-- 4: Phase 8 - Verkaufsempfehlung (nur Complete + Provider!=None) -->
-            <RowDefinition Height="Auto"/>     <!-- 5: Buttons -->
+            <RowDefinition Height="Auto"/>     <!-- 3: Verschieben-Combo -->
+            <RowDefinition Height="Auto"/>     <!-- 4: Buttons -->
         </Grid.RowDefinitions>
 
-        <!-- Header: Bild + Name + BL-ID + Bin -->
+        <!-- Header: Bild + Name + BL-ID + Bin + Fortschritt + Status-Badge -->
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
@@ -29,7 +41,8 @@
             <Image Grid.Column="0" Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
                    Width="100" Height="100" Stretch="Uniform"
                    VerticalAlignment="Top"
-                   b:ImageZoom.IsEnabled="True"/>
+                   b:ImageZoom.IsEnabled="True"
+                   ToolTip="Vergroessern"/>
 
             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                 <TextBlock Text="{Binding Name}"
@@ -50,11 +63,17 @@
                              Minimum="0" Maximum="1"
                              Value="{Binding ProgressFraction, Mode=OneWay}"/>
 
-                <!-- Phase 6: KOMPLETT-Badge bei Status=Complete -->
-                <TextBlock Text="✓ KOMPLETT"
-                           Foreground="{StaticResource StatusSuccessBrush}" FontWeight="Bold" FontSize="14"
-                           Visibility="{Binding IsComplete, Converter={StaticResource BoolToVisibility}}"
-                           Margin="0,4,0,0"/>
+                <!-- Status-Badge: ein Wechsel-Element basierend auf IsComplete -->
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock Text="✓ KOMPLETT"
+                               Foreground="{StaticResource StatusSuccessBrush}"
+                               FontWeight="Bold" FontSize="14"
+                               Visibility="{Binding IsComplete, Converter={StaticResource BoolToVisibility}}"/>
+                    <TextBlock Text="WARTEND"
+                               Foreground="{StaticResource StatusWarningBrush}"
+                               FontWeight="Bold" FontSize="14"
+                               Visibility="{Binding IsWaiting, Converter={StaticResource BoolToVisibility}}"/>
+                </StackPanel>
             </StackPanel>
         </Grid>
 
@@ -121,9 +140,10 @@
             </ScrollViewer>
         </Border>
 
-        <!-- Verschieben: Lagerfach-Auswahl (Phase 6: nur fuer wartende Figuren) -->
-        <Grid Grid.Row="3" Margin="0,12,0,0"
-              Visibility="{Binding IsWaiting, Converter={StaticResource BoolToVisibility}}">
+        <!-- Verschieben: Lagerfach-Auswahl. UX X.20 Teil 7: jetzt immer sichtbar
+             (auch bei Status=Complete) - Bin-Wechsel ist auch fuer komplette
+             Figuren nuetzlich. -->
+        <Grid Grid.Row="3" Margin="0,12,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -136,78 +156,28 @@
                       SelectedItem="{Binding MoveTarget}"/>
         </Grid>
 
-        <!-- Phase 8: Verkaufsempfehlung (nur sichtbar wenn Status=Complete + Provider!=None) -->
-        <Border Grid.Row="4" Margin="0,12,0,0"
-                Background="#F5F5F5" BorderBrush="#BDBDBD"
-                BorderThickness="1" CornerRadius="4"
-                Padding="12"
-                Visibility="{Binding ShowSalesRecommendation, Converter={StaticResource BoolToVisibility}}">
-            <StackPanel>
-                <Grid Margin="0,0,0,4">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Verkaufsempfehlung"
-                               FontWeight="SemiBold" FontSize="13"
-                               VerticalAlignment="Center"/>
-                    <Button Grid.Column="1" Content="Neu laden"
-                            Padding="8,2"
-                            Command="{Binding ReloadPricesCommand}"
-                            IsEnabled="{Binding IsLoadingPrices, Converter={StaticResource InverseBoolToVisibility}, ConverterParameter=true}"/>
-                </Grid>
-
-                <!-- Lade-Anzeige -->
-                <TextBlock Text="Lade Preise..." Foreground="Gray" FontStyle="Italic" FontSize="11"
-                           Visibility="{Binding IsLoadingPrices, Converter={StaticResource BoolToVisibility}}"/>
-
-                <!-- Fehler-Anzeige -->
-                <TextBlock Text="{Binding PriceErrorText}" Foreground="{StaticResource StatusErrorBrush}" FontSize="11"
-                           TextWrapping="Wrap" Margin="0,0,0,4"/>
-
-                <!-- Daten-Anzeige -->
-                <StackPanel Visibility="{Binding HasSalesRecommendation, Converter={StaticResource BoolToVisibility}}">
-                    <TextBlock Text="{Binding SalesRecommendation.ProviderInfo}"
-                               Foreground="Gray" FontSize="11" Margin="0,0,0,6"/>
-                    <TextBlock Text="{Binding MinifigPriceLabel}" FontFamily="Consolas" FontSize="12"/>
-                    <TextBlock Text="{Binding PartsPriceLabel}" FontFamily="Consolas" FontSize="12"/>
-                    <TextBlock Text="{Binding SalesAdviceText}"
-                               FontWeight="SemiBold" FontSize="13"
-                               Margin="0,8,0,0"
-                               Foreground="{Binding SalesAdviceBrush}"/>
-                </StackPanel>
-            </StackPanel>
-        </Border>
-
         <!-- Buttons -->
-        <StackPanel Grid.Row="5" Orientation="Horizontal"
+        <StackPanel Grid.Row="4" Orientation="Horizontal"
                     HorizontalAlignment="Right" Margin="0,12,0,0">
 
-            <!-- Loeschen: immer sichtbar -->
+            <!-- Loeschen: immer sichtbar. Destruktiv-Style (rotes Hex laut UX X.16-Konvention). -->
             <Button Content="Loeschen" Width="120" Margin="0,0,8,0"
                     Click="Delete_Click"
                     Background="#D32F2F" Foreground="White"
                     ToolTip="Figur komplett aus der DB entfernen. Floating-Parts mit Origin-Verbindung bleiben erhalten."/>
 
-            <!-- Zerlegen: nur bei Status=Waiting -->
+            <!-- Zerlegen: jetzt immer sichtbar (auch bei Complete). DismantleAsync
+                 hat keinen Status-Filter und funktioniert fuer beide Status. -->
             <Button Content="Zerlegen" Width="120" Margin="0,0,8,0"
                     Click="GiveUp_Click"
-                    Visibility="{Binding IsWaiting, Converter={StaticResource BoolToVisibility}}"
                     ToolTip="Figur zerlegen: gesammelte Teile wandern als Einzelteile in den Pool, die Figur selbst wird geloescht."/>
 
-            <!-- Wieder oeffnen: nur bei Status=Complete (Phase 6) -->
-            <Button Content="Wieder oeffnen" Width="130" Margin="0,0,8,0"
-                    Click="Reopen_Click"
-                    Visibility="{Binding IsComplete, Converter={StaticResource BoolToVisibility}}"
-                    ToolTip="Status zurueck auf Wartend setzen, falls man sich vertan hat."/>
-
-            <!-- Verschieben: nur bei Status=Waiting -->
+            <!-- Verschieben: immer sichtbar. -->
             <Button Content="Verschieben" Width="120" Margin="0,0,8,0"
                     Click="Move_Click"
-                    Visibility="{Binding IsWaiting, Converter={StaticResource BoolToVisibility}}"
                     ToolTip="Figur in das oben gewaehlte Fach verschieben."/>
 
-            <!-- Schliessen: immer sichtbar -->
+            <!-- Schliessen: Read-Only-Konvention -> nur IsCancel, kein IsDefault. -->
             <Button Content="Schliessen" IsCancel="True" Width="120"
                     Style="{StaticResource AccentButtonStyle}"
                     Click="Close_Click"/>

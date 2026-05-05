@@ -71,18 +71,18 @@ public partial class InventoryListView : UserControl
 
         if (row.Type == InventoryItemType.Minifig && row.UnderlyingMinifigId.HasValue)
         {
+            // UX X.20 Teil 7: priceCalc + settings werden vom MinifigSummaryViewModel
+            // nicht mehr gebraucht (Verkaufsempfehlungs-Block raus). Aufrufe entfallen.
             var ctxFactory = Service<Microsoft.EntityFrameworkCore.IDbContextFactory<Core.Database.UserDataContext>>();
             var binService = Service<IStorageBinService>();
             var notif = Service<INotificationService>();
             var persistence = Service<IMinifigPersistenceService>();
             var imgProvider = Service<IPartImageProvider>();
             var catalog = Service<IBlCatalogService>();
-            var priceCalc = Service<IPriceCalculationService>();
-            var settings = Service<ISettingsService>();
 
             var vm = new MinifigSummaryViewModel(
                 row.UnderlyingMinifigId.Value, ctxFactory, binService,
-                imgProvider, catalog, priceCalc, settings);
+                imgProvider, catalog);
             var dialog = new MinifigSummaryDialog(vm, notif, persistence) { Owner = window };
             dialog.ShowDialog();
         }

@@ -41,18 +41,17 @@ public partial class WaitingDetailView : UserControl
         // Identische Service-Aufloesung wie in InventoryListView.Details_Click.
         // Wenn das hier zur dritten oder vierten Stelle wird, lohnt sich ein
         // gemeinsamer Helper - aktuell sind es nur zwei Aufrufstellen.
+        // UX X.20 Teil 7: priceCalc + settings werden vom Summary-VM nicht mehr gebraucht.
         var ctxFactory = Service<IDbContextFactory<UserDataContext>>();
         var binService = Service<IStorageBinService>();
         var notif = Service<INotificationService>();
         var persistence = Service<IMinifigPersistenceService>();
         var imgProvider = Service<IPartImageProvider>();
         var catalog = Service<IBlCatalogService>();
-        var priceCalc = Service<IPriceCalculationService>();
-        var settings = Service<ISettingsService>();
 
         var vm = new MinifigSummaryViewModel(
             item.MinifigId, ctxFactory, binService,
-            imgProvider, catalog, priceCalc, settings);
+            imgProvider, catalog);
         var dialog = new MinifigSummaryDialog(vm, notif, persistence)
         {
             Owner = Window.GetWindow(this)

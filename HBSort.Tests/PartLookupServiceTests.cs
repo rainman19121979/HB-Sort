@@ -218,6 +218,74 @@ public class PartLookupServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task UnassignPart_reverting_complete_decrements_DailyStats_and_writes_audit_event()
+    {
+        // UX X.20 Teil 7e: wenn der User durch Unassign eine komplette Figur
+        // zurueck auf Waiting bringt, soll der DailyStats-Komplettierungs-
+        // Counter am Tag des damaligen CompletedAt um eins reduziert werden.
+        var binId = await SeedBinAsync("Box 01");
+        var (minifigId, partId) = await SeedCompleteMinifigAsync(binId, "arc007", "3001", 11);
+
+        // Den DailyStats-Eintrag fuer "heute UTC" anlegen mit Counter=1
+        // (so wuerde er nach einem PersistAndStore-Auto-Complete aussehen).
+        await using (var seedCtx = await _factory.CreateDbContextAsync())
+        {
+            var todayUtc = DateTime.UtcNow.Date;
+            seedCtx.DailyStats.Add(new DailyStats
+            {
+                Date = todayUtc,
+                ScanCount = 1,
+                MinifigsCompletedCount = 1
+            });
+            // Damit das CompletedAt der Figur und der DailyStats-Tag uebereinstimmen,
+            // setzen wir CompletedAt explizit auf "heute UTC" mit Mittagszeit.
+            var m = await seedCtx.TrackedMinifigs.FirstAsync(m => m.Id == minifigId);
+            m.CompletedAt = todayUtc.AddHours(12);
+            await seedCtx.SaveChangesAsync();
+        }
+
+        var changed = await _sut.UnassignPartFromMinifigAsync(partId);
+        Assert.True(changed);
+
+        await using var ctx = await _factory.CreateDbContextAsync();
+        var statsToday = await ctx.DailyStats.FirstAsync();
+        Assert.Equal(0, statsToday.MinifigsCompletedCount); // Decrement!
+        Assert.Equal(1, statsToday.ScanCount);              // andere Counter unangetastet
+
+        // ScanEvent als Audit-Trail muss den Status-Wechsel deutlich machen.
+        var scanEvent = await ctx.ScanEvents.SingleAsync();
+        Assert.Contains("Komplett", scanEvent.ResultDescription);
+        Assert.Contains("Wartend", scanEvent.ResultDescription);
+    }
+
+    [Fact]
+    public async Task UnassignPart_on_waiting_minifig_does_not_touch_DailyStats()
+    {
+        // Negativ-Pfad: bei einer wartenden Figur (war nie komplett) darf
+        // der Counter nicht angefasst werden, auch wenn am selben Tag ein
+        // anderer Eintrag in DailyStats existiert.
+        var binId = await SeedBinAsync("Box 01");
+        var (_, partId) = await SeedWaitingMinifigAsync(binId, "arc007", "3001", 11,
+            qtyNeeded: 3, qtyCollected: 2);
+
+        await using (var seedCtx = await _factory.CreateDbContextAsync())
+        {
+            seedCtx.DailyStats.Add(new DailyStats
+            {
+                Date = DateTime.UtcNow.Date,
+                MinifigsCompletedCount = 5  // bewusst hoch
+            });
+            await seedCtx.SaveChangesAsync();
+        }
+
+        await _sut.UnassignPartFromMinifigAsync(partId);
+
+        await using var ctx = await _factory.CreateDbContextAsync();
+        var stats = await ctx.DailyStats.FirstAsync();
+        Assert.Equal(5, stats.MinifigsCompletedCount); // unveraendert
+    }
+
+    [Fact]
     public async Task UnassignPart_returns_false_when_nothing_collected()
     {
         var binId = await SeedBinAsync("Box 01");

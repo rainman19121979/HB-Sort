@@ -149,18 +149,53 @@ public class PartLookupService : IPartLookupService
 
         part.QuantityCollected = 0;
 
-        // Wenn die Figur vorher COMPLETE war, zurueck auf WAITING.
-        if (part.TrackedMinifig.Status == TrackedMinifigStatus.Complete)
+        // UX X.20 Teil 7e: wenn die Figur vorher COMPLETE war, zurueck auf
+        // WAITING. Zusaetzlich:
+        //   - DailyStats am Tag des CompletedAt um eins reduzieren (Audit-
+        //     Konsistenz: wenn der User die Komplettierung zurueckdreht,
+        //     soll der Counter es widerspiegeln).
+        //   - ScanEvent als Audit-Trail mit Status-Wechsel-Hinweis.
+        // Wir lesen CompletedAt VOR der Aenderung; das DailyStats-Update ist
+        // best-effort - wenn am damaligen Tag kein Eintrag existiert (z.B.
+        // wegen DB-Cleanup), unterbleibt das Decrement still.
+        bool wasComplete = part.TrackedMinifig.Status == TrackedMinifigStatus.Complete;
+        DateTime? completionDay = part.TrackedMinifig.CompletedAt?.Date;
+
+        if (wasComplete)
         {
             part.TrackedMinifig.Status = TrackedMinifigStatus.Waiting;
             part.TrackedMinifig.CompletedAt = null;
+
+            if (completionDay.HasValue)
+            {
+                var stat = await ctx.DailyStats.FirstOrDefaultAsync(
+                    s => s.Date == completionDay.Value, ct);
+                if (stat != null && stat.MinifigsCompletedCount > 0)
+                {
+                    stat.MinifigsCompletedCount--;
+                }
+            }
         }
+
+        // ScanEvent fuer Audit-Trail. Bei Status-Wechsel deutlicher Text;
+        // ohne Wechsel der bisherige Standard-Eintrag.
+        var description = wasComplete
+            ? $"Teil {part.PartNumber}/{part.ColorId} entfernt aus Figur '{part.TrackedMinifig.Name}' - Status: Komplett -> Wartend"
+            : $"Teil {part.PartNumber}/{part.ColorId} entfernt aus Figur '{part.TrackedMinifig.Name}'";
+        ctx.ScanEvents.Add(new ScanEvent
+        {
+            Timestamp = DateTime.UtcNow,
+            Type = ScanType.PartScan,
+            RecognizedId = part.PartNumber,
+            ResultDescription = description,
+            WasUndone = false
+        });
 
         await ctx.SaveChangesAsync(ct);
         _persistence.RaiseDataChanged();
 
-        Log.Information("Part-Zuordnung entfernt: {Part}/{Color} aus Figur '{Name}'",
-            part.PartNumber, part.ColorId, part.TrackedMinifig.Name);
+        Log.Information("Part-Zuordnung entfernt: {Part}/{Color} aus Figur '{Name}' (wasComplete={WC})",
+            part.PartNumber, part.ColorId, part.TrackedMinifig.Name, wasComplete);
         return true;
     }
 

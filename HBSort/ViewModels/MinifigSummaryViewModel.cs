@@ -6,7 +6,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HBSort.Core.Database;
 using HBSort.Core.Models;
-using HBSort.Core.Models.Pricing;
 using HBSort.Core.Services;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -17,6 +16,10 @@ namespace HBSort.ViewModels;
 /// ViewModel fuer den MinifigSummaryDialog (Wartende-Liste-Klick).
 /// Liest die Figur frisch aus der DB inkl. RequiredParts und berechnet die
 /// Anzeige-Felder. Stellt zudem die "Verschieben"-Liste (alle Faecher) bereit.
+///
+/// UX X.20 Teil 7: ein einheitlicher Dialog fuer wartende UND komplette
+/// Figuren. Der Verkaufsempfehlungs-Block wurde entfernt - die Live-Preise
+/// leben in der MinifigPriceView im Sortier-Tab (Spalte 3 unten).
 /// </summary>
 public partial class MinifigSummaryViewModel : ObservableObject
 {
@@ -24,8 +27,6 @@ public partial class MinifigSummaryViewModel : ObservableObject
     private readonly IStorageBinService _binService;
     private readonly IPartImageProvider? _imageProvider;
     private readonly IBlCatalogService? _catalog;
-    private readonly IPriceCalculationService? _priceCalc;
-    private readonly ISettingsService? _settings;
 
     public int MinifigId { get; }
     public string Name { get; private set; } = string.Empty;
@@ -64,121 +65,13 @@ public partial class MinifigSummaryViewModel : ObservableObject
         IDbContextFactory<UserDataContext> ctxFactory,
         IStorageBinService binService,
         IPartImageProvider? imageProvider = null,
-        IBlCatalogService? catalog = null,
-        IPriceCalculationService? priceCalc = null,
-        ISettingsService? settings = null)
+        IBlCatalogService? catalog = null)
     {
         MinifigId = minifigId;
         _ctxFactory = ctxFactory;
         _binService = binService;
         _imageProvider = imageProvider;
         _catalog = catalog;
-        _priceCalc = priceCalc;
-        _settings = settings;
-    }
-
-    // ========================================================================
-    // Phase 8: Verkaufsempfehlung
-    // ========================================================================
-
-    /// <summary>True wenn ein Preis-Provider konfiguriert ist - sonst Block versteckt.</summary>
-    public bool ShowSalesRecommendation =>
-        IsComplete
-        && _priceCalc != null
-        && _settings != null
-        && (_settings.Current.Prices.Provider ?? "None") != "None";
-
-    [ObservableProperty] private bool _isLoadingPrices;
-    [ObservableProperty] private SalesRecommendation? _salesRecommendation;
-    [ObservableProperty] private string _priceErrorText = string.Empty;
-
-    public bool HasSalesRecommendation => SalesRecommendation != null
-        && SalesRecommendation.Advice != SalesAdvice.NoData;
-
-    /// <summary>Anzeige-Text der Empfehlung (mit Differenz).</summary>
-    public string SalesAdviceText
-    {
-        get
-        {
-            if (SalesRecommendation == null) return string.Empty;
-            var rec = SalesRecommendation;
-            return rec.Advice switch
-            {
-                SalesAdvice.CompleteWorthIt => $"Komplett verkaufen lohnt (+{rec.Difference:F2} {rec.Currency})",
-                SalesAdvice.PartsWorthIt    => $"Einzelteile lohnen mehr (+{Math.Abs(rec.Difference):F2} {rec.Currency})",
-                SalesAdvice.Equal           => $"Beide Optionen gleichwertig (Diff {rec.Difference:F2} {rec.Currency})",
-                _                            => "Keine Preisdaten verfuegbar"
-            };
-        }
-    }
-
-    /// <summary>Brush fuer den Empfehlungs-Text.</summary>
-    public Brush SalesAdviceBrush => SalesRecommendation?.Advice switch
-    {
-        SalesAdvice.CompleteWorthIt => FreezeBrush(Color.FromRgb(46, 125, 50)),     // gruen
-        SalesAdvice.PartsWorthIt    => FreezeBrush(Color.FromRgb(230, 81, 0)),      // orange
-        SalesAdvice.Equal           => Brushes.Gray,
-        _                            => Brushes.LightGray
-    };
-
-    public string MinifigPriceLabel
-    {
-        get
-        {
-            var rec = SalesRecommendation;
-            if (rec?.MinifigPrice == null || !rec.MinifigPrice.HasAnyPrice)
-                return $"Als Figur:    (kein Preis)";
-            var raw = (rec.MinifigPrice.QtyAvgPrice ?? rec.MinifigPrice.AvgPrice ?? 0m);
-            return $"Als Figur:    {rec.CorrectedMinifigPrice:F2} {rec.Currency}  (BL: {raw:F2})";
-        }
-    }
-
-    public string PartsPriceLabel
-    {
-        get
-        {
-            var rec = SalesRecommendation;
-            if (rec?.PartsRawSum == null)
-                return "Einzelteile:  (keine Preise)";
-            var missing = rec.PartsMissingPriceCount > 0
-                ? $" ({rec.PartsMissingPriceCount} Teil(e) ohne Preis)"
-                : string.Empty;
-            return $"Einzelteile:  {rec.CorrectedPartsSum:F2} {rec.Currency}  (BL: {rec.PartsRawSum:F2}){missing}";
-        }
-    }
-
-    /// <summary>Manuelles Neu-Laden via Button im Dialog.</summary>
-    [RelayCommand]
-    public async Task ReloadPricesAsync()
-    {
-        if (_priceCalc == null) return;
-        IsLoadingPrices = true;
-        PriceErrorText = string.Empty;
-        try
-        {
-            SalesRecommendation = await _priceCalc.CalculateForMinifigAsync(MinifigId);
-            OnPropertyChanged(nameof(HasSalesRecommendation));
-            OnPropertyChanged(nameof(SalesAdviceText));
-            OnPropertyChanged(nameof(SalesAdviceBrush));
-            OnPropertyChanged(nameof(MinifigPriceLabel));
-            OnPropertyChanged(nameof(PartsPriceLabel));
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Preis-Lookup fehlgeschlagen");
-            PriceErrorText = $"Fehler: {ex.Message}";
-        }
-        finally
-        {
-            IsLoadingPrices = false;
-        }
-    }
-
-    private static Brush FreezeBrush(Color c)
-    {
-        var b = new SolidColorBrush(c);
-        b.Freeze();
-        return b;
     }
 
     /// <summary>Laed die Figur aus der DB inkl. Parts + alle anderen Faecher als Move-Targets.</summary>
@@ -235,7 +128,6 @@ public partial class MinifigSummaryViewModel : ObservableObject
         OnPropertyChanged(nameof(Status));
         OnPropertyChanged(nameof(IsWaiting));
         OnPropertyChanged(nameof(IsComplete));
-        OnPropertyChanged(nameof(ShowSalesRecommendation));
         OnPropertyChanged(nameof(Notes));
         OnPropertyChanged(nameof(NotesDisplay));
         OnPropertyChanged(nameof(HasNotes));
@@ -243,17 +135,6 @@ public partial class MinifigSummaryViewModel : ObservableObject
         OnPropertyChanged(nameof(CompletedParts));
         OnPropertyChanged(nameof(ProgressFraction));
         OnPropertyChanged(nameof(ProgressLabel));
-
-        // Phase 8: Auto-Load wenn Settings das wuenschen + Provider != None.
-        // UX-Iteration X.10: AutoLoadOnComplete (bool) abgeloest durch
-        // AutoLoadCompletePrice (PriceLoadMode). Default ist jetzt Manual -
-        // der User muss aktiv "Preis laden" klicken (spart API-Calls).
-        if (ShowSalesRecommendation
-            && _settings != null
-            && _settings.Current.Prices.AutoLoadCompletePrice == Core.Models.PriceLoadMode.Auto)
-        {
-            _ = ReloadPricesAsync();
-        }
     }
 
     /// <summary>
