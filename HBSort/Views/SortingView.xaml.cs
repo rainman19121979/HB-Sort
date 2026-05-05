@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Threading;
 using HBSort.Core.Services;
 using HBSort.Services;
 using HBSort.ViewModels;
@@ -45,8 +46,22 @@ public partial class SortingView : UserControl
 
     private void SortingView_Loaded(object sender, RoutedEventArgs e)
     {
-        Log.Information("[SPLITTER] SortingView_Loaded fired");
-        ApplySplitterRatios();
+        Log.Information("[SPLITTER] SortingView_Loaded fired - scheduling ApplyRatios via Dispatcher");
+
+        // UX-Iteration X.21 Teil 1 Fix (2026-05-05): WPF muss zuerst seinen
+        // Default-Layout-Pass machen, sonst werden unsere RowDefinitions[i].
+        // Height-Setzungen ueberschrieben (Praxis-Befund: ApplyRatios direkt
+        // im Loaded fuehrte dazu dass WPF danach mit den XAML-Default-Star-
+        // Werten 65*/35* re-layoutete und alle drei Spalten exakt das gleiche
+        // 0.6503-Verhaeltnis bekamen).
+        // DispatcherPriority.Loaded laesst alle hoeher-priorisierten Layout-/
+        // Render-Operationen vorher laufen, dann wirken unsere Star-Werte
+        // ohne ueberschrieben zu werden.
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        {
+            Log.Information("[SPLITTER] ApplyRatios via Dispatcher invoked");
+            ApplySplitterRatios();
+        }));
     }
 
     /// <summary>Such-Fallback (in Phase 5+ implementiert).</summary>
@@ -190,19 +205,34 @@ public partial class SortingView : UserControl
         if (c1 + c2 > 0.9) { c1 = c2 = 1.0 / 3.0; }
         var c3 = 1.0 - c1 - c2;
 
+        Log.Information("[SPLITTER] BEFORE Vertical LeftActual={L} MidActual={M} RightActual={R}",
+            LeftCol.ActualWidth, MidCol.ActualWidth, RightCol.ActualWidth);
+
         LeftCol.Width = new GridLength(c1, GridUnitType.Star);
         MidCol.Width = new GridLength(c2, GridUnitType.Star);
         RightCol.Width = new GridLength(c3, GridUnitType.Star);
 
         // --- Horizontale Splitter pro Spalte ---
+        Log.Information("[SPLITTER] BEFORE Col=1 TopActual={T} BotActual={B}",
+            Col1TopRow.ActualHeight, Col1BotRow.ActualHeight);
         Log.Information("[SPLITTER] ApplyRatios Col=1 loaded={R}", ws.Column1HorizontalSplitterRatio);
         ApplyRowRatio(Col1TopRow, Col1BotRow, ws.Column1HorizontalSplitterRatio);
+        Log.Information("[SPLITTER] AFTER Col=1 TopActual={T} BotActual={B}",
+            Col1TopRow.ActualHeight, Col1BotRow.ActualHeight);
 
+        Log.Information("[SPLITTER] BEFORE Col=2 TopActual={T} BotActual={B}",
+            Col2TopRow.ActualHeight, Col2BotRow.ActualHeight);
         Log.Information("[SPLITTER] ApplyRatios Col=2 loaded={R}", ws.Column2HorizontalSplitterRatio);
         ApplyRowRatio(Col2TopRow, Col2BotRow, ws.Column2HorizontalSplitterRatio);
+        Log.Information("[SPLITTER] AFTER Col=2 TopActual={T} BotActual={B}",
+            Col2TopRow.ActualHeight, Col2BotRow.ActualHeight);
 
+        Log.Information("[SPLITTER] BEFORE Col=3 TopActual={T} BotActual={B}",
+            Col3TopRow.ActualHeight, Col3BotRow.ActualHeight);
         Log.Information("[SPLITTER] ApplyRatios Col=3 loaded={R}", ws.Column3HorizontalSplitterRatio);
         ApplyRowRatio(Col3TopRow, Col3BotRow, ws.Column3HorizontalSplitterRatio);
+        Log.Information("[SPLITTER] AFTER Col=3 TopActual={T} BotActual={B}",
+            Col3TopRow.ActualHeight, Col3BotRow.ActualHeight);
     }
 
     /// <summary>
