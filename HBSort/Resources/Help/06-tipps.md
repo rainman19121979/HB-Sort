@@ -13,6 +13,8 @@
 | `Strg + L` | Lagerliste-Tab aktivieren |
 | `Strg + H` | Hilfe-Tab aktivieren |
 | `Strg + ,` | Einstellungen oeffnen |
+| `Strg + Q` | App beenden (gleicher Pfad wie der Beenden-Button im Header) |
+| `Alt + F4` | Windows-Standard: schiebt das Fenster ins Tray-Icon. Zum kompletten Beenden: Strg+Q oder Tray-Menu -> Beenden. |
 
 > **Leertaste-Hinweis:** Das Scannen funktioniert auch wenn du gerade
 > auf eine Karte oder einen RadioButton geklickt hast. Nur in

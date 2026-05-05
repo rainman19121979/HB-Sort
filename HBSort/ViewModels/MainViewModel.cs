@@ -206,6 +206,16 @@ public partial class MainViewModel : ObservableObject
     public void OpenSettings() => OpenSettingsRequested?.Invoke(this, EventArgs.Empty);
 
     /// <summary>
+    /// UX-Iteration X.21 Teil 3: Strg+Q = App beenden. Wir feuern ein Event,
+    /// das das MainWindow auffaengt und den ExitApplicationAsync-Pfad ausfuehrt.
+    /// Analog zu OpenSettings: das VM darf das Window nicht direkt schliessen.
+    /// </summary>
+    public event EventHandler? ExitAppRequested;
+
+    [RelayCommand]
+    public void ExitApp() => ExitAppRequested?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
     /// Liest den aktuellen RateLimitStatus und aktualisiert die UI-Properties.
     /// Wird bei jedem API-Call (via Event) und alle 60s (via Timer) aufgerufen.
     /// </summary>

@@ -34,6 +34,10 @@ public partial class MainWindow : Window
         // UX X.20 Teil 6: Strg+, oeffnet Einstellungen. Das VM feuert das Event,
         // weil es nicht selbst Window-Instanzen erstellen darf.
         _viewModel.OpenSettingsRequested += (_, _) => OpenSettings_Click(this, new RoutedEventArgs());
+
+        // UX X.21 Teil 3: Strg+Q beendet die App. Analog zum Settings-Event -
+        // das VM darf nicht selbst Application.Shutdown() rufen.
+        _viewModel.ExitAppRequested += (_, _) => ExitApp_Click(this, new RoutedEventArgs());
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -121,6 +125,27 @@ public partial class MainWindow : Window
     private async void TrayExit_Click(object sender, RoutedEventArgs e)
     {
         Log.Information("App wird ueber Tray-Menue beendet");
+        await ExitApplicationAsync();
+    }
+
+    /// <summary>
+    /// UX-Iteration X.21 Teil 3: Beenden-Button im Header.
+    /// Gleicher Beendigungs-Pfad wie Tray-Exit (Settings speichern, Kamera
+    /// stoppen, Tray-Icon disposen, Shutdown).
+    /// </summary>
+    private async void ExitApp_Click(object sender, RoutedEventArgs e)
+    {
+        Log.Information("App wird ueber Header-Button/Strg+Q beendet");
+        await ExitApplicationAsync();
+    }
+
+    /// <summary>
+    /// Gemeinsamer Beendigungs-Pfad: persistiert WindowState + Settings,
+    /// stoppt die Kamera, raeumt das Tray-Icon ab und faehrt die App
+    /// regulaer runter (loest dann App.OnExit aus).
+    /// </summary>
+    private async Task ExitApplicationAsync()
+    {
         SaveWindowState();
         await _settingsService.SaveAsync();
         _viewModel.ScanViewModel.StopCamera();

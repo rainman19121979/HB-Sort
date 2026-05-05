@@ -53,6 +53,13 @@
         <!-- UX X.20 Teil 6: Einstellungen via Strg+Komma (Standard-Konvention). -->
         <KeyBinding Modifiers="Control" Key="OemComma"
                     Command="{Binding OpenSettingsCommand}"/>
+
+        <!-- UX-Iteration X.21 Teil 3: Strg+Q = App beenden. Alt+F4 ist Windows-
+             Standard und funktioniert ohnehin (dort greift Window_Closing →
+             Tray-Hide-Pfad); Strg+Q ist der explizite "App komplett beenden"-
+             Shortcut, der den gleichen Pfad nutzt wie der Beenden-Button. -->
+        <KeyBinding Modifiers="Control" Key="Q"
+                    Command="{Binding ExitAppCommand}"/>
     </Window.InputBindings>
 
     <Grid>
@@ -133,19 +140,36 @@
                              ToolTip="Integrierte Doku zu Workflow, Lagerverwaltung, Export. (F1)"/>
             </StackPanel>
 
-            <!-- Rechts: Settings-Button als Icon + Text -->
-            <Button Grid.Column="2"
-                    VerticalAlignment="Center"
-                    Click="OpenSettings_Click"
-                    Padding="10,6"
-                    ToolTip="Oeffnet die Einstellungen (Kamera, BL-Tokens, Cache, Preise, Lagerfaecher).">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets"
-                               FontSize="16" VerticalAlignment="Center"
-                               Margin="0,0,6,0"/>
-                    <TextBlock Text="Einstellungen" VerticalAlignment="Center"/>
-                </StackPanel>
-            </Button>
+            <!-- Rechts: Settings + Beenden als zwei Buttons nebeneinander -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button VerticalAlignment="Center"
+                        Click="OpenSettings_Click"
+                        Padding="10,6"
+                        Margin="0,0,8,0"
+                        ToolTip="Oeffnet die Einstellungen (Kamera, BL-Tokens, Cache, Preise, Lagerfaecher).">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16" VerticalAlignment="Center"
+                                   Margin="0,0,6,0"/>
+                        <TextBlock Text="Einstellungen" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- UX-Iteration X.21 Teil 3: Beenden-Button neben Einstellungen.
+                     Kein AccentButtonStyle - das ist eine destruktive Aktion und kein
+                     primaerer Workflow. Shortcut: Strg+Q (siehe InputBindings oben). -->
+                <Button VerticalAlignment="Center"
+                        Click="ExitApp_Click"
+                        Padding="10,6"
+                        ToolTip="Beendet die App (Strg+Q).">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE7E8;" FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16" VerticalAlignment="Center"
+                                   Margin="0,0,6,0"/>
+                        <TextBlock Text="Beenden" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
         </Grid>
 
         <!-- Trenn-Linie zwischen Header und Inhalt -->
