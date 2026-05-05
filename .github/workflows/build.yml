@@ -1,0 +1,37 @@
+name: Build & Test
+
+# Bei jedem Push auf main + bei jedem PR gegen main:
+# - Solution restoren
+# - Release-Build
+# - Tests laufen lassen
+#
+# Laeuft auf windows-latest weil das Projekt UseWPF=true hat (WPF +
+# native Dependencies wie OpenCvSharp4 brauchen Windows).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore HBSort.slnx
+
+      - name: Build (Release)
+        run: dotnet build HBSort.slnx -c Release --no-restore
+
+      - name: Test (Release)
+        run: dotnet test HBSort.Tests/HBSort.Tests.csproj -c Release --no-build --verbosity normal

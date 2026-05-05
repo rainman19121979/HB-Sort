@@ -1,0 +1,102 @@
+name: Release
+
+# Wird ausgeloest sobald ein Tag im Format v*.*.* gepusht wird (z.B. v0.1.0).
+# Baut einen self-contained Single-File-Release fuer win-x64, packt das
+# Ergebnis als ZIP und haengt es ans GitHub-Release.
+#
+# Trigger-Beispiel:
+#   git tag -a v0.1.0 -m "First public release"
+#   git push origin v0.1.0
+#
+# Hinweis zu PublishSingleFile bei WPF: bei Native-Dependencies wie
+# OpenCvSharp4 muss IncludeNativeLibrariesForSelfExtract=true gesetzt
+# werden, damit die DLLs beim Start ausgepackt werden. Falls das im
+# Praxis-Test scheitert, koennen wir auf PublishSingleFile=false +
+# ZIP-des-ganzen-Ordners umstellen - aber erst nach realem Test.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write   # benoetigt fuer das Anlegen des Releases
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Volle Historie noetig fuer "git describe" + Release-Notes-Generation.
+          fetch-depth: 0
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Extract version from tag
+        id: version
+        shell: pwsh
+        run: |
+          # Tag-Name ist "v0.1.0" -> Version "0.1.0".
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart('v')
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Release-Version: $version"
+
+      - name: Restore
+        run: dotnet restore HBSort.slnx
+
+      - name: Publish (win-x64 self-contained)
+        # Single-File mit IncludeNativeLibrariesForSelfExtract=true, damit
+        # OpenCvSharp4-Native-DLLs beim Start in einen Temp-Ordner extrahiert
+        # werden. ReadyToRun fuer schnelleren Erststart.
+        run: |
+          dotnet publish HBSort/HBSort.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:PublishReadyToRun=true `
+            -p:Version=${{ steps.version.outputs.version }} `
+            -p:AssemblyVersion=${{ steps.version.outputs.version }}.0 `
+            -p:FileVersion=${{ steps.version.outputs.version }}.0 `
+            -o publish/win-x64
+
+      - name: Create ZIP
+        shell: pwsh
+        run: |
+          $zipName = "HBSort-${{ steps.version.outputs.version }}-win-x64.zip"
+          Compress-Archive -Path publish/win-x64/* -DestinationPath $zipName
+          Write-Host "Erstellt: $zipName"
+
+      - name: Generate Release Notes
+        id: notes
+        shell: pwsh
+        run: |
+          # Letzten Tag VOR diesem finden (HEAD^ damit der aktuelle Tag nicht zaehlt).
+          $previousTag = git describe --tags --abbrev=0 HEAD^ 2>$null
+          if ($LASTEXITCODE -ne 0 -or -not $previousTag) {
+              # Erstes Release - alle Commits in die Notes.
+              $notes = git log --pretty=format:"- %s" | Out-String
+          } else {
+              $notes = git log "$previousTag..HEAD" --pretty=format:"- %s" | Out-String
+          }
+          # PowerShell-Zeilenenden auf LF normalisieren (UTF-8 ohne BOM).
+          $notes = $notes.Replace("`r", "")
+          [System.IO.File]::WriteAllText("release_notes.md", $notes, (New-Object System.Text.UTF8Encoding $false))
+          Write-Host "Release-Notes generiert ($($notes.Length) Zeichen)."
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: HBSort-${{ steps.version.outputs.version }}-win-x64.zip
+          body_path: release_notes.md
+          name: HB-Sort ${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false

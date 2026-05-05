@@ -1,0 +1,23 @@
+version: 2
+
+# Wenn Dependabot neue Updates findet:
+# - NuGet wird woechentlich gecheckt (Microsoft- und Community-Pakete
+#   bekommen oft Patches; bei .NET 8 wollen wir die mitkriegen).
+# - GitHub-Actions werden monatlich gecheckt (langsamer Update-Zyklus).
+#
+# Dependabot eroeffnet pro Update einen Pull Request gegen main.
+# Der CI-Workflow (build.yml) laeuft dann automatisch + verifiziert
+# dass der Build mit dem Update sauber bleibt.
+
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
