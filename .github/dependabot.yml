@@ -15,11 +15,23 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
-    # Markdig-Major-Bumps blockieren: Markdig.Wpf 0.5.0.1 ist gegen Markdig 0.x
-    # gebaut und hat keine 1.x-kompatible Version. Patch- und Minor-Updates
-    # innerhalb von 0.x werden weiter aufgemacht.
+    # Major-Bumps blockieren fuer:
+    # - Markdig: Markdig.Wpf 0.5.0.1 ist gegen Markdig 0.x gebaut und hat
+    #   keine 1.x-kompatible Version.
+    # - Microsoft.Data.Sqlite + EntityFrameworkCore.Sqlite +
+    #   EntityFrameworkCore.Design: muessen alle drei dieselbe Hauptversion
+    #   haben, ein einzelner Bump waere ein Versions-Konflikt + Laufzeit-
+    #   Inkompatibilitaet. EF Core 8 -> 9/10 ist eigene Iteration mit
+    #   TargetFramework-Sprung.
+    # Patch- und Minor-Updates kommen weiter durch.
     ignore:
       - dependency-name: "Markdig"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.Data.Sqlite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.EntityFrameworkCore.Sqlite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.EntityFrameworkCore.Design"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
