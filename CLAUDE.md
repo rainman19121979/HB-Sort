@@ -663,7 +663,7 @@ class DailyStats
         "cacheStaleDays": 90
     },
     "priceTool": {
-        "url": "http://10.0.0.147:3000",
+        "url": "http://192.168.1.50:3000",
         "tokenEncrypted": "BASE64_DPAPI_PROTECTED_BLOB",
         "defaultCondition": "U"
     },
