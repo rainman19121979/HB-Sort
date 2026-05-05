@@ -440,10 +440,24 @@
                 <RowDefinition Height="35*"/>
             </Grid.RowDefinitions>
 
-            <!-- Obere Box (groesser) - Inhalt folgt im naechsten Commit. -->
+            <!-- Obere Box (groesser) - UX X.18: BuildSuggestionsView ("Was kann
+                 ich bauen?") - vorher als Tab in der Mitten-Spalte unten,
+                 jetzt dauerhaft sichtbar in Spalte 3 oben. Refreshed sich
+                 ueber das DataChanged-Event des MinifigPersistenceService
+                 (siehe BuildSuggestionsViewModel ctor). Kein Visibility-
+                 Trigger - immer angezeigt, auch ohne Pending-Minifig. -->
             <Border Grid.Row="0"
                     BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                    BorderThickness="1" CornerRadius="4"/>
+                    BorderThickness="1" CornerRadius="4"
+                    Padding="0">
+                <ContentControl Content="{Binding BuildSuggestions}">
+                    <ContentControl.ContentTemplate>
+                        <DataTemplate>
+                            <views:BuildSuggestionsView/>
+                        </DataTemplate>
+                    </ContentControl.ContentTemplate>
+                </ContentControl>
+            </Border>
 
             <!-- Untere Box (kleiner) - UX X.18: BL-Preise gewandert von oben.
                  Sichtbar wenn Pending-Minifig aktiv; sonst Idle/leer-Zustand
