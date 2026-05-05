@@ -46,11 +46,20 @@
                       Cursor="SizeWE"
                       DragCompleted="ColumnSplitter2_DragCompleted"/>
 
-        <!--
-            Horizontaler Splitter wurde absichtlich entfernt: das 65/35-Verhaeltnis
-            zwischen oberer und unterer Zeile ist fix. Vertikale Splitter (Spalten)
-            bleiben aktiv und werden weiter persistiert.
-        -->
+        <!-- UX X.18: Horizontaler Splitter zwischen den 65*/35*-Outer-Rows.
+             Erstreckt sich nur ueber Col0 + Col2 (Spalte 1+2). Spalte 3 hat
+             ein eigenes Subgrid mit RowSpan=3 und einen eigenen horizontalen
+             Splitter im Subgrid (siehe unten). Der Splitter persistiert das
+             Verhaeltnis aktuell NICHT - das ist eine bewusste Vereinfachung,
+             damit der User es nur situativ verschieben kann; beim naechsten
+             Start ist wieder 65/35. -->
+        <GridSplitter Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                      Height="5"
+                      HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                      Background="Transparent"
+                      ShowsPreview="True"
+                      ResizeBehavior="PreviousAndNext"
+                      Cursor="SizeNS"/>
 
         <!-- ===== OBEN-LINKS (R0,C0): Webcam-Bereich ===== -->
         <Border Grid.Row="0" Grid.Column="0"
@@ -420,14 +429,25 @@
 
         <!-- ===== SPALTE 3 (UX-Iteration X.18) =====
              Subgrid mit eigenem 65*/35*-Verhaeltnis (analog Spalten 1+2).
-             - Oben (groesser): kommt im naechsten Commit (BuildSuggestionsView).
-             - Unten (kleiner): MinifigPriceView (von oben hierhin verschoben). -->
+             - Oben (groesser): BuildSuggestionsView ("Was kann ich bauen?").
+             - Unten (kleiner): MinifigPriceView (BL-Preise, kontextabhaengig).
+             Eigener horizontaler Splitter in der mittleren 5px-Row, damit der
+             User die Hoehen unabhaengig von Spalte 1+2 verschieben kann. -->
         <Grid Grid.Row="0" Grid.RowSpan="3" Grid.Column="4">
             <Grid.RowDefinitions>
                 <RowDefinition Height="65*"/>
                 <RowDefinition Height="5"/>
                 <RowDefinition Height="35*"/>
             </Grid.RowDefinitions>
+
+            <!-- Horizontaler Splitter zwischen oberer und unterer Box. -->
+            <GridSplitter Grid.Row="1"
+                          Height="5"
+                          HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                          Background="Transparent"
+                          ShowsPreview="True"
+                          ResizeBehavior="PreviousAndNext"
+                          Cursor="SizeNS"/>
 
             <!-- Obere Box (groesser) - UX X.18: BuildSuggestionsView ("Was kann
                  ich bauen?") - vorher als Tab in der Mitten-Spalte unten,
