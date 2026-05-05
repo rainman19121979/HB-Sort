@@ -42,7 +42,7 @@ jobs:
       # HBSort.slnx setzt .NET 9 SDK voraus; TargetFramework bleibt
       # net8.0-windows.
       - name: Setup .NET 9
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 9.0.x
 
