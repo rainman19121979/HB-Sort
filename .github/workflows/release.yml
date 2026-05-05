@@ -22,21 +22,29 @@ on:
 permissions:
   contents: write   # benoetigt fuer das Anlegen des Releases
 
+# Node-24-Opt-in fuer alle JavaScript-Actions (siehe build.yml).
+# softprops/action-gh-release@v3 ist eine JS-Action und profitiert davon.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   release:
     runs-on: windows-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Volle Historie noetig fuer "git describe" + Release-Notes-Generation.
           fetch-depth: 0
 
-      - name: Setup .NET 8
-        uses: actions/setup-dotnet@v4
+      # dotnet-Version: 9.0.x (siehe Begruendung in build.yml).
+      # HBSort.slnx setzt .NET 9 SDK voraus; TargetFramework bleibt
+      # net8.0-windows.
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 9.0.x
 
       - name: Extract version from tag
         id: version
@@ -48,18 +56,24 @@ jobs:
           echo "version=$version" >> $env:GITHUB_OUTPUT
           Write-Host "Release-Version: $version"
 
+      # Restore ueber die Solution - laed alle Projekte in einen Rutsch
+      # (= besseres Caching auf dem Runner als zwei separate Restores).
+      # dotnet publish unten zielt dann nur auf das HBSort-csproj, weil
+      # Publish projekt-spezifisch ist (Test-Projekt soll nicht ins ZIP).
       - name: Restore
         run: dotnet restore HBSort.slnx
 
       - name: Publish (win-x64 self-contained)
         # Single-File mit IncludeNativeLibrariesForSelfExtract=true, damit
         # OpenCvSharp4-Native-DLLs beim Start in einen Temp-Ordner extrahiert
-        # werden. ReadyToRun fuer schnelleren Erststart.
+        # werden. ReadyToRun fuer schnelleren Erststart. --no-restore weil
+        # der vorige Restore-Step das schon erledigt hat.
         run: |
           dotnet publish HBSort/HBSort.csproj `
             -c Release `
             -r win-x64 `
             --self-contained true `
+            --no-restore `
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:PublishReadyToRun=true `
@@ -93,7 +107,7 @@ jobs:
           Write-Host "Release-Notes generiert ($($notes.Length) Zeichen)."
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: HBSort-${{ steps.version.outputs.version }}-win-x64.zip
           body_path: release_notes.md

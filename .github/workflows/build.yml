@@ -7,6 +7,13 @@ name: Build & Test
 #
 # Laeuft auf windows-latest weil das Projekt UseWPF=true hat (WPF +
 # native Dependencies wie OpenCvSharp4 brauchen Windows).
+#
+# dotnet-Version: 9.0.x. Begruendung: HBSort.slnx ist das neue XML-
+# Solution-Format, das erst ab .NET 9 SDK unterstuetzt wird. dotnet 8
+# wuerde "no such file" auf der slnx melden. TargetFramework bleibt
+# in den csproj-Files net8.0-windows; das dotnet 9 SDK kann net8.0-
+# Projekte ohne Probleme bauen (SDK-Version und TargetFramework sind
+# unabhaengig).
 
 on:
   push:
@@ -14,18 +21,27 @@ on:
   pull_request:
     branches: [main]
 
+# Node-24-Opt-in fuer alle JavaScript-Actions im Workflow.
+# Hintergrund: GitHub deprecated Node 20 als Action-Runtime ab Juni 2026.
+# actions/checkout@v6 laeuft schon nativ auf Node 24; setup-dotnet@v4 noch
+# nicht (v5 gibts zum Stand 05/2026 nicht). Die Env-Variable zwingt alle
+# JS-Actions in diesem Workflow auf Node 24, sodass auch noch nicht
+# upgegradete Actions zukunftsfest bleiben.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Setup .NET 8
-        uses: actions/setup-dotnet@v4
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 9.0.x
 
       - name: Restore
         run: dotnet restore HBSort.slnx
@@ -34,4 +50,4 @@ jobs:
         run: dotnet build HBSort.slnx -c Release --no-restore
 
       - name: Test (Release)
-        run: dotnet test HBSort.Tests/HBSort.Tests.csproj -c Release --no-build --verbosity normal
+        run: dotnet test HBSort.slnx -c Release --no-build --verbosity normal
