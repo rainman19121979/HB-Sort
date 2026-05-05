@@ -26,6 +26,7 @@
 
     <!-- OpenCvSharp4: C#-Wrapper für OpenCV, gibt uns Zugriff auf USB-Webcams
          und Bildverarbeitung (Frame-Capture, Bild speichern etc.) -->
+  <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.7" />
     <PackageReference Include="OpenCvSharp4" Version="4.10.0.20241108" />
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.10.0.20241108" />
 
@@ -35,7 +36,7 @@
     <PackageReference Include="Serilog" Version="4.2.0" />
 
     <!-- DI-Abstraktion -->
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
 
     <!-- BricklinkSharp: offizieller .NET-Wrapper um die BL-Store-API.
          Macht OAuth1 + JSON-Parsing fuer uns. Wir kapseln das Library-Singleton

@@ -43,7 +43,7 @@
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
 
     <!-- DI-Container von Microsoft -->
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.7" />
 
     <!-- EF Core Design-Package wird vom Startup-Projekt gebraucht für Migrations-Tooling -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.13">
