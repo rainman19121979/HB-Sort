@@ -107,6 +107,7 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object sender, CancelEventArgs e)
     {
+        Log.Information("[SPLITTER] Window_Closing called (will set e.Cancel=true and Hide)");
         SaveWindowState();
         e.Cancel = true;
         Hide();

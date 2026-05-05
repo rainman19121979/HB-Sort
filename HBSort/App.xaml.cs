@@ -532,6 +532,7 @@ public partial class App : Application
     /// </summary>
     protected override void OnExit(ExitEventArgs e)
     {
+        Log.Information("[SPLITTER] OnExit called");
         Log.Information("=== HB-Sort beendet ===");
 
         // ServiceProvider disponieren - das ruft Dispose() auf allen Singleton-

@@ -66,6 +66,11 @@ public class SettingsService : ISettingsService
             Directory.CreateDirectory(AppDataFolder);
 
             var json = JsonSerializer.Serialize(Current, JsonOptions);
+            Log.Information("[SPLITTER] SaveAsync writing JSON to {Path} (h1={H1} h2={H2} h3={H3})",
+                SettingsFilePath,
+                Current.WindowState.Column1HorizontalSplitterRatio,
+                Current.WindowState.Column2HorizontalSplitterRatio,
+                Current.WindowState.Column3HorizontalSplitterRatio);
             await File.WriteAllTextAsync(SettingsFilePath, json);
 
             Log.Debug("Einstellungen gespeichert nach {Path}", SettingsFilePath);
