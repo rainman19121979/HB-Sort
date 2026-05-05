@@ -7,6 +7,13 @@ name: Build & Test
 #
 # Laeuft auf windows-latest weil das Projekt UseWPF=true hat (WPF +
 # native Dependencies wie OpenCvSharp4 brauchen Windows).
+#
+# dotnet-Version: 9.0.x. Begruendung: HBSort.slnx ist das neue XML-
+# Solution-Format, das erst ab .NET 9 SDK unterstuetzt wird. dotnet 8
+# wuerde "no such file" auf der slnx melden. TargetFramework bleibt
+# in den csproj-Files net8.0-windows; das dotnet 9 SDK kann net8.0-
+# Projekte ohne Probleme bauen (SDK-Version und TargetFramework sind
+# unabhaengig).
 
 on:
   push:
@@ -22,25 +29,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET 8
+      - name: Setup .NET 9
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
-
-      # Hinweis: HBSort.slnx ist das neue XML-Solution-Format (ab .NET 9 SDK).
-      # Der GitHub-Runner mit dotnet 8.0.x kennt es nicht - daher bauen wir
-      # gezielt die zwei csproj-Wurzeln. dotnet zieht ihre Dependencies
-      # (HBSort.Core) automatisch transitiv mit.
+          dotnet-version: 9.0.x
 
       - name: Restore
-        run: |
-          dotnet restore HBSort/HBSort.csproj
-          dotnet restore HBSort.Tests/HBSort.Tests.csproj
+        run: dotnet restore HBSort.slnx
 
       - name: Build (Release)
-        run: |
-          dotnet build HBSort/HBSort.csproj -c Release --no-restore
-          dotnet build HBSort.Tests/HBSort.Tests.csproj -c Release --no-restore
+        run: dotnet build HBSort.slnx -c Release --no-restore
 
       - name: Test (Release)
-        run: dotnet test HBSort.Tests/HBSort.Tests.csproj -c Release --no-build --verbosity normal
+        run: dotnet test HBSort.slnx -c Release --no-build --verbosity normal
