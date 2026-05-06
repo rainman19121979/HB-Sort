@@ -23,6 +23,11 @@ updates:
     #   haben, ein einzelner Bump waere ein Versions-Konflikt + Laufzeit-
     #   Inkompatibilitaet. EF Core 8 -> 9/10 ist eigene Iteration mit
     #   TargetFramework-Sprung.
+    # - Microsoft.Extensions.DependencyInjection +
+    #   Microsoft.Extensions.DependencyInjection.Abstractions: gehoeren
+    #   zur .NET-Runtime-Familie und sollten synchron mit EntityFramework-
+    #   Core gebumpt werden (transitive Refs). Major-Bumps hier alleine
+    #   wuerden zur Laufzeit Versions-Konflikte mit EF Core 8 erzeugen.
     # Patch- und Minor-Updates kommen weiter durch.
     ignore:
       - dependency-name: "Markdig"
@@ -32,6 +37,10 @@ updates:
       - dependency-name: "Microsoft.EntityFrameworkCore.Sqlite"
         update-types: ["version-update:semver-major"]
       - dependency-name: "Microsoft.EntityFrameworkCore.Design"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.Extensions.DependencyInjection"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.Extensions.DependencyInjection.Abstractions"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
