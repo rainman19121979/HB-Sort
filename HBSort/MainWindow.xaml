@@ -2,7 +2,6 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.modernwpf.com/2019"
-        xmlns:tb="http://www.hardcodet.net/taskbar"
         xmlns:views="clr-namespace:HBSort.Views"
         xmlns:behaviors="clr-namespace:HBSort.Behaviors"
         ui:WindowHelper.UseModernWindowStyle="True"
@@ -140,8 +139,15 @@
                              ToolTip="Integrierte Doku zu Workflow, Lagerverwaltung, Export. (F1)"/>
             </StackPanel>
 
-            <!-- Rechts: Update-Badge (nur sichtbar wenn Update da) + Settings + Beenden -->
-            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+            <!-- Rechts: Update-Badge (nur sichtbar wenn Update da) + Settings + Beenden.
+                 v0.1.7: explizit MinWidth=320 damit Layout immer Platz fuer alle drei
+                 Buttons reserviert (Update + Settings + Beenden). Wenn Update-Badge
+                 spaeter Visibility=Visible bekommt, ist der Slot schon da und das
+                 Layout muss nicht alle Spalten-Breiten neu rechnen. Praxis-Befund:
+                 Button war im Visual-Tree, blitzte beim Beenden kurz auf - klassisches
+                 Symptom fuer einen reservierten-aber-zu-kleinen Layout-Slot. -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
+                        MinWidth="320">
 
                 <!-- UX-Iteration X.23: Update-Badge. Nur sichtbar wenn
                      MainViewModel.HasUpdateAvailable. Klick triggert
@@ -311,19 +317,10 @@
                                    Grid.Row="0" Grid.RowSpan="3"
                                    Panel.ZIndex="1000"/>
 
-        <!-- === TRAY-ICON === -->
-        <tb:TaskbarIcon x:Name="TrayIcon"
-                        IconSource="Resources/app.ico"
-                        ToolTipText="HB-Sort"
-                        TrayMouseDoubleClick="TrayIcon_TrayMouseDoubleClick"
-                        Visibility="Visible">
-            <tb:TaskbarIcon.ContextMenu>
-                <ContextMenu>
-                    <MenuItem Header="Oeffnen" Click="TrayOpen_Click"/>
-                    <Separator/>
-                    <MenuItem Header="Beenden" Click="TrayExit_Click"/>
-                </ContextMenu>
-            </tb:TaskbarIcon.ContextMenu>
-        </tb:TaskbarIcon>
+        <!-- UX X.24: Tray-Icon entfernt. X-Klick + Header-Beenden + Strg+Q
+             machen jetzt alle das gleiche (echtes Beenden via
+             Application.Shutdown). Vorher: X-Klick minimierte ins Tray, was zu
+             "App ist zu, neue Instanz starten"-Verwirrung gefuehrt hat -
+             zwei Instanzen kaempften um die Webcam. -->
     </Grid>
 </Window>
