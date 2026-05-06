@@ -9,6 +9,7 @@ using HBSort.Views;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
+using Velopack;
 
 namespace HBSort;
 
@@ -42,6 +43,25 @@ public partial class App : Application
     /// </summary>
     private async void Application_Startup(object sender, StartupEventArgs e)
     {
+        // UX-Iteration X.23: Velopack-Hook MUSS als allererstes laufen.
+        // Wenn die App per Setup.exe installiert ist und gerade ein Update
+        // oder Erst-Lauf passiert, beendet VelopackApp.Run() den Prozess
+        // intern - der restliche App-Code laeuft dann gar nicht erst los.
+        // Bei nicht-installierten Apps (Portable-ZIP, Debug-Builds) ist
+        // das ein No-Op.
+        try
+        {
+            VelopackApp.Build().Run();
+        }
+        catch (Exception velopackEx)
+        {
+            // Defensiv: wir wollen NIE dass Velopack die App killt. Bei
+            // jedem Fehler einfach loggen und weiter starten - die App
+            // funktioniert auch ohne Update-Mechanismus.
+            // Logging ist hier noch nicht initialisiert, daher Debug.WriteLine.
+            Debug.WriteLine($"[Velopack] Init fehlgeschlagen, ueberspringe: {velopackEx}");
+        }
+
         // UX-Iteration X.23: Splash-Window VOR allem anderen anzeigen, damit
         // der User sofort Feedback bekommt (Logo + ProgressRing). Der Splash
         // bleibt mind. 800ms sichtbar (Splash-Stopwatch) und wird nach dem
@@ -283,6 +303,12 @@ public partial class App : Application
         // Resources; Singleton, weil index.json einmal beim Start gelesen wird.
         services.AddSingleton<IHelpContentService, HelpContentService>();
         services.AddSingleton<ViewModels.HelpViewModel>();
+
+        // UX-Iteration X.23: Velopack-Auto-Update via GitHub Releases.
+        // Singleton weil der UpdateManager den letzten Check-Stand cached
+        // (pendingUpdate). Aufgerufen vom MainViewModel beim App-Start
+        // (Background-Check) und ueber den Update-Badge im Header.
+        services.AddSingleton<IUpdateService, UpdateService>();
 
         // Phase 4: Bin-Dialoge (transient - pro Aufruf eine neue Instanz).
         services.AddTransient<Views.BinCreateDialog>();

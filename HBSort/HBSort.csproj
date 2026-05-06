@@ -58,6 +58,14 @@
          Bringt eigene Default-Styles fuer Headings/Listen/Code/Bilder mit, die
          per ResourceDictionary ueberschrieben werden koennen. -->
     <PackageReference Include="Markdig.Wpf" Version="0.5.0.1" />
+
+    <!-- Velopack: Setup-Erstellung + Auto-Update via GitHub Releases. Ersetzt
+         das fruehere SquirrelWindows. Kerncode laedt einen neuen Release im
+         Hintergrund herunter und wechselt beim naechsten Start auf die neue
+         Version. UI-Sichtbarkeit liegt komplett bei uns (kein eigenes Velopack-
+         UI). Setup.exe + .nupkg + RELEASES-Datei werden im CI-Workflow ueber
+         vpk pack erzeugt. -->
+    <PackageReference Include="Velopack" Version="0.0.1298" />
   </ItemGroup>
 
   <!-- Logo-Resources fuer Splash, About-Dialog, Window-Icons -->
