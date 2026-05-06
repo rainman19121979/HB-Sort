@@ -107,6 +107,28 @@ Floating-Parts, belegte Faecher.
 Default-Ordner fuer BSX und Wanted-List setzen.
 Default ist `Documents\HBSort-Export\`.
 
+## Updates
+
+Auto-Update via GitHub Releases - aber nur wenn du HB-Sort ueber den
+**Setup.exe**-Installer installiert hast. Bei Portable-ZIP-Nutzung
+ist der ganze Tab deaktiviert; neue Versionen musst du dann manuell
+herunterladen.
+
+- **Beim App-Start nach Updates suchen** (Default an): einmal pro
+  App-Start im Hintergrund pruefen ob ein neuer Release auf GitHub
+  verfuegbar ist. Bei Treffer erscheint im Header oben rechts ein
+  blaues "Update X.Y.Z"-Badge.
+- **Jetzt nach Updates suchen**: manueller Check, unabhaengig von
+  Auto-Check.
+- **Letzte Pruefung**: Zeitstempel der letzten erfolgreichen
+  Hintergrund- oder manuellen Pruefung.
+
+Wenn du auf das Update-Badge klickst, wird die neue Version im
+Hintergrund heruntergeladen und die App startet danach automatisch
+neu. Deine Daten unter `%APPDATA%\HBSort\` (settings.json,
+Datenbanken, Logs) bleiben dabei unveraendert - nur die App selbst
+wird ausgetauscht.
+
 ## Info
 
 Versions-Info, Lizenz-Hinweise, Pfad zu `%APPDATA%\HBSort\` (DB,
