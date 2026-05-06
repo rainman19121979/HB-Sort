@@ -38,6 +38,21 @@ public partial class MainWindow : Window
         // UX X.21 Teil 3: Strg+Q beendet die App. Analog zum Settings-Event -
         // das VM darf nicht selbst Application.Shutdown() rufen.
         _viewModel.ExitAppRequested += (_, _) => ExitApp_Click(this, new RoutedEventArgs());
+
+        // UX X.23 Diagnose v0.1.6: zeigt ob das Window die PropertyChanged-Events
+        // vom MainViewModel ueberhaupt sieht. Wenn das Window's Sicht auf das
+        // Event fehlt, ist [ObservableProperty]-Source-Generator nicht eingewebt
+        // oder das DataContext-Binding zeigt auf ein anderes Objekt.
+        _viewModel.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(MainViewModel.HasUpdateAvailable)
+                || e.PropertyName == nameof(MainViewModel.AvailableUpdateVersion))
+            {
+                Log.Information("[DIAG-UI] WINDOW received PropertyChanged: {PropName} (Sender={SenderType})",
+                    e.PropertyName,
+                    s?.GetType().Name ?? "null");
+            }
+        };
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -55,6 +70,70 @@ public partial class MainWindow : Window
         _ = _viewModel.RunBrickognizeHealthCheckAsync();
 
         _viewModel.StatusText = "Bereit";
+
+        // UX X.23 Diagnose v0.1.6: nach 5s das Visual-Tree absuchen ob der
+        // Update-Badge-Button ueberhaupt instanziiert wurde. Wenn ja: dessen
+        // Visibility/IsVisible/ActualWidth/Height/DataContext loggen.
+        var diagTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(5)
+        };
+        diagTimer.Tick += (_, _) =>
+        {
+            diagTimer.Stop();
+            try
+            {
+                var allButtons = FindAllButtons(this);
+                var updateButton = allButtons.FirstOrDefault(b =>
+                    b.Command != null
+                    && b.Command.GetType().Name.Contains("ApplyUpdate", StringComparison.OrdinalIgnoreCase));
+
+                Log.Information("[DIAG-UI] Visual-Tree nach 5s: TotalButtons={Count}, UpdateButton found={Found}",
+                    allButtons.Count,
+                    updateButton != null);
+
+                if (updateButton != null)
+                {
+                    Log.Information("[DIAG-UI] UpdateButton: Visibility={Vis} IsVisible={IsVis} ActualWidth={W} ActualHeight={H} DataContext={DC}",
+                        updateButton.Visibility,
+                        updateButton.IsVisible,
+                        updateButton.ActualWidth,
+                        updateButton.ActualHeight,
+                        updateButton.DataContext?.GetType().Name ?? "null");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "[DIAG-UI] Visual-Tree-Inspektion fehlgeschlagen");
+            }
+        };
+        diagTimer.Start();
+    }
+
+    /// <summary>
+    /// UX X.23 Diagnose-Helfer: rekursiv alle Buttons im Visual-Tree finden.
+    /// Try-Catch falls ein VisualTreeHelper-Knoten zickt.
+    /// </summary>
+    private static List<System.Windows.Controls.Button> FindAllButtons(System.Windows.DependencyObject parent)
+    {
+        var result = new List<System.Windows.Controls.Button>();
+        try
+        {
+            var count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < count; i++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+                if (child is System.Windows.Controls.Button btn) result.Add(btn);
+                result.AddRange(FindAllButtons(child));
+            }
+        }
+        catch
+        {
+            // Defensiv: bestimmte Visual-Tree-Knoten lassen sich nicht traversieren
+            // (z.B. wenn ein Custom-Control im Konstruktor crasht). Diagnose darf
+            // nicht zum App-Stop fuehren.
+        }
+        return result;
     }
 
     /// <summary>
