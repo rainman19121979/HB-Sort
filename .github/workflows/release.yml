@@ -77,7 +77,11 @@ jobs:
           dotnet-version: 9.0.x
 
       - name: Restore
-        run: dotnet restore HBSort.slnx
+        # -r win-x64 ist noetig, sonst loest NuGet keine win-x64-spezifischen
+        # Assets auf, und der spaetere Publish mit --no-restore -r win-x64
+        # bricht mit NETSDK1047 ("project.assets.json doesn't have a target
+        # for net8.0-windows/win-x64"). Praxis-Erfahrung aus v0.1.1-Tag.
+        run: dotnet restore HBSort.slnx -r win-x64
 
       - name: Publish (win-x64 self-contained, single-file)
         # Single-File mit IncludeNativeLibrariesForSelfExtract=true, damit
@@ -150,7 +154,9 @@ jobs:
           dotnet-version: 9.0.x
 
       - name: Restore
-        run: dotnet restore HBSort.slnx
+        # Siehe build-zip-Job: -r win-x64 vermeidet NETSDK1047 beim
+        # nachfolgenden Publish mit --no-restore.
+        run: dotnet restore HBSort.slnx -r win-x64
 
       - name: Publish (win-x64 self-contained, multi-file)
         # Velopack braucht Multi-File-Publish damit Delta-Updates funktionieren
