@@ -1,18 +1,29 @@
 name: Release
 
 # Wird ausgeloest sobald ein Tag im Format v*.*.* gepusht wird (z.B. v0.1.0).
-# Baut einen self-contained Single-File-Release fuer win-x64, packt das
-# Ergebnis als ZIP und haengt es ans GitHub-Release.
+#
+# Drei Jobs in Reihe:
+#   1. setup        - Tag -> Version-String (Output fuer beide Build-Jobs)
+#   2. build-zip    - bestehender Self-Contained Single-File-Build, ZIP-Asset
+#   3. build-velopack - Multi-File-Publish + Velopack vpk pack, liefert
+#                       HBSort-Setup.exe + .nupkg + RELEASES als Assets
+#
+# build-velopack laeuft nach build-zip (needs:), damit das GitHub-Release
+# garantiert vom ZIP-Job angelegt ist bevor Velopack seine Assets dort
+# hochlaedt. Falls build-velopack failed: ZIP ist schon im Release - User
+# koennen Portable nutzen, Setup.exe ist halt diese Iteration nicht da.
+#
+# Zur Risiken-Liste UX X.23 Schritt 5:
+# - A: Multi-File-Publish vs OpenCvSharp4-Native-DLLs - sehen wir am ersten
+#      Tag-Push. Bei Fehler: build-velopack failed, ZIP bleibt OK.
+# - B: vpk-Version-Skew - mit --version 0.0.1298 gepinnt (matches NuGet).
+# - C: RELEASES-Pfad - vpk legt alle Outputs in --outputDir; wir uploaden
+#      mit Glob-Pattern alles aus dem Verzeichnis.
+# - D: Erst-Test nach Tag - Praxis-Test-Anleitung im README + CLAUDE.md.
 #
 # Trigger-Beispiel:
-#   git tag -a v0.1.0 -m "First public release"
-#   git push origin v0.1.0
-#
-# Hinweis zu PublishSingleFile bei WPF: bei Native-Dependencies wie
-# OpenCvSharp4 muss IncludeNativeLibrariesForSelfExtract=true gesetzt
-# werden, damit die DLLs beim Start ausgepackt werden. Falls das im
-# Praxis-Test scheitert, koennen wir auf PublishSingleFile=false +
-# ZIP-des-ganzen-Ordners umstellen - aber erst nach realem Test.
+#   git tag -a v0.1.1 -m "Test Velopack-Pfad"
+#   git push origin v0.1.1
 
 on:
   push:
@@ -28,9 +39,30 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  release:
-    runs-on: windows-latest
+  # ====================================================================
+  # JOB 1: Tag -> Version extrahieren (1-2 Sekunden, beide Build-Jobs
+  # konsumieren das Output ueber needs: setup).
+  # ====================================================================
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: |
+          # Tag-Name ist "v0.1.0" -> Version "0.1.0".
+          version="${GITHUB_REF_NAME#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Release-Version: $version"
 
+  # ====================================================================
+  # JOB 2: Self-Contained Single-File ZIP. Genau wie vor UX X.23.
+  # ====================================================================
+  build-zip:
+    runs-on: windows-latest
+    needs: setup
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -39,35 +71,18 @@ jobs:
           fetch-depth: 0
 
       # dotnet-Version: 9.0.x (siehe Begruendung in build.yml).
-      # HBSort.slnx setzt .NET 9 SDK voraus; TargetFramework bleibt
-      # net8.0-windows.
       - name: Setup .NET 9
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 9.0.x
 
-      - name: Extract version from tag
-        id: version
-        shell: pwsh
-        run: |
-          # Tag-Name ist "v0.1.0" -> Version "0.1.0".
-          $tag = "${{ github.ref_name }}"
-          $version = $tag.TrimStart('v')
-          echo "version=$version" >> $env:GITHUB_OUTPUT
-          Write-Host "Release-Version: $version"
-
-      # Restore ueber die Solution - laed alle Projekte in einen Rutsch
-      # (= besseres Caching auf dem Runner als zwei separate Restores).
-      # dotnet publish unten zielt dann nur auf das HBSort-csproj, weil
-      # Publish projekt-spezifisch ist (Test-Projekt soll nicht ins ZIP).
       - name: Restore
         run: dotnet restore HBSort.slnx
 
-      - name: Publish (win-x64 self-contained)
+      - name: Publish (win-x64 self-contained, single-file)
         # Single-File mit IncludeNativeLibrariesForSelfExtract=true, damit
         # OpenCvSharp4-Native-DLLs beim Start in einen Temp-Ordner extrahiert
-        # werden. ReadyToRun fuer schnelleren Erststart. --no-restore weil
-        # der vorige Restore-Step das schon erledigt hat.
+        # werden. ReadyToRun fuer schnelleren Erststart.
         run: |
           dotnet publish HBSort/HBSort.csproj `
             -c Release `
@@ -77,15 +92,15 @@ jobs:
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:PublishReadyToRun=true `
-            -p:Version=${{ steps.version.outputs.version }} `
-            -p:AssemblyVersion=${{ steps.version.outputs.version }}.0 `
-            -p:FileVersion=${{ steps.version.outputs.version }}.0 `
+            -p:Version=${{ needs.setup.outputs.version }} `
+            -p:AssemblyVersion=${{ needs.setup.outputs.version }}.0 `
+            -p:FileVersion=${{ needs.setup.outputs.version }}.0 `
             -o publish/win-x64
 
       - name: Create ZIP
         shell: pwsh
         run: |
-          $zipName = "HBSort-${{ steps.version.outputs.version }}-win-x64.zip"
+          $zipName = "HBSort-${{ needs.setup.outputs.version }}-win-x64.zip"
           Compress-Archive -Path publish/win-x64/* -DestinationPath $zipName
           Write-Host "Erstellt: $zipName"
 
@@ -106,11 +121,91 @@ jobs:
           [System.IO.File]::WriteAllText("release_notes.md", $notes, (New-Object System.Text.UTF8Encoding $false))
           Write-Host "Release-Notes generiert ($($notes.Length) Zeichen)."
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release with ZIP
         uses: softprops/action-gh-release@v3
         with:
-          files: HBSort-${{ steps.version.outputs.version }}-win-x64.zip
+          files: HBSort-${{ needs.setup.outputs.version }}-win-x64.zip
           body_path: release_notes.md
-          name: HB-Sort ${{ steps.version.outputs.version }}
+          name: HB-Sort ${{ needs.setup.outputs.version }}
+          draft: false
+          prerelease: false
+
+  # ====================================================================
+  # JOB 3: Velopack-Setup.exe + Auto-Update-Artefakte. Laeuft NACH
+  # build-zip damit das GitHub-Release garantiert existiert. Wenn dieser
+  # Job failed: ZIP-Asset ist schon hochgeladen, User koennen Portable.
+  # ====================================================================
+  build-velopack:
+    runs-on: windows-latest
+    needs: [setup, build-zip]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore
+        run: dotnet restore HBSort.slnx
+
+      - name: Publish (win-x64 self-contained, multi-file)
+        # Velopack braucht Multi-File-Publish damit Delta-Updates funktionieren
+        # (es vergleicht einzelne Dateien zwischen Versionen). Daher KEIN
+        # PublishSingleFile hier - im Gegensatz zum ZIP-Job. Self-Contained
+        # bleibt true, damit der Setup-User keine .NET-Runtime installieren
+        # muss. ReadyToRun gleich.
+        run: |
+          dotnet publish HBSort/HBSort.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            --no-restore `
+            -p:PublishSingleFile=false `
+            -p:PublishReadyToRun=true `
+            -p:Version=${{ needs.setup.outputs.version }} `
+            -p:AssemblyVersion=${{ needs.setup.outputs.version }}.0 `
+            -p:FileVersion=${{ needs.setup.outputs.version }}.0 `
+            -o publish/velopack-input
+
+      - name: Install Velopack CLI (vpk)
+        # Version gepinnt auf die NuGet-Velopack-Version damit CLI und Library
+        # synchron bleiben. Bei Bump-PR muessen beide gemeinsam steigen.
+        run: dotnet tool install -g vpk --version 0.0.1298
+
+      - name: Velopack pack
+        # Erzeugt HBSort-Setup.exe + HBSort-X.Y.Z-full.nupkg + RELEASES
+        # in velopack-out. Auto-Update-Pipeline liest spaeter die RELEASES-
+        # Datei vom GitHub-Release als Quelle.
+        shell: pwsh
+        run: |
+          vpk pack `
+            --packId HBSort `
+            --packTitle "HB-Sort" `
+            --packAuthors "rainman19121979" `
+            --packVersion ${{ needs.setup.outputs.version }} `
+            --packDir publish/velopack-input `
+            --mainExe HBSort.exe `
+            --icon HBSort/Resources/app.ico `
+            --outputDir velopack-out
+
+          Write-Host "Velopack-Outputs:"
+          Get-ChildItem velopack-out | ForEach-Object { Write-Host " - $($_.Name) ($([math]::Round($_.Length / 1MB, 2)) MB)" }
+
+      - name: Upload Velopack assets to release
+        # Wir adden zum BESTEHENDEN Release das build-zip schon angelegt hat.
+        # softprops/action-gh-release@v3 ist idempotent - bei selbem Tag
+        # werden Assets ergaenzt, nicht ueberschrieben.
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            velopack-out/HBSort-Setup.exe
+            velopack-out/HBSort-${{ needs.setup.outputs.version }}-full.nupkg
+            velopack-out/RELEASES
+          # name + body weglassen damit kein Overwrite des bestehenden Release-
+          # Bodys; softprops behaelt die alten Werte.
           draft: false
           prerelease: false
