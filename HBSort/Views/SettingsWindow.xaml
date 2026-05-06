@@ -121,31 +121,16 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="60"/>
                             </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition/>
-                                <RowDefinition/>
-                            </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" Text="Scan-Cooldown:"
+                            <TextBlock Text="Scan-Cooldown:"
                                        VerticalAlignment="Center"
                                        ToolTip="Pause zwischen zwei Scans (verhindert Doppelscans)"/>
-                            <Slider Grid.Row="0" Grid.Column="1"
+                            <Slider Grid.Column="1"
                                     Minimum="500" Maximum="3000"
                                     Value="{Binding ScanCooldownMs}"
                                     TickFrequency="100" IsSnapToTickEnabled="True"/>
-                            <TextBlock Grid.Row="0" Grid.Column="2"
+                            <TextBlock Grid.Column="2"
                                        Text="{Binding ScanCooldownMs, StringFormat='{}{0} ms'}"
-                                       VerticalAlignment="Center" HorizontalAlignment="Right"/>
-
-                            <TextBlock Grid.Row="1" Text="Freeze-Dauer:"
-                                       VerticalAlignment="Center" Margin="0,8,0,0"
-                                       ToolTip="Wie lange das Bild nach dem Scan eingefroren bleibt"/>
-                            <Slider Grid.Row="1" Grid.Column="1" Margin="0,8,0,0"
-                                    Minimum="500" Maximum="3000"
-                                    Value="{Binding FreezeFrameMs}"
-                                    TickFrequency="100" IsSnapToTickEnabled="True"/>
-                            <TextBlock Grid.Row="1" Grid.Column="2" Margin="0,8,0,0"
-                                       Text="{Binding FreezeFrameMs, StringFormat='{}{0} ms'}"
                                        VerticalAlignment="Center" HorizontalAlignment="Right"/>
                         </Grid>
 
@@ -1176,6 +1161,90 @@
                                 waehrend des Sortier-Workflows.
                             </TextBlock>
                         </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ====================================== -->
+            <!-- TAB: UPDATES (Auto-Update Konfiguration) -->
+            <!-- UX-Iteration X.23: Velopack-basierter Auto-Update-Mechanismus.
+                 Toggle, manueller Check-Button, Status-Anzeige. -->
+            <!-- ====================================== -->
+            <TabItem Header="Updates">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                    <StackPanel MaxWidth="600">
+
+                        <TextBlock Text="Updates"
+                                   FontSize="18" FontWeight="SemiBold"
+                                   Margin="0,0,0,8"/>
+
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray"
+                                   FontSize="12" Margin="0,0,0,16">
+                            HB-Sort kann sich ueber GitHub Releases automatisch
+                            aktualisieren - aber nur wenn die App ueber den
+                            Setup.exe-Installer installiert wurde. Bei Portable-
+                            ZIP-Nutzung sind alle Update-Funktionen deaktiviert
+                            und du musst neue Versionen manuell herunterladen.
+                        </TextBlock>
+
+                        <!-- Aktueller Status -->
+                        <Border BorderBrush="{StaticResource StatusInfoBrush}"
+                                BorderThickness="1" CornerRadius="4"
+                                Background="{StaticResource InfoBoxBackground}"
+                                Padding="12" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold"
+                                           FontSize="13"
+                                           Margin="0,0,0,4">
+                                    <Run Text="Installation: "/>
+                                    <Run Text="{Binding UpdateInstallStateText, Mode=OneWay}"/>
+                                </TextBlock>
+                                <TextBlock FontSize="12" Foreground="Gray">
+                                    <Run Text="Aktuelle Version: "/>
+                                    <Run Text="{Binding CurrentVersionText, Mode=OneWay}"/>
+                                </TextBlock>
+                                <TextBlock FontSize="12" Foreground="Gray">
+                                    <Run Text="Letzte Pruefung: "/>
+                                    <Run Text="{Binding LastUpdateCheckText, Mode=OneWay}"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Auto-Check-Toggle -->
+                        <CheckBox Content="Beim App-Start nach Updates suchen"
+                                  IsChecked="{Binding AutoCheckForUpdates}"
+                                  IsEnabled="{Binding IsUpdateInstalled}"
+                                  Margin="0,0,0,8"
+                                  ToolTip="Wenn aktiv, prueft HB-Sort beim Starten einmal im Hintergrund auf neue Versionen. Kein automatischer Download - nur ein Hinweis im Header."/>
+
+                        <TextBlock Text="Wenn deaktiviert: nur manuelles Pruefen via Button unten."
+                                   FontSize="11" Foreground="Gray"
+                                   Margin="24,0,0,16"/>
+
+                        <!-- Manueller Check -->
+                        <Button Content="Jetzt nach Updates suchen"
+                                Command="{Binding CheckForUpdatesCommand}"
+                                IsEnabled="{Binding IsUpdateInstalled}"
+                                HorizontalAlignment="Left"
+                                Padding="12,6"
+                                Margin="0,0,0,8"/>
+
+                        <TextBlock Text="{Binding UpdateCheckStatusText}"
+                                   FontSize="12"
+                                   Foreground="{Binding UpdateCheckStatusBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,4,0,16"
+                                   Visibility="{Binding HasUpdateCheckStatus, Converter={StaticResource BoolToVisibility}}"/>
+
+                        <Separator Margin="0,8,0,8"/>
+
+                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray">
+                            Updates werden ueber Velopack + GitHub Releases verteilt.
+                            Beim Update-Restart bleiben deine Daten unter
+                            %APPDATA%\HBSort\ (settings.json, Datenbanken, Logs)
+                            unveraendert - nur die App selbst wird ausgetauscht.
+                        </TextBlock>
+
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

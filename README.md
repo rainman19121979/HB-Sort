@@ -58,11 +58,41 @@ dotnet build -c Release
 dotnet run --project HBSort
 ```
 
-### Self-contained Release
+### Setup-Installer (.exe) - empfohlen
 
-Die GitHub-Releases unter
-https://github.com/rainman19121979/HB-Sort/releases bieten ein fertig
-gepacktes Single-File-Build fuer Windows x64 (kein .NET-Install noetig).
+Auf jedem GitHub-Release liegt ein `HBSort-Setup.exe`. Das ist ein
+schlanker Installer (Velopack-Format) der:
+
+- HB-Sort unter `%LOCALAPPDATA%\HBSort\` ohne Admin-Rechte installiert,
+- einen Startmenue-Eintrag anlegt,
+- in **Programme & Features** als "HB-Sort" auftaucht (zum
+  Deinstallieren),
+- **Auto-Update** unterstuetzt: spaetere Versionen werden im Hintergrund
+  geladen und beim naechsten Start eingespielt.
+
+**SmartScreen-Warnung beim ersten Start:** weil der Installer aktuell
+nicht code-signiert ist, zeigt Windows ein blaues SmartScreen-Fenster
+"App von unbekanntem Herausgeber". Klick auf "Weitere Informationen"
+und dann "Trotzdem ausfuehren". Das ist normal fuer kostenlose Open-
+Source-Hobby-Apps - Code-Signing-Zertifikate kosten 100-300 EUR/Jahr
+und sind fuer dieses Projekt aktuell nicht vorgesehen.
+
+Auto-Updates aus der laufenden App heraus haben **keine** SmartScreen-
+Warnung mehr - die wird nur beim allerersten Setup-Klick gezeigt.
+
+### Portable ZIP - keine Installation
+
+Auf jedem Release liegt zusaetzlich `HBSort-X.Y.Z-win-x64.zip`. Das ist
+ein Self-Contained Single-File-Build:
+
+- Entpacken irgendwohin, `HBSort.exe` doppelklicken.
+- Kein Eintrag in Programme & Features.
+- **Kein Auto-Update** - neue Versionen musst du selbst herunterladen.
+- Lauffaehig ohne .NET-Installation und ohne Admin-Rechte.
+
+Daten landen in beiden Varianten unter `%APPDATA%\HBSort\` und sind
+unabhaengig von der App-Installation - du kannst zwischen Setup und
+Portable wechseln, ohne deinen Bestand zu verlieren.
 
 ## Konfiguration
 
@@ -87,6 +117,23 @@ Daten zentral.
   Brickognize-API zur Erkennung. Kein Account ist Pflicht fuer die
   Nutzung von HB-Sort - die API ist frei nutzbar mit fairem Rate-Limit.
   Mehr Infos auf brickognize.com.
+- **Brickognize-Terms-of-Service**: Mit der Nutzung von HB-Sort
+  akzeptierst Du implizit die Terms-of-Service von Brickognize
+  (siehe brickognize.com -> "Legal" / "Terms of Service").
+  Insbesondere:
+  - Brickognize-API ist fuer **persoenliche, nicht-kommerzielle
+    Nutzung** gedacht.
+  - Hochgeladene Bilder werden gemaess Brickognize-ToS Section 8
+    verarbeitet (Lizenz-Grant an Brickognize zur Nutzung der
+    hochgeladenen Bilder fuer u.a. Modell-Training).
+  - HB-Sort ist nicht von Brickognize betrieben oder finanziert.
+    Wenn Du Bedenken hast, schau Dir die ToS an oder verzichte auf
+    den Webcam-Erkennungs-Schritt (HB-Sort ist auch nutzbar fuer
+    manuelle Item-Eingabe).
+
+  Falls Du HB-Sort kommerziell nutzen willst (z.B. fuer einen Shop):
+  bitte direkt an Brickognize wenden, das ist nicht durch die
+  HB-Sort-Doku abgedeckt.
 
 ### BrickStore-Datenbank (rgriebl/brickstore-database)
 

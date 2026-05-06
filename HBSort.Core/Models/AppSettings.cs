@@ -35,9 +35,6 @@ public class AppSettings
     /// <summary>Pause zwischen zwei Scans in Millisekunden (verhindert Doppelscans)</summary>
     public int ScanCooldownMs { get; set; } = 1000;
 
-    /// <summary>Wie lange das Bild nach dem Scan eingefroren wird (in Millisekunden)</summary>
-    public int FreezeFrameMs { get; set; } = 1000;
-
     /// <summary>Sound-Effekte an/aus (Default: aus)</summary>
     public bool SoundEnabled { get; set; } = false;
 
@@ -107,6 +104,17 @@ public class AppSettings
     /// Default: Provider=None -> keine Preise sichtbar.
     /// </summary>
     public PriceSettings Prices { get; set; } = new();
+
+    /// <summary>
+    /// UX-Iteration X.23: Auto-Update via Velopack + GitHub Releases.
+    /// Wenn true: beim App-Start einmal pruefen ob ein neuer Release
+    /// verfuegbar ist; bei Treffer wird das Update-Badge im Header
+    /// angezeigt. Manuelles "Jetzt pruefen" funktioniert immer
+    /// unabhaengig von dem Wert. (LastUpdateCheck-Zeitstempel wird
+    /// weiterhin in der bestehenden LastUpdateCheck-Property oben
+    /// gespeichert.)
+    /// </summary>
+    public bool AutoCheckForUpdates { get; set; } = true;
 }
 
 /// <summary>

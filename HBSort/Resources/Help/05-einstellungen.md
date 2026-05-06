@@ -16,9 +16,6 @@ in der Header-Leiste. Sie sind in Tabs gegliedert.
     als "nicht erkannt".
 - **Scan-Cooldown** - Pause zwischen zwei Scans, verhindert
   Doppelscans (Default 1000 ms).
-- **Freeze-Frame-Dauer** - wie lange das Bild nach dem Scan eingefroren
-  bleibt (Default 1000 ms).
-- **UI-Dichte** - Kompakt / Normal / Komfortabel.
 - **Sound-Effekte** - akustisches Feedback (Default aus).
 - **Tooltips anzeigen** - blendet alle Tooltips aus, falls sie dich
   stoeren. Default an.
@@ -109,6 +106,28 @@ Floating-Parts, belegte Faecher.
 
 Default-Ordner fuer BSX und Wanted-List setzen.
 Default ist `Documents\HBSort-Export\`.
+
+## Updates
+
+Auto-Update via GitHub Releases - aber nur wenn du HB-Sort ueber den
+**Setup.exe**-Installer installiert hast. Bei Portable-ZIP-Nutzung
+ist der ganze Tab deaktiviert; neue Versionen musst du dann manuell
+herunterladen.
+
+- **Beim App-Start nach Updates suchen** (Default an): einmal pro
+  App-Start im Hintergrund pruefen ob ein neuer Release auf GitHub
+  verfuegbar ist. Bei Treffer erscheint im Header oben rechts ein
+  blaues "Update X.Y.Z"-Badge.
+- **Jetzt nach Updates suchen**: manueller Check, unabhaengig von
+  Auto-Check.
+- **Letzte Pruefung**: Zeitstempel der letzten erfolgreichen
+  Hintergrund- oder manuellen Pruefung.
+
+Wenn du auf das Update-Badge klickst, wird die neue Version im
+Hintergrund heruntergeladen und die App startet danach automatisch
+neu. Deine Daten unter `%APPDATA%\HBSort\` (settings.json,
+Datenbanken, Logs) bleiben dabei unveraendert - nur die App selbst
+wird ausgetauscht.
 
 ## Info
 

@@ -1,12 +1,15 @@
+using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Windows;
 using HBSort.Core.Database;
 using HBSort.Core.Services;
 using HBSort.Services;
+using HBSort.Views;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
+using Velopack;
 
 namespace HBSort;
 
@@ -40,6 +43,33 @@ public partial class App : Application
     /// </summary>
     private async void Application_Startup(object sender, StartupEventArgs e)
     {
+        // UX-Iteration X.23: Velopack-Hook MUSS als allererstes laufen.
+        // Wenn die App per Setup.exe installiert ist und gerade ein Update
+        // oder Erst-Lauf passiert, beendet VelopackApp.Run() den Prozess
+        // intern - der restliche App-Code laeuft dann gar nicht erst los.
+        // Bei nicht-installierten Apps (Portable-ZIP, Debug-Builds) ist
+        // das ein No-Op.
+        try
+        {
+            VelopackApp.Build().Run();
+        }
+        catch (Exception velopackEx)
+        {
+            // Defensiv: wir wollen NIE dass Velopack die App killt. Bei
+            // jedem Fehler einfach loggen und weiter starten - die App
+            // funktioniert auch ohne Update-Mechanismus.
+            // Logging ist hier noch nicht initialisiert, daher Debug.WriteLine.
+            Debug.WriteLine($"[Velopack] Init fehlgeschlagen, ueberspringe: {velopackEx}");
+        }
+
+        // UX-Iteration X.23: Splash-Window VOR allem anderen anzeigen, damit
+        // der User sofort Feedback bekommt (Logo + ProgressRing). Der Splash
+        // bleibt mind. 800ms sichtbar (Splash-Stopwatch) und wird nach dem
+        // MainWindow.Show() unten wieder geschlossen.
+        var splashStopwatch = Stopwatch.StartNew();
+        var splash = new SplashWindow();
+        splash.Show();
+
         // 0. Auto-Migration: alter Datenbestand (LegoMinifigSorter) -> neuer Pfad (HBSort).
         // Muss VOR EnsureDirectories laufen, weil wir den neuen Ordner sonst leer anlegen.
         await MigrateLegacyAppDataIfNeededAsync();
@@ -92,7 +122,21 @@ public partial class App : Application
 
             // 7. Hauptfenster anzeigen
             var mainWindow = Services.GetRequiredService<MainWindow>();
+
+            // UX-Iteration X.23: Splash mind. 800ms anzeigen damit der User
+            // ihn ueberhaupt wahrnimmt - bei kalt-gestartetem System dauert
+            // die DB-Init oben allein meist > 800ms, der Delay greift dann
+            // gar nicht. Bei warmem Start (zweiter App-Start innerhalb von
+            // Sekunden) ist die Init schneller, der Delay garantiert eine
+            // saubere Splash-Anzeige.
+            var elapsed = splashStopwatch.ElapsedMilliseconds;
+            if (elapsed < 800)
+            {
+                await Task.Delay((int)(800 - elapsed));
+            }
+
             mainWindow.Show();
+            splash.Close();
 
             // 9. Phase R1: BL-API-Verbindung im Hintergrund pruefen wenn Tokens vorhanden.
             // Fire-and-forget: blockiert NICHT den Startup. Wenn keine Tokens da sind,
@@ -105,6 +149,10 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
+            // Splash auch im Fehlerfall schliessen, sonst haengt er ueber dem
+            // MessageBox-Error-Dialog.
+            try { splash.Close(); } catch { /* Splash schon zu - egal */ }
+
             Log.Fatal(ex, "Schwerwiegender Fehler beim App-Start");
             MessageBox.Show(
                 $"Die Anwendung konnte nicht gestartet werden:\n\n{ex.Message}",
@@ -255,6 +303,12 @@ public partial class App : Application
         // Resources; Singleton, weil index.json einmal beim Start gelesen wird.
         services.AddSingleton<IHelpContentService, HelpContentService>();
         services.AddSingleton<ViewModels.HelpViewModel>();
+
+        // UX-Iteration X.23: Velopack-Auto-Update via GitHub Releases.
+        // Singleton weil der UpdateManager den letzten Check-Stand cached
+        // (pendingUpdate). Aufgerufen vom MainViewModel beim App-Start
+        // (Background-Check) und ueber den Update-Badge im Header.
+        services.AddSingleton<IUpdateService, UpdateService>();
 
         // Phase 4: Bin-Dialoge (transient - pro Aufruf eine neue Instanz).
         services.AddTransient<Views.BinCreateDialog>();
@@ -532,6 +586,7 @@ public partial class App : Application
     /// </summary>
     protected override void OnExit(ExitEventArgs e)
     {
+        Log.Information("[SPLITTER] OnExit called");
         Log.Information("=== HB-Sort beendet ===");
 
         // ServiceProvider disponieren - das ruft Dispose() auf allen Singleton-

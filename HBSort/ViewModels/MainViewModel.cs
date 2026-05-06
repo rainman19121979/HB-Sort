@@ -24,6 +24,7 @@ public partial class MainViewModel : ObservableObject
     private readonly NotificationService _notificationService;
     private readonly IPersistentImageCache _imageCache;
     private readonly IBricklinkRateLimiter _rateLimiter;
+    private readonly IUpdateService _updateService;
 
     // 60s-Timer fuer Status-Refresh damit die Anzeige aktuell bleibt auch ohne neue Calls
     // (Eintraege fallen aus dem rolling 24h-Window).
@@ -106,6 +107,36 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private RateLimitState _bricklinkRateLimitState = RateLimitState.Ok;
 
+    // --- UX-Iteration X.23: Update-Badge im Header ---
+
+    /// <summary>True wenn ein Update verfuegbar ist - steuert die Sichtbarkeit
+    /// des Update-Badges im Header.</summary>
+    [ObservableProperty]
+    private bool _hasUpdateAvailable;
+
+    // UX X.23 Diagnose-Hook: zeigt ob der Setter auf dem UI-Thread laeuft
+    // und ob die ObservableProperty-Source-Generators ueberhaupt PropertyChanged
+    // feuern. Wenn dieser Log NIE erscheint -> Property wird nie gesetzt.
+    // Wenn der Log erscheint aber Badge unsichtbar bleibt -> WPF-Binding/
+    // Converter-Problem.
+    partial void OnHasUpdateAvailableChanged(bool value)
+    {
+        Log.Information("[DIAG-UI] MainViewModel.HasUpdateAvailable Setter aufgerufen, neuer Wert={Value}, ManagedThreadId={ThreadId} CheckAccess={CheckAccess}",
+            value,
+            System.Threading.Thread.CurrentThread.ManagedThreadId,
+            System.Windows.Application.Current?.Dispatcher.CheckAccess() ?? false);
+    }
+
+    /// <summary>Versions-String der gefundenen neuen Version (z.B. "0.2.0").</summary>
+    [ObservableProperty]
+    private string _availableUpdateVersion = string.Empty;
+
+    /// <summary>Wahr waehrend ein Update gerade heruntergeladen wird; deaktiviert
+    /// das Badge gegen Doppelklicks.</summary>
+    [ObservableProperty]
+    private bool _isUpdateDownloading;
+
+
     public MainViewModel(
         ISettingsService settingsService,
         ScanViewModel scanViewModel,
@@ -118,7 +149,8 @@ public partial class MainViewModel : ObservableObject
         LiveStatsViewModel liveStats,
         WaitingDetailViewModel waitingDetail,
         RecentScansViewModel recentScans,
-        HelpViewModel help)
+        HelpViewModel help,
+        IUpdateService updateService)
     {
         _settingsService = settingsService;
         ScanViewModel = scanViewModel;
@@ -134,6 +166,7 @@ public partial class MainViewModel : ObservableObject
         _notificationService = (NotificationService)notificationService;
         _imageCache = imageCache;
         _rateLimiter = rateLimiter;
+        _updateService = updateService;
 
         // Letzten Tab-Index (variables Feld unten rechts) aus den Settings laden.
         // Default 0 (Live-Stats). Direkt auf das Backing-Field, damit der
@@ -169,6 +202,85 @@ public partial class MainViewModel : ObservableObject
         _rateLimiter.StatusChanged += OnRateLimitChanged;
         _rateLimitTimer.Tick += (_, _) => _ = RefreshRateLimitStatusAsync();
         _rateLimitTimer.Start();
+
+        // UX-Iteration X.23: Update-Check beim App-Start (nur wenn der User
+        // ihn aktiviert hat und die App per Setup.exe installiert ist).
+        // Fire-and-forget weil die App nicht auf Netzwerk-Antworten warten soll.
+        Log.Information("[DIAG-UI] MainViewModel ctor: AutoCheck={Auto} IsInstalled={Inst} ctorThreadId={ThreadId} CheckAccess={CheckAccess}",
+            _settingsService.Current.AutoCheckForUpdates,
+            _updateService.IsInstalled,
+            System.Threading.Thread.CurrentThread.ManagedThreadId,
+            System.Windows.Application.Current?.Dispatcher.CheckAccess() ?? false);
+        if (_settingsService.Current.AutoCheckForUpdates && _updateService.IsInstalled)
+        {
+            _ = CheckForUpdatesInBackgroundAsync();
+        }
+    }
+
+    /// <summary>
+    /// UX-Iteration X.23: stiller Update-Check im Hintergrund. Setzt bei
+    /// Treffer HasUpdateAvailable + AvailableUpdateVersion. Bei Fehler/
+    /// kein Treffer: kein Badge, kein Toast - nur Log.
+    /// </summary>
+    private async Task CheckForUpdatesInBackgroundAsync()
+    {
+        try
+        {
+            Log.Information("[DIAG-UI] CheckForUpdatesInBackgroundAsync vor await ThreadId={ThreadId} CheckAccess={CheckAccess}",
+                System.Threading.Thread.CurrentThread.ManagedThreadId,
+                System.Windows.Application.Current?.Dispatcher.CheckAccess() ?? false);
+
+            var hasUpdate = await _updateService.CheckForUpdatesAsync();
+
+            Log.Information("[DIAG-UI] CheckForUpdatesInBackgroundAsync nach await ThreadId={ThreadId} CheckAccess={CheckAccess} hasUpdate={Has}",
+                System.Threading.Thread.CurrentThread.ManagedThreadId,
+                System.Windows.Application.Current?.Dispatcher.CheckAccess() ?? false,
+                hasUpdate);
+
+            _settingsService.Current.LastUpdateCheck = DateTime.UtcNow;
+            _ = _settingsService.SaveAsync();
+
+            if (hasUpdate && _updateService.AvailableVersion is { } v)
+            {
+                AvailableUpdateVersion = v;
+                HasUpdateAvailable = true;
+                Log.Information("Update verfuegbar: {Version}", v);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Background-Update-Check fehlgeschlagen");
+        }
+    }
+
+    /// <summary>
+    /// UX-Iteration X.23: Klick auf das Update-Badge. Stoesst den Download
+    /// und Restart an. Velopack beendet die App intern und startet sie neu -
+    /// nach diesem Aufruf laeuft kein Code mehr.
+    /// </summary>
+    [RelayCommand]
+    private async Task ApplyUpdateAsync()
+    {
+        if (!HasUpdateAvailable || IsUpdateDownloading) return;
+
+        IsUpdateDownloading = true;
+        try
+        {
+            await _updateService.DownloadAndApplyAsync();
+            // Wenn wir hier landen, hat Velopack den Restart NICHT angestossen
+            // (z.B. weil zwischen Check und Apply was schief ging). Badge zuruecksetzen.
+            HasUpdateAvailable = false;
+            AvailableUpdateVersion = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Update-Apply fehlgeschlagen");
+            _notificationService.ShowError("Update fehlgeschlagen - bitte spaeter erneut versuchen.");
+        }
+        finally
+        {
+            IsUpdateDownloading = false;
+        }
     }
 
     /// <summary>
@@ -204,6 +316,16 @@ public partial class MainViewModel : ObservableObject
 
     [RelayCommand]
     public void OpenSettings() => OpenSettingsRequested?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// UX-Iteration X.21 Teil 3: Strg+Q = App beenden. Wir feuern ein Event,
+    /// das das MainWindow auffaengt und den ExitApplicationAsync-Pfad ausfuehrt.
+    /// Analog zu OpenSettings: das VM darf das Window nicht direkt schliessen.
+    /// </summary>
+    public event EventHandler? ExitAppRequested;
+
+    [RelayCommand]
+    public void ExitApp() => ExitAppRequested?.Invoke(this, EventArgs.Empty);
 
     /// <summary>
     /// Liest den aktuellen RateLimitStatus und aktualisiert die UI-Properties.

@@ -83,6 +83,21 @@ Klick auf den Button:
 So sammelt HB-Sort automatisch Teile fuer neue Figuren ein, die schon
 auf Lager liegen.
 
+## Hinweis zu Brickognize-ToS
+
+Beim Klick auf **Scannen** (oder Druecken der Leertaste) wird das
+Webcam-Bild an die Brickognize-API geschickt. Mit der Nutzung
+akzeptierst du die Brickognize-Terms-of-Service:
+
+- Persoenliche, nicht-kommerzielle Nutzung
+- Hochgeladene Bilder werden gemaess Brickognize-ToS Section 8
+  verarbeitet (u.a. Modell-Training)
+- HB-Sort ist nicht von Brickognize betrieben oder finanziert
+
+Details siehe README oder <https://brickognize.com> -> *Legal* /
+*Terms of Service*. Wenn du HB-Sort nicht mit Webcam-Erkennung
+nutzen willst, kannst du Items auch manuell anlegen.
+
 ## Wartende Figuren komplettieren
 
 Klick im Tab *Sortieren* unten rechts (oder im Detail-Tab *Wartende-

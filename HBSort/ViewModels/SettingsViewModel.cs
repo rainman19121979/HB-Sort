@@ -32,6 +32,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IDialogService _dialogs;
     private readonly IBlPriceCacheService _priceCache;
     private readonly ITooltipsService _tooltips;
+    private readonly IUpdateService _updateService;
 
     /// <summary>Tab "Lagerfaecher" - eigenes ViewModel mit Liste + Commands.</summary>
     public BinManagerViewModel BinManager { get; }
@@ -61,9 +62,6 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private int _scanCooldownMs;
-
-    [ObservableProperty]
-    private int _freezeFrameMs;
 
     // --- Sonstiges ---
 
@@ -229,6 +227,44 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _rateLimitSaveMessage = string.Empty;
 
+    // --- UX-Iteration X.23: Updates-Tab ---
+
+    /// <summary>Toggle "Beim App-Start nach Updates suchen". Persistiert in
+    /// AppSettings.AutoCheckForUpdates.</summary>
+    [ObservableProperty]
+    private bool _autoCheckForUpdates;
+
+    /// <summary>True wenn die App per Setup.exe installiert ist (= Auto-Update
+    /// nutzbar). Steuert die Enable-Property aller Update-Controls.</summary>
+    [ObservableProperty]
+    private bool _isUpdateInstalled;
+
+    /// <summary>Status-Text "Per Setup.exe installiert" / "Portable-ZIP-Build".</summary>
+    [ObservableProperty]
+    private string _updateInstallStateText = "...";
+
+    /// <summary>Aktuelle App-Version aus dem Assembly.</summary>
+    [ObservableProperty]
+    private string _currentVersionText = "-";
+
+    /// <summary>Zeitstempel der letzten Update-Pruefung (oder "noch nie").</summary>
+    [ObservableProperty]
+    private string _lastUpdateCheckText = "noch nie";
+
+    /// <summary>Zwischenzustand-Text nach manuellem Check ("Pruefe..." / "Keine
+    /// neue Version" / "Update {Version} verfuegbar").</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasUpdateCheckStatus))]
+    private string _updateCheckStatusText = string.Empty;
+
+    public bool HasUpdateCheckStatus => !string.IsNullOrEmpty(UpdateCheckStatusText);
+
+    /// <summary>Brush-Resource-Key fuer den Status-Text. Default Info-Blau,
+    /// bei Treffer Success-Gruen, bei Fehler Error-Rot.</summary>
+    [ObservableProperty]
+    private System.Windows.Media.Brush _updateCheckStatusBrush =
+        System.Windows.Media.Brushes.Gray;
+
     public SettingsViewModel(
         ISettingsService settingsService,
         ICameraService cameraService,
@@ -242,7 +278,8 @@ public partial class SettingsViewModel : ObservableObject
         BinManagerViewModel binManager,
         IDialogService dialogs,
         IBlPriceCacheService priceCache,
-        ITooltipsService tooltips)
+        ITooltipsService tooltips,
+        IUpdateService updateService)
     {
         _settingsService = settingsService;
         _cameraService = cameraService;
@@ -256,6 +293,7 @@ public partial class SettingsViewModel : ObservableObject
         _dialogs = dialogs;
         _tooltips = tooltips;
         _priceCache = priceCache;
+        _updateService = updateService;
         BinManager = binManager;
 
         // Vorhandene BL-Tokens beim Oeffnen der Settings laden, damit der User
@@ -274,6 +312,9 @@ public partial class SettingsViewModel : ObservableObject
 
         // Cache-Stats initial befuellen
         RefreshCacheStats();
+
+        // UX-Iteration X.23: Update-Tab Initial-Daten.
+        InitializeUpdateState();
 
         // UX#12: Preis-Cache-Eintraege initial laden.
         _ = RefreshPriceCacheCountAsync();
@@ -316,9 +357,9 @@ public partial class SettingsViewModel : ObservableObject
         ScoreThresholdMin = s.ScoreThresholdMin;
         ScoreThresholdShowSelection = s.ScoreThresholdShowSelection;
         ScanCooldownMs = s.ScanCooldownMs;
-        FreezeFrameMs = s.FreezeFrameMs;
         SoundEnabled = s.SoundEnabled;
         ShowTooltips = s.ShowTooltips;
+        AutoCheckForUpdates = s.AutoCheckForUpdates;
         PreferBricklinkImages = s.ImageCache.PreferBricklinkImages;
         PreloadOnMinifigScan = s.ImageCache.PreloadOnMinifigScan;
         ImageCacheLimitMb = s.ImageCache.LimitMb;
@@ -356,9 +397,9 @@ public partial class SettingsViewModel : ObservableObject
         s.ScoreThresholdMin = ScoreThresholdMin;
         s.ScoreThresholdShowSelection = ScoreThresholdShowSelection;
         s.ScanCooldownMs = ScanCooldownMs;
-        s.FreezeFrameMs = FreezeFrameMs;
         s.SoundEnabled = SoundEnabled;
         s.ShowTooltips = ShowTooltips;
+        s.AutoCheckForUpdates = AutoCheckForUpdates;
         s.ImageCache.PreferBricklinkImages = PreferBricklinkImages;
         s.ImageCache.PreloadOnMinifigScan = PreloadOnMinifigScan;
         s.ImageCache.LimitMb = ImageCacheLimitMb;
@@ -382,6 +423,68 @@ public partial class SettingsViewModel : ObservableObject
 
         await _settingsService.SaveAsync();
         Log.Information("Einstellungen gespeichert");
+    }
+
+    // ========================================================================
+    // UX-Iteration X.23: Updates-Tab
+    // ========================================================================
+
+    /// <summary>
+    /// Initialisiert die Update-Tab-Anzeigen aus IUpdateService + Settings.
+    /// Liest die Install-Variante (Setup.exe vs Portable-ZIP) und den letzten
+    /// Check-Zeitstempel; lost keinen aktiven Update-Check aus.
+    /// </summary>
+    private void InitializeUpdateState()
+    {
+        IsUpdateInstalled = _updateService.IsInstalled;
+        UpdateInstallStateText = IsUpdateInstalled
+            ? "Per Setup.exe installiert (Auto-Update verfuegbar)"
+            : "Portable-ZIP-Build oder Debug (kein Auto-Update)";
+
+        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        CurrentVersionText = version is null ? "0.0.0"
+            : $"{version.Major}.{version.Minor}.{version.Build}";
+
+        var last = _settingsService.Current.LastUpdateCheck;
+        LastUpdateCheckText = last is null
+            ? "noch nie"
+            : last.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm");
+    }
+
+    /// <summary>
+    /// Manuelles "Jetzt nach Updates suchen". Aktualisiert Status-Text +
+    /// LastUpdateCheck in Settings (sofort persistiert).
+    /// </summary>
+    [RelayCommand]
+    private async Task CheckForUpdatesAsync()
+    {
+        UpdateCheckStatusText = "Pruefe...";
+        UpdateCheckStatusBrush = System.Windows.Media.Brushes.Gray;
+
+        try
+        {
+            var hasUpdate = await _updateService.CheckForUpdatesAsync();
+            _settingsService.Current.LastUpdateCheck = DateTime.UtcNow;
+            await _settingsService.SaveAsync();
+            LastUpdateCheckText = DateTime.Now.ToString("dd.MM.yyyy HH:mm");
+
+            if (hasUpdate && _updateService.AvailableVersion is { } v)
+            {
+                UpdateCheckStatusText = $"Update {v} verfuegbar - der Hinweis erscheint im Header.";
+                UpdateCheckStatusBrush = System.Windows.Media.Brushes.Green;
+            }
+            else
+            {
+                UpdateCheckStatusText = "Du nutzt die aktuelle Version.";
+                UpdateCheckStatusBrush = System.Windows.Media.Brushes.Gray;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "CheckForUpdatesAsync fehlgeschlagen (UI-Pfad)");
+            UpdateCheckStatusText = "Pruefung fehlgeschlagen - kein Internet?";
+            UpdateCheckStatusBrush = System.Windows.Media.Brushes.OrangeRed;
+        }
     }
 
     // ========================================================================
