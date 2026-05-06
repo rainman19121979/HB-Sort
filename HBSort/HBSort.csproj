@@ -53,7 +53,7 @@
 
     <!-- Markdig: CommonMark-konformer Markdown-Parser. Wird vom Hilfe-Tab
          genutzt, um die .md-Dateien aus Resources/Help/ zur Laufzeit zu rendern. -->
-    <PackageReference Include="Markdig" Version="0.37.0" />
+    <PackageReference Include="Markdig" Version="0.45.0" />
     <!-- Markdig.Wpf: Renderer der ein FlowDocument aus dem Markdig-Tree baut.
          Bringt eigene Default-Styles fuer Headings/Listen/Code/Bilder mit, die
          per ResourceDictionary ueberschrieben werden koennen. -->
