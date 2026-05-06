@@ -60,6 +60,14 @@ public class UpdateService : IUpdateService
 
             Log.Information("UpdateService: Update verfuegbar -> {Version}",
                 _pendingUpdate.TargetFullRelease.Version);
+            // Hypothese B (Threading): in welchem Thread laufen wir hier?
+            // Wenn UI-Thread (1) -> Continuation-Capture funktioniert; Caller
+            // setzt Property nach await safe auf UI-Thread.
+            // Wenn anderer Thread -> Velopack hat den Sync-Context verloren.
+            Log.Information("[DIAG-UI] UpdateService.CheckForUpdatesAsync return - ManagedThreadId={ThreadId} IsBackground={IsBg} CheckAccess={CheckAccess}",
+                System.Threading.Thread.CurrentThread.ManagedThreadId,
+                System.Threading.Thread.CurrentThread.IsBackground,
+                System.Windows.Application.Current?.Dispatcher.CheckAccess() ?? false);
             return true;
         }
         catch (Exception ex)

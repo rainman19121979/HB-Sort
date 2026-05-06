@@ -33,9 +33,9 @@
          automatisch passend zum System-Theme -->
     <PackageReference Include="ModernWpfUI" Version="0.9.6" />
 
-    <!-- H.NotifyIcon.Wpf: Tray-Icon-Bibliothek mit MVVM-Support,
-         damit die App beim Schließen in die Taskleiste minimiert wird -->
-    <PackageReference Include="H.NotifyIcon.Wpf" Version="2.3.2" />
+<!-- H.NotifyIcon.Wpf entfernt in UX X.24: Tray-Icon raus, X-Klick beendet jetzt
+         direkt die App (nicht mehr in den Tray minimieren). -->
+
 
     <!-- Serilog: Strukturiertes Logging-Framework mit tagesweiser Rotation -->
     <PackageReference Include="Serilog" Version="4.2.0" />

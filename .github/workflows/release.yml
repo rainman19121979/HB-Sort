@@ -77,7 +77,12 @@ jobs:
           dotnet-version: 9.0.x
 
       - name: Restore
-        run: dotnet restore HBSort.slnx
+        # -r win-x64 + -p:PublishReadyToRun=true noetig damit NuGet die R2R-
+        # Composite-Pakete bei der Restore-Phase aufloest. Der spaetere
+        # Publish mit PublishReadyToRun=true findet sonst kein Runtime-
+        # Package und scheitert mit "Unable to optimize assemblies".
+        # Praxis-Erfahrung aus v0.1.1 (NETSDK1047 + R2R-Runtime-Resolve).
+        run: dotnet restore HBSort.slnx -r win-x64 -p:PublishReadyToRun=true
 
       - name: Publish (win-x64 self-contained, single-file)
         # Single-File mit IncludeNativeLibrariesForSelfExtract=true, damit
@@ -150,7 +155,9 @@ jobs:
           dotnet-version: 9.0.x
 
       - name: Restore
-        run: dotnet restore HBSort.slnx
+        # Siehe build-zip-Job: -r win-x64 + PublishReadyToRun=true vermeiden
+        # NETSDK1047 + R2R-Runtime-Resolve-Fehler beim nachfolgenden Publish.
+        run: dotnet restore HBSort.slnx -r win-x64 -p:PublishReadyToRun=true
 
       - name: Publish (win-x64 self-contained, multi-file)
         # Velopack braucht Multi-File-Publish damit Delta-Updates funktionieren
@@ -199,11 +206,27 @@ jobs:
         # Wir adden zum BESTEHENDEN Release das build-zip schon angelegt hat.
         # softprops/action-gh-release@v3 ist idempotent - bei selbem Tag
         # werden Assets ergaenzt, nicht ueberschrieben.
+        #
+        # vpk pack erzeugt "HBSort-win-Setup.exe" (mit -win-Praefix), nicht
+        # "HBSort-Setup.exe". Praxis-Erfahrung aus v0.1.1-Run.
+        # HBSort-win-Portable.zip wird BEWUSST nicht hochgeladen - der ZIP-Pfad
+        # liefert schon HBSort-X.Y.Z-win-x64.zip, doppelte ZIPs verwirren User.
+        #
+        # Manifest-Formate (vpk erzeugt mehrere):
+        # - RELEASES         : altes Squirrel-Format, aktuelle Velopack-Versionen
+        #                      verwenden es nicht mehr aktiv. Bleibt drin fuer
+        #                      Backward-Kompat falls jemand mit alter Lib installiert hat.
+        # - releases.win.json: neues Velopack-Format, von Velopack 0.0.1298+
+        #                      ZWINGEND erwartet beim Update-Check. Praxis-Befund
+        #                      v0.1.2: ohne diese Datei wirft GithubSource
+        #                      "Could not find asset called 'releases.win.json'".
+        # - assets.win.json  : internes vpk-Tracking, NICHT als Asset benoetigt.
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            velopack-out/HBSort-Setup.exe
+            velopack-out/HBSort-win-Setup.exe
             velopack-out/HBSort-${{ needs.setup.outputs.version }}-full.nupkg
+            velopack-out/releases.win.json
             velopack-out/RELEASES
           # name + body weglassen damit kein Overwrite des bestehenden Release-
           # Bodys; softprops behaelt die alten Werte.

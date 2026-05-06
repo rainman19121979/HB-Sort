@@ -114,6 +114,19 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _hasUpdateAvailable;
 
+    // UX X.23 Diagnose-Hook: zeigt ob der Setter auf dem UI-Thread laeuft
+    // und ob die ObservableProperty-Source-Generators ueberhaupt PropertyChanged
+    // feuern. Wenn dieser Log NIE erscheint -> Property wird nie gesetzt.
+    // Wenn der Log erscheint aber Badge unsichtbar bleibt -> WPF-Binding/
+    // Converter-Problem.
+    partial void OnHasUpdateAvailableChanged(bool value)
+    {
+        Log.Information("[DIAG-UI] MainViewModel.HasUpdateAvailable Setter aufgerufen, neuer Wert={Value}, ManagedThreadId={ThreadId} CheckAccess={CheckAccess}",
+            value,
+            System.Threading.Thread.CurrentThread.ManagedThreadId,
+            System.Windows.Application.Current?.Dispatcher.CheckAccess() ?? false);
+    }
+
     /// <summary>Versions-String der gefundenen neuen Version (z.B. "0.2.0").</summary>
     [ObservableProperty]
     private string _availableUpdateVersion = string.Empty;
@@ -193,6 +206,11 @@ public partial class MainViewModel : ObservableObject
         // UX-Iteration X.23: Update-Check beim App-Start (nur wenn der User
         // ihn aktiviert hat und die App per Setup.exe installiert ist).
         // Fire-and-forget weil die App nicht auf Netzwerk-Antworten warten soll.
+        Log.Information("[DIAG-UI] MainViewModel ctor: AutoCheck={Auto} IsInstalled={Inst} ctorThreadId={ThreadId} CheckAccess={CheckAccess}",
+            _settingsService.Current.AutoCheckForUpdates,
+            _updateService.IsInstalled,
+            System.Threading.Thread.CurrentThread.ManagedThreadId,
+            System.Windows.Application.Current?.Dispatcher.CheckAccess() ?? false);
         if (_settingsService.Current.AutoCheckForUpdates && _updateService.IsInstalled)
         {
             _ = CheckForUpdatesInBackgroundAsync();
@@ -208,7 +226,17 @@ public partial class MainViewModel : ObservableObject
     {
         try
         {
+            Log.Information("[DIAG-UI] CheckForUpdatesInBackgroundAsync vor await ThreadId={ThreadId} CheckAccess={CheckAccess}",
+                System.Threading.Thread.CurrentThread.ManagedThreadId,
+                System.Windows.Application.Current?.Dispatcher.CheckAccess() ?? false);
+
             var hasUpdate = await _updateService.CheckForUpdatesAsync();
+
+            Log.Information("[DIAG-UI] CheckForUpdatesInBackgroundAsync nach await ThreadId={ThreadId} CheckAccess={CheckAccess} hasUpdate={Has}",
+                System.Threading.Thread.CurrentThread.ManagedThreadId,
+                System.Windows.Application.Current?.Dispatcher.CheckAccess() ?? false,
+                hasUpdate);
+
             _settingsService.Current.LastUpdateCheck = DateTime.UtcNow;
             _ = _settingsService.SaveAsync();
 

@@ -117,6 +117,23 @@ Daten zentral.
   Brickognize-API zur Erkennung. Kein Account ist Pflicht fuer die
   Nutzung von HB-Sort - die API ist frei nutzbar mit fairem Rate-Limit.
   Mehr Infos auf brickognize.com.
+- **Brickognize-Terms-of-Service**: Mit der Nutzung von HB-Sort
+  akzeptierst Du implizit die Terms-of-Service von Brickognize
+  (siehe brickognize.com -> "Legal" / "Terms of Service").
+  Insbesondere:
+  - Brickognize-API ist fuer **persoenliche, nicht-kommerzielle
+    Nutzung** gedacht.
+  - Hochgeladene Bilder werden gemaess Brickognize-ToS Section 8
+    verarbeitet (Lizenz-Grant an Brickognize zur Nutzung der
+    hochgeladenen Bilder fuer u.a. Modell-Training).
+  - HB-Sort ist nicht von Brickognize betrieben oder finanziert.
+    Wenn Du Bedenken hast, schau Dir die ToS an oder verzichte auf
+    den Webcam-Erkennungs-Schritt (HB-Sort ist auch nutzbar fuer
+    manuelle Item-Eingabe).
+
+  Falls Du HB-Sort kommerziell nutzen willst (z.B. fuer einen Shop):
+  bitte direkt an Brickognize wenden, das ist nicht durch die
+  HB-Sort-Doku abgedeckt.
 
 ### BrickStore-Datenbank (rgriebl/brickstore-database)
 
