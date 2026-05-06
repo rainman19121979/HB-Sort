@@ -206,10 +206,15 @@ jobs:
         # Wir adden zum BESTEHENDEN Release das build-zip schon angelegt hat.
         # softprops/action-gh-release@v3 ist idempotent - bei selbem Tag
         # werden Assets ergaenzt, nicht ueberschrieben.
+        #
+        # vpk pack erzeugt "HBSort-win-Setup.exe" (mit -win-Praefix), nicht
+        # "HBSort-Setup.exe". Praxis-Erfahrung aus v0.1.1-Run.
+        # HBSort-win-Portable.zip wird BEWUSST nicht hochgeladen - der ZIP-Pfad
+        # liefert schon HBSort-X.Y.Z-win-x64.zip, doppelte ZIPs verwirren User.
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            velopack-out/HBSort-Setup.exe
+            velopack-out/HBSort-win-Setup.exe
             velopack-out/HBSort-${{ needs.setup.outputs.version }}-full.nupkg
             velopack-out/RELEASES
           # name + body weglassen damit kein Overwrite des bestehenden Release-
