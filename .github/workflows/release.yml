@@ -211,11 +211,22 @@ jobs:
         # "HBSort-Setup.exe". Praxis-Erfahrung aus v0.1.1-Run.
         # HBSort-win-Portable.zip wird BEWUSST nicht hochgeladen - der ZIP-Pfad
         # liefert schon HBSort-X.Y.Z-win-x64.zip, doppelte ZIPs verwirren User.
+        #
+        # Manifest-Formate (vpk erzeugt mehrere):
+        # - RELEASES         : altes Squirrel-Format, aktuelle Velopack-Versionen
+        #                      verwenden es nicht mehr aktiv. Bleibt drin fuer
+        #                      Backward-Kompat falls jemand mit alter Lib installiert hat.
+        # - releases.win.json: neues Velopack-Format, von Velopack 0.0.1298+
+        #                      ZWINGEND erwartet beim Update-Check. Praxis-Befund
+        #                      v0.1.2: ohne diese Datei wirft GithubSource
+        #                      "Could not find asset called 'releases.win.json'".
+        # - assets.win.json  : internes vpk-Tracking, NICHT als Asset benoetigt.
         uses: softprops/action-gh-release@v3
         with:
           files: |
             velopack-out/HBSort-win-Setup.exe
             velopack-out/HBSort-${{ needs.setup.outputs.version }}-full.nupkg
+            velopack-out/releases.win.json
             velopack-out/RELEASES
           # name + body weglassen damit kein Overwrite des bestehenden Release-
           # Bodys; softprops behaelt die alten Werte.
