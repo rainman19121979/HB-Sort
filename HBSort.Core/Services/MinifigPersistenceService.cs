@@ -112,11 +112,31 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         var now = DateTime.UtcNow;
         var createdCount = 0;
         var totalQty = 0;
+        var assignedCount = 0;
+        var completedNames = new List<string>();
 
         foreach (var c in choiceList.Where(c => c.IsKept))
         {
             var part = minifig.RequiredParts.FirstOrDefault(p => p.Id == c.TrackedMinifigPartId);
             if (part == null) continue;
+
+            // UX X.25 Validierung: bei IsKept=true muss GENAU EINE der beiden
+            // Ziel-Properties gesetzt sein - TargetBinId (FloatingPart-Pfad)
+            // ODER AssignToTrackedMinifigPartId (Direkt-Zuordnung-Pfad).
+            var hasBin = c.TargetBinId.HasValue;
+            var hasAssign = c.AssignToTrackedMinifigPartId.HasValue;
+            if (hasBin && hasAssign)
+            {
+                throw new InvalidOperationException(
+                    $"Teil '{part.PartName}': TargetBinId UND AssignToTrackedMinifigPartId " +
+                    "koennen nicht gleichzeitig gesetzt sein - genau einer von beiden noetig.");
+            }
+            if (!hasBin && !hasAssign)
+            {
+                throw new InvalidOperationException(
+                    $"Teil '{part.PartName}': weder TargetBinId noch " +
+                    "AssignToTrackedMinifigPartId gesetzt - einer von beiden noetig bei IsKept=true.");
+            }
 
             // Quantity: was wirklich da ist (collected) hat Vorrang. Wenn 0,
             // fallen wir auf needed zurueck (alte Code-Pfade die vor T3 liefen).
@@ -125,9 +145,61 @@ public class MinifigPersistenceService : IMinifigPersistenceService
                 : part.QuantityNeeded;
             if (qty <= 0) continue;
 
-            var binId = c.TargetBinId
-                ?? throw new InvalidOperationException(
-                    $"Lagerfach fehlt fuer Teil '{part.PartName}'");
+            // ===== UX X.25 Direkt-Zuordnung-Pfad =====
+            if (hasAssign)
+            {
+                // Wir laden den wartenden TrackedMinifigPart inline (gleiche
+                // Transaction wie der Rest von DismantleAsync). AssignAsync-
+                // Logik aus PartLookupService duplizieren statt aufrufen, damit
+                // alles atomar in einer SaveChangesAsync landet.
+                var waitingPart = await ctx.TrackedMinifigParts
+                    .Include(p => p.TrackedMinifig)
+                        .ThenInclude(m => m.RequiredParts)
+                    .FirstOrDefaultAsync(p => p.Id == c.AssignToTrackedMinifigPartId!.Value, ct);
+
+                if (waitingPart == null)
+                {
+                    Log.Warning("DismantleAsync: AssignToTrackedMinifigPartId={Id} nicht gefunden",
+                        c.AssignToTrackedMinifigPartId);
+                    continue;
+                }
+
+                if (waitingPart.QuantityCollected >= waitingPart.QuantityNeeded)
+                {
+                    Log.Information("DismantleAsync: Teil {Part} schon komplett bei wartender Figur, ueberspringen",
+                        waitingPart.PartNumber);
+                    continue;
+                }
+
+                waitingPart.QuantityCollected++;
+                assignedCount++;
+
+                // Komplettierungs-Check fuer die wartende Figur (analog AssignPartToMinifigAsync).
+                var allComplete = waitingPart.TrackedMinifig.RequiredParts.All(p =>
+                    (p.Id == waitingPart.Id ? waitingPart.QuantityCollected : p.QuantityCollected) >= p.QuantityNeeded);
+                if (allComplete && waitingPart.TrackedMinifig.Status != TrackedMinifigStatus.Complete)
+                {
+                    waitingPart.TrackedMinifig.Status = TrackedMinifigStatus.Complete;
+                    waitingPart.TrackedMinifig.CompletedAt = now;
+                    completedNames.Add(waitingPart.TrackedMinifig.Name);
+                    Log.Information("UX X.25: Wartende Figur '{Name}' wurde durch Zerlege-Zuordnung komplett",
+                        waitingPart.TrackedMinifig.Name);
+                }
+
+                ctx.ScanEvents.Add(new ScanEvent
+                {
+                    Timestamp = now,
+                    Type = ScanType.PartScan,
+                    RecognizedId = waitingPart.PartNumber,
+                    ResultDescription = $"Teil aus Zerlegung von '{originName}' -> wartende Figur " +
+                        $"'{waitingPart.TrackedMinifig.Name}' ({waitingPart.QuantityCollected}/{waitingPart.QuantityNeeded})",
+                    WasUndone = false
+                });
+                continue;
+            }
+
+            // ===== Standard: FloatingPart-Pfad =====
+            var binId = c.TargetBinId!.Value;
 
             // Zusammenfuehren wenn schon vorhanden (Part+Color+Bin).
             var existing = await ctx.FloatingParts.FirstOrDefaultAsync(
@@ -191,7 +263,9 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         {
             Success = true,
             CreatedFloatingParts = createdCount,
-            TotalPartsTransferred = totalQty
+            TotalPartsTransferred = totalQty,
+            AssignedToWaitingCount = assignedCount,
+            CompletedMinifigNames = completedNames
         };
     }
 
