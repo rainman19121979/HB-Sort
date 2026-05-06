@@ -140,8 +140,32 @@
                              ToolTip="Integrierte Doku zu Workflow, Lagerverwaltung, Export. (F1)"/>
             </StackPanel>
 
-            <!-- Rechts: Settings + Beenden als zwei Buttons nebeneinander -->
+            <!-- Rechts: Update-Badge (nur sichtbar wenn Update da) + Settings + Beenden -->
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+
+                <!-- UX-Iteration X.23: Update-Badge. Nur sichtbar wenn
+                     MainViewModel.HasUpdateAvailable. Klick triggert
+                     ApplyUpdateCommand -> Velopack downloadet + restartet. -->
+                <Button Command="{Binding ApplyUpdateCommand}"
+                        Visibility="{Binding HasUpdateAvailable, Converter={StaticResource BoolToVisibility}}"
+                        Padding="10,6"
+                        Margin="0,0,8,0"
+                        Background="{DynamicResource SystemAccentColorBrush}"
+                        Foreground="White"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        ToolTip="Klick lädt das Update herunter und startet die App neu. Deine Daten unter %APPDATA%\HBSort bleiben erhalten.">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE777;" FontFamily="Segoe MDL2 Assets"
+                                   FontSize="14" VerticalAlignment="Center"
+                                   Margin="0,0,6,0"/>
+                        <TextBlock VerticalAlignment="Center" FontWeight="SemiBold">
+                            <Run Text="Update "/>
+                            <Run Text="{Binding AvailableUpdateVersion, Mode=OneWay}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Button>
+
                 <Button VerticalAlignment="Center"
                         Click="OpenSettings_Click"
                         Padding="10,6"
