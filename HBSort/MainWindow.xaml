@@ -139,57 +139,14 @@
                              ToolTip="Integrierte Doku zu Workflow, Lagerverwaltung, Export. (F1)"/>
             </StackPanel>
 
-            <!-- Rechts: Update-Badge (nur sichtbar wenn Update da) + Settings + Beenden.
-                 v0.1.7: explizit MinWidth=320 damit Layout immer Platz fuer alle drei
-                 Buttons reserviert (Update + Settings + Beenden). Wenn Update-Badge
-                 spaeter Visibility=Visible bekommt, ist der Slot schon da und das
-                 Layout muss nicht alle Spalten-Breiten neu rechnen. Praxis-Befund:
-                 Button war im Visual-Tree, blitzte beim Beenden kurz auf - klassisches
-                 Symptom fuer einen reservierten-aber-zu-kleinen Layout-Slot. -->
-            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
-                        MinWidth="320">
-
-                <!-- UX-Iteration X.23/X.24/v0.1.9: Update-Badge.
-                     v0.1.9 Opacity-Fix: Button ist IMMER im Visual-Tree.
-                     Visibility=Collapsed -> Visible im StackPanel triggert in
-                     bestimmten WPF-Konstellationen kein zuverlaessiges Re-Layout
-                     (Praxis-Befund v0.1.7: PropertyChanged feuert + Setter
-                     laeuft sauber, Badge bleibt aber unsichtbar; blitzt nur
-                     beim Window-Close kurz auf).
-                     Loesung: immer im Tree, Opacity+IsHitTestVisible per
-                     DataTrigger gesteuert. MinWidth=320 am Parent-StackPanel
-                     reserviert sowieso Platz, also kein Layout-Sprung. -->
-                <Button x:Name="UpdateBadgeButton"
-                        Command="{Binding ApplyUpdateCommand}"
-                        Padding="10,6"
-                        Margin="0,0,8,0"
-                        Background="{DynamicResource SystemAccentColorBrush}"
-                        Foreground="White"
-                        BorderThickness="0"
-                        Cursor="Hand"
-                        ToolTip="Klick lädt das Update herunter und startet die App neu. Deine Daten unter %APPDATA%\HBSort bleiben erhalten.">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                            <Setter Property="Opacity" Value="0"/>
-                            <Setter Property="IsHitTestVisible" Value="False"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding HasUpdateAvailable}" Value="True">
-                                    <Setter Property="Opacity" Value="1"/>
-                                    <Setter Property="IsHitTestVisible" Value="True"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE777;" FontFamily="Segoe MDL2 Assets"
-                                   FontSize="14" VerticalAlignment="Center"
-                                   Margin="0,0,6,0"/>
-                        <TextBlock VerticalAlignment="Center" FontWeight="SemiBold">
-                            <Run Text="Update "/>
-                            <Run Text="{Binding AvailableUpdateVersion, Mode=OneWay}"/>
-                        </TextBlock>
-                    </StackPanel>
-                </Button>
+            <!-- Rechts: Settings + Beenden. UX X.26 (v0.1.13): Update-Badge
+                 entfernt nach 6 fehlgeschlagenen Sichtbarkeits-Iterationen
+                 (v0.1.5..v0.1.12). Diagnose-Logs zeigten korrekte Property-
+                 Werte (Opacity=1, IsHitTestVisible=true, ActualWidth=128),
+                 aber visuell blieb der Button unsichtbar. Vermutung:
+                 WPF-Phantom-Bug, Hardware/Treiber-spezifisch. Update-Pfad
+                 lebt jetzt nur noch im Settings-Tab "Updates". -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
 
                 <Button VerticalAlignment="Center"
                         Click="OpenSettings_Click"

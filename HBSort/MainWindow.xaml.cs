@@ -38,42 +38,6 @@ public partial class MainWindow : Window
         // UX X.21 Teil 3: Strg+Q beendet die App. Analog zum Settings-Event -
         // das VM darf nicht selbst Application.Shutdown() rufen.
         _viewModel.ExitAppRequested += (_, _) => ExitApp_Click(this, new RoutedEventArgs());
-
-        // UX X.23 Diagnose v0.1.6: zeigt ob das Window die PropertyChanged-Events
-        // vom MainViewModel ueberhaupt sieht. Wenn das Window's Sicht auf das
-        // Event fehlt, ist [ObservableProperty]-Source-Generator nicht eingewebt
-        // oder das DataContext-Binding zeigt auf ein anderes Objekt.
-        _viewModel.PropertyChanged += (s, e) =>
-        {
-            if (e.PropertyName == nameof(MainViewModel.HasUpdateAvailable)
-                || e.PropertyName == nameof(MainViewModel.AvailableUpdateVersion))
-            {
-                Log.Information("[DIAG-UI] WINDOW received PropertyChanged: {PropName} (Sender={SenderType})",
-                    e.PropertyName,
-                    s?.GetType().Name ?? "null");
-            }
-
-            // UX X.24 Fix-Versuch: bei HasUpdateAvailable-Aenderung explizit
-            // Layout-Pass anstossen. WPF macht das normalerweise selbst, aber
-            // bei Visibility=Collapsed -> Visible im StackPanel kann es zu
-            // Layout-Caching kommen (Slot wurde initial nicht reserviert).
-            // Praxis-Befund v0.1.6: Button war im Visual-Tree, blitzte beim
-            // Beenden kurz auf - klassisches Layout-Race-Symptom.
-            if (e.PropertyName == nameof(MainViewModel.HasUpdateAvailable))
-            {
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    InvalidateVisual();
-                    UpdateLayout();
-                    Log.Information("[DIAG-UI] Window UpdateLayout() nach HasUpdateAvailable-Aenderung getriggert");
-                    // v0.1.11: Direkt nach UpdateLayout den Badge-State loggen.
-                    // Wenn Opacity=0 hier obwohl HasUpdateAvailable=true: DataTrigger
-                    // greift nicht (Style.BasedOn-Konflikt mit ModernWpf?).
-                    // Wenn Opacity=1 hier aber visuell nichts da: Layout/Z-Order-Problem.
-                    LogUpdateBadgeState("PostUpdateLayout");
-                }), System.Windows.Threading.DispatcherPriority.Render);
-            }
-        };
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -91,83 +55,7 @@ public partial class MainWindow : Window
         _ = _viewModel.RunBrickognizeHealthCheckAsync();
 
         _viewModel.StatusText = "Bereit";
-
-        // v0.1.11 Diagnose: FindName statt FindAllButtons-Filter (alter Filter
-        // matcht nie weil [RelayCommand] AsyncRelayCommand erzeugt, nicht
-        // ApplyUpdateCommand). Pro Snapshot loggen wir den vollen visuellen
-        // Zustand des Buttons + alle Parent-Frameworkelement-Properties.
-        // Drei Snapshot-Zeitpunkte:
-        //   T+5s: Initial-Layout fertig, HasUpdateAvailable noch undefined oder false
-        //   T+15s: nach Background-Update-Check + UpdateLayout-Trigger
-        //   T+30s: ggf. nach 2. Layout-Pass
-        var diagTimer = new System.Windows.Threading.DispatcherTimer
-        {
-            Interval = TimeSpan.FromSeconds(5)
-        };
-        var snapshotCount = 0;
-        diagTimer.Tick += (_, _) =>
-        {
-            snapshotCount++;
-            LogUpdateBadgeState($"T+{snapshotCount * 5}s");
-            if (snapshotCount >= 6) diagTimer.Stop(); // bis 30s
-        };
-        diagTimer.Start();
     }
-
-    /// <summary>
-    /// v0.1.11 Diagnose: Update-Badge-Button per FindName direkt holen
-    /// (deterministisch, kein Command-Type-Filter mehr) und alle relevanten
-    /// Properties loggen. Plus Parent-Chain bis zum Window-Root.
-    /// </summary>
-    private void LogUpdateBadgeState(string label)
-    {
-        try
-        {
-            var btn = FindName("UpdateBadgeButton") as System.Windows.Controls.Button;
-            if (btn == null)
-            {
-                Log.Information("[DIAG-UI] {Label}: UpdateBadgeButton via FindName=NULL", label);
-                return;
-            }
-
-            Log.Information("[DIAG-UI] {Label} UpdateBadgeButton: Vis={Vis} IsVisible={IsVis} Opacity={Op} IsHitTestVisible={Hit} ActualW={AW} ActualH={AH} DC={DC}",
-                label,
-                btn.Visibility,
-                btn.IsVisible,
-                btn.Opacity,
-                btn.IsHitTestVisible,
-                btn.ActualWidth,
-                btn.ActualHeight,
-                btn.DataContext?.GetType().Name ?? "null");
-
-            // Pro Parent FrameworkElement: alle relevanten Layout-Properties.
-            System.Windows.DependencyObject? current = btn;
-            int depth = 0;
-            while (current != null && depth < 10)
-            {
-                if (current is System.Windows.FrameworkElement fe)
-                {
-                    Log.Information("[DIAG-UI] {Label} Parent[{Depth}]: {Type} Vis={Vis} IsVis={IsVis} Opacity={Op} W={W} H={H} ActW={AW} ActH={AH}",
-                        label, depth, current.GetType().Name,
-                        fe.Visibility, fe.IsVisible, fe.Opacity,
-                        fe.Width, fe.Height,
-                        fe.ActualWidth, fe.ActualHeight);
-                }
-                current = System.Windows.Media.VisualTreeHelper.GetParent(current);
-                depth++;
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "[DIAG-UI] LogUpdateBadgeState ({Label}) fehlgeschlagen", label);
-        }
-    }
-
-    // v0.1.11: alter FindAllButtons-Helper entfernt - wurde nur fuer den
-    // kaputten Filter b.Command.GetType().Name.Contains("ApplyUpdate")
-    // genutzt. RelayCommand-Generator erzeugt AsyncRelayCommand, nicht
-    // ApplyUpdateCommand - der Filter hat nie gematcht. Ersetzt durch
-    // FindName("UpdateBadgeButton") in LogUpdateBadgeState.
 
     /// <summary>
     /// Setzt den Tastatur-Fokus zurueck auf das Hauptfenster (FocusTrap),

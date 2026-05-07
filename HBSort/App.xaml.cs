@@ -586,7 +586,6 @@ public partial class App : Application
     /// </summary>
     protected override void OnExit(ExitEventArgs e)
     {
-        Log.Information("[SPLITTER] OnExit called");
         Log.Information("=== HB-Sort beendet ===");
 
         // ServiceProvider disponieren - das ruft Dispose() auf allen Singleton-
@@ -599,5 +598,29 @@ public partial class App : Application
         Log.CloseAndFlush();
 
         base.OnExit(e);
+
+        // UX X.26 (v0.1.13) Tasks-Geist-Fix:
+        // User-Befund: nach App-Beenden bleibt manchmal eine HBSort.exe-Instanz
+        // im Hintergrund haengen und blockiert die Webcam beim naechsten Start.
+        // Wahrscheinliche Ursachen: OpenCvSharp4-VideoCapture-Thread (non-
+        // Background), Velopack-async-Tasks, fire-and-forget HttpClient-Calls.
+        //
+        // Fallback: nach 2s Wartezeit Process.Kill als ultima ratio. Wir geben
+        // dem normalen Shutdown-Pfad (oben) erstmal Zeit, dann zwingen wir die
+        // Beendigung. Settings-Saves laufen ueber Window_Closing schon vorher
+        // synchron durch - kein Datenverlust durch das Kill.
+        Task.Run(async () =>
+        {
+            await Task.Delay(2000);
+            try
+            {
+                System.Diagnostics.Process.GetCurrentProcess().Kill();
+            }
+            catch
+            {
+                // Wenn Kill scheitert (z.B. Berechtigungs-Fehler): nicht weiter
+                // tragisch, der Prozess wird irgendwann von Windows aufgeraeumt.
+            }
+        });
     }
 }
