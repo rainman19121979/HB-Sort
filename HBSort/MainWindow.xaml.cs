@@ -129,6 +129,27 @@ public partial class MainWindow : Window
         try { Task.Run(() => _settingsService.SaveAsync()).Wait(TimeSpan.FromSeconds(5)); }
         catch (Exception ex) { Log.Warning(ex, "Window_Closing: SaveAsync fehlgeschlagen"); }
         _viewModel.ScanViewModel.StopCamera();
+
+        // UX X.27 (v0.1.14): Tasks-Geist-Fix Stufe 2.
+        // Trotz OnExit-Fallback (2s) bleibt manchmal eine HBSort.exe-Instanz
+        // im Hintergrund haengen - vermutlich weil OnExit gar nicht erst
+        // aufgerufen wird (z.B. wenn ein non-Background-Thread den Shutdown
+        // blockiert, bevor Application.Current.OnExit greift).
+        // Hier in Window_Closing zusaetzlich nach 1s killen. Settings sind
+        // oben schon sauber gesichert, Camera ist gestoppt - ab hier ist
+        // hartes Beenden sicher.
+        Task.Run(async () =>
+        {
+            await Task.Delay(1000);
+            try
+            {
+                System.Diagnostics.Process.GetCurrentProcess().Kill();
+            }
+            catch
+            {
+                // Kill-Berechtigung fehlt o.ae. - dann uebernimmt OnExit-Fallback (2s).
+            }
+        });
     }
 
     /// <summary>
