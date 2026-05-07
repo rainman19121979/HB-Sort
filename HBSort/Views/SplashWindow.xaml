@@ -61,17 +61,17 @@
                            Margin="0,4,0,0"/>
             </StackPanel>
 
-            <!-- ProgressRing als Lade-Indikator. v0.1.5 (2026-05-06):
-                 Status-Text von 'Wird geladen...' auf 'App startet...'
-                 geaendert - sichtbarer Marker fuer Auto-Update-Badge-
-                 Verifikation (UX X.23 Final-Verifikation). -->
+            <!-- ProgressRing als Lade-Indikator.
+                 v0.1.12 (2026-05-07): Status-Text von 'App startet...'
+                 auf 'Bereitet App vor...' geaendert - sichtbarer Marker
+                 fuer Update-Badge-Trigger nach Opacity-Fix in v0.1.11. -->
             <StackPanel Grid.Row="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Center"
                         Margin="0,12,0,12">
                 <ui:ProgressRing IsActive="True"
                                  Width="20" Height="20"/>
-                <TextBlock Text="App startet..."
+                <TextBlock Text="Bereitet App vor..."
                            FontSize="12"
                            Foreground="Gray"
                            VerticalAlignment="Center"
