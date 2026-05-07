@@ -149,11 +149,18 @@
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
                         MinWidth="320">
 
-                <!-- UX-Iteration X.23: Update-Badge. Nur sichtbar wenn
-                     MainViewModel.HasUpdateAvailable. Klick triggert
-                     ApplyUpdateCommand -> Velopack downloadet + restartet. -->
-                <Button Command="{Binding ApplyUpdateCommand}"
-                        Visibility="{Binding HasUpdateAvailable, Converter={StaticResource BoolToVisibility}}"
+                <!-- UX-Iteration X.23/X.24/v0.1.9: Update-Badge.
+                     v0.1.9 Opacity-Fix: Button ist IMMER im Visual-Tree.
+                     Visibility=Collapsed -> Visible im StackPanel triggert in
+                     bestimmten WPF-Konstellationen kein zuverlaessiges Re-Layout
+                     (Praxis-Befund v0.1.7: PropertyChanged feuert + Setter
+                     laeuft sauber, Badge bleibt aber unsichtbar; blitzt nur
+                     beim Window-Close kurz auf).
+                     Loesung: immer im Tree, Opacity+IsHitTestVisible per
+                     DataTrigger gesteuert. MinWidth=320 am Parent-StackPanel
+                     reserviert sowieso Platz, also kein Layout-Sprung. -->
+                <Button x:Name="UpdateBadgeButton"
+                        Command="{Binding ApplyUpdateCommand}"
                         Padding="10,6"
                         Margin="0,0,8,0"
                         Background="{DynamicResource SystemAccentColorBrush}"
@@ -161,6 +168,18 @@
                         BorderThickness="0"
                         Cursor="Hand"
                         ToolTip="Klick lädt das Update herunter und startet die App neu. Deine Daten unter %APPDATA%\HBSort bleiben erhalten.">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Setter Property="Opacity" Value="0"/>
+                            <Setter Property="IsHitTestVisible" Value="False"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasUpdateAvailable}" Value="True">
+                                    <Setter Property="Opacity" Value="1"/>
+                                    <Setter Property="IsHitTestVisible" Value="True"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE777;" FontFamily="Segoe MDL2 Assets"
                                    FontSize="14" VerticalAlignment="Center"
