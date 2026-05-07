@@ -78,11 +78,11 @@
                            Margin="8,0,0,0"/>
             </StackPanel>
 
-            <!-- Footer. v0.1.2 (2026-05-06): Wort "Powered by" entfernt fuer
-                 Auto-Update-Verifikation - sichtbarer Marker dass das Update
-                 von v0.1.1 auf v0.1.2 wirklich angewendet wurde. -->
+            <!-- Footer. v0.1.10 (2026-05-07): Reihenfolge der Drittanbieter
+                 alphabetisch sortiert - sichtbarer Marker fuer Update-Badge-
+                 Praxis-Test (UX X.24 Opacity-Fix-Verifikation v0.1.9 -> v0.1.10). -->
             <TextBlock Grid.Row="2"
-                       Text="Brickognize · BrickStore-DB · BrickLink"
+                       Text="BrickLink · Brickognize · BrickStore-DB"
                        FontSize="10"
                        HorizontalAlignment="Center"
                        Foreground="#999"/>
