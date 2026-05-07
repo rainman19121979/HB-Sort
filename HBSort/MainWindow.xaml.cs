@@ -66,6 +66,11 @@ public partial class MainWindow : Window
                     InvalidateVisual();
                     UpdateLayout();
                     Log.Information("[DIAG-UI] Window UpdateLayout() nach HasUpdateAvailable-Aenderung getriggert");
+                    // v0.1.11: Direkt nach UpdateLayout den Badge-State loggen.
+                    // Wenn Opacity=0 hier obwohl HasUpdateAvailable=true: DataTrigger
+                    // greift nicht (Style.BasedOn-Konflikt mit ModernWpf?).
+                    // Wenn Opacity=1 hier aber visuell nichts da: Layout/Z-Order-Problem.
+                    LogUpdateBadgeState("PostUpdateLayout");
                 }), System.Windows.Threading.DispatcherPriority.Render);
             }
         };
@@ -87,91 +92,82 @@ public partial class MainWindow : Window
 
         _viewModel.StatusText = "Bereit";
 
-        // UX X.23 Diagnose v0.1.6: nach 5s das Visual-Tree absuchen ob der
-        // Update-Badge-Button ueberhaupt instanziiert wurde. Wenn ja: dessen
-        // Visibility/IsVisible/ActualWidth/Height/DataContext loggen.
+        // v0.1.11 Diagnose: FindName statt FindAllButtons-Filter (alter Filter
+        // matcht nie weil [RelayCommand] AsyncRelayCommand erzeugt, nicht
+        // ApplyUpdateCommand). Pro Snapshot loggen wir den vollen visuellen
+        // Zustand des Buttons + alle Parent-Frameworkelement-Properties.
+        // Drei Snapshot-Zeitpunkte:
+        //   T+5s: Initial-Layout fertig, HasUpdateAvailable noch undefined oder false
+        //   T+15s: nach Background-Update-Check + UpdateLayout-Trigger
+        //   T+30s: ggf. nach 2. Layout-Pass
         var diagTimer = new System.Windows.Threading.DispatcherTimer
         {
             Interval = TimeSpan.FromSeconds(5)
         };
+        var snapshotCount = 0;
         diagTimer.Tick += (_, _) =>
         {
-            diagTimer.Stop();
-            try
-            {
-                var allButtons = FindAllButtons(this);
-                var updateButton = allButtons.FirstOrDefault(b =>
-                    b.Command != null
-                    && b.Command.GetType().Name.Contains("ApplyUpdate", StringComparison.OrdinalIgnoreCase));
-
-                Log.Information("[DIAG-UI] Visual-Tree nach 5s: TotalButtons={Count}, UpdateButton found={Found}",
-                    allButtons.Count,
-                    updateButton != null);
-
-                if (updateButton != null)
-                {
-                    Log.Information("[DIAG-UI] UpdateButton: Visibility={Vis} IsVisible={IsVis} ActualWidth={W} ActualHeight={H} DataContext={DC}",
-                        updateButton.Visibility,
-                        updateButton.IsVisible,
-                        updateButton.ActualWidth,
-                        updateButton.ActualHeight,
-                        updateButton.DataContext?.GetType().Name ?? "null");
-
-                    // UX X.24: Parent-Chain-Inspektion. Zeigt fuer jeden
-                    // Vorfahren bis zum Window-Root die Visibility-/IsVisible-/
-                    // Width-/Height-Werte. Wenn ein Parent z.B. Width=0 oder
-                    // Visibility=Hidden hat, wuerde das den Button unsichtbar
-                    // machen obwohl er selbst Visibility=Visible hat.
-                    System.Windows.DependencyObject? current = updateButton;
-                    int depth = 0;
-                    while (current != null && depth < 10)
-                    {
-                        if (current is System.Windows.FrameworkElement fe)
-                        {
-                            Log.Information("[DIAG-UI] Parent-Chain[{Depth}]: {Type} Vis={Vis} IsVis={IsVis} W={W} H={H} ActW={AW} ActH={AH}",
-                                depth, current.GetType().Name,
-                                fe.Visibility, fe.IsVisible,
-                                fe.Width, fe.Height,
-                                fe.ActualWidth, fe.ActualHeight);
-                        }
-                        current = System.Windows.Media.VisualTreeHelper.GetParent(current);
-                        depth++;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Warning(ex, "[DIAG-UI] Visual-Tree-Inspektion fehlgeschlagen");
-            }
+            snapshotCount++;
+            LogUpdateBadgeState($"T+{snapshotCount * 5}s");
+            if (snapshotCount >= 6) diagTimer.Stop(); // bis 30s
         };
         diagTimer.Start();
     }
 
     /// <summary>
-    /// UX X.23 Diagnose-Helfer: rekursiv alle Buttons im Visual-Tree finden.
-    /// Try-Catch falls ein VisualTreeHelper-Knoten zickt.
+    /// v0.1.11 Diagnose: Update-Badge-Button per FindName direkt holen
+    /// (deterministisch, kein Command-Type-Filter mehr) und alle relevanten
+    /// Properties loggen. Plus Parent-Chain bis zum Window-Root.
     /// </summary>
-    private static List<System.Windows.Controls.Button> FindAllButtons(System.Windows.DependencyObject parent)
+    private void LogUpdateBadgeState(string label)
     {
-        var result = new List<System.Windows.Controls.Button>();
         try
         {
-            var count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);
-            for (int i = 0; i < count; i++)
+            var btn = FindName("UpdateBadgeButton") as System.Windows.Controls.Button;
+            if (btn == null)
             {
-                var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
-                if (child is System.Windows.Controls.Button btn) result.Add(btn);
-                result.AddRange(FindAllButtons(child));
+                Log.Information("[DIAG-UI] {Label}: UpdateBadgeButton via FindName=NULL", label);
+                return;
+            }
+
+            Log.Information("[DIAG-UI] {Label} UpdateBadgeButton: Vis={Vis} IsVisible={IsVis} Opacity={Op} IsHitTestVisible={Hit} ActualW={AW} ActualH={AH} DC={DC}",
+                label,
+                btn.Visibility,
+                btn.IsVisible,
+                btn.Opacity,
+                btn.IsHitTestVisible,
+                btn.ActualWidth,
+                btn.ActualHeight,
+                btn.DataContext?.GetType().Name ?? "null");
+
+            // Pro Parent FrameworkElement: alle relevanten Layout-Properties.
+            System.Windows.DependencyObject? current = btn;
+            int depth = 0;
+            while (current != null && depth < 10)
+            {
+                if (current is System.Windows.FrameworkElement fe)
+                {
+                    Log.Information("[DIAG-UI] {Label} Parent[{Depth}]: {Type} Vis={Vis} IsVis={IsVis} Opacity={Op} W={W} H={H} ActW={AW} ActH={AH}",
+                        label, depth, current.GetType().Name,
+                        fe.Visibility, fe.IsVisible, fe.Opacity,
+                        fe.Width, fe.Height,
+                        fe.ActualWidth, fe.ActualHeight);
+                }
+                current = System.Windows.Media.VisualTreeHelper.GetParent(current);
+                depth++;
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Defensiv: bestimmte Visual-Tree-Knoten lassen sich nicht traversieren
-            // (z.B. wenn ein Custom-Control im Konstruktor crasht). Diagnose darf
-            // nicht zum App-Stop fuehren.
+            Log.Warning(ex, "[DIAG-UI] LogUpdateBadgeState ({Label}) fehlgeschlagen", label);
         }
-        return result;
     }
+
+    // v0.1.11: alter FindAllButtons-Helper entfernt - wurde nur fuer den
+    // kaputten Filter b.Command.GetType().Name.Contains("ApplyUpdate")
+    // genutzt. RelayCommand-Generator erzeugt AsyncRelayCommand, nicht
+    // ApplyUpdateCommand - der Filter hat nie gematcht. Ersetzt durch
+    // FindName("UpdateBadgeButton") in LogUpdateBadgeState.
 
     /// <summary>
     /// Setzt den Tastatur-Fokus zurueck auf das Hauptfenster (FocusTrap),
