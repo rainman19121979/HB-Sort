@@ -370,6 +370,266 @@ public class MinifigPersistenceServiceTests : IDisposable
             }).ToList()
         };
 
+    // ====================================================================
+    // UX X.25: DismantleAsync mit Direkt-Zuordnung zu wartender Figur
+    // ====================================================================
+
+    [Fact]
+    public async Task Dismantle_throws_when_TargetBin_and_AssignTo_both_set()
+    {
+        var binId = await SeedBinAsync("Box 001");
+        var input = MakeInput("set000", "TestSet", binId,
+            new[] { ("3001", 11, 1) });
+        var stored = await _sut.PersistAndStoreAsync(input);
+        var partId = await GetFirstPartIdAsync(stored.SavedMinifig.Id);
+
+        var choices = new[]
+        {
+            new DismantlePartChoice
+            {
+                TrackedMinifigPartId = partId,
+                IsKept = true,
+                TargetBinId = binId,
+                AssignToTrackedMinifigPartId = 999  // BEIDE gesetzt -> Validierungs-Fehler
+            }
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _sut.DismantleAsync(stored.SavedMinifig.Id, choices));
+    }
+
+    [Fact]
+    public async Task Dismantle_throws_when_neither_TargetBin_nor_AssignTo_set_and_kept()
+    {
+        var binId = await SeedBinAsync("Box 001");
+        var input = MakeInput("set000", "TestSet", binId,
+            new[] { ("3001", 11, 1) });
+        var stored = await _sut.PersistAndStoreAsync(input);
+        var partId = await GetFirstPartIdAsync(stored.SavedMinifig.Id);
+
+        var choices = new[]
+        {
+            new DismantlePartChoice
+            {
+                TrackedMinifigPartId = partId,
+                IsKept = true,
+                TargetBinId = null,
+                AssignToTrackedMinifigPartId = null  // BEIDE null + IsKept=true -> Fehler
+            }
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _sut.DismantleAsync(stored.SavedMinifig.Id, choices));
+    }
+
+    [Fact]
+    public async Task Dismantle_assigns_part_to_waiting_minifig_when_AssignTo_set()
+    {
+        var binA = await SeedBinAsync("Box 001"); // wartende Figur
+        var binB = await SeedBinAsync("Box 002"); // zu zerlegende Figur
+
+        // Wartende Figur die das Teil 3001/11 noch braucht
+        var waiting = await _sut.PersistAndStoreAsync(MakeInput(
+            "wait1", "WaitingFig", binA, new[] { ("3001", 11, 2), ("9999", 0, 1) }));
+
+        // Zu zerlegende Figur mit dem benoetigten Teil
+        var donor = await _sut.PersistAndStoreAsync(MakeInput(
+            "don1", "Donor", binB, new[] { ("3001", 11, 1) }));
+        var donorPartId = await GetFirstPartIdAsync(donor.SavedMinifig.Id);
+
+        // Den wartenden TrackedMinifigPart finden den wir zuweisen wollen
+        int waitingPartId;
+        await using (var ctx = await _factory.CreateDbContextAsync())
+        {
+            waitingPartId = await ctx.TrackedMinifigParts
+                .Where(p => p.TrackedMinifigId == waiting.SavedMinifig.Id && p.PartNumber == "3001")
+                .Select(p => p.Id)
+                .SingleAsync();
+        }
+
+        var choices = new[]
+        {
+            new DismantlePartChoice
+            {
+                TrackedMinifigPartId = donorPartId,
+                IsKept = true,
+                AssignToTrackedMinifigPartId = waitingPartId
+            }
+        };
+
+        var result = await _sut.DismantleAsync(donor.SavedMinifig.Id, choices);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, result.CreatedFloatingParts);
+        Assert.Equal(1, result.AssignedToWaitingCount);
+        Assert.Empty(result.CompletedMinifigNames); // Wartende braucht 2x, hat erst 1x
+
+        await using var verify = await _factory.CreateDbContextAsync();
+        var part = await verify.TrackedMinifigParts.SingleAsync(p => p.Id == waitingPartId);
+        Assert.Equal(1, part.QuantityCollected);
+        // Donor-Figur ist weg (Cascade)
+        Assert.False(await verify.TrackedMinifigs.AnyAsync(m => m.Id == donor.SavedMinifig.Id));
+    }
+
+    [Fact]
+    public async Task Dismantle_completes_waiting_minifig_when_assignment_fills_last_part()
+    {
+        var binA = await SeedBinAsync("Box 001");
+        var binB = await SeedBinAsync("Box 002");
+
+        // Wartende Figur die NUR noch dieses eine Teil braucht (1x)
+        var waiting = await _sut.PersistAndStoreAsync(MakeInput(
+            "wait2", "FastWait", binA, new[] { ("3001", 11, 1) }));
+
+        var donor = await _sut.PersistAndStoreAsync(MakeInput(
+            "don2", "Donor", binB, new[] { ("3001", 11, 1) }));
+        var donorPartId = await GetFirstPartIdAsync(donor.SavedMinifig.Id);
+
+        int waitingPartId;
+        await using (var ctx = await _factory.CreateDbContextAsync())
+        {
+            waitingPartId = await ctx.TrackedMinifigParts
+                .Where(p => p.TrackedMinifigId == waiting.SavedMinifig.Id)
+                .Select(p => p.Id)
+                .SingleAsync();
+        }
+
+        var result = await _sut.DismantleAsync(donor.SavedMinifig.Id, new[]
+        {
+            new DismantlePartChoice
+            {
+                TrackedMinifigPartId = donorPartId,
+                IsKept = true,
+                AssignToTrackedMinifigPartId = waitingPartId
+            }
+        });
+
+        Assert.True(result.Success);
+        Assert.Equal(1, result.AssignedToWaitingCount);
+        Assert.Single(result.CompletedMinifigNames);
+        Assert.Equal("FastWait", result.CompletedMinifigNames[0]);
+
+        await using var verify = await _factory.CreateDbContextAsync();
+        var fig = await verify.TrackedMinifigs
+            .SingleAsync(m => m.Id == waiting.SavedMinifig.Id);
+        Assert.Equal(TrackedMinifigStatus.Complete, fig.Status);
+        Assert.NotNull(fig.CompletedAt);
+    }
+
+    [Fact]
+    public async Task Dismantle_mixed_choices_assign_and_floating_in_one_call()
+    {
+        var binA = await SeedBinAsync("Box 001");
+        var binB = await SeedBinAsync("Box 002");
+
+        var waiting = await _sut.PersistAndStoreAsync(MakeInput(
+            "wait3", "MixWait", binA, new[] { ("3001", 11, 1), ("9999", 0, 1) }));
+
+        var donor = await _sut.PersistAndStoreAsync(MakeInput(
+            "don3", "MixDonor", binB,
+            new[] { ("3001", 11, 1), ("3024", 5, 2) }));
+
+        int donorPart3001Id, donorPart3024Id, waitingPart3001Id;
+        await using (var ctx = await _factory.CreateDbContextAsync())
+        {
+            donorPart3001Id = await ctx.TrackedMinifigParts
+                .Where(p => p.TrackedMinifigId == donor.SavedMinifig.Id && p.PartNumber == "3001")
+                .Select(p => p.Id).SingleAsync();
+            donorPart3024Id = await ctx.TrackedMinifigParts
+                .Where(p => p.TrackedMinifigId == donor.SavedMinifig.Id && p.PartNumber == "3024")
+                .Select(p => p.Id).SingleAsync();
+            waitingPart3001Id = await ctx.TrackedMinifigParts
+                .Where(p => p.TrackedMinifigId == waiting.SavedMinifig.Id && p.PartNumber == "3001")
+                .Select(p => p.Id).SingleAsync();
+        }
+
+        var result = await _sut.DismantleAsync(donor.SavedMinifig.Id, new[]
+        {
+            // 3001 -> wartende Figur direkt zuordnen
+            new DismantlePartChoice
+            {
+                TrackedMinifigPartId = donorPart3001Id,
+                IsKept = true,
+                AssignToTrackedMinifigPartId = waitingPart3001Id
+            },
+            // 3024 -> normaler FloatingPart-Pfad
+            new DismantlePartChoice
+            {
+                TrackedMinifigPartId = donorPart3024Id,
+                IsKept = true,
+                TargetBinId = binB
+            }
+        });
+
+        Assert.True(result.Success);
+        Assert.Equal(1, result.AssignedToWaitingCount);
+        Assert.Equal(1, result.CreatedFloatingParts);
+        Assert.Equal(2, result.TotalPartsTransferred); // 3024 hat collected=0 -> qty=needed=2
+
+        await using var verify = await _factory.CreateDbContextAsync();
+        var floating = await verify.FloatingParts
+            .Where(fp => fp.PartNumber == "3024" && fp.StorageBinId == binB)
+            .SingleAsync();
+        Assert.Equal(2, floating.Quantity);
+    }
+
+    [Fact]
+    public async Task Dismantle_skips_assignment_when_waiting_part_already_full()
+    {
+        var binA = await SeedBinAsync("Box 001");
+        var binB = await SeedBinAsync("Box 002");
+
+        // Wartende Figur, Teil ist schon voll (collected=1, needed=1)
+        var waiting = await _sut.PersistAndStoreAsync(MakeInput(
+            "wait4", "FullWait", binA, new[] { ("3001", 11, 1), ("9999", 0, 1) }));
+
+        // Wartende Figur ist noch nicht komplett (9999 fehlt), aber 3001 ist schon 1/1
+        await using (var ctx = await _factory.CreateDbContextAsync())
+        {
+            var p = await ctx.TrackedMinifigParts
+                .SingleAsync(x => x.TrackedMinifigId == waiting.SavedMinifig.Id && x.PartNumber == "3001");
+            p.QuantityCollected = 1;
+            await ctx.SaveChangesAsync();
+        }
+
+        var donor = await _sut.PersistAndStoreAsync(MakeInput(
+            "don4", "Donor", binB, new[] { ("3001", 11, 1) }));
+        var donorPartId = await GetFirstPartIdAsync(donor.SavedMinifig.Id);
+
+        int waitingPartId;
+        await using (var ctx = await _factory.CreateDbContextAsync())
+        {
+            waitingPartId = await ctx.TrackedMinifigParts
+                .Where(p => p.TrackedMinifigId == waiting.SavedMinifig.Id && p.PartNumber == "3001")
+                .Select(p => p.Id).SingleAsync();
+        }
+
+        var result = await _sut.DismantleAsync(donor.SavedMinifig.Id, new[]
+        {
+            new DismantlePartChoice
+            {
+                TrackedMinifigPartId = donorPartId,
+                IsKept = true,
+                AssignToTrackedMinifigPartId = waitingPartId
+            }
+        });
+
+        Assert.True(result.Success);
+        // Skip-Pfad: waiting-Teil schon voll -> nichts inkrementiert, kein Floating angelegt.
+        // assignedCount BLEIBT 0 weil der Pfad durchs continue ueberspringt.
+        Assert.Equal(0, result.AssignedToWaitingCount);
+        Assert.Equal(0, result.CreatedFloatingParts);
+    }
+
+    private async Task<int> GetFirstPartIdAsync(int trackedMinifigId)
+    {
+        await using var ctx = await _factory.CreateDbContextAsync();
+        return await ctx.TrackedMinifigParts
+            .Where(p => p.TrackedMinifigId == trackedMinifigId)
+            .Select(p => p.Id)
+            .FirstAsync();
+    }
+
     // ---- Helpers ----
 
     private async Task<int> SeedBinAsync(string label)

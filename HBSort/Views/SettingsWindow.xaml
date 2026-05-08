@@ -1215,7 +1215,7 @@
                                   IsChecked="{Binding AutoCheckForUpdates}"
                                   IsEnabled="{Binding IsUpdateInstalled}"
                                   Margin="0,0,0,8"
-                                  ToolTip="Wenn aktiv, prueft HB-Sort beim Starten einmal im Hintergrund auf neue Versionen. Kein automatischer Download - nur ein Hinweis im Header."/>
+                                  ToolTip="Wenn aktiv, prueft HB-Sort beim Starten einmal im Hintergrund auf neue Versionen. Kein automatischer Download - der 'Jetzt updaten'-Button unten wird dann aktiv."/>
 
                         <TextBlock Text="Wenn deaktiviert: nur manuelles Pruefen via Button unten."
                                    FontSize="11" Foreground="Gray"
@@ -1235,6 +1235,43 @@
                                    TextWrapping="Wrap"
                                    Margin="0,4,0,16"
                                    Visibility="{Binding HasUpdateCheckStatus, Converter={StaticResource BoolToVisibility}}"/>
+
+                        <!-- UX X.26 (v0.1.13): prominenter "Jetzt updaten"-Button.
+                             Sichtbarkeit an HasUpdateAvailable - erscheint nur
+                             wenn der Background-Check (oder manueller Check oben)
+                             ein Update gefunden hat. AccentButton-Style hebt ihn
+                             als primaere Aktion hervor.
+                             Ersetzt das frueher geplante Header-Update-Badge,
+                             das nach 6 fehlgeschlagenen Sichtbarkeits-Iterationen
+                             (v0.1.5..v0.1.12) komplett entfernt wurde. -->
+                        <Border Background="{StaticResource InfoBoxBackground}"
+                                BorderBrush="{StaticResource StatusInfoBrush}"
+                                BorderThickness="1" CornerRadius="4"
+                                Padding="12" Margin="0,8,0,16"
+                                Visibility="{Binding HasUpdateAvailable, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold" FontSize="13" Margin="0,0,0,8">
+                                    <Run Text="Update verfuegbar: v"/>
+                                    <Run Text="{Binding AvailableUpdateVersion, Mode=OneWay}"/>
+                                </TextBlock>
+                                <Button Command="{Binding ApplyUpdateCommand}"
+                                        Style="{StaticResource AccentButtonStyle}"
+                                        Padding="14,8"
+                                        HorizontalAlignment="Left"
+                                        ToolTip="Laedt die neue Version herunter und startet die App neu. Deine Daten unter %APPDATA%\HBSort bleiben erhalten.">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE777;" FontFamily="Segoe MDL2 Assets"
+                                                   FontSize="14" VerticalAlignment="Center"
+                                                   Margin="0,0,6,0"/>
+                                        <TextBlock VerticalAlignment="Center">
+                                            <Run Text="Jetzt auf v"/>
+                                            <Run Text="{Binding AvailableUpdateVersion, Mode=OneWay}"/>
+                                            <Run Text=" updaten"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Border>
 
                         <Separator Margin="0,8,0,8"/>
 
