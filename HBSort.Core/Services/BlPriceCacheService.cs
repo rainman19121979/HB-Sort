@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using HBSort.Core.Helpers;
 using HBSort.Core.Models.Pricing;
 using Serilog;
 
@@ -129,8 +130,9 @@ public class BlPriceCacheService : IBlPriceCacheService
         //    am UI das Update nicht killt).
         if (cached != null && cached.IsStale)
         {
-            _ = Task.Run(() => RevalidateInBackgroundAsync(
-                itemType, itemNo, colorId, cfg.GuideType, newOrUsed, region, currency));
+            Task.Run(() => RevalidateInBackgroundAsync(
+                itemType, itemNo, colorId, cfg.GuideType, newOrUsed, region, currency))
+                .FireAndForget($"BlPrice-Revalidate {itemType}/{itemNo}/{colorId}");
 
             return new PriceLookupOutcome(
                 Price: cached.Price,

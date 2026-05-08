@@ -17,8 +17,10 @@ namespace HBSort.ViewModels;
 /// Der Toast-Container (NotificationService.ActiveToasts) wird hier ueber
 /// die Property ActiveToasts an das XAML weitergereicht.
 /// </summary>
-public partial class MainViewModel : ObservableObject
+public partial class MainViewModel : ObservableObject, IDisposable
 {
+    private bool _disposed;
+
     private readonly ISettingsService _settingsService;
     private readonly IBrickognizeClient _brickognizeClient;
     private readonly NotificationService _notificationService;
@@ -461,5 +463,23 @@ public partial class MainViewModel : ObservableObject
                 ErrorMessage = ex.Message
             });
         }
+    }
+
+    /// <summary>
+    /// UX X.28 (v0.1.15): IDisposable damit der ServiceProvider beim OnExit
+    /// den DispatcherTimer stoppt und Event-Subscriptions abmeldet. Vorher
+    /// liefen die bis zum Process.Kill weiter.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        try { _rateLimitTimer.Stop(); } catch { /* defensiv */ }
+        try { _rateLimiter.StatusChanged -= OnRateLimitChanged; } catch { /* defensiv */ }
+        try { _imageCache.StatsChanged -= OnCacheStatsChanged; } catch { /* defensiv */ }
+
+        Log.Information("MainViewModel disposed");
+        GC.SuppressFinalize(this);
     }
 }

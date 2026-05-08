@@ -2,6 +2,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HBSort.Core.Database;
+using HBSort.Core.Helpers;
 using HBSort.Core.Models;
 using HBSort.Core.Services;
 using Microsoft.EntityFrameworkCore;
@@ -42,12 +43,12 @@ public partial class LiveStatsViewModel : ObservableObject, IDisposable
         {
             var disp = Application.Current?.Dispatcher;
             if (disp != null && !disp.CheckAccess())
-                disp.BeginInvoke(() => _ = RefreshAsync());
+                disp.BeginInvoke(() => RefreshAsync().FireAndForget("LiveStats-Refresh-DataChanged"));
             else
-                _ = RefreshAsync();
+                RefreshAsync().FireAndForget("LiveStats-Refresh-DataChanged");
         };
         _persistence.DataChanged += _onDataChanged;
-        _ = RefreshAsync();
+        RefreshAsync().FireAndForget("LiveStats-Refresh-Initial");
     }
 
     /// <summary>Audit K-2: Unsubscribe beim ServiceProvider-Dispose.</summary>
