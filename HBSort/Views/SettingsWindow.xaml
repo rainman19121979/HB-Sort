@@ -1355,7 +1355,7 @@
                         </Border>
 
                         <!-- Copyright -->
-                        <TextBlock Text="(c) 2026 Holger Buchmann - HB-Bricks"
+                        <TextBlock Text="(c) 2026 Holger Kessler - HB-Bricks"
                                    FontSize="11" Foreground="Gray"
                                    HorizontalAlignment="Center"
                                    Margin="0,8,0,0"/>

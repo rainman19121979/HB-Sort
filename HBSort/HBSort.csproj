@@ -15,7 +15,7 @@
     <Product>HB-Sort</Product>
     <Company>HB-Bricks</Company>
     <Description>Sortier-Werkzeug fuer Klemmbausteine</Description>
-    <Copyright>(c) 2026 Holger</Copyright>
+    <Copyright>(c) 2026 Holger Kessler</Copyright>
   </PropertyGroup>
 
   <!-- Projekt-Referenz auf die Core-Bibliothek (enthält alle Services und Models) -->
