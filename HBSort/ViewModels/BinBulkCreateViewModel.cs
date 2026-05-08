@@ -17,7 +17,10 @@ public partial class BinBulkCreateViewModel : ObservableObject
     private readonly INotificationService _notifications;
     private readonly IDialogService _dialogs;
 
-    [ObservableProperty] private string _prefix = "Box ";
+    // UX X.27 (v0.1.14): kein Leerzeichen mehr am Ende des Default-Prefix.
+    // Vorher: "Box " + "01" = "Box 01". Jetzt: "Box" + "01" = "Box01".
+    // User kann selbst ein Leerzeichen tippen wenn er das Format will.
+    [ObservableProperty] private string _prefix = "Box";
     [ObservableProperty] private string _suffix = string.Empty;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsNumbers))]

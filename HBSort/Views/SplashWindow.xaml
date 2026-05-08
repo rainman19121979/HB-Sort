@@ -61,28 +61,28 @@
                            Margin="0,4,0,0"/>
             </StackPanel>
 
-            <!-- ProgressRing als Lade-Indikator. v0.1.5 (2026-05-06):
-                 Status-Text von 'Wird geladen...' auf 'App startet...'
-                 geaendert - sichtbarer Marker fuer Auto-Update-Badge-
-                 Verifikation (UX X.23 Final-Verifikation). -->
+            <!-- ProgressRing als Lade-Indikator.
+                 v0.1.12 (2026-05-07): Status-Text von 'App startet...'
+                 auf 'Bereitet App vor...' geaendert - sichtbarer Marker
+                 fuer Update-Badge-Trigger nach Opacity-Fix in v0.1.11. -->
             <StackPanel Grid.Row="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Center"
                         Margin="0,12,0,12">
                 <ui:ProgressRing IsActive="True"
                                  Width="20" Height="20"/>
-                <TextBlock Text="App startet..."
+                <TextBlock Text="Bereitet App vor..."
                            FontSize="12"
                            Foreground="Gray"
                            VerticalAlignment="Center"
                            Margin="8,0,0,0"/>
             </StackPanel>
 
-            <!-- Footer. v0.1.2 (2026-05-06): Wort "Powered by" entfernt fuer
-                 Auto-Update-Verifikation - sichtbarer Marker dass das Update
-                 von v0.1.1 auf v0.1.2 wirklich angewendet wurde. -->
+            <!-- Footer. v0.1.10 (2026-05-07): Reihenfolge der Drittanbieter
+                 alphabetisch sortiert - sichtbarer Marker fuer Update-Badge-
+                 Praxis-Test (UX X.24 Opacity-Fix-Verifikation v0.1.9 -> v0.1.10). -->
             <TextBlock Grid.Row="2"
-                       Text="Brickognize · BrickStore-DB · BrickLink"
+                       Text="BrickLink · Brickognize · BrickStore-DB"
                        FontSize="10"
                        HorizontalAlignment="Center"
                        Foreground="#999"/>

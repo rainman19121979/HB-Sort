@@ -10,6 +10,14 @@ namespace HBSort.Core.Services;
 /// </summary>
 public class CameraService : ICameraService
 {
+    // UX X.28 (v0.1.15): benannte Konstanten statt Magic Numbers im Capture-Loop.
+    /// <summary>Wartezeit wenn ein Frame nicht erfolgreich gelesen wurde.</summary>
+    private const int FrameRetryDelayMs = 10;
+    /// <summary>Pause zwischen erfolgreichen Frames (ca. 30 FPS).</summary>
+    private const int FrameIntervalMs = 33;
+    /// <summary>Wartezeit nach Capture-Exception bevor neuer Versuch.</summary>
+    private const int CaptureErrorRetryDelayMs = 100;
+
     // Das VideoCapture-Objekt von OpenCV - unsere Verbindung zur Kamera
     private VideoCapture? _capture;
 
@@ -116,7 +124,7 @@ public class CameraService : ICameraService
                 if (!success || frame.Empty())
                 {
                     // Kein Frame bekommen - kurz warten und nochmal versuchen
-                    Thread.Sleep(10);
+                    Thread.Sleep(FrameRetryDelayMs);
                     continue;
                 }
 
@@ -130,12 +138,12 @@ public class CameraService : ICameraService
                 FrameReceived?.Invoke(jpegBytes);
 
                 // ~30 FPS: ca. 33ms zwischen Frames
-                Thread.Sleep(33);
+                Thread.Sleep(FrameIntervalMs);
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "Fehler beim Lesen des Kamera-Frames");
-                Thread.Sleep(100);
+                Thread.Sleep(CaptureErrorRetryDelayMs);
             }
         }
     }

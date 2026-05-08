@@ -116,18 +116,19 @@ herunterladen.
 
 - **Beim App-Start nach Updates suchen** (Default an): einmal pro
   App-Start im Hintergrund pruefen ob ein neuer Release auf GitHub
-  verfuegbar ist. Bei Treffer erscheint im Header oben rechts ein
-  blaues "Update X.Y.Z"-Badge.
+  verfuegbar ist. Bei Treffer wird in diesem Tab eine blaue Box
+  "Update verfuegbar: vX.Y.Z" angezeigt.
 - **Jetzt nach Updates suchen**: manueller Check, unabhaengig von
   Auto-Check.
 - **Letzte Pruefung**: Zeitstempel der letzten erfolgreichen
   Hintergrund- oder manuellen Pruefung.
+- **Jetzt auf vX.Y.Z updaten**: erscheint nur wenn ein Update
+  verfuegbar ist. Klick laedt die neue Version im Hintergrund
+  herunter und startet die App automatisch neu.
 
-Wenn du auf das Update-Badge klickst, wird die neue Version im
-Hintergrund heruntergeladen und die App startet danach automatisch
-neu. Deine Daten unter `%APPDATA%\HBSort\` (settings.json,
-Datenbanken, Logs) bleiben dabei unveraendert - nur die App selbst
-wird ausgetauscht.
+Deine Daten unter `%APPDATA%\HBSort\` (settings.json, Datenbanken,
+Logs) bleiben beim Update unveraendert - nur die App selbst wird
+ausgetauscht.
 
 ## Info
 

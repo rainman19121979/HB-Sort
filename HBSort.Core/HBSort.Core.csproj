@@ -14,7 +14,7 @@
   <ItemGroup>
     <!-- Entity Framework Core mit SQLite für die userdata.db -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.26" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.13">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.26">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
@@ -22,7 +22,7 @@
     <!-- Microsoft.Data.Sqlite: Direkter ADO.NET-Zugriff auf SQLite, ohne EF.
          Wird fuer den BL-Cache (bl_cache.db) und Bulk-Import genutzt -
          EF ist fuer Bulk-Inserts zu langsam. -->
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.13" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.26" />
 
     <!-- OpenCvSharp4: C#-Wrapper für OpenCV, gibt uns Zugriff auf USB-Webcams
          und Bildverarbeitung (Frame-Capture, Bild speichern etc.) -->

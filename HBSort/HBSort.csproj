@@ -8,14 +8,20 @@
     <UseWPF>true</UseWPF>
     <LangVersion>12</LangVersion>
     <ApplicationIcon>Resources\app.ico</ApplicationIcon>
-    <Version>0.1.0</Version>
-    <AssemblyVersion>0.1.0.0</AssemblyVersion>
-    <FileVersion>0.1.0.0</FileVersion>
+    <!-- UX X.28 (v0.1.15): Version-Strings werden im CI-Pipeline-Tag-Build
+         ueberschrieben (-p:Version, -p:AssemblyVersion, -p:FileVersion,
+         -p:InformationalVersion). Lokal-Build (Visual Studio F5) zeigt
+         "0.1.15-dev" als InformationalVersion -> Splash-Marker fuer User
+         dass dies kein Tag-Release ist. -->
+    <Version>0.1.15</Version>
+    <AssemblyVersion>0.1.15.0</AssemblyVersion>
+    <FileVersion>0.1.15.0</FileVersion>
+    <InformationalVersion>0.1.15-dev</InformationalVersion>
     <AssemblyTitle>HB-Sort</AssemblyTitle>
     <Product>HB-Sort</Product>
     <Company>HB-Bricks</Company>
     <Description>Sortier-Werkzeug fuer Klemmbausteine</Description>
-    <Copyright>(c) 2026 Holger</Copyright>
+    <Copyright>(c) 2026 Holger Kessler</Copyright>
   </PropertyGroup>
 
   <!-- Projekt-Referenz auf die Core-Bibliothek (enthält alle Services und Models) -->
@@ -46,7 +52,7 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
 
     <!-- EF Core Design-Package wird vom Startup-Projekt gebraucht für Migrations-Tooling -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.13">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.26">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
