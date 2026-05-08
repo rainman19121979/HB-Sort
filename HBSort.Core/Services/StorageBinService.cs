@@ -95,6 +95,19 @@ public class StorageBinService : IStorageBinService
         };
         ctx.StorageBins.Add(bin);
         await ctx.SaveChangesAsync(ct);
+
+        // UX X.29 (v0.1.16): Undo-ScanEvent fuer angelegtes Fach.
+        var snapshot = new UndoSnapshotBinCreated { BinIds = new() { bin.Id } };
+        ctx.ScanEvents.Add(new ScanEvent
+        {
+            Timestamp = DateTime.UtcNow,
+            Type = ScanType.BinCreated,
+            ResultDescription = $"Lagerfach '{bin.Label}' angelegt",
+            WasUndone = false,
+            UndoData = System.Text.Json.JsonSerializer.Serialize(snapshot)
+        });
+        await ctx.SaveChangesAsync(ct);
+
         Log.Information("Lagerfach angelegt: '{Label}' (Id={Id})", bin.Label, bin.Id);
         return bin;
     }
@@ -139,6 +152,29 @@ public class StorageBinService : IStorageBinService
         }
 
         await ctx.SaveChangesAsync(ct);
+
+        // UX X.29 (v0.1.16): Bulk-Anlage als ein Undo-Event - ein Klick auf
+        // Rueckgaengig loescht alle in diesem Schwung angelegten Faecher
+        // (sofern noch leer).
+        if (result.Created.Count > 0)
+        {
+            var snapshot = new UndoSnapshotBinCreated
+            {
+                BinIds = result.Created.Select(b => b.Id).ToList()
+            };
+            ctx.ScanEvents.Add(new ScanEvent
+            {
+                Timestamp = DateTime.UtcNow,
+                Type = ScanType.BinCreated,
+                ResultDescription = result.Created.Count == 1
+                    ? $"Lagerfach '{result.Created[0].Label}' angelegt"
+                    : $"{result.Created.Count} Lagerfaecher angelegt (Bulk)",
+                WasUndone = false,
+                UndoData = System.Text.Json.JsonSerializer.Serialize(snapshot)
+            });
+            await ctx.SaveChangesAsync(ct);
+        }
+
         Log.Information("Bulk-Anlage: {Count} Faecher erstellt, {Conflicts} Konflikte",
             result.Created.Count, result.Conflicts.Count);
         return result;
@@ -287,7 +323,26 @@ public class StorageBinService : IStorageBinService
         if (bins.Count == 0) return 0;
 
         var now = DateTime.UtcNow;
-        foreach (var b in bins) b.FreedAt = now;
+        foreach (var b in bins)
+        {
+            b.FreedAt = now;
+            // UX X.29 (v0.1.16): pro Bin ein eigener BinFreed-ScanEvent.
+            // Damit kann der User pro Fach einzeln zurueckziehen falls
+            // er nur eines wieder reaktivieren will.
+            var snapshot = new UndoSnapshotBinFreed
+            {
+                BinId = b.Id,
+                PreviousFreedAt = now
+            };
+            ctx.ScanEvents.Add(new ScanEvent
+            {
+                Timestamp = now,
+                Type = ScanType.BinFreed,
+                ResultDescription = $"Lagerfach '{b.Label}' freigegeben",
+                WasUndone = false,
+                UndoData = System.Text.Json.JsonSerializer.Serialize(snapshot)
+            });
+        }
         await ctx.SaveChangesAsync(ct);
 
         Log.Information("Lagerfaecher freigegeben: {Count} ({Labels})",

@@ -75,13 +75,39 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             .ToListAsync(ct);
         foreach (var fp in origins) fp.OriginMinifigId = null;
 
+        // UX X.29 (v0.1.16): Undo-Snapshot vor dem Loeschen erfassen.
+        var snapshot = new UndoSnapshotMinifigDelete
+        {
+            OriginalMinifigId = minifig.Id,
+            BricklinkId = minifig.BricklinkId ?? string.Empty,
+            FigNum = minifig.FigNum,
+            Name = minifig.Name,
+            ImageUrl = minifig.ImageUrl,
+            LocalImagePath = minifig.LocalImagePath,
+            UserNotes = minifig.UserNotes,
+            CreatedAt = minifig.CreatedAt,
+            CompletedAt = minifig.CompletedAt,
+            Status = minifig.Status.ToString(),
+            StorageBinId = minifig.StorageBinId,
+            RequiredParts = minifig.RequiredParts.Select(p => new UndoSnapshotPart
+            {
+                PartNumber = p.PartNumber,
+                ColorId = p.ColorId,
+                PartName = p.PartName,
+                ColorName = p.ColorName,
+                QuantityNeeded = p.QuantityNeeded,
+                QuantityCollected = p.QuantityCollected
+            }).ToList()
+        };
+
         ctx.ScanEvents.Add(new ScanEvent
         {
             Timestamp = DateTime.UtcNow,
-            Type = ScanType.MinifigScan,
+            Type = ScanType.Delete,
             RecognizedId = minifig.BricklinkId ?? minifig.FigNum,
             ResultDescription = $"Figur '{minifig.Name}' geloescht (Status war: {minifig.Status})",
-            WasUndone = false
+            WasUndone = false,
+            UndoData = System.Text.Json.JsonSerializer.Serialize(snapshot)
         });
 
         // RequiredParts werden via Cascade-Delete entfernt (EF Core: Cascade auf TrackedMinifig).

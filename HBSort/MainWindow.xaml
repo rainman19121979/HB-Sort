@@ -36,8 +36,9 @@
     <Window.InputBindings>
         <KeyBinding Key="Q"
                     Command="{Binding ScanViewModel.OpenQuantityDialogCommand}"/>
-        <KeyBinding Modifiers="Control" Key="Z"
-                    Command="{Binding ScanViewModel.UndoLastScanCommand}"/>
+        <!-- UX X.29 (v0.1.16): Strg+Z wird via MainWindow_PreviewKeyDown
+             gehandelt damit der TextBox-Fokus den Standard-WPF-Undo-Pfad
+             nicht blockiert. KeyBinding hier waere immer-aktiv. -->
         <KeyBinding Key="F1"
                     Command="{Binding OpenHelpCommand}"/>
 
@@ -136,7 +137,14 @@
                              IsChecked="{Binding IsMainTabHelp, Mode=OneWay}"
                              Click="MainTabHelp_Click"
                              Content="Hilfe"
-                             ToolTip="Integrierte Doku zu Workflow, Lagerverwaltung, Export. (F1)"/>
+                             ToolTip="Integrierte Doku zu Workflow, Lagerverwaltung, Export. (F1)"
+                             Margin="0,0,8,0"/>
+                <RadioButton x:Name="TabHistoryButton" GroupName="MainTabs"
+                             Style="{StaticResource MainTabRadioStyle}"
+                             IsChecked="{Binding IsMainTabHistory, Mode=OneWay}"
+                             Click="MainTabHistory_Click"
+                             Content="Verlauf"
+                             ToolTip="Letzte Aktionen + Rueckgaengig-Funktion. Strg+Z macht die letzte Aktion rueckgaengig."/>
             </StackPanel>
 
             <!-- Rechts: Settings + Beenden. UX X.26 (v0.1.13): Update-Badge
@@ -197,6 +205,10 @@
                             Visibility="{Binding DataContext.IsMainTabHelp,
                                 RelativeSource={RelativeSource AncestorType=Window},
                                 Converter={StaticResource BoolToVisibility}}"/>
+            <views:HistoryView DataContext="{Binding History}"
+                               Visibility="{Binding DataContext.IsMainTabHistory,
+                                   RelativeSource={RelativeSource AncestorType=Window},
+                                   Converter={StaticResource BoolToVisibility}}"/>
         </Grid>
 
 

@@ -27,10 +27,32 @@ public class ScanEvent
 
     /// <summary>Wurde dieser Scan per Undo rueckgaengig gemacht?</summary>
     public bool WasUndone { get; set; }
+
+    /// <summary>
+    /// UX X.29 (v0.1.16): Zeitpunkt zu dem die Aktion rueckgaengig gemacht
+    /// wurde. Null = noch nicht. Doppel-Undo wird ueber WasUndone+UndoneAt
+    /// blockiert.
+    /// </summary>
+    public DateTime? UndoneAt { get; set; }
+
+    /// <summary>
+    /// UX X.29 (v0.1.16): JSON-serialisierter Snapshot, der das Undo
+    /// ermoeglicht. Pro <see cref="ScanType"/> ein eigenes Format - siehe
+    /// HBSort.Core.Services.UndoSnapshot* Records. Null bei Aktionen die
+    /// nicht rueckgaengig gemacht werden koennen (z.B. Import,
+    /// FloatingPartExported).
+    /// </summary>
+    public string? UndoData { get; set; }
 }
 
 /// <summary>
-/// Typ des ScanEvents:
+/// Typ des ScanEvents.
+///
+/// HasConversion&lt;string&gt;() in UserDataContext - neue Werte sind ohne
+/// DB-Migration moeglich (TEXT-Spalte). Trotzdem hier alle Werte in einer
+/// stabilen Reihenfolge halten, damit alte ScanEvents bei Re-Read korrekt
+/// gemappt werden.
+///
 ///   MinifigScan / PartScan        - klassische Brickognize-Scans
 ///   FloatingPartTransfer          - User uebernimmt ein Teil aus einem
 ///                                   Lagerfach in eine wartende oder gerade
@@ -40,13 +62,29 @@ public class ScanEvent
 ///                                   der DB entfernt (Phase 7-Erweiterung).
 ///                                   ResultDescription enthaelt die Quell-
 ///                                   Bin-Info als Audit-Trail.
-/// HasConversion&lt;string&gt;() in UserDataContext - neue Werte sind ohne
-/// DB-Migration moeglich (TEXT-Spalte).
+///
+/// UX X.29 (v0.1.16): Undo-faehige Aktions-Typen. Werden vom UndoService
+/// verarbeitet, UndoData enthaelt einen typ-spezifischen JSON-Snapshot.
+///   Delete            - Minifig oder FloatingPart geloescht
+///   Move              - Minifig in anderen Bin verschoben
+///   Complete          - Teil/Figur als komplett markiert (manuell)
+///   BinFreed          - Bin wurde freigegeben (FreedAt gesetzt)
+///   BinCreated        - Ein oder mehrere Bins wurden angelegt
+///   Import            - BL-Daten-Import (NICHT undobar - Backup nutzen)
+///   UndoApplied       - Audit: ein anderer ScanEvent wurde rueckgaengig
+///                       gemacht. Selbst nicht erneut undobar.
 /// </summary>
 public enum ScanType
 {
     MinifigScan,
     PartScan,
     FloatingPartTransfer,
-    FloatingPartExported
+    FloatingPartExported,
+    Delete,
+    Move,
+    Complete,
+    BinFreed,
+    BinCreated,
+    Import,
+    UndoApplied
 }

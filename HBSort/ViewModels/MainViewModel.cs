@@ -30,6 +30,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly IBricklinkRateLimiter _rateLimiter;
     private readonly IUpdateService _updateService;
     private readonly IBlBulkImportService _blBulkImport;
+    private readonly IUndoService? _undoService;
 
     // 60s-Timer fuer Status-Refresh damit die Anzeige aktuell bleibt auch ohne neue Calls
     // (Eintraege fallen aus dem rolling 24h-Window).
@@ -45,6 +46,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>Lagerliste-Tab (Phase X).</summary>
     public InventoryListViewModel Inventory { get; }
+
+    /// <summary>UX X.29 (v0.1.16): Verlauf-Tab.</summary>
+    public HistoryViewModel History { get; }
 
     /// <summary>
     /// Hilfe-Tab (UX-Iteration X.9): integrierte Doku als dritter
@@ -79,11 +83,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(IsMainTabSorting))]
     [NotifyPropertyChangedFor(nameof(IsMainTabInventory))]
     [NotifyPropertyChangedFor(nameof(IsMainTabHelp))]
+    [NotifyPropertyChangedFor(nameof(IsMainTabHistory))]
     private int _mainTabIndex = 0;
 
     public bool IsMainTabSorting   => MainTabIndex == 0;
     public bool IsMainTabInventory => MainTabIndex == 1;
     public bool IsMainTabHelp      => MainTabIndex == 2;
+    public bool IsMainTabHistory   => MainTabIndex == 3;
 
     /// <summary>Toast-Liste fuer das XAML-Binding (ItemsControl).</summary>
     public ObservableCollection<ToastItem> ActiveToasts => _notificationService.ActiveToasts;
@@ -142,8 +148,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         WaitingDetailViewModel waitingDetail,
         RecentScansViewModel recentScans,
         HelpViewModel help,
+        HistoryViewModel history,
         IUpdateService updateService,
-        IBlBulkImportService blBulkImport)
+        IBlBulkImportService blBulkImport,
+        IUndoService undoService)
     {
         _settingsService = settingsService;
         ScanViewModel = scanViewModel;
@@ -153,6 +161,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         WaitingDetail = waitingDetail;
         RecentScans = recentScans;
         Help = help;
+        History = history;
+        _undoService = undoService;
         _brickognizeClient = brickognizeClient;
         // Wir brauchen die konkrete Implementierung wegen ActiveToasts -
         // das DI registriert beide Wege auf die selbe Singleton-Instanz.
@@ -211,10 +221,19 @@ public partial class MainViewModel : ObservableObject, IDisposable
         // UX X.28 (v0.1.15): Auto-BL-Import beim Start, falls aktiviert und
         // Intervall ueberschritten. Default ist AutoBlImport=false - User muss
         // explizit aktivieren in Settings -> BrickLink-Daten.
+        //
+        // UX X.29 (v0.1.16) Bug-Fix: Task.Run-Wrapping ist Pflicht. Der
+        // BlBulkImportService entpackt das ZIP synchron (ZipFile.OpenRead +
+        // entry.ExtractToFile haben keine async-Variante) und macht
+        // CPU-intensive DB-Inserts. Ohne Task.Run laufen diese Block-Phasen
+        // auf dem UI-Thread (weil der erste Aufruf vom Konstruktor unter
+        // dem UI-SynchronizationContext startet) - resultiert in 10-20s
+        // Freeze direkt nach App-Start.
         if (_settingsService.Current.AutoBlImport
             && ShouldRunAutoBlImport(_settingsService.Current))
         {
-            RunAutoBlImportAsync().FireAndForget("AutoBlImport-Startup");
+            Task.Run(async () => await RunAutoBlImportAsync())
+                .FireAndForget("AutoBlImport-Startup");
         }
     }
 
@@ -342,6 +361,53 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Strg+H: Hilfe-Tab (gleiche Aktion wie OpenHelp/F1, aber
     /// eigener Command-Name fuer den Strg+H-Shortcut).</summary>
     [RelayCommand] public void SwitchToHelpTab()      => MainTabIndex = 2;
+
+    /// <summary>UX X.29 (v0.1.16): Verlauf-Tab.</summary>
+    [RelayCommand]
+    public void SwitchToHistoryTab()
+    {
+        MainTabIndex = 3;
+        // Beim Tab-Wechsel die Liste frisch laden (analog Inventory).
+        if (History is HistoryViewModel hvm)
+            _ = hvm.RefreshAsync();
+    }
+
+    /// <summary>
+    /// UX X.29 (v0.1.16): Strg+Z - macht die letzte rueckgaengigmachbare Aktion
+    /// rueckgaengig. Bei leerer Historie: Toast-Hinweis.
+    /// </summary>
+    [RelayCommand]
+    public async Task UndoLastAsync()
+    {
+        if (_undoService == null) return;
+        try
+        {
+            var last = await _undoService.GetLastUndoableAsync();
+            if (last == null)
+            {
+                _notificationService.ShowInfo("Keine rueckgaengigmachbare Aktion vorhanden.");
+                return;
+            }
+
+            var result = await _undoService.UndoAsync(last.Id);
+            if (result.Success)
+            {
+                _notificationService.ShowSuccess($"Rueckgaengig: {last.Description}");
+                // Verlauf-Liste live aktualisieren falls sichtbar.
+                if (History is HistoryViewModel hvm) _ = hvm.RefreshAsync();
+            }
+            else
+            {
+                _notificationService.ShowError(
+                    "Rueckgaengig fehlgeschlagen: " + (result.ErrorMessage ?? "unbekannter Fehler"));
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Undo (Strg+Z) fehlgeschlagen");
+            _notificationService.ShowError("Rueckgaengig fehlgeschlagen.");
+        }
+    }
 
     /// <summary>
     /// Strg+Komma: Einstellungen oeffnen. Wir feuern ein Event, das das

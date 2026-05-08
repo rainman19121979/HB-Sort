@@ -1,0 +1,118 @@
+<UserControl x:Class="HBSort.Views.HistoryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.modernwpf.com/2019">
+    <!-- UX X.29 (v0.1.16): Verlauf-Tab. ScanEvent-Liste mit Filter +
+         Rueckgaengig-Button pro undobarer Aktion. -->
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>     <!-- 0: Header -->
+            <RowDefinition Height="Auto"/>     <!-- 1: Filter-Zeile -->
+            <RowDefinition Height="*"/>        <!-- 2: DataGrid -->
+            <RowDefinition Height="Auto"/>     <!-- 3: Status-Footer -->
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="VERLAUF"
+                       FontSize="18" FontWeight="SemiBold"/>
+            <Button Grid.Column="1" Content="Aktualisieren"
+                    Command="{Binding RefreshCommand}" Padding="8,2"
+                    ToolTip="Liest die Verlaufs-Liste aus der DB neu ein."/>
+        </Grid>
+
+        <!-- Filter-Zeile -->
+        <Grid Grid.Row="1" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="200"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="180"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Suche:" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="Gray"/>
+            <TextBox Grid.Column="1"
+                     Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                     ui:ControlHelper.PlaceholderText="Beschreibung..."
+                     ToolTip="Filtert nach Beschreibungs-Text der Aktion."/>
+            <TextBlock Grid.Column="2" Text="Typ:" VerticalAlignment="Center" Margin="12,0,6,0"
+                       Foreground="Gray"/>
+            <ComboBox Grid.Column="3"
+                      ItemsSource="{Binding AvailableTypeFilters}"
+                      SelectedItem="{Binding SelectedTypeFilter, Mode=TwoWay}"
+                      ToolTip="Beschraenkt die Liste auf einen bestimmten Aktions-Typ."/>
+            <TextBlock Grid.Column="4" Text="Von:" VerticalAlignment="Center" Margin="12,0,6,0"
+                       Foreground="Gray"/>
+            <DatePicker Grid.Column="5"
+                        SelectedDate="{Binding FilterFromDate, Mode=TwoWay}"
+                        ToolTip="Frueheste Aktion (inklusiv)."/>
+            <TextBlock Grid.Column="6" Text="Bis:" VerticalAlignment="Center" Margin="12,0,6,0"
+                       Foreground="Gray"/>
+            <DatePicker Grid.Column="7"
+                        SelectedDate="{Binding FilterToDate, Mode=TwoWay}"
+                        ToolTip="Spaeteste Aktion (inklusiv)."/>
+            <Button Grid.Column="9" Content="Reset"
+                    Command="{Binding ClearFiltersCommand}"
+                    Padding="8,2" Margin="8,0,0,0"
+                    ToolTip="Setzt alle Filter zurueck."/>
+        </Grid>
+
+        <!-- DataGrid -->
+        <DataGrid Grid.Row="2"
+                  ItemsSource="{Binding ItemsView}"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False" CanUserDeleteRows="False"
+                  IsReadOnly="True"
+                  HeadersVisibility="Column"
+                  GridLinesVisibility="Horizontal"
+                  AlternatingRowBackground="#F8F8F8"
+                  SelectionMode="Single"
+                  RowHeight="36">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Datum/Uhrzeit"
+                                    Binding="{Binding TimestampDisplay}"
+                                    Width="170"
+                                    FontFamily="Consolas"/>
+                <DataGridTextColumn Header="Aktion"
+                                    Binding="{Binding TypeDisplay}"
+                                    Width="180"/>
+                <DataGridTextColumn Header="Beschreibung"
+                                    Binding="{Binding Description}"
+                                    Width="*"/>
+                <DataGridTextColumn Header="Status"
+                                    Binding="{Binding StatusDisplay}"
+                                    Width="180"
+                                    FontStyle="Italic"/>
+                <DataGridTemplateColumn Header="" Width="120">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="Rueckgaengig"
+                                    Click="UndoRow_Click"
+                                    Tag="{Binding}"
+                                    Padding="6,2"
+                                    Visibility="{Binding CanUndo, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="Diese Aktion rueckgaengig machen (mit Bestaetigung)."/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Footer -->
+        <Border Grid.Row="3"
+                Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                Padding="8,4" CornerRadius="4" Margin="0,8,0,0">
+            <TextBlock Text="{Binding StatusText}" FontSize="12"/>
+        </Border>
+    </Grid>
+</UserControl>

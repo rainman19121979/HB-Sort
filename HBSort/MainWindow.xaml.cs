@@ -84,14 +84,33 @@ public partial class MainWindow : Window
     /// </summary>
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Space) return;
-        if (IsTextInputFocused()) return;
-
-        var cmd = _viewModel.ScanViewModel.PerformScanCommand;
-        if (cmd.CanExecute(null))
+        // Leertaste = Scan ausloesen.
+        if (e.Key == Key.Space)
         {
-            cmd.Execute(null);
-            e.Handled = true;
+            if (IsTextInputFocused()) return;
+            var scan = _viewModel.ScanViewModel.PerformScanCommand;
+            if (scan.CanExecute(null))
+            {
+                scan.Execute(null);
+                e.Handled = true;
+            }
+            return;
+        }
+
+        // UX X.29 (v0.1.16): Strg+Z = globales Undo. In TextBoxen NICHT
+        // greifen damit die Standard-WPF-Undo-Logik im Text-Editor weiter
+        // funktioniert.
+        if (e.Key == Key.Z
+            && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control
+            && (Keyboard.Modifiers & ModifierKeys.Shift) == 0)
+        {
+            if (IsTextInputFocused()) return;
+            var undo = _viewModel.UndoLastCommand;
+            if (undo.CanExecute(null))
+            {
+                undo.Execute(null);
+                e.Handled = true;
+            }
         }
     }
 
@@ -174,6 +193,10 @@ public partial class MainWindow : Window
     /// <summary>Header-Tab "Hilfe" geklickt -> MainTabIndex=2.</summary>
     private void MainTabHelp_Click(object sender, RoutedEventArgs e)
         => _viewModel.MainTabIndex = 2;
+
+    /// <summary>UX X.29 (v0.1.16): Header-Tab "Verlauf" geklickt -> MainTabIndex=3.</summary>
+    private void MainTabHistory_Click(object sender, RoutedEventArgs e)
+        => _viewModel.SwitchToHistoryTabCommand.Execute(null);
 
     private void OpenSettings_Click(object sender, RoutedEventArgs e)
     {

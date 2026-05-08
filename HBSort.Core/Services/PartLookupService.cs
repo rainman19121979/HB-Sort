@@ -299,13 +299,28 @@ public class PartLookupService : IPartLookupService
         var fp = await ctx.FloatingParts.FirstOrDefaultAsync(p => p.Id == floatingPartId, ct);
         if (fp == null) return false;
 
+        // UX X.29 (v0.1.16): Undo-Snapshot vor dem Loeschen erfassen.
+        var snapshot = new UndoSnapshotFloatingDelete
+        {
+            OriginalFloatingId = fp.Id,
+            PartNumber = fp.PartNumber,
+            ColorId = fp.ColorId,
+            PartName = fp.PartName,
+            ColorName = fp.ColorName,
+            Quantity = fp.Quantity,
+            StorageBinId = fp.StorageBinId,
+            AddedAt = fp.AddedAt,
+            OriginMinifigId = fp.OriginMinifigId
+        };
+
         ctx.ScanEvents.Add(new ScanEvent
         {
             Timestamp = DateTime.UtcNow,
-            Type = ScanType.PartScan,
+            Type = ScanType.Delete,
             RecognizedId = fp.PartNumber,
             ResultDescription = $"Einzelteil '{fp.PartName}' (BL:{fp.PartNumber}/{fp.ColorId}) x{fp.Quantity} geloescht",
-            WasUndone = false
+            WasUndone = false,
+            UndoData = System.Text.Json.JsonSerializer.Serialize(snapshot)
         });
 
         ctx.FloatingParts.Remove(fp);

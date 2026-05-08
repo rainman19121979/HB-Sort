@@ -122,8 +122,10 @@ public partial class App : Application
 
             // 6.55 Auto-Backup (UX X.29): wenn aktiviert + Intervall faellig,
             // im Hintergrund ein Backup erzeugen + alte aufraeumen. Fire-and-
-            // forget - blockiert NICHT den Startup.
-            _ = TryAutoBackupAsync();
+            // forget - blockiert NICHT den Startup. Task.Run-Wrapping wegen
+            // sync SQLite-BackupDatabase + ZIP-Pack auf ThreadPool statt
+            // UI-Thread (siehe Auto-BL-Import-Bug-Fix in MainViewModel).
+            _ = Task.Run(TryAutoBackupAsync);
 
             // 6.6 Cleanup: alte DISMANTLED-Figuren komplett loeschen (T2-Migration).
             // Frueher hat "Aufgeben" Status=Dismantled gesetzt; jetzt wird die Figur
@@ -278,6 +280,10 @@ public partial class App : Application
         // Pfad damit die Backups in %APPDATA%\HBSort\backups\ landen.
         services.AddSingleton<IBackupService>(_ => new BackupService(AppDataFolder));
 
+        // UX X.29 (v0.1.16): Undo-System. Liest ScanEvent-UndoData und
+        // macht Aktionen rueckgaengig. Singleton weil zustandslos.
+        services.AddSingleton<IUndoService, UndoService>();
+
         // Phase 5: PartLookup (Modus B)
         services.AddSingleton<IPartLookupService, PartLookupService>();
 
@@ -325,6 +331,9 @@ public partial class App : Application
         // Resources; Singleton, weil index.json einmal beim Start gelesen wird.
         services.AddSingleton<IHelpContentService, HelpContentService>();
         services.AddSingleton<ViewModels.HelpViewModel>();
+
+        // UX X.29 (v0.1.16): Verlauf-Tab.
+        services.AddSingleton<ViewModels.HistoryViewModel>();
 
         // UX-Iteration X.23: Velopack-Auto-Update via GitHub Releases.
         // Singleton weil der UpdateManager den letzten Check-Stand cached

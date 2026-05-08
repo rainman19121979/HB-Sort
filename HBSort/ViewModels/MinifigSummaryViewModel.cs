@@ -251,6 +251,24 @@ public partial class MinifigSummaryViewModel : ObservableObject
             bin.FreedAt = null;
         }
 
+        // UX X.29 (v0.1.16): Move-Snapshot fuer Undo erfassen + ScanEvent schreiben.
+        var oldBinId = m.StorageBinId;
+        var moveSnapshot = new HBSort.Core.Services.UndoSnapshotMove
+        {
+            MinifigId = m.Id,
+            OldStorageBinId = oldBinId,
+            NewStorageBinId = newBinId
+        };
+        ctx.ScanEvents.Add(new HBSort.Core.Models.ScanEvent
+        {
+            Timestamp = DateTime.UtcNow,
+            Type = HBSort.Core.Models.ScanType.Move,
+            RecognizedId = m.BricklinkId ?? m.FigNum,
+            ResultDescription = $"Figur '{m.Name}' verschoben in Fach '{bin.Label}'",
+            WasUndone = false,
+            UndoData = System.Text.Json.JsonSerializer.Serialize(moveSnapshot)
+        });
+
         m.StorageBinId = newBinId;
         await ctx.SaveChangesAsync();
         Log.Information("Minifigur '{Name}' (Id={Id}) in Fach {Bin} verschoben",
