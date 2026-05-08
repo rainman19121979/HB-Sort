@@ -295,22 +295,9 @@ public class StorageBinService : IStorageBinService
         return bins.Count;
     }
 
-    public async Task<int> CleanupStaleBinAssignmentsAsync(CancellationToken ct = default)
-    {
-        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
-        var stale = await ctx.TrackedMinifigs
-            .Where(m => m.StorageBinId != null
-                     && m.Status != TrackedMinifigStatus.Waiting)
-            .ToListAsync(ct);
-        foreach (var m in stale)
-            m.StorageBinId = null;
-        if (stale.Count > 0)
-        {
-            await ctx.SaveChangesAsync(ct);
-            Log.Information("Cleanup: {Count} nicht-wartende Figuren aus Faechern ab-gekoppelt", stale.Count);
-        }
-        return stale.Count;
-    }
+    // Bug A (UX X.28, 2026-05-08): CleanupStaleBinAssignmentsAsync ersatzlos entfernt.
+    // Pre-X.6-Altlast - hat StorageBinId von Complete/Sold-Figuren beim App-Start
+    // auf null gesetzt, widersprach UX-X.6-Konvention "Faecher bleiben belegt".
 
     public async Task<BinDetailData?> GetDetailAsync(int id, CancellationToken ct = default)
     {

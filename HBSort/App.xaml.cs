@@ -106,9 +106,10 @@ public partial class App : Application
             // 6. Backup der userdata.db beim Start anlegen
             BackupUserData();
 
-            // 6.5 Cleanup: Altdaten - nicht-wartende Figuren von Faechern loesen,
-            // damit BinManager-Zaehler und DeleteAsync konsistent bleiben.
-            await CleanupStaleBinAssignmentsAsync();
+            // 6.5 DataHeal (UX X.28): Bug-B-Folgen aus alten Versionen heilen.
+            // Bins die belegt sind aber FreedAt!=null haben werden korrigiert.
+            // Idempotent - mehrfaches Aufrufen ist safe.
+            await DataHealAsync();
 
             // 6.6 Cleanup: alte DISMANTLED-Figuren komplett loeschen (T2-Migration).
             // Frueher hat "Aufgeben" Status=Dismantled gesetzt; jetzt wird die Figur
@@ -256,6 +257,9 @@ public partial class App : Application
         services.AddSingleton<IStorageBinService, StorageBinService>();
         services.AddSingleton<IMinifigPersistenceService, MinifigPersistenceService>();
 
+        // UX X.28: Daten-Heal beim App-Start (Bug-B-Folgen automatisch korrigieren).
+        services.AddSingleton<IDataHealService, DataHealService>();
+
         // Phase 5: PartLookup (Modus B)
         services.AddSingleton<IPartLookupService, PartLookupService>();
 
@@ -338,25 +342,26 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Einmaliger Cleanup beim Start: Figuren die im Fach liegen, aber nicht
-    /// mehr WAITING sind, werden ab-gekoppelt (StorageBinId=null). Verhindert
-    /// Inkonsistenzen zwischen Anzeige (zaehlt nur belegte) und DeleteAsync
-    /// (blockt bei jeder Figur-Zuordnung).
+    /// UX X.28 (2026-05-08): Heilt Bug-B-Folgen aus alten Versionen.
+    /// Bins die belegt sind (mind. eine TrackedMinifig oder ein FloatingPart)
+    /// aber FreedAt!=null haben, werden auf belegt zurueckgesetzt.
+    /// Idempotent - mehrfaches Aufrufen ist safe.
     /// </summary>
-    private static async Task CleanupStaleBinAssignmentsAsync()
+    private static async Task DataHealAsync()
     {
         try
         {
-            var binService = Services.GetRequiredService<IStorageBinService>();
-            var detached = await binService.CleanupStaleBinAssignmentsAsync();
-            if (detached > 0)
+            var heal = Services.GetRequiredService<IDataHealService>();
+            var result = await heal.HealAsync();
+            if (result.ResetFreedAtCount > 0)
             {
-                Log.Information("Startup-Cleanup: {Count} Figuren aus Faechern geloest", detached);
+                Log.Information("DataHeal abgeschlossen: {Count} Bin-FreedAt-Inkonsistenzen korrigiert",
+                    result.ResetFreedAtCount);
             }
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "Startup-Cleanup geworfen");
+            Log.Warning(ex, "DataHeal geworfen");
         }
     }
 

@@ -51,13 +51,6 @@ public interface IStorageBinService
     Task<BinDetailData?> GetDetailAsync(int id, CancellationToken ct = default);
 
     /// <summary>
-    /// Aufraeum-Aktion fuer Altdaten: alle Figuren mit Status != Waiting werden vom
-    /// Fach geloest (StorageBinId=null). Wird einmalig beim App-Start aufgerufen.
-    /// Liefert die Anzahl ab-gekoppelter Figuren.
-    /// </summary>
-    Task<int> CleanupStaleBinAssignmentsAsync(CancellationToken ct = default);
-
-    /// <summary>
     /// Phase 7: Vorab-Berechnung fuer den BSX-Export-Cleanup. Liefert die Faecher
     /// die NACH dem Loeschen der uebergebenen Minifig-IDs UND/ODER FloatingPart-IDs
     /// leer waeren (FreedAt=null, keine wartenden Figuren ausser den uebergebenen,

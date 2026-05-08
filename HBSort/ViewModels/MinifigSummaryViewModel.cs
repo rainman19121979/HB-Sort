@@ -238,6 +238,19 @@ public partial class MinifigSummaryViewModel : ObservableObject
         await using var ctx = await _ctxFactory.CreateDbContextAsync();
         var m = await ctx.TrackedMinifigs.FirstOrDefaultAsync(x => x.Id == MinifigId);
         if (m == null) return false;
+
+        // Bug B Fix (UX X.28): wenn das Ziel-Fach als "frei" markiert war,
+        // jetzt wieder als belegt markieren.
+        var bin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == newBinId);
+        if (bin == null)
+            throw new InvalidOperationException($"Lagerfach {newBinId} existiert nicht.");
+        if (bin.FreedAt != null)
+        {
+            Log.Information("Fach '{Label}' war als frei markiert (seit {FreedAt}) - wird durch verschobene Figur wieder belegt",
+                bin.Label, bin.FreedAt);
+            bin.FreedAt = null;
+        }
+
         m.StorageBinId = newBinId;
         await ctx.SaveChangesAsync();
         Log.Information("Minifigur '{Name}' (Id={Id}) in Fach {Bin} verschoben",

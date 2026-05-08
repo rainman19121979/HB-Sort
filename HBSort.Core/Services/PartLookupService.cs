@@ -211,6 +211,14 @@ public class PartLookupService : IPartLookupService
         var bin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == storageBinId, ct)
             ?? throw new InvalidOperationException($"Lagerfach {storageBinId} existiert nicht.");
 
+        // Bug B Fix (UX X.28): wenn das Fach als "frei" markiert war, jetzt wieder als belegt markieren.
+        if (bin.FreedAt != null)
+        {
+            Log.Information("Fach '{Label}' war als frei markiert (seit {FreedAt}) - wird durch neues Einzelteil wieder belegt",
+                bin.Label, bin.FreedAt);
+            bin.FreedAt = null;
+        }
+
         // Existierender FloatingPart in selben Bin?
         var existing = await ctx.FloatingParts
             .FirstOrDefaultAsync(fp => fp.PartNumber == blPartNo
@@ -340,6 +348,14 @@ public class PartLookupService : IPartLookupService
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
         var bin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == storageBinId, ct)
             ?? throw new InvalidOperationException($"Lagerfach {storageBinId} existiert nicht.");
+
+        // Bug B Fix (UX X.28): wenn das Fach als "frei" markiert war, jetzt wieder als belegt markieren.
+        if (bin.FreedAt != null)
+        {
+            Log.Information("Fach '{Label}' war als frei markiert (seit {FreedAt}) - wird durch neue Figur wieder belegt",
+                bin.Label, bin.FreedAt);
+            bin.FreedAt = null;
+        }
 
         var minifig = new TrackedMinifig
         {

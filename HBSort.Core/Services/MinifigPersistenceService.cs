@@ -201,6 +201,22 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             // ===== Standard: FloatingPart-Pfad =====
             var binId = c.TargetBinId!.Value;
 
+            // Bug B Fix (UX X.28): wenn das Ziel-Fach als "frei" markiert war,
+            // jetzt wieder als belegt markieren. Bin existiert-Check inklusive.
+            var targetBin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == binId, ct);
+            if (targetBin == null)
+            {
+                Log.Warning("DismantleAsync: TargetBinId={BinId} nicht gefunden, Teil {Part} wird uebersprungen",
+                    binId, part.PartNumber);
+                continue;
+            }
+            if (targetBin.FreedAt != null)
+            {
+                Log.Information("Fach '{Label}' war als frei markiert (seit {FreedAt}) - wird durch Zerlege-Teil wieder belegt",
+                    targetBin.Label, targetBin.FreedAt);
+                targetBin.FreedAt = null;
+            }
+
             // Zusammenfuehren wenn schon vorhanden (Part+Color+Bin).
             var existing = await ctx.FloatingParts.FirstOrDefaultAsync(
                 fp => fp.PartNumber == part.PartNumber
@@ -458,6 +474,14 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         var bin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == input.StorageBinId, ct);
         if (bin == null)
             throw new InvalidOperationException($"Lagerfach {input.StorageBinId} existiert nicht.");
+
+        // Bug B Fix (UX X.28): wenn das Fach als "frei" markiert war, jetzt wieder als belegt markieren.
+        if (bin.FreedAt != null)
+        {
+            Log.Information("Fach '{Label}' war als frei markiert (seit {FreedAt}) - wird durch neue Figur wieder belegt",
+                bin.Label, bin.FreedAt);
+            bin.FreedAt = null;
+        }
 
         // 1) TrackedMinifig + RequiredParts anlegen
         var minifig = new TrackedMinifig

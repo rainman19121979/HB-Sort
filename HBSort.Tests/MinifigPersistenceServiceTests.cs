@@ -630,6 +630,208 @@ public class MinifigPersistenceServiceTests : IDisposable
             .FirstAsync();
     }
 
+    // ====================================================================
+    // UX X.28 Bug A (v0.1.15): wartende Figur darf StorageBinId NICHT
+    // verlieren wenn sie via UX-X.25-Direkt-Zuordnung komplett wird.
+    // Praxis-Befund 2026-05-08: cty0685 (Volcano Explorer) lag in Box 001
+    // (StorageBinId=1), wurde durch Zerlege-Direkt-Zuordnung komplett, war
+    // danach aber StorageBinId=null in der DB.
+    // ====================================================================
+
+    [Fact]
+    public async Task Dismantle_DirectAssign_PreservesWaitingMinifigStorageBin()
+    {
+        var binA = await SeedBinAsync("Box A"); // wartende Figur
+        var binB = await SeedBinAsync("Box B"); // Donor
+
+        // Wartende Figur die nur noch das Teil 3001/11 braucht (sonst komplett)
+        var waiting = await _sut.PersistAndStoreAsync(MakeInput(
+            "wait_bug_a", "WaitingFig-BugA", binA, new[] { ("3001", 11, 1) }));
+        var donor = await _sut.PersistAndStoreAsync(MakeInput(
+            "don_bug_a", "Donor-BugA", binB, new[] { ("3001", 11, 1) }));
+        var donorPartId = await GetFirstPartIdAsync(donor.SavedMinifig.Id);
+
+        int waitingPartId;
+        await using (var ctx = await _factory.CreateDbContextAsync())
+        {
+            waitingPartId = await ctx.TrackedMinifigParts
+                .Where(p => p.TrackedMinifigId == waiting.SavedMinifig.Id)
+                .Select(p => p.Id).SingleAsync();
+        }
+
+        // Act: Direkt-Zuordnung -> waiting wird komplett
+        await _sut.DismantleAsync(donor.SavedMinifig.Id, new[]
+        {
+            new DismantlePartChoice
+            {
+                TrackedMinifigPartId = donorPartId,
+                IsKept = true,
+                AssignToTrackedMinifigPartId = waitingPartId
+            }
+        });
+
+        // Assert: wartende Figur ist Complete UND behaelt StorageBinId=binA
+        await using var verify = await _factory.CreateDbContextAsync();
+        var w = await verify.TrackedMinifigs.SingleAsync(m => m.Id == waiting.SavedMinifig.Id);
+        Assert.Equal(TrackedMinifigStatus.Complete, w.Status);
+        Assert.NotNull(w.StorageBinId);
+        Assert.Equal(binA, w.StorageBinId);
+    }
+
+    [Fact]
+    public async Task Dismantle_DirectAssign_NotCompleting_PreservesStorageBin()
+    {
+        // Variante des Bug-A-Tests: Direkt-Zuordnung ohne Komplettierung.
+        // Wartende braucht 2x, hat 0 -> nach Zuordnung 1/2 (noch wartend).
+        // StorageBinId muss trotzdem erhalten bleiben.
+        var binA = await SeedBinAsync("Box A2");
+        var binB = await SeedBinAsync("Box B2");
+
+        var waiting = await _sut.PersistAndStoreAsync(MakeInput(
+            "wait_bug_a2", "WaitingFig-A2", binA, new[] { ("3001", 11, 2), ("9999", 0, 1) }));
+        var donor = await _sut.PersistAndStoreAsync(MakeInput(
+            "don_bug_a2", "Donor-A2", binB, new[] { ("3001", 11, 1) }));
+        var donorPartId = await GetFirstPartIdAsync(donor.SavedMinifig.Id);
+
+        int waitingPartId;
+        await using (var ctx = await _factory.CreateDbContextAsync())
+        {
+            waitingPartId = await ctx.TrackedMinifigParts
+                .Where(p => p.TrackedMinifigId == waiting.SavedMinifig.Id && p.PartNumber == "3001")
+                .Select(p => p.Id).SingleAsync();
+        }
+
+        await _sut.DismantleAsync(donor.SavedMinifig.Id, new[]
+        {
+            new DismantlePartChoice
+            {
+                TrackedMinifigPartId = donorPartId,
+                IsKept = true,
+                AssignToTrackedMinifigPartId = waitingPartId
+            }
+        });
+
+        await using var verify = await _factory.CreateDbContextAsync();
+        var w = await verify.TrackedMinifigs.SingleAsync(m => m.Id == waiting.SavedMinifig.Id);
+        Assert.Equal(TrackedMinifigStatus.Waiting, w.Status); // noch wartend
+        Assert.NotNull(w.StorageBinId);
+        Assert.Equal(binA, w.StorageBinId);
+    }
+
+    // ====================================================================
+    // UX X.28 Bug B (v0.1.15): StorageBin.FreedAt muss zurueckgesetzt werden
+    // wenn neue Items in einen freigegebenen Bin eingehen. Praxis-Befund:
+    // Box 001 hatte FreedAt=2026-05-04, am 8.5. wurden dort Minifigs
+    // angelegt, FreedAt blieb auf altem Wert -> Bin wirkt "frei" obwohl
+    // belegt.
+    // ====================================================================
+
+    [Fact]
+    public async Task PersistAndStore_into_freed_bin_clears_FreedAt()
+    {
+        var binId = await SeedBinAsync("Box freed");
+        // Bin als freigegeben markieren (simuliert vergangene Freigabe)
+        await using (var ctx = await _factory.CreateDbContextAsync())
+        {
+            var bin = await ctx.StorageBins.SingleAsync(b => b.Id == binId);
+            bin.FreedAt = DateTime.UtcNow.AddDays(-3);
+            await ctx.SaveChangesAsync();
+        }
+
+        // Act: neue Minifig im freigegebenen Bin anlegen
+        await _sut.PersistAndStoreAsync(MakeInput(
+            "freed_bug_b", "Reactivated", binId, new[] { ("3001", 11, 1) }));
+
+        // Assert: Bin ist nicht mehr "frei"
+        await using var verify = await _factory.CreateDbContextAsync();
+        var b2 = await verify.StorageBins.SingleAsync(b => b.Id == binId);
+        Assert.Null(b2.FreedAt);
+    }
+
+    [Fact]
+    public async Task Dismantle_floating_into_freed_bin_clears_FreedAt()
+    {
+        var donorBin = await SeedBinAsync("Box donor");
+        var floatBin = await SeedBinAsync("Box freed-float");
+
+        // floatBin als frei markieren
+        await using (var ctx = await _factory.CreateDbContextAsync())
+        {
+            var bin = await ctx.StorageBins.SingleAsync(b => b.Id == floatBin);
+            bin.FreedAt = DateTime.UtcNow.AddDays(-2);
+            await ctx.SaveChangesAsync();
+        }
+
+        var donor = await _sut.PersistAndStoreAsync(MakeInput(
+            "don_bug_b2", "DonorB2", donorBin, new[] { ("3001", 11, 1) }));
+        var donorPartId = await GetFirstPartIdAsync(donor.SavedMinifig.Id);
+
+        // Donor zerlegen und Teil als FloatingPart in den freigegebenen Bin legen
+        await _sut.DismantleAsync(donor.SavedMinifig.Id, new[]
+        {
+            new DismantlePartChoice
+            {
+                TrackedMinifigPartId = donorPartId,
+                IsKept = true,
+                TargetBinId = floatBin
+            }
+        });
+
+        await using var verify = await _factory.CreateDbContextAsync();
+        var b2 = await verify.StorageBins.SingleAsync(b => b.Id == floatBin);
+        Assert.Null(b2.FreedAt);
+    }
+
+    // ====================================================================
+    // UX X.28 Bug A (v0.1.15) Regression-Test:
+    // App-Start-Cleanup-Pfad darf StorageBinId von Complete-Minifigs NIEMALS
+    // antasten. Wenn eine zukuenftige Cleanup-Methode auf die alte Logik
+    // zurueckfaellt, faengt dieser Test sie ab.
+    // ====================================================================
+
+    [Fact]
+    public async Task AppStartCleanups_DoNotResetStorageBinIdOfCompleteMinifigs()
+    {
+        // Arrange: Bin + Complete Minifig mit StorageBinId.
+        // Damit die Figur sofort Complete wird, seeden wir alle benoetigten
+        // Teile als FloatingParts -> Reverse-Match konsumiert sie sofort.
+        var binId = await SeedBinAsync("TestBox");
+        var fpBinId = await SeedBinAsync("FloatingBox");
+        await SeedFloatingAsync(fpBinId, "3001", 11, qty: 1);
+        await SeedFloatingAsync(fpBinId, "3002", 11, qty: 1);
+
+        var input = MakeInput(
+            "test001", "Complete Test Fig", binId,
+            new[] { ("3001", 11, 1), ("3002", 11, 1) });
+        var result = await _sut.PersistAndStoreAsync(input);
+        var minifigId = result.SavedMinifig.Id;
+
+        // Sanity-Check: Figur ist jetzt Complete + hat StorageBinId
+        await using (var ctx = await _factory.CreateDbContextAsync())
+        {
+            var m = await ctx.TrackedMinifigs.SingleAsync(x => x.Id == minifigId);
+            Assert.Equal(TrackedMinifigStatus.Complete, m.Status);
+            Assert.Equal(binId, m.StorageBinId);
+        }
+
+        // Act: ALLE App-Start-Cleanup-Methoden simulieren
+        // (alle die in App.xaml.cs OnStartup nach DataHeal aufgerufen werden).
+        var dataHeal = new DataHealService(_factory);
+        await dataHeal.HealAsync();
+        await _sut.CleanupOldDismantledMinifigsAsync();
+        await _sut.CleanupOnePartCompletesAsync();
+
+        // Assert: Complete Minifig hat NACH allen Cleanups noch ihre StorageBinId
+        await using var verify = await _factory.CreateDbContextAsync();
+        var still = await verify.TrackedMinifigs.SingleAsync(x => x.Id == minifigId);
+        Assert.Equal(TrackedMinifigStatus.Complete, still.Status);
+        Assert.Equal(binId, still.StorageBinId);
+
+        // Bin darf nicht als "frei" markiert sein (DataHeal heilt das, falls noetig)
+        var bin = await verify.StorageBins.SingleAsync(b => b.Id == binId);
+        Assert.Null(bin.FreedAt);
+    }
+
     // ---- Helpers ----
 
     private async Task<int> SeedBinAsync(string label)
