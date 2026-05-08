@@ -28,9 +28,13 @@ Faecher haben einen Status:
 ### Faecher in einem Rutsch anlegen
 
 In den Einstellungen unter *Lagerfaecher* gibt es **Bulk anlegen**.
-Du kannst eine Serie wie "Box 001"-"Box 050" oder "Schale A"-"Schale Z"
+Du kannst eine Serie wie "Box001"-"Box050" oder "SchaleA"-"SchaleZ"
 auf einmal erzeugen. Bei Buchstaben wird nach Z auf AA, AB ...
 fortgesetzt.
+
+**Praefix-Format** (ab v0.1.14): Default ist `Box` (kein automatisches
+Leerzeichen am Ende). Wenn du das alte Format `Box 001` mit Leerzeichen
+willst, einfach `Box ` mit Leerzeichen am Ende ins Praefix-Feld tippen.
 
 ## Wartende vs. komplette Figuren
 

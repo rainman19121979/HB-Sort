@@ -69,6 +69,25 @@ Die schnellste Variante, um an Stammdaten zu kommen, ohne BL-API:
   Verbindung noetig, BL-Account nicht.
 - **Cache leeren / pruning** - bereinigt alte Eintraege > 90 Tage.
 
+### Automatischer Import (ab v0.1.15)
+
+Wenn aktiviert, prueft HB-Sort beim App-Start ob die BrickLink-Daten
+aelter als das gewaehlte Intervall sind und laed sie dann im
+Hintergrund neu. Default ist **AUS** - du musst es bewusst aktivieren.
+
+- **Letzter Import** - Zeitstempel des letzten erfolgreichen Imports
+  (manuell oder Auto), oder "noch nie".
+- **Automatisch im Hintergrund aktualisieren** - Toggle.
+- **Intervall** - Dropdown 7 / 14 / 30 / 90 Tage. Default 30.
+
+Beim erfolgreichen Auto-Import siehst du Toasts:
+- Vorher: *"BrickLink-Daten werden im Hintergrund aktualisiert..."*
+- Erfolg: *"BrickLink-Daten aktualisiert."*
+- Fehler: *"Auto-Import fehlgeschlagen - bitte manuell"* (du kannst
+  dann einfach "Von GitHub importieren" oben klicken).
+
+Manueller Import oben funktioniert immer unabhaengig vom Toggle.
+
 ## Bild-Cache
 
 - **Limit** in MB (Default 1024).

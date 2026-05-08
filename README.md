@@ -33,7 +33,10 @@ BrickStore- und BrickLink-Export.
   Tab-Wechsel, F1 = Hilfe, etc.).
 - **Integrierte Hilfe** (F1) mit Markdown-Inhalten.
 - **Theming** folgt dem Windows-System-Theme (hell/dunkel).
-- **Tray-Icon** mit Minimieren statt Schliessen.
+- **Auto-Update** ueber GitHub Releases (Settings → Updates) - nur bei
+  Setup-Installation, Portable-ZIP zeigt den Tab deaktiviert.
+- **Auto-BL-Import** (ab v0.1.15, optional) - aktualisiert die BrickLink-
+  Stammdaten alle 7/14/30/90 Tage im Hintergrund.
 
 ## Voraussetzungen
 
