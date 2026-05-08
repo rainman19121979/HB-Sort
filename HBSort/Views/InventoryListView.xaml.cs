@@ -19,6 +19,22 @@ public partial class InventoryListView : UserControl
     public InventoryListView()
     {
         InitializeComponent();
+
+        // UX X.28 (v0.1.15): Lagerliste laed automatisch bei jedem Tab-Wechsel.
+        // Vorher musste der User manuell "Aktualisieren" klicken.
+        // IsVisibleChanged statt Loaded: Loaded feuert nur einmal beim ersten
+        // Sichtbar-Werden, IsVisibleChanged bei jedem Visibility-Toggle. Das
+        // deckt MainTab-Wechsel ab (Visibility-Binding gegen IsMainTabInventory).
+        IsVisibleChanged += async (_, args) =>
+        {
+            if (args.NewValue is bool isVisible
+                && isVisible
+                && DataContext is InventoryListViewModel vm)
+            {
+                try { await vm.LoadAsync(); }
+                catch (System.Exception ex) { Log.Warning(ex, "InventoryListView Auto-Load fehlgeschlagen"); }
+            }
+        };
     }
 
     private static T Service<T>() where T : notnull => App.Services.GetRequiredService<T>();
