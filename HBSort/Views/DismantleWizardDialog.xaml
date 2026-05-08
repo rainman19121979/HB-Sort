@@ -49,63 +49,130 @@
                         <DataTemplate>
                             <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
                                     BorderThickness="0,0,0,1" Padding="8,6">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="200"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <!-- Hauptzeile: Checkbox + Bild + Swatch + Name + Default-Bin + Status -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="200"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
 
-                                    <CheckBox Grid.Column="0"
-                                              IsChecked="{Binding IsKept, Mode=TwoWay}"
-                                              VerticalAlignment="Center"
-                                              ToolTip="Markieren: Teil als Einzelteil uebernehmen. Unmarkiert: Teil verwerfen."/>
-                                    <Image Grid.Column="1" Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
-                                           Width="40" Height="40" Stretch="Uniform"
-                                           Margin="8,0,0,0"
-                                           b:ImageZoom.IsEnabled="True"/>
-                                    <Border Grid.Column="2" Width="16" Height="16"
-                                            Background="{Binding SwatchBrush}"
-                                            BorderBrush="Black" BorderThickness="1"
-                                            Margin="8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="3"
-                                               Text="{Binding DisplayLine}"
-                                               TextWrapping="Wrap"
-                                               VerticalAlignment="Center"
-                                               Margin="6,0">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding WasCollected}" Value="False">
-                                                        <Setter Property="Foreground" Value="Gray"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                    <StackPanel Grid.Column="4" VerticalAlignment="Center">
-                                        <ComboBox ItemsSource="{Binding DataContext.AvailableBins,
-                                                      RelativeSource={RelativeSource AncestorType=Window}}"
-                                                  SelectedItem="{Binding TargetBin, Mode=TwoWay}"
-                                                  DisplayMemberPath="Label"
-                                                  IsEnabled="{Binding IsKept}"/>
-                                        <TextBlock Text="{Binding SmartHint}"
-                                                   FontSize="10" FontStyle="Italic"
-                                                   Foreground="#2196F3"
-                                                   Margin="0,2,0,0"
-                                                   Visibility="{Binding HasSmartHint,
-                                                       Converter={StaticResource BoolToVisibility}}"/>
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="5"
-                                               Text="{Binding StatusLabel}"
-                                               VerticalAlignment="Center"
+                                        <CheckBox Grid.Column="0"
+                                                  IsChecked="{Binding IsKept, Mode=TwoWay}"
+                                                  VerticalAlignment="Center"
+                                                  ToolTip="Markieren: Teil als Einzelteil uebernehmen. Unmarkiert: Teil verwerfen."/>
+                                        <Image Grid.Column="1" Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
+                                               Width="40" Height="40" Stretch="Uniform"
                                                Margin="8,0,0,0"
-                                               FontStyle="Italic"
-                                               FontSize="11" Foreground="Gray"/>
-                                </Grid>
+                                               b:ImageZoom.IsEnabled="True"/>
+                                        <Border Grid.Column="2" Width="16" Height="16"
+                                                Background="{Binding SwatchBrush}"
+                                                BorderBrush="Black" BorderThickness="1"
+                                                Margin="8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="3"
+                                                   Text="{Binding DisplayLine}"
+                                                   TextWrapping="Wrap"
+                                                   VerticalAlignment="Center"
+                                                   Margin="6,0">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding WasCollected}" Value="False">
+                                                            <Setter Property="Foreground" Value="Gray"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <StackPanel Grid.Column="4" VerticalAlignment="Center">
+                                            <ComboBox ItemsSource="{Binding DataContext.AvailableBins,
+                                                          RelativeSource={RelativeSource AncestorType=Window}}"
+                                                      SelectedItem="{Binding TargetBin, Mode=TwoWay}"
+                                                      DisplayMemberPath="Label"
+                                                      IsEnabled="{Binding IsKept}"/>
+                                            <TextBlock Text="{Binding SmartHint}"
+                                                       FontSize="10" FontStyle="Italic"
+                                                       Foreground="#2196F3"
+                                                       Margin="0,2,0,0"
+                                                       Visibility="{Binding HasSmartHint,
+                                                           Converter={StaticResource BoolToVisibility}}"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="5"
+                                                   Text="{Binding StatusLabel}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="8,0,0,0"
+                                                   FontStyle="Italic"
+                                                   FontSize="11" Foreground="Gray"/>
+                                    </Grid>
+
+                                    <!-- UX X.25: Match-Sub-Zeile, nur sichtbar wenn HasMatches=true.
+                                         Zwei RadioButtons + (1 Match: Display) oder (N Matches: Dropdown). -->
+                                    <Grid Margin="36,4,0,2"
+                                          Visibility="{Binding HasMatches,
+                                              Converter={StaticResource BoolToVisibility}}"
+                                          IsEnabled="{Binding IsKept}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <RadioButton Grid.Column="0"
+                                                     Content="in Lager legen"
+                                                     GroupName="{Binding ModeGroupName}"
+                                                     IsChecked="{Binding IsPutInBinMode, Mode=OneWay}"
+                                                     Click="ModePutInBin_Click"
+                                                     VerticalAlignment="Center"
+                                                     Margin="0,0,12,0"
+                                                     FontSize="11"/>
+
+                                        <RadioButton Grid.Column="1"
+                                                     Content="zuordnen zu wartender Figur:"
+                                                     GroupName="{Binding ModeGroupName}"
+                                                     IsChecked="{Binding IsAssignToWaitingMode, Mode=OneWay}"
+                                                     Click="ModeAssignToWaiting_Click"
+                                                     VerticalAlignment="Center"
+                                                     Margin="0,0,8,0"
+                                                     FontSize="11"
+                                                     ToolTip="Statt in Lager: direkt einer wartenden Figur zuordnen die das Teil noch braucht."/>
+
+                                        <!-- 1 Match: Klartext-Anzeige -->
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding SingleMatchDisplay}"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource StatusInfoBrush}"
+                                                   Visibility="{Binding HasSingleMatch,
+                                                       Converter={StaticResource BoolToVisibility}}"/>
+
+                                        <!-- N Matches: Dropdown -->
+                                        <ComboBox Grid.Column="2"
+                                                  ItemsSource="{Binding WaitingMatches}"
+                                                  SelectedItem="{Binding SelectedMatch, Mode=TwoWay}"
+                                                  IsEnabled="{Binding IsAssignToWaitingMode}"
+                                                  FontSize="11"
+                                                  HorizontalAlignment="Stretch"
+                                                  Visibility="{Binding HasMultipleMatches,
+                                                      Converter={StaticResource BoolToVisibility}}">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock>
+                                                        <Run Text="{Binding MinifigName, Mode=OneWay}"/>
+                                                        <Run Text=" ("/>
+                                                        <Run Text="{Binding QuantityCollected, Mode=OneWay}"/>
+                                                        <Run Text="/"/>
+                                                        <Run Text="{Binding QuantityNeeded, Mode=OneWay}"/>
+                                                        <Run Text=")"/>
+                                                    </TextBlock>
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                    </Grid>
+                                </StackPanel>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
