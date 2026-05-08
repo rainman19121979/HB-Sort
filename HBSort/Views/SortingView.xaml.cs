@@ -6,7 +6,6 @@ using HBSort.Core.Services;
 using HBSort.Services;
 using HBSort.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
-using Serilog;
 
 namespace HBSort.Views;
 
@@ -46,8 +45,6 @@ public partial class SortingView : UserControl
 
     private void SortingView_Loaded(object sender, RoutedEventArgs e)
     {
-        Log.Information("[SPLITTER] SortingView_Loaded fired - scheduling ApplyRatios via Dispatcher");
-
         // UX-Iteration X.21 Teil 1 Fix (2026-05-05): WPF muss zuerst seinen
         // Default-Layout-Pass machen, sonst werden unsere RowDefinitions[i].
         // Height-Setzungen ueberschrieben (Praxis-Befund: ApplyRatios direkt
@@ -57,11 +54,7 @@ public partial class SortingView : UserControl
         // DispatcherPriority.Loaded laesst alle hoeher-priorisierten Layout-/
         // Render-Operationen vorher laufen, dann wirken unsere Star-Werte
         // ohne ueberschrieben zu werden.
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
-        {
-            Log.Information("[SPLITTER] ApplyRatios via Dispatcher invoked");
-            ApplySplitterRatios();
-        }));
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(ApplySplitterRatios));
     }
 
     /// <summary>Such-Fallback (in Phase 5+ implementiert).</summary>
@@ -102,100 +95,61 @@ public partial class SortingView : UserControl
     /// Save via Dispatcher (siehe X.22-Kommentar oben).
     /// </summary>
     private void VerticalSplitter1_DragCompleted(object sender, DragCompletedEventArgs e)
-    {
-        Log.Information("[SPLITTER] VerticalSplitter1_DragCompleted FIRED - scheduling Save via Dispatcher");
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(SaveColumnRatios));
-    }
+        => Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(SaveColumnRatios));
 
     /// <summary>Vertikaler Splitter zwischen Spalte 2 und 3.</summary>
     private void VerticalSplitter2_DragCompleted(object sender, DragCompletedEventArgs e)
-    {
-        Log.Information("[SPLITTER] VerticalSplitter2_DragCompleted FIRED - scheduling Save via Dispatcher");
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(SaveColumnRatios));
-    }
+        => Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(SaveColumnRatios));
 
     /// <summary>Horizontaler Splitter in Spalte 1 (Webcam / Brickognize).</summary>
     private void Col1HorizontalSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
-    {
-        Log.Information("[SPLITTER] Col1HorizontalSplitter_DragCompleted FIRED - scheduling Save via Dispatcher");
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        => Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
         {
-            var ratio = ComputeRowRatio(Col1TopRow, Col1BotRow, columnNumber: 1);
+            var ratio = ComputeRowRatio(Col1TopRow, Col1BotRow);
             if (ratio.HasValue)
             {
                 var settings = Service<ISettingsService>();
                 settings.Current.WindowState.Column1HorizontalSplitterRatio = ratio.Value;
-                Log.Information("[SPLITTER] SettingsSaveAsync invoked col=1 ratio={Ratio}", ratio.Value);
                 _ = settings.SaveAsync();
             }
-            else
-            {
-                Log.Information("[SPLITTER] Col1 ratio=null -> kein Save");
-            }
         }));
-    }
 
     /// <summary>Horizontaler Splitter in Spalte 2 (Detail / Tabs).</summary>
     private void Col2HorizontalSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
-    {
-        Log.Information("[SPLITTER] Col2HorizontalSplitter_DragCompleted FIRED - scheduling Save via Dispatcher");
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        => Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
         {
-            var ratio = ComputeRowRatio(Col2TopRow, Col2BotRow, columnNumber: 2);
+            var ratio = ComputeRowRatio(Col2TopRow, Col2BotRow);
             if (ratio.HasValue)
             {
                 var settings = Service<ISettingsService>();
                 settings.Current.WindowState.Column2HorizontalSplitterRatio = ratio.Value;
-                Log.Information("[SPLITTER] SettingsSaveAsync invoked col=2 ratio={Ratio}", ratio.Value);
                 _ = settings.SaveAsync();
             }
-            else
-            {
-                Log.Information("[SPLITTER] Col2 ratio=null -> kein Save");
-            }
         }));
-    }
 
     /// <summary>Horizontaler Splitter in Spalte 3 (BuildSuggestions / Preise).</summary>
     private void Col3HorizontalSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
-    {
-        Log.Information("[SPLITTER] Col3HorizontalSplitter_DragCompleted FIRED - scheduling Save via Dispatcher");
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        => Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
         {
-            var ratio = ComputeRowRatio(Col3TopRow, Col3BotRow, columnNumber: 3);
+            var ratio = ComputeRowRatio(Col3TopRow, Col3BotRow);
             if (ratio.HasValue)
             {
                 var settings = Service<ISettingsService>();
                 settings.Current.WindowState.Column3HorizontalSplitterRatio = ratio.Value;
-                Log.Information("[SPLITTER] SettingsSaveAsync invoked col=3 ratio={Ratio}", ratio.Value);
                 _ = settings.SaveAsync();
             }
-            else
-            {
-                Log.Information("[SPLITTER] Col3 ratio=null -> kein Save");
-            }
         }));
-    }
 
     /// <summary>
     /// Berechnet das Top/Bot-Verhaeltnis aus den Actual-Hoehen einer Subgrid-
     /// Row-Pair. Liefert null wenn die Werte noch nicht layouted sind.
     /// </summary>
-    private static double? ComputeRowRatio(RowDefinition top, RowDefinition bot, int columnNumber)
+    private static double? ComputeRowRatio(RowDefinition top, RowDefinition bot)
     {
         var sum = top.ActualHeight + bot.ActualHeight;
-        Log.Information("[SPLITTER] ComputeRowRatio Col={N} TopActual={Top} BotActual={Bot} Sum={Sum}",
-            columnNumber, top.ActualHeight, bot.ActualHeight, sum);
-        if (sum <= 0)
-        {
-            Log.Information("[SPLITTER] ComputeRowRatio Col={N} Sum<=0 -> returns null", columnNumber);
-            return null;
-        }
+        if (sum <= 0) return null;
         var ratio = top.ActualHeight / sum;
-        var clamped = Math.Clamp(ratio, MinRatio, MaxRatio);
-        Log.Information("[SPLITTER] ComputeRowRatio Col={N} RawRatio={Raw} Clamped={Clamp}",
-            columnNumber, ratio, clamped);
-        return clamped;
+        return Math.Clamp(ratio, MinRatio, MaxRatio);
     }
 
     /// <summary>
@@ -222,11 +176,6 @@ public partial class SortingView : UserControl
     private void ApplySplitterRatios()
     {
         var ws = Service<ISettingsService>().Current.WindowState;
-        Log.Information("[SPLITTER] ApplySplitterRatios start: vert1={V1} vert2={V2} h1={H1} h2={H2} h3={H3}",
-            ws.SplitterColumnRatio, ws.SplitterColumnRatio2,
-            ws.Column1HorizontalSplitterRatio,
-            ws.Column2HorizontalSplitterRatio,
-            ws.Column3HorizontalSplitterRatio);
 
         // --- Vertikale Splitter (Spalten-Breiten) ---
         var c1 = ClampOrDefault(ws.SplitterColumnRatio, 1.0 / 3.0);
