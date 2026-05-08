@@ -33,6 +33,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IBlPriceCacheService _priceCache;
     private readonly ITooltipsService _tooltips;
     private readonly IUpdateService _updateService;
+    private readonly IBackupService _backupService;
 
     /// <summary>Tab "Lagerfaecher" - eigenes ViewModel mit Liste + Commands.</summary>
     public BinManagerViewModel BinManager { get; }
@@ -286,6 +287,26 @@ public partial class SettingsViewModel : ObservableObject
         return Task.CompletedTask;
     }
 
+    // --- UX X.29 (v0.1.16): Backup-Tab ---
+
+    [ObservableProperty]
+    private bool _autoBackup;
+
+    [ObservableProperty]
+    private int _autoBackupIntervalDays;
+
+    [ObservableProperty]
+    private int _backupKeepCount;
+
+    [ObservableProperty]
+    private string _lastBackupDisplay = "noch nie";
+
+    /// <summary>Liste der vorhandenen Backups, neueste zuerst (fuer DataGrid).</summary>
+    public ObservableCollection<BackupRowViewModel> Backups { get; } = new();
+
+    [ObservableProperty]
+    private string _backupsSummary = string.Empty;
+
     /// <summary>UX X.26 (v0.1.13): True wenn ein Update verfuegbar ist.
     /// Steuert die Sichtbarkeit der "Jetzt updaten"-Box im Updates-Tab.</summary>
     [ObservableProperty]
@@ -315,7 +336,8 @@ public partial class SettingsViewModel : ObservableObject
         IDialogService dialogs,
         IBlPriceCacheService priceCache,
         ITooltipsService tooltips,
-        IUpdateService updateService)
+        IUpdateService updateService,
+        IBackupService backupService)
     {
         _settingsService = settingsService;
         _cameraService = cameraService;
@@ -330,6 +352,7 @@ public partial class SettingsViewModel : ObservableObject
         _tooltips = tooltips;
         _priceCache = priceCache;
         _updateService = updateService;
+        _backupService = backupService;
         BinManager = binManager;
 
         // Vorhandene BL-Tokens beim Oeffnen der Settings laden, damit der User
@@ -354,6 +377,9 @@ public partial class SettingsViewModel : ObservableObject
 
         // UX X.28 (v0.1.15): Auto-BL-Import-Anzeige initialisieren.
         _ = RefreshLastBlImportTextAsync();
+
+        // UX X.29 (v0.1.16): Backup-Liste laden + Letztes-Backup-Anzeige.
+        _ = RefreshBackupsAsync();
 
         // UX#12: Preis-Cache-Eintraege initial laden.
         _ = RefreshPriceCacheCountAsync();
@@ -403,6 +429,13 @@ public partial class SettingsViewModel : ObservableObject
         AutoBlImportIntervalDays = AutoBlImportIntervalOptions.Contains(s.AutoBlImportIntervalDays)
             ? s.AutoBlImportIntervalDays
             : 30;
+
+        // UX X.29: Backup-Settings
+        AutoBackup = s.AutoBackup;
+        // Erlaubte Werte fuer Intervall: 1/7/30. Andere Werte fallen auf 1.
+        AutoBackupIntervalDays = (s.AutoBackupIntervalDays == 7 || s.AutoBackupIntervalDays == 30)
+            ? s.AutoBackupIntervalDays : 1;
+        BackupKeepCount = s.BackupKeepCount > 0 ? s.BackupKeepCount : 7;
         PreferBricklinkImages = s.ImageCache.PreferBricklinkImages;
         PreloadOnMinifigScan = s.ImageCache.PreloadOnMinifigScan;
         ImageCacheLimitMb = s.ImageCache.LimitMb;
@@ -445,6 +478,11 @@ public partial class SettingsViewModel : ObservableObject
         s.AutoCheckForUpdates = AutoCheckForUpdates;
         s.AutoBlImport = AutoBlImport;
         s.AutoBlImportIntervalDays = AutoBlImportIntervalDays;
+
+        // UX X.29: Backup-Settings
+        s.AutoBackup = AutoBackup;
+        s.AutoBackupIntervalDays = AutoBackupIntervalDays > 0 ? AutoBackupIntervalDays : 1;
+        s.BackupKeepCount = Math.Max(1, BackupKeepCount);
         s.ImageCache.PreferBricklinkImages = PreferBricklinkImages;
         s.ImageCache.PreloadOnMinifigScan = PreloadOnMinifigScan;
         s.ImageCache.LimitMb = ImageCacheLimitMb;
@@ -1107,4 +1145,118 @@ public partial class SettingsViewModel : ObservableObject
         }
     }
 
+    // ====================================================================
+    // UX X.29 (v0.1.16): Backup-System
+    // ====================================================================
+
+    /// <summary>Aktualisiert die Backup-Liste + Letztes-Backup-Anzeige.</summary>
+    public async Task RefreshBackupsAsync()
+    {
+        try
+        {
+            var last = _settingsService.Current.LastBackup;
+            LastBackupDisplay = last is null
+                ? "noch nie"
+                : last.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm");
+
+            var list = await _backupService.ListBackupsAsync();
+            Backups.Clear();
+            long totalSize = 0;
+            foreach (var b in list)
+            {
+                Backups.Add(new BackupRowViewModel(b));
+                totalSize += b.SizeBytes;
+            }
+            BackupsSummary = list.Count == 0
+                ? "Keine Backups vorhanden."
+                : $"{list.Count} Backup(s), gesamt {FormatSize(totalSize)}";
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "RefreshBackupsAsync fehlgeschlagen");
+            BackupsSummary = "Fehler beim Laden der Backup-Liste.";
+        }
+    }
+
+    /// <summary>Erzeugt ein Backup auf User-Klick. Liefert Statusmeldung fuer die UI.</summary>
+    public async Task<string> CreateBackupNowAsync()
+    {
+        try
+        {
+            var result = await _backupService.CreateBackupAsync();
+            _settingsService.Current.LastBackup = result.CreatedAt;
+            await _settingsService.SaveAsync();
+            await _backupService.CleanupOldBackupsAsync(_settingsService.Current.BackupKeepCount);
+            await RefreshBackupsAsync();
+            return $"Backup erstellt: {result.FileName} ({FormatSize(result.SizeBytes)})";
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "CreateBackupNow fehlgeschlagen");
+            return "Backup fehlgeschlagen: " + ex.Message;
+        }
+    }
+
+    /// <summary>Stellt ein Backup wieder her. Mit Pre-Restore-Backup im Service.</summary>
+    public async Task<bool> RestoreBackupAsync(string fileName)
+    {
+        try
+        {
+            var ok = await _backupService.RestoreBackupAsync(fileName);
+            await RefreshBackupsAsync();
+            return ok;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "RestoreBackup fehlgeschlagen");
+            return false;
+        }
+    }
+
+    /// <summary>Loescht ein einzelnes Backup.</summary>
+    public async Task<bool> DeleteBackupAsync(string fileName)
+    {
+        try
+        {
+            var ok = await _backupService.DeleteBackupAsync(fileName);
+            await RefreshBackupsAsync();
+            return ok;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "DeleteBackup fehlgeschlagen");
+            return false;
+        }
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024.0).ToString("F1") + " KB";
+        return (bytes / (1024.0 * 1024.0)).ToString("F2") + " MB";
+    }
+
+}
+
+/// <summary>
+/// UX X.29 (v0.1.16): eine Zeile in der Backup-DataGrid.
+/// </summary>
+public class BackupRowViewModel
+{
+    public string FileName { get; }
+    public long SizeBytes { get; }
+    public DateTime CreatedAt { get; }
+    public string CreatedAtDisplay { get; }
+    public string SizeDisplay { get; }
+
+    public BackupRowViewModel(BackupInfo info)
+    {
+        FileName = info.FileName;
+        SizeBytes = info.SizeBytes;
+        CreatedAt = info.CreatedAt;
+        CreatedAtDisplay = info.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss");
+        SizeDisplay = info.SizeBytes < 1024 * 1024
+            ? (info.SizeBytes / 1024.0).ToString("F1") + " KB"
+            : (info.SizeBytes / (1024.0 * 1024.0)).ToString("F2") + " MB";
+    }
 }

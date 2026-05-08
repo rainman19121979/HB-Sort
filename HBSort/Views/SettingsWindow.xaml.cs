@@ -390,4 +390,96 @@ public partial class SettingsWindow : Window
             _viewModel.IsImporting = false;
         }
     }
+
+    // ====================================================================
+    // UX X.29 (v0.1.16): Backup-Tab Click-Handler
+    // ====================================================================
+
+    private async void CreateBackupNow_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button b) return;
+        var oldText = BackupStatusText.Text;
+        try
+        {
+            b.IsEnabled = false;
+            BackupStatusText.Text = "Backup laeuft...";
+            var status = await _viewModel.CreateBackupNowAsync();
+            BackupStatusText.Text = status;
+        }
+        finally
+        {
+            b.IsEnabled = true;
+        }
+    }
+
+    private async void RestoreBackup_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button b || b.Tag is not BackupRowViewModel row) return;
+        if (!b.IsEnabled) return;
+        b.IsEnabled = false;
+
+        try
+        {
+            var dialogs = App.Services.GetRequiredService<IDialogService>();
+            var ok = await dialogs.ShowQuestionAsync(
+                "Backup wiederherstellen?",
+                $"Aktuelle Daten werden mit dem Backup vom " +
+                $"{row.CreatedAtDisplay} ueberschrieben.\n\n" +
+                $"Vor dem Wiederherstellen wird automatisch ein Pre-Restore-Backup " +
+                $"deines aktuellen Standes angelegt.\n\n" +
+                $"Nach dem Wiederherstellen muss die App neu gestartet werden, " +
+                $"damit die Aenderungen wirksam werden.\n\n" +
+                $"Wirklich wiederherstellen?");
+            if (!ok) return;
+
+            var success = await _viewModel.RestoreBackupAsync(row.FileName);
+            var notif = App.Services.GetRequiredService<INotificationService>();
+            if (success)
+            {
+                BackupStatusText.Text = $"Wiederhergestellt aus '{row.FileName}'. Bitte App neu starten.";
+                await dialogs.ShowInfoAsync(
+                    "Wiederherstellung erfolgreich",
+                    "Bitte beende die App jetzt und starte sie neu, " +
+                    "damit die wiederhergestellten Daten geladen werden.");
+            }
+            else
+            {
+                BackupStatusText.Text = "Wiederherstellung fehlgeschlagen.";
+                await dialogs.ShowErrorAsync(
+                    "Fehler",
+                    "Das Backup konnte nicht wiederhergestellt werden. " +
+                    "Pruefe die Logs fuer Details.");
+            }
+        }
+        finally
+        {
+            b.IsEnabled = true;
+        }
+    }
+
+    private async void DeleteBackup_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button b || b.Tag is not BackupRowViewModel row) return;
+        if (!b.IsEnabled) return;
+        b.IsEnabled = false;
+
+        try
+        {
+            var dialogs = App.Services.GetRequiredService<IDialogService>();
+            var ok = await dialogs.ShowQuestionAsync(
+                "Backup loeschen?",
+                $"Backup '{row.FileName}' dauerhaft loeschen?\n\n" +
+                $"Diese Aktion kann nicht rueckgaengig gemacht werden.");
+            if (!ok) return;
+
+            var success = await _viewModel.DeleteBackupAsync(row.FileName);
+            BackupStatusText.Text = success
+                ? $"'{row.FileName}' geloescht."
+                : "Loeschen fehlgeschlagen.";
+        }
+        finally
+        {
+            b.IsEnabled = true;
+        }
+    }
 }

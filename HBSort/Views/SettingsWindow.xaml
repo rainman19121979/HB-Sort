@@ -1212,6 +1212,149 @@
             </TabItem>
 
             <!-- ====================================== -->
+            <!-- TAB: BACKUPS (UX X.29 / v0.1.16) -->
+            <!-- Manuelles + automatisches Backup von userdata.db, bl_cache.db
+                 und settings.json. Liste der vorhandenen Backups mit
+                 Wiederherstellen-/Loeschen-Buttons. -->
+            <!-- ====================================== -->
+            <TabItem Header="Backups">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                    <StackPanel MaxWidth="700">
+
+                        <TextBlock Text="Backups"
+                                   FontSize="18" FontWeight="SemiBold"
+                                   Margin="0,0,0,8"/>
+                        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Gray"
+                                   Margin="0,0,0,16">
+                            Backups enthalten deine Lagerfaecher-Daten, den BL-Cache und
+                            deine Einstellungen. Sie liegen als ZIP unter
+                            %APPDATA%\HBSort\backups\.
+                        </TextBlock>
+
+                        <!-- Sektion: Automatisches Backup -->
+                        <TextBlock Text="Automatisches Backup"
+                                   FontSize="14" FontWeight="SemiBold"
+                                   Margin="0,8,0,8"/>
+                        <CheckBox Content="Automatisch beim App-Start"
+                                  IsChecked="{Binding AutoBackup, Mode=TwoWay}"
+                                  Margin="0,0,0,8"
+                                  ToolTip="Erstellt beim App-Start ein Backup, wenn das letzte Backup laenger als das Intervall her ist."/>
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Intervall:"
+                                       VerticalAlignment="Center"/>
+                            <ComboBox Grid.Column="1"
+                                      SelectedValuePath="Tag"
+                                      SelectedValue="{Binding AutoBackupIntervalDays, Mode=TwoWay}"
+                                      Width="200" HorizontalAlignment="Left"
+                                      IsEnabled="{Binding AutoBackup}">
+                                <ComboBoxItem Content="Taeglich" Tag="1"/>
+                                <ComboBoxItem Content="Woechentlich" Tag="7"/>
+                                <ComboBoxItem Content="Monatlich" Tag="30"/>
+                            </ComboBox>
+                        </Grid>
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Anzahl behaltener Backups:"
+                                       VerticalAlignment="Center"/>
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding BackupKeepCount, Mode=TwoWay}"
+                                     Width="80" HorizontalAlignment="Left"
+                                     ToolTip="Aelteste Backups werden geloescht wenn diese Zahl ueberschritten ist (min. 1)."/>
+                        </Grid>
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Letztes Backup:"
+                                       VerticalAlignment="Center" Foreground="Gray"/>
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding LastBackupDisplay}"
+                                       VerticalAlignment="Center" FontStyle="Italic"/>
+                        </Grid>
+
+                        <Separator Margin="0,4,0,12"/>
+
+                        <!-- Sektion: Manuelles Backup -->
+                        <TextBlock Text="Manuelles Backup"
+                                   FontSize="14" FontWeight="SemiBold"
+                                   Margin="0,0,0,8"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <Button Content="Backup jetzt erstellen"
+                                    Click="CreateBackupNow_Click"
+                                    Padding="12,4"
+                                    Style="{StaticResource AccentButtonStyle}"/>
+                            <TextBlock x:Name="BackupStatusText"
+                                       VerticalAlignment="Center"
+                                       Margin="12,0,0,0"
+                                       Foreground="Gray"/>
+                        </StackPanel>
+
+                        <Separator Margin="0,12,0,12"/>
+
+                        <!-- Sektion: Vorhandene Backups -->
+                        <TextBlock Text="Vorhandene Backups"
+                                   FontSize="14" FontWeight="SemiBold"
+                                   Margin="0,0,0,8"/>
+                        <DataGrid x:Name="BackupListGrid"
+                                  ItemsSource="{Binding Backups}"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  IsReadOnly="True"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal"
+                                  AlternatingRowBackground="#F8F8F8"
+                                  Height="220"
+                                  Margin="0,0,0,8">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Datum/Uhrzeit"
+                                                    Binding="{Binding CreatedAtDisplay}"
+                                                    Width="180"/>
+                                <DataGridTextColumn Header="Groesse"
+                                                    Binding="{Binding SizeDisplay}"
+                                                    Width="100"/>
+                                <DataGridTextColumn Header="Datei"
+                                                    Binding="{Binding FileName}"
+                                                    Width="*"
+                                                    FontFamily="Consolas"/>
+                                <DataGridTemplateColumn Header="Aktionen" Width="200">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Button Content="Wiederherstellen"
+                                                        Click="RestoreBackup_Click"
+                                                        Tag="{Binding}"
+                                                        Padding="6,2" Margin="0,0,4,0"
+                                                        ToolTip="Aktuelle Daten werden ueberschrieben (mit Bestaetigung)."/>
+                                                <Button Content="Loeschen"
+                                                        Click="DeleteBackup_Click"
+                                                        Tag="{Binding}"
+                                                        Padding="6,2"
+                                                        Background="#D32F2F" Foreground="White"
+                                                        ToolTip="Backup-Datei dauerhaft loeschen."/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <TextBlock Text="{Binding BackupsSummary}"
+                                   FontSize="11" Foreground="Gray"
+                                   Margin="0,0,0,8"/>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ====================================== -->
             <!-- TAB: UPDATES (Auto-Update Konfiguration) -->
             <!-- UX-Iteration X.23: Velopack-basierter Auto-Update-Mechanismus.
                  Toggle, manueller Check-Button, Status-Anzeige. -->

@@ -111,6 +111,11 @@ public partial class App : Application
             // Idempotent - mehrfaches Aufrufen ist safe.
             await DataHealAsync();
 
+            // 6.55 Auto-Backup (UX X.29): wenn aktiviert + Intervall faellig,
+            // im Hintergrund ein Backup erzeugen + alte aufraeumen. Fire-and-
+            // forget - blockiert NICHT den Startup.
+            _ = TryAutoBackupAsync();
+
             // 6.6 Cleanup: alte DISMANTLED-Figuren komplett loeschen (T2-Migration).
             // Frueher hat "Aufgeben" Status=Dismantled gesetzt; jetzt wird die Figur
             // direkt geloescht. Wir raeumen Altbestaende beim Start auf.
@@ -260,6 +265,10 @@ public partial class App : Application
         // UX X.28: Daten-Heal beim App-Start (Bug-B-Folgen automatisch korrigieren).
         services.AddSingleton<IDataHealService, DataHealService>();
 
+        // UX X.29 (v0.1.16): Backup-System. Konstruktor braucht den AppData-
+        // Pfad damit die Backups in %APPDATA%\HBSort\backups\ landen.
+        services.AddSingleton<IBackupService>(_ => new BackupService(AppDataFolder));
+
         // Phase 5: PartLookup (Modus B)
         services.AddSingleton<IPartLookupService, PartLookupService>();
 
@@ -339,6 +348,43 @@ public partial class App : Application
         var context = scope.ServiceProvider.GetRequiredService<UserDataContext>();
         await context.Database.MigrateAsync();
         Log.Information("Datenbank userdata.db bereit");
+    }
+
+    /// <summary>
+    /// UX X.29 (v0.1.16): Auto-Backup beim App-Start. Wenn die Setting
+    /// aktiviert ist und das letzte Backup laenger als das Intervall her
+    /// ist, wird im Hintergrund ein neues Backup erzeugt + alte aufgeraeumt.
+    /// Fire-and-forget - Fehler werden nur geloggt, App-Start blockiert nicht.
+    /// </summary>
+    private static async Task TryAutoBackupAsync()
+    {
+        try
+        {
+            var settings = Services.GetRequiredService<ISettingsService>();
+            if (!settings.Current.AutoBackup) return;
+
+            var lastBackup = settings.Current.LastBackup;
+            var intervalDays = Math.Max(1, settings.Current.AutoBackupIntervalDays);
+            if (lastBackup.HasValue
+                && (DateTime.UtcNow - lastBackup.Value).TotalDays < intervalDays)
+            {
+                Log.Debug("Auto-Backup: Intervall noch nicht erreicht, ueberspringen");
+                return;
+            }
+
+            var backup = Services.GetRequiredService<IBackupService>();
+            var result = await backup.CreateBackupAsync();
+            settings.Current.LastBackup = result.CreatedAt;
+            await settings.SaveAsync();
+            Log.Information("Auto-Backup erzeugt: {File} ({Size} Bytes)",
+                result.FileName, result.SizeBytes);
+
+            await backup.CleanupOldBackupsAsync(settings.Current.BackupKeepCount);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Auto-Backup fehlgeschlagen");
+        }
     }
 
     /// <summary>

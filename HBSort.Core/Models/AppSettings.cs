@@ -138,6 +138,35 @@ public class AppSettings
     /// Null = noch nie. UTC.
     /// </summary>
     public DateTime? LastBlImport { get; set; }
+
+    // ====================================================================
+    // UX X.29 (v0.1.16): Backup-System (Block A)
+    // ====================================================================
+
+    /// <summary>
+    /// Wenn true: beim App-Start wird ein automatisches Backup erzeugt, sofern
+    /// das letzte Backup laenger als AutoBackupIntervalDays her ist. Default
+    /// true - Sicherheitsnetz fuer neue Installationen.
+    /// </summary>
+    public bool AutoBackup { get; set; } = true;
+
+    /// <summary>
+    /// Intervall in Tagen zwischen automatischen Backups. Default 1 = taeglich.
+    /// UI bietet Dropdown 1/7/30 Tage (Taeglich/Woechentlich/Monatlich).
+    /// </summary>
+    public int AutoBackupIntervalDays { get; set; } = 1;
+
+    /// <summary>
+    /// Wieviele Backups maximal aufgehoben werden - aelteste werden beim
+    /// Cleanup geloescht. Default 7.
+    /// </summary>
+    public int BackupKeepCount { get; set; } = 7;
+
+    /// <summary>
+    /// Zeitstempel des letzten erfolgreichen Backups (manuell oder Auto).
+    /// Null = noch nie. UTC.
+    /// </summary>
+    public DateTime? LastBackup { get; set; }
 }
 
 /// <summary>
