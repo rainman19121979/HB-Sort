@@ -32,6 +32,7 @@ public partial class BsxExportDialog : Window
     private readonly ISettingsService _settings;
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
     private readonly IBlCatalogService _catalog;
+    private readonly IPartImageProvider _imgProvider;
 
     private List<int> _minifigIds = new();
     private List<int> _floatingIds = new();
@@ -45,7 +46,8 @@ public partial class BsxExportDialog : Window
         INotificationService notifications,
         ISettingsService settings,
         IDbContextFactory<UserDataContext> ctxFactory,
-        IBlCatalogService catalog)
+        IBlCatalogService catalog,
+        IPartImageProvider imgProvider)
     {
         InitializeComponent();
         _exporter = exporter;
@@ -55,6 +57,7 @@ public partial class BsxExportDialog : Window
         _settings = settings;
         _ctxFactory = ctxFactory;
         _catalog = catalog;
+        _imgProvider = imgProvider;
     }
 
     /// <summary>
@@ -118,21 +121,40 @@ public partial class BsxExportDialog : Window
             }).ToList();
 
             // Floating-Liste fuellen.
-            FloatingList.ItemsSource = orderedFloats.Select(fp =>
+            // UX X.28 (v0.1.15): Einzelteile zeigen jetzt auch Thumbnails (vorher
+            // war ImageUrl=null als Performance-Entscheidung). Cache-Hit ist
+            // schnell; bei Cache-Miss laed der Provider best-effort und liefert
+            // im Worst-Case einen leeren Pfad zurueck (Image-Element bleibt
+            // dann unsichtbar via NullToImageSource-Converter).
+            var floatingRows = new List<FloatingExportRow>();
+            foreach (var fp in orderedFloats)
             {
                 colorMap.TryGetValue(fp.ColorId, out var color);
                 var colorName = color?.Name ?? fp.ColorName;
                 if (string.IsNullOrWhiteSpace(colorName)) colorName = $"Color {fp.ColorId}";
-                return new FloatingExportRow
+
+                string? imageUrl = null;
+                try
+                {
+                    imageUrl = await _imgProvider.GetImageFileByBlAsync("P", fp.PartNumber, fp.ColorId);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "BSX-Export: Bild fuer FloatingPart {Part}/{Color} konnte nicht geladen werden",
+                        fp.PartNumber, fp.ColorId);
+                }
+
+                floatingRows.Add(new FloatingExportRow
                 {
                     Name = fp.PartName,
                     BricklinkId = fp.PartNumber,
                     ColorLabel = $"{colorName} (BL:{fp.ColorId})",
                     Quantity = fp.Quantity,
                     BinLabel = fp.StorageBin?.Label ?? "(kein Fach)",
-                    ImageUrl = null   // Bild-Lookup hier weggelassen, kein Service-Call noetig
-                };
-            }).ToList();
+                    ImageUrl = string.IsNullOrWhiteSpace(imageUrl) ? null : imageUrl
+                });
+            }
+            FloatingList.ItemsSource = floatingRows;
 
             // Sektion-Header mit Counts. Leere Sektion wird komplett ausgeblendet.
             MinifigSectionTitle.Text = $"Komplette Figuren ({orderedMinifigs.Count})";

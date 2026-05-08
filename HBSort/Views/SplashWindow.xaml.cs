@@ -24,13 +24,26 @@ public partial class SplashWindow : Window
     }
 
     /// <summary>
-    /// Liefert die Version aus dem aktuellen Assembly im Format "Major.Minor.Patch".
-    /// Fallback "0.0.0" wenn die Assembly keine Version hat (sollte nicht passieren,
-    /// aber defensiv).
+    /// UX X.28 (v0.1.15): bevorzugt InformationalVersion damit ein "-dev"-
+    /// Suffix fuer lokale Builds sichtbar wird. Im Tag-Release setzt die
+    /// Pipeline -p:InformationalVersion=X.Y.Z (ohne Suffix), bei lokalem
+    /// Visual-Studio-Build bleibt "0.1.15-dev" aus der csproj.
+    /// Fallback auf AssemblyVersion (Major.Minor.Patch) wenn
+    /// InformationalVersion leer ist.
     /// </summary>
     private static string GetVersionString()
     {
-        var version = Assembly.GetExecutingAssembly().GetName().Version;
+        var asm = Assembly.GetExecutingAssembly();
+        var informational = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (!string.IsNullOrWhiteSpace(informational))
+        {
+            // GitVersion-/MSBuild-Suffixe wie "+abc1234"-Commit-Hash abschneiden,
+            // damit der Splash nicht ueberlaeuft. "-dev"-Suffix bleibt erhalten.
+            var plusIdx = informational.IndexOf('+');
+            return plusIdx > 0 ? informational[..plusIdx] : informational;
+        }
+
+        var version = asm.GetName().Version;
         if (version is null) return "0.0.0";
         return $"{version.Major}.{version.Minor}.{version.Build}";
     }

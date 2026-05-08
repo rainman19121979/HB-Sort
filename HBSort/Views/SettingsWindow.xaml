@@ -635,6 +635,52 @@
                             </StackPanel>
                         </Expander>
 
+                        <!-- UX X.28 (v0.1.15): Auto-BL-Import. Default AUS - User
+                             muss explizit aktivieren. Beim App-Start wird dann
+                             alle X Tage im Hintergrund neu importiert. -->
+                        <Separator Margin="0,16,0,8"/>
+
+                        <TextBlock Text="Automatischer Import"
+                                   FontSize="14" FontWeight="SemiBold"
+                                   Margin="0,0,0,4"/>
+
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray"
+                                   FontSize="11" Margin="0,0,0,8">
+                            Wenn aktiviert, prueft HB-Sort beim App-Start ob die
+                            BrickLink-Daten aelter als das Intervall sind und
+                            laed sie dann im Hintergrund neu. Manueller Import
+                            oben funktioniert immer unabhaengig davon.
+                        </TextBlock>
+
+                        <TextBlock FontSize="11" Foreground="Gray" Margin="0,0,0,4">
+                            <Run Text="Letzter Import: "/>
+                            <Run Text="{Binding LastBlImportText, Mode=OneWay}"/>
+                        </TextBlock>
+
+                        <CheckBox Content="Automatisch im Hintergrund aktualisieren"
+                                  IsChecked="{Binding AutoBlImport}"
+                                  Margin="0,4,0,8"
+                                  ToolTip="Aktualisiert die BrickLink-Stammdaten regelmaessig im Hintergrund."/>
+
+                        <StackPanel Orientation="Horizontal"
+                                    IsEnabled="{Binding AutoBlImport}"
+                                    Margin="24,0,0,8">
+                            <TextBlock Text="Intervall:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <ComboBox ItemsSource="{Binding AutoBlImportIntervalOptions}"
+                                      SelectedItem="{Binding AutoBlImportIntervalDays}"
+                                      Width="80"
+                                      ToolTip="Wie oft die BrickLink-Daten automatisch neu geladen werden (in Tagen).">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock>
+                                            <Run Text="{Binding Mode=OneWay}"/>
+                                            <Run Text=" Tage"/>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+
                         <StackPanel Margin="0,16,0,0"
                                     Visibility="{Binding IsImporting, Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="{Binding ImportStatus}"

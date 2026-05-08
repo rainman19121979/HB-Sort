@@ -3,6 +3,8 @@ using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using HBSort.Core.Helpers;
+using HBSort.Core.Models;
 using HBSort.Core.Models.Bricklink;
 using HBSort.Core.Services;
 using HBSort.Services;
@@ -17,14 +19,17 @@ namespace HBSort.ViewModels;
 /// Der Toast-Container (NotificationService.ActiveToasts) wird hier ueber
 /// die Property ActiveToasts an das XAML weitergereicht.
 /// </summary>
-public partial class MainViewModel : ObservableObject
+public partial class MainViewModel : ObservableObject, IDisposable
 {
+    private bool _disposed;
+
     private readonly ISettingsService _settingsService;
     private readonly IBrickognizeClient _brickognizeClient;
     private readonly NotificationService _notificationService;
     private readonly IPersistentImageCache _imageCache;
     private readonly IBricklinkRateLimiter _rateLimiter;
     private readonly IUpdateService _updateService;
+    private readonly IBlBulkImportService _blBulkImport;
 
     // 60s-Timer fuer Status-Refresh damit die Anzeige aktuell bleibt auch ohne neue Calls
     // (Eintraege fallen aus dem rolling 24h-Window).
@@ -137,7 +142,8 @@ public partial class MainViewModel : ObservableObject
         WaitingDetailViewModel waitingDetail,
         RecentScansViewModel recentScans,
         HelpViewModel help,
-        IUpdateService updateService)
+        IUpdateService updateService,
+        IBlBulkImportService blBulkImport)
     {
         _settingsService = settingsService;
         ScanViewModel = scanViewModel;
@@ -154,6 +160,7 @@ public partial class MainViewModel : ObservableObject
         _imageCache = imageCache;
         _rateLimiter = rateLimiter;
         _updateService = updateService;
+        _blBulkImport = blBulkImport;
 
         // Letzten Tab-Index (variables Feld unten rechts) aus den Settings laden.
         // Default 0 (Live-Stats). Direkt auf das Backing-Field, damit der
@@ -200,6 +207,15 @@ public partial class MainViewModel : ObservableObject
         {
             _ = CheckForUpdatesInBackgroundAsync();
         }
+
+        // UX X.28 (v0.1.15): Auto-BL-Import beim Start, falls aktiviert und
+        // Intervall ueberschritten. Default ist AutoBlImport=false - User muss
+        // explizit aktivieren in Settings -> BrickLink-Daten.
+        if (_settingsService.Current.AutoBlImport
+            && ShouldRunAutoBlImport(_settingsService.Current))
+        {
+            RunAutoBlImportAsync().FireAndForget("AutoBlImport-Startup");
+        }
     }
 
     /// <summary>
@@ -225,6 +241,51 @@ public partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Log.Debug(ex, "Background-Update-Check fehlgeschlagen");
+        }
+    }
+
+    /// <summary>
+    /// UX X.28 (v0.1.15): prueft ob ein Auto-BL-Import faellig ist (faellig =
+    /// noch nie ausgefuehrt ODER laenger her als IntervalDays). Public fuer
+    /// Tests, ist aber sonst privat in der Logik.
+    /// </summary>
+    public static bool ShouldRunAutoBlImport(AppSettings s)
+    {
+        if (!s.AutoBlImport) return false;
+        if (s.LastBlImport is null) return true; // noch nie -> sofort
+        var daysSince = (DateTime.UtcNow - s.LastBlImport.Value).TotalDays;
+        return daysSince >= s.AutoBlImportIntervalDays;
+    }
+
+    /// <summary>
+    /// UX X.28 (v0.1.15): fuehrt den Auto-BL-Import durch. Toast-Feedback
+    /// vorher + nachher, nicht-blockierend (Fire-and-Forget aus dem Konstruktor).
+    /// Bei Erfolg: LastBlImport wird auf UtcNow gesetzt + persistiert.
+    /// </summary>
+    private async Task RunAutoBlImportAsync()
+    {
+        Log.Information("Auto-BL-Import wird gestartet (Intervall {Days} Tage)",
+            _settingsService.Current.AutoBlImportIntervalDays);
+        _notificationService.ShowInfo("BrickLink-Daten werden im Hintergrund aktualisiert...");
+
+        try
+        {
+            // Progress wird nicht in der UI angezeigt (waere zu invasiv fuer
+            // Background-Aktion). Bei Bedarf koennte ein dezenter Status-
+            // Badge im Header oder im Settings-Tab kommen.
+            await _blBulkImport.ImportFromGitHubAsync(progress: null, ct: default);
+
+            _settingsService.Current.LastBlImport = DateTime.UtcNow;
+            await _settingsService.SaveAsync();
+
+            _notificationService.ShowSuccess("BrickLink-Daten aktualisiert.");
+            Log.Information("Auto-BL-Import erfolgreich abgeschlossen");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Auto-BL-Import fehlgeschlagen");
+            _notificationService.ShowError(
+                "Auto-Import fehlgeschlagen - bitte manuell in Einstellungen -> BrickLink.");
         }
     }
 
@@ -461,5 +522,23 @@ public partial class MainViewModel : ObservableObject
                 ErrorMessage = ex.Message
             });
         }
+    }
+
+    /// <summary>
+    /// UX X.28 (v0.1.15): IDisposable damit der ServiceProvider beim OnExit
+    /// den DispatcherTimer stoppt und Event-Subscriptions abmeldet. Vorher
+    /// liefen die bis zum Process.Kill weiter.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        try { _rateLimitTimer.Stop(); } catch { /* defensiv */ }
+        try { _rateLimiter.StatusChanged -= OnRateLimitChanged; } catch { /* defensiv */ }
+        try { _imageCache.StatsChanged -= OnCacheStatsChanged; } catch { /* defensiv */ }
+
+        Log.Information("MainViewModel disposed");
+        GC.SuppressFinalize(this);
     }
 }

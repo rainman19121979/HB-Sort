@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using HBSort.Core.Helpers;
 using HBSort.Core.Models;
 using HBSort.Core.Models.Exceptions;
 using HBSort.Core.Services;
@@ -827,18 +828,18 @@ public partial class ScanViewModel : ObservableObject
             }
 
             // Header-Bild + Vorab-Cache im Hintergrund (best-effort)
-            _ = LoadMinifigHeaderImageAsync(bricklinkId);
+            LoadMinifigHeaderImageAsync(bricklinkId).FireAndForget("Scan-MinifigHeaderImage");
             if (_settingsService.Current.ImageCache.PreloadOnMinifigScan)
             {
-                _ = PreloadPartImagesAsync(pending);
+                PreloadPartImagesAsync(pending).FireAndForget("Scan-PreloadPartImages");
             }
 
             // Phase 4: Lagerfach-Liste fuer die ComboBox laden + Default setzen.
-            _ = LoadAvailableBinsForPendingAsync(pending);
+            LoadAvailableBinsForPendingAsync(pending).FireAndForget("Scan-LoadAvailableBins");
 
             // UX X.4+: pro Teil pruefen ob ein passender FloatingPart existiert
             // -> Button "Aus Fach uebernehmen" einblenden.
-            _ = RefreshFloatingMatchesForPendingAsync(pending);
+            RefreshFloatingMatchesForPendingAsync(pending).FireAndForget("Scan-RefreshFloatingMatches");
         }
         catch (OperationCanceledException)
         {
@@ -903,16 +904,16 @@ public partial class ScanViewModel : ObservableObject
         }
 
         // Bild im Hintergrund (best-effort, nutzt BL-Color)
-        _ = LoadPartImageAsync(pending);
+        LoadPartImageAsync(pending).FireAndForget("PartScan-LoadImage");
 
         // Lagerfaecher fuer Floating-Combo laden
-        _ = LoadAvailableBinsForPendingPartAsync(pending);
+        LoadAvailableBinsForPendingPartAsync(pending).FireAndForget("PartScan-LoadAvailableBins");
 
         // Known-Colors fuer Korrektur-Dropdown laden
-        _ = LoadKnownColorsForPendingPartAsync(pending);
+        LoadKnownColorsForPendingPartAsync(pending).FireAndForget("PartScan-LoadKnownColors");
 
         // BL-Catalog-Treffer-Bilder im Hintergrund nachladen
-        _ = LoadBlCatalogImagesAsync(pending);
+        LoadBlCatalogImagesAsync(pending).FireAndForget("PartScan-LoadBlCatalogImages");
     }
 
     /// <summary>Re-Lookup nach Farb-Korrektur ueber das Dropdown.</summary>
@@ -931,8 +932,8 @@ public partial class ScanViewModel : ObservableObject
             Log.Warning(ex, "Re-Lookup nach Farb-Korrektur fehlgeschlagen");
         }
 
-        _ = LoadPartImageAsync(pending);
-        _ = LoadBlCatalogImagesAsync(pending);
+        LoadPartImageAsync(pending).FireAndForget("PartReLookup-LoadImage");
+        LoadBlCatalogImagesAsync(pending).FireAndForget("PartReLookup-LoadBlCatalogImages");
     }
 
     /// <summary>
