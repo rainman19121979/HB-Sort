@@ -371,6 +371,12 @@ public partial class SettingsWindow : Window
                 (result.Errors.Count > 0 ? $" ({result.Errors.Count} Fehler)" : string.Empty);
             await _viewModel.RefreshBrickStoreStatsAsync();
             await _viewModel.RefreshBlCacheStatsAsync();
+            // UX X.28 (v0.1.15): manueller Import setzt LastBlImport, damit
+            // der Auto-Import-Timer nicht direkt nochmal triggert.
+            var settings = App.Services.GetRequiredService<HBSort.Core.Services.ISettingsService>();
+            settings.Current.LastBlImport = System.DateTime.UtcNow;
+            await settings.SaveAsync();
+            await _viewModel.RefreshLastBlImportTextAsync();
             notif.ShowSuccess("BrickStore-Import abgeschlossen.");
         }
         catch (System.Exception ex)

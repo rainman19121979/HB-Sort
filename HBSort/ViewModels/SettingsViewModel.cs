@@ -259,6 +259,42 @@ public partial class SettingsViewModel : ObservableObject
 
     public bool HasUpdateCheckStatus => !string.IsNullOrEmpty(UpdateCheckStatusText);
 
+    // --- UX X.28 (v0.1.15): Auto-BL-Import ---
+
+    /// <summary>Toggle "Automatisch im Hintergrund aktualisieren".</summary>
+    [ObservableProperty]
+    private bool _autoBlImport;
+
+    /// <summary>Intervall in Tagen (UI: Dropdown 7/14/30/90).</summary>
+    [ObservableProperty]
+    private int _autoBlImportIntervalDays;
+
+    /// <summary>Anzeige-Text "Letzter Import: 12.04.2026 14:23" oder "noch nie".</summary>
+    [ObservableProperty]
+    private string _lastBlImportText = "noch nie";
+
+    /// <summary>Verfuegbare Intervall-Optionen fuer das Dropdown.</summary>
+    public List<int> AutoBlImportIntervalOptions { get; } = new() { 7, 14, 30, 90 };
+
+    /// <summary>Refresht die LastBlImportText-Anzeige aus den aktuellen Settings.</summary>
+    public Task RefreshLastBlImportTextAsync()
+    {
+        var last = _settingsService.Current.LastBlImport;
+        LastBlImportText = last is null
+            ? "noch nie"
+            : last.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>UX X.26 (v0.1.13): True wenn ein Update verfuegbar ist.
+    /// Steuert die Sichtbarkeit der "Jetzt updaten"-Box im Updates-Tab.</summary>
+    [ObservableProperty]
+    private bool _hasUpdateAvailable;
+
+    /// <summary>UX X.26 (v0.1.13): Versions-String der gefundenen neuen Version.</summary>
+    [ObservableProperty]
+    private string _availableUpdateVersion = string.Empty;
+
     /// <summary>Brush-Resource-Key fuer den Status-Text. Default Info-Blau,
     /// bei Treffer Success-Gruen, bei Fehler Error-Rot.</summary>
     [ObservableProperty]
@@ -316,6 +352,9 @@ public partial class SettingsViewModel : ObservableObject
         // UX-Iteration X.23: Update-Tab Initial-Daten.
         InitializeUpdateState();
 
+        // UX X.28 (v0.1.15): Auto-BL-Import-Anzeige initialisieren.
+        _ = RefreshLastBlImportTextAsync();
+
         // UX#12: Preis-Cache-Eintraege initial laden.
         _ = RefreshPriceCacheCountAsync();
     }
@@ -360,6 +399,10 @@ public partial class SettingsViewModel : ObservableObject
         SoundEnabled = s.SoundEnabled;
         ShowTooltips = s.ShowTooltips;
         AutoCheckForUpdates = s.AutoCheckForUpdates;
+        AutoBlImport = s.AutoBlImport;
+        AutoBlImportIntervalDays = AutoBlImportIntervalOptions.Contains(s.AutoBlImportIntervalDays)
+            ? s.AutoBlImportIntervalDays
+            : 30;
         PreferBricklinkImages = s.ImageCache.PreferBricklinkImages;
         PreloadOnMinifigScan = s.ImageCache.PreloadOnMinifigScan;
         ImageCacheLimitMb = s.ImageCache.LimitMb;
@@ -400,6 +443,8 @@ public partial class SettingsViewModel : ObservableObject
         s.SoundEnabled = SoundEnabled;
         s.ShowTooltips = ShowTooltips;
         s.AutoCheckForUpdates = AutoCheckForUpdates;
+        s.AutoBlImport = AutoBlImport;
+        s.AutoBlImportIntervalDays = AutoBlImportIntervalDays;
         s.ImageCache.PreferBricklinkImages = PreferBricklinkImages;
         s.ImageCache.PreloadOnMinifigScan = PreloadOnMinifigScan;
         s.ImageCache.LimitMb = ImageCacheLimitMb;
@@ -449,11 +494,23 @@ public partial class SettingsViewModel : ObservableObject
         LastUpdateCheckText = last is null
             ? "noch nie"
             : last.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm");
+
+        // UX X.26 (v0.1.13): wenn der MainViewModel-Background-Check beim
+        // App-Start schon ein Update gefunden hat, ist UpdateService.
+        // AvailableVersion gesetzt - dann Box gleich beim ersten Settings-
+        // Oeffnen sichtbar machen, ohne dass der User nochmal manuell
+        // pruefen muesste.
+        if (_updateService.AvailableVersion is { } pendingVersion)
+        {
+            AvailableUpdateVersion = pendingVersion;
+            HasUpdateAvailable = true;
+        }
     }
 
     /// <summary>
     /// Manuelles "Jetzt nach Updates suchen". Aktualisiert Status-Text +
-    /// LastUpdateCheck in Settings (sofort persistiert).
+    /// LastUpdateCheck in Settings (sofort persistiert) und setzt
+    /// HasUpdateAvailable/AvailableUpdateVersion fuer die "Jetzt updaten"-Box.
     /// </summary>
     [RelayCommand]
     private async Task CheckForUpdatesAsync()
@@ -470,11 +527,15 @@ public partial class SettingsViewModel : ObservableObject
 
             if (hasUpdate && _updateService.AvailableVersion is { } v)
             {
-                UpdateCheckStatusText = $"Update {v} verfuegbar - der Hinweis erscheint im Header.";
+                AvailableUpdateVersion = v;
+                HasUpdateAvailable = true;
+                UpdateCheckStatusText = $"Update {v} verfuegbar - klick unten 'Jetzt auf v{v} updaten'.";
                 UpdateCheckStatusBrush = System.Windows.Media.Brushes.Green;
             }
             else
             {
+                HasUpdateAvailable = false;
+                AvailableUpdateVersion = string.Empty;
                 UpdateCheckStatusText = "Du nutzt die aktuelle Version.";
                 UpdateCheckStatusBrush = System.Windows.Media.Brushes.Gray;
             }
@@ -483,6 +544,32 @@ public partial class SettingsViewModel : ObservableObject
         {
             Log.Warning(ex, "CheckForUpdatesAsync fehlgeschlagen (UI-Pfad)");
             UpdateCheckStatusText = "Pruefung fehlgeschlagen - kein Internet?";
+            UpdateCheckStatusBrush = System.Windows.Media.Brushes.OrangeRed;
+        }
+    }
+
+    /// <summary>
+    /// UX X.26 (v0.1.13): "Jetzt updaten"-Button im Settings-Tab. Triggert
+    /// Velopack-Download + Restart. Velopack beendet die App intern und
+    /// startet sie neu - der Code nach diesem Aufruf laeuft nur wenn was
+    /// schief gegangen ist.
+    /// </summary>
+    [RelayCommand]
+    private async Task ApplyUpdateAsync()
+    {
+        if (!HasUpdateAvailable) return;
+
+        try
+        {
+            await _updateService.DownloadAndApplyAsync();
+            // Wenn wir hier landen: Velopack hat den Restart NICHT angestossen.
+            HasUpdateAvailable = false;
+            AvailableUpdateVersion = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Update-Apply fehlgeschlagen (Settings-Pfad)");
+            UpdateCheckStatusText = "Update fehlgeschlagen - bitte spaeter erneut versuchen.";
             UpdateCheckStatusBrush = System.Windows.Media.Brushes.OrangeRed;
         }
     }

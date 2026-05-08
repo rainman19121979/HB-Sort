@@ -100,6 +100,7 @@ jobs:
             -p:Version=${{ needs.setup.outputs.version }} `
             -p:AssemblyVersion=${{ needs.setup.outputs.version }}.0 `
             -p:FileVersion=${{ needs.setup.outputs.version }}.0 `
+            -p:InformationalVersion=${{ needs.setup.outputs.version }} `
             -o publish/win-x64
 
       - name: Create ZIP
@@ -176,6 +177,7 @@ jobs:
             -p:Version=${{ needs.setup.outputs.version }} `
             -p:AssemblyVersion=${{ needs.setup.outputs.version }}.0 `
             -p:FileVersion=${{ needs.setup.outputs.version }}.0 `
+            -p:InformationalVersion=${{ needs.setup.outputs.version }} `
             -o publish/velopack-input
 
       - name: Install Velopack CLI (vpk)

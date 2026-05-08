@@ -152,6 +152,15 @@ public partial class DismantleWizardViewModel : ObservableObject
             {
                 _ = LoadPartImagesAndSwatchesAsync();
             }
+
+            // UX X.25: pro Part die wartenden Figuren laden die das Teil noch
+            // brauchen. Eigene Figur ausschliessen (kann sich nicht selbst
+            // zuordnen). Best-effort - bei Fehler bleibt WaitingMatches leer
+            // und der RadioButton-Pfad wird einfach nicht angezeigt.
+            if (_partLookup != null)
+            {
+                _ = LoadWaitingMatchesAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -160,6 +169,42 @@ public partial class DismantleWizardViewModel : ObservableObject
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// UX X.25: laedt fuer jeden Required-Part die wartenden Figuren die das
+    /// Teil noch brauchen. Eigene Figur (TrackedMinifigId) wird gefiltert -
+    /// man kann sich nicht selbst zuordnen.
+    /// </summary>
+    private async Task LoadWaitingMatchesAsync()
+    {
+        if (_partLookup == null) return;
+
+        // Snapshot der aktuellen Liste damit wir nicht in eine ObservableCollection-
+        // Modification-Race kommen wenn LoadAsync nochmal laeuft.
+        var partsSnapshot = Parts.ToList();
+        foreach (var partVm in partsSnapshot)
+        {
+            try
+            {
+                var lookup = await _partLookup.LookupPartAsync(partVm.BlPartNo, partVm.BlColorId);
+                // Eigene Figur filtern - sonst koennte man sich selbst Teile
+                // zuordnen die man gerade zerlegt.
+                var matches = lookup.WaitingMatches
+                    .Where(m => m.TrackedMinifigId != TrackedMinifigId)
+                    .ToList();
+
+                if (matches.Count > 0)
+                {
+                    Application.Current?.Dispatcher.Invoke(() => partVm.SetMatches(matches));
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "UX X.25 LookupPartAsync fuer {Part}/{Color} fehlgeschlagen",
+                    partVm.BlPartNo, partVm.BlColorId);
+            }
         }
     }
 
@@ -239,14 +284,38 @@ public partial class DismantleWizardViewModel : ObservableObject
     /// <summary>Fuehrt den Aufgeben-Vorgang aus und gibt das Service-Resultat zurueck.</summary>
     public async Task<DismantleResult> ConfirmAsync()
     {
-        var choices = Parts.Select(p => new DismantlePartChoice
+        var choices = Parts.Select(p =>
         {
-            TrackedMinifigPartId = p.Id,
-            IsKept = p.IsKept,
-            TargetBinId = p.IsKept ? p.TargetBin?.Id : null
+            // UX X.25: Mode-basiert TargetBinId ODER AssignToTrackedMinifigPartId.
+            // - PutInBin (Default): TargetBinId aus Bin-Combo
+            // - AssignToWaiting: SelectedMatch.TrackedMinifigPartId
+            // Bei IsKept=false werden beide null gesetzt (Validierung im Service ist OK).
+            var assignTo = p.IsKept && p.IsAssignToWaitingMode && p.SelectedMatch != null
+                ? p.SelectedMatch.TrackedMinifigPartId
+                : (int?)null;
+            var targetBin = p.IsKept && p.IsPutInBinMode
+                ? p.TargetBin?.Id
+                : (int?)null;
+
+            return new DismantlePartChoice
+            {
+                TrackedMinifigPartId = p.Id,
+                IsKept = p.IsKept,
+                TargetBinId = targetBin,
+                AssignToTrackedMinifigPartId = assignTo
+            };
         }).ToList();
         return await _persistence.DismantleAsync(TrackedMinifigId, choices);
     }
+}
+
+/// <summary>UX X.25: Modus pro Teil im DismantleWizard.</summary>
+public enum DismantlePartMode
+{
+    /// <summary>Standard: Teil wird als FloatingPart in das gewaehlte Fach gelegt.</summary>
+    PutInBin,
+    /// <summary>UX X.25: Teil wird einer wartenden Figur direkt zugeordnet.</summary>
+    AssignToWaiting
 }
 
 /// <summary>Eine Zeile im Wizard: ein Required-Part + Auswahl + Ziel-Fach.</summary>
@@ -288,6 +357,66 @@ public partial class DismantlePartItemViewModel : ObservableObject
 
     public bool HasSmartHint => !string.IsNullOrEmpty(SmartHint);
 
+    // ====================================================================
+    // UX X.25: Direkt-Zuordnung zu wartender Figur
+    // ====================================================================
+
+    /// <summary>
+    /// Modus pro Teil: in Lager legen (Default) oder einer wartenden Figur
+    /// zuordnen (nur sichtbar wenn HasMatches=true).
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsAssignToWaitingMode))]
+    [NotifyPropertyChangedFor(nameof(IsPutInBinMode))]
+    private DismantlePartMode _mode = DismantlePartMode.PutInBin;
+
+    public bool IsPutInBinMode => Mode == DismantlePartMode.PutInBin;
+    public bool IsAssignToWaitingMode => Mode == DismantlePartMode.AssignToWaiting;
+
+    /// <summary>
+    /// Eindeutiger RadioButton-GroupName pro Item, sonst wuerden alle
+    /// RadioButtons im ItemsControl in einer einzigen WPF-Gruppe landen
+    /// (RadioButton.GroupName ist global pro Window).
+    /// </summary>
+    public string ModeGroupName => $"PartMode_{Id}";
+
+    /// <summary>
+    /// Wartende Figuren die dieses Teil noch brauchen (aus IPartLookupService.
+    /// LookupPartAsync). Leer = der "zuordnen"-RadioButton wird nicht angezeigt.
+    /// </summary>
+    public ObservableCollection<HBSort.Core.Services.WaitingMinifigMatch> WaitingMatches { get; } = new();
+
+    /// <summary>
+    /// Aktuell gewaehlter Match aus WaitingMatches (Default: erster Eintrag).
+    /// Bei N Matches: User waehlt aus dem Dropdown. Bei 1 Match: implizit gesetzt.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SingleMatchDisplay))]
+    private HBSort.Core.Services.WaitingMinifigMatch? _selectedMatch;
+
+    /// <summary>True wenn mind. ein Match existiert -> RadioButton-Reihe wird sichtbar.</summary>
+    public bool HasMatches => WaitingMatches.Count > 0;
+
+    /// <summary>True wenn genau 1 Match (Anzeige als Text statt Dropdown).</summary>
+    public bool HasSingleMatch => WaitingMatches.Count == 1;
+
+    /// <summary>True wenn 2+ Matches (Anzeige als Dropdown).</summary>
+    public bool HasMultipleMatches => WaitingMatches.Count > 1;
+
+    /// <summary>Display-Text fuer den 1-Match-Fall: "cty0685 (6/7) [Box 003]".</summary>
+    public string SingleMatchDisplay
+    {
+        get
+        {
+            var m = SelectedMatch ?? WaitingMatches.FirstOrDefault();
+            if (m == null) return string.Empty;
+            var bin = string.IsNullOrWhiteSpace(m.StorageBinLabel)
+                ? string.Empty
+                : $" [{m.StorageBinLabel}]";
+            return $"{m.MinifigName} ({m.QuantityCollected + 1}/{m.QuantityNeeded}){bin}";
+        }
+    }
+
     public string StatusLabel => IsKept ? "(uebernommen)" : "(verworfen)";
     public string EffectiveQtyLabel => WasCollected
         ? $"x{QuantityCollected} (gesammelt)"
@@ -303,5 +432,20 @@ public partial class DismantlePartItemViewModel : ObservableObject
         BlColorId = p.ColorId;
         QuantityNeeded = p.QuantityNeeded;
         QuantityCollected = p.QuantityCollected;
+    }
+
+    /// <summary>
+    /// UX X.25: wird vom Wizard-VM nach LookupPartAsync aufgerufen.
+    /// Setzt WaitingMatches + waehlt den ersten Match als Default.
+    /// </summary>
+    public void SetMatches(IEnumerable<HBSort.Core.Services.WaitingMinifigMatch> matches)
+    {
+        WaitingMatches.Clear();
+        foreach (var m in matches) WaitingMatches.Add(m);
+        SelectedMatch = WaitingMatches.FirstOrDefault();
+        OnPropertyChanged(nameof(HasMatches));
+        OnPropertyChanged(nameof(HasSingleMatch));
+        OnPropertyChanged(nameof(HasMultipleMatches));
+        OnPropertyChanged(nameof(SingleMatchDisplay));
     }
 }

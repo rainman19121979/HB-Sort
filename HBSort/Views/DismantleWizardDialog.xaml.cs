@@ -31,6 +31,28 @@ public partial class DismantleWizardDialog : Window
     private void DeselectAll_Click(object sender, RoutedEventArgs e) => _viewModel.DeselectAll();
     private void ApplyDefault_Click(object sender, RoutedEventArgs e) => _viewModel.ApplyDefaultBin();
 
+    /// <summary>
+    /// UX X.25: RadioButton "in Lager legen" geklickt. WPF-RadioButton-IsChecked
+    /// ist OneWay-gebunden weil ein TwoWay-Binding auf zwei computed Properties
+    /// (IsPutInBinMode/IsAssignToWaitingMode) Endlos-Schleifen erzeugt.
+    /// Wir setzen den Mode hier explizit.
+    /// </summary>
+    private void ModePutInBin_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is ViewModels.DismantlePartItemViewModel item)
+        {
+            item.Mode = ViewModels.DismantlePartMode.PutInBin;
+        }
+    }
+
+    private void ModeAssignToWaiting_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is ViewModels.DismantlePartItemViewModel item)
+        {
+            item.Mode = ViewModels.DismantlePartMode.AssignToWaiting;
+        }
+    }
+
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
         DialogResult = false;
@@ -39,21 +61,54 @@ public partial class DismantleWizardDialog : Window
 
     private async void Confirm_Click(object sender, RoutedEventArgs e)
     {
-        // Validierung: alle als-uebernommen markierten Teile brauchen ein Ziel-Fach.
-        var missingBin = _viewModel.Parts.FirstOrDefault(p => p.IsKept && p.TargetBin == null);
+        // Validierung pro Teil:
+        //  - PutInBin-Mode + IsKept=true -> TargetBin muss gesetzt sein
+        //  - AssignToWaiting-Mode + IsKept=true -> SelectedMatch muss gesetzt sein
+        var missingBin = _viewModel.Parts.FirstOrDefault(p =>
+            p.IsKept && p.IsPutInBinMode && p.TargetBin == null);
         if (missingBin != null)
         {
             _notifications.ShowWarning($"Teil '{missingBin.PartName}': bitte ein Ziel-Fach waehlen.");
+            return;
+        }
+        var missingMatch = _viewModel.Parts.FirstOrDefault(p =>
+            p.IsKept && p.IsAssignToWaitingMode && p.SelectedMatch == null);
+        if (missingMatch != null)
+        {
+            _notifications.ShowWarning(
+                $"Teil '{missingMatch.PartName}': bitte eine wartende Figur auswaehlen.");
             return;
         }
 
         try
         {
             Result = await _viewModel.ConfirmAsync();
-            var msg = Result.TotalPartsTransferred > 0
-                ? $"Figur '{_viewModel.MinifigName}' zerlegt - {Result.TotalPartsTransferred} Einzelteil(e) in Pool uebernommen."
+
+            // UX X.25: Toast-Message zusammenstellen aus FloatingPart- und
+            // Direkt-Zuordnung-Counts. CompletedMinifigNames werden separat
+            // genannt (max. 3 Namen, dann "+N weitere") damit der Toast nicht
+            // ausufert.
+            var parts = new List<string>();
+            if (Result.TotalPartsTransferred > 0)
+                parts.Add($"{Result.TotalPartsTransferred} Einzelteil(e) in Pool");
+            if (Result.AssignedToWaitingCount > 0)
+                parts.Add($"{Result.AssignedToWaitingCount} Teil(e) wartenden Figuren zugeordnet");
+            var head = parts.Count > 0
+                ? $"Figur '{_viewModel.MinifigName}' zerlegt - {string.Join(", ", parts)}."
                 : $"Figur '{_viewModel.MinifigName}' zerlegt (keine Teile uebernommen).";
-            _notifications.ShowSuccess(msg);
+            _notifications.ShowSuccess(head);
+
+            // Pro komplett gewordene Figur ein eigener Toast (max. 3 - sonst Spam).
+            foreach (var name in Result.CompletedMinifigNames.Take(3))
+            {
+                _notifications.ShowSuccess($"Figur '{name}' ist jetzt komplett!");
+            }
+            if (Result.CompletedMinifigNames.Count > 3)
+            {
+                _notifications.ShowSuccess(
+                    $"... und {Result.CompletedMinifigNames.Count - 3} weitere Figuren komplett.");
+            }
+
             DialogResult = true;
             Close();
         }

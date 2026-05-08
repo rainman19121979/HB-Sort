@@ -100,12 +100,29 @@ public interface IMinifigPersistenceService
         CancellationToken ct = default);
 }
 
-/// <summary>Eine Part-Wahl im DismantleWizard.</summary>
+/// <summary>
+/// Eine Part-Wahl im DismantleWizard.
+///
+/// IsKept=false: Teil wird verworfen (kein FloatingPart, keine Zuordnung).
+/// IsKept=true:  GENAU EINE der folgenden Properties muss gesetzt sein:
+///   - TargetBinId             -> Teil wird als FloatingPart in das Fach gelegt
+///   - AssignToTrackedMinifigPartId -> Teil wird einer wartenden Figur direkt
+///                                     zugeordnet (UX X.25)
+/// Validierung in DismantleAsync wirft InvalidOperationException wenn beide
+/// gesetzt sind oder beide null bei IsKept=true.
+/// </summary>
 public class DismantlePartChoice
 {
     public int TrackedMinifigPartId { get; init; }
     public bool IsKept { get; init; }
     public int? TargetBinId { get; init; }
+
+    /// <summary>
+    /// UX X.25: ID eines wartenden TrackedMinifigPart das diesem Teil-Slot
+    /// zugeordnet werden soll. Wenn gesetzt, wird statt FloatingPart anlegen
+    /// die wartende Figur inkrementiert (analog AssignPartToMinifigAsync).
+    /// </summary>
+    public int? AssignToTrackedMinifigPartId { get; init; }
 }
 
 /// <summary>Ergebnis von DismantleAsync.</summary>
@@ -119,6 +136,15 @@ public class DismantleResult
 
     /// <summary>Gesamt-Anzahl Einzelteile die in den Pool gewandert sind (Summe der Mengen).</summary>
     public int TotalPartsTransferred { get; init; }
+
+    /// <summary>UX X.25: Anzahl Teile die direkt einer wartenden Figur zugeordnet wurden.</summary>
+    public int AssignedToWaitingCount { get; init; }
+
+    /// <summary>
+    /// UX X.25: Namen der wartenden Figuren die durch diese Aktion komplett geworden sind.
+    /// Vom UI-Layer fuer Toast-Notifications genutzt ("Figur X ist jetzt komplett!").
+    /// </summary>
+    public List<string> CompletedMinifigNames { get; init; } = new();
 
     // Legacy-Felder (nicht mehr aktiv befuellt, fuer aeltere Aufrufer kompatibel)
     public int KeptCount { get; init; }

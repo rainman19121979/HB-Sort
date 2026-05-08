@@ -23,6 +23,14 @@ public class BlBulkImportService : IBlBulkImportService
     private const string GitHubZipUrl =
         "https://github.com/rgriebl/brickstore-database/releases/latest/download/downloads.zip";
 
+    /// <summary>
+    /// UX X.28 (v0.1.15): Items werden in Batches von 1000 in die SQLite
+    /// geschrieben. Wert ist ein Kompromiss: kleinere Batches = mehr Round-
+    /// Trips, groessere = mehr RAM + Risiko bei Fehler in der Mitte. 1000
+    /// hat sich beim 90k-Items-Komplett-Import als guter Wert gezeigt.
+    /// </summary>
+    private const int ItemUpsertBatchSize = 1000;
+
     private readonly IBlCacheRepository _cache;
     private readonly HttpClient _http;
 
@@ -370,7 +378,7 @@ public class BlBulkImportService : IBlBulkImportService
                         $"Stammdaten {itemType}", count, 0, items[^1].ItemNo));
                 }
 
-                if (items.Count >= 1000)
+                if (items.Count >= ItemUpsertBatchSize)
                 {
                     await _cache.UpsertItemsAsync(items, ct);
                     items.Clear();

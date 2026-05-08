@@ -115,6 +115,29 @@ public class AppSettings
     /// gespeichert.)
     /// </summary>
     public bool AutoCheckForUpdates { get; set; } = true;
+
+    // ====================================================================
+    // UX X.28 (v0.1.15): Auto-BL-Import
+    // ====================================================================
+
+    /// <summary>
+    /// Wenn true: BrickStore-Inventory wird im Hintergrund automatisch alle
+    /// AutoBlImportIntervalDays Tage aktualisiert. Default false - User muss
+    /// explizit aktivieren in Settings -> BrickLink-Daten.
+    /// </summary>
+    public bool AutoBlImport { get; set; } = false;
+
+    /// <summary>
+    /// Intervall in Tagen zwischen automatischen BL-Imports. Default 30.
+    /// UI bietet Auswahl 7/14/30/90 Tage.
+    /// </summary>
+    public int AutoBlImportIntervalDays { get; set; } = 30;
+
+    /// <summary>
+    /// Zeitstempel des letzten erfolgreichen BL-Imports (manuell oder Auto).
+    /// Null = noch nie. UTC.
+    /// </summary>
+    public DateTime? LastBlImport { get; set; }
 }
 
 /// <summary>

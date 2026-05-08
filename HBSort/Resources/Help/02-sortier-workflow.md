@@ -83,6 +83,30 @@ Klick auf den Button:
 So sammelt HB-Sort automatisch Teile fuer neue Figuren ein, die schon
 auf Lager liegen.
 
+## Beim Zerlegen: wartende Figuren komplettieren
+
+Beim Zerlegen einer kompletten Figur (Klick auf **Zerlegen** im Detail-
+Popup) erkennt HB-Sort jetzt automatisch, ob ein frei werdendes Teil zu
+einer wartenden Figur passt. Der Zerlegen-Wizard zeigt pro Teil eine
+zusaetzliche Auswahl (nur wenn Treffer existieren):
+
+- ⚪ **in Lager legen** (Default) - Teil wandert als FloatingPart in
+  das gewaehlte Fach (bisheriges Verhalten).
+- ⚪ **zuordnen zu wartender Figur** - Teil wird direkt einer
+  wartenden Figur als gesammelt gebucht.
+  - Bei genau einem Treffer: Klartext-Anzeige *"Officer (7/7) [Box 003]"*
+    mit Vorschau des Fortschritts nach dem Zuordnen.
+  - Bei mehreren Treffern: Dropdown - du waehlst die passende Figur aus.
+
+Falls die wartende Figur durch die Zuordnung **komplett** wird, taucht
+direkt nach dem Zerlegen ein Toast *"Figur 'X' ist jetzt komplett!"* auf
+und der Status wechselt von Wartend auf Komplett.
+
+Du kannst pro Teil unterschiedlich entscheiden: ein Teil ins Lager,
+das naechste einer wartenden Figur zuordnen, das dritte verwerfen
+(Checkbox aus). Die Auswahl-Spalten sind disabled wenn die Checkbox
+links nicht gesetzt ist.
+
 ## Hinweis zu Brickognize-ToS
 
 Beim Klick auf **Scannen** (oder Druecken der Leertaste) wird das
