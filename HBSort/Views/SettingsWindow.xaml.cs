@@ -238,12 +238,19 @@ public partial class SettingsWindow : Window
     // Tab "BL-Catalog-Daten" (Phase 5.5: BrickStore-Bulk-Import)
     // ====================================================================
 
-    /// <summary>"Von GitHub importieren": laedt downloads.zip + entpackt + importiert.</summary>
+    /// <summary>"Von GitHub importieren": laedt downloads.zip + entpackt + importiert.
+    /// UX X.29 (v0.1.16): mit ETag/Hash-Caching - bei unveraenderter
+    /// BrickStore-DB wird nur ein HEAD-roundtrip gemacht und als
+    /// "uebersprungen" gemeldet.</summary>
     private async void ImportFromGitHub_Click(object sender, RoutedEventArgs e)
     {
         var importer = App.Services.GetRequiredService<IBlBulkImportService>();
         var notif = App.Services.GetRequiredService<INotificationService>();
-        await RunImportAsync(notif, importer.ImportFromGitHubAsync);
+        var settings = App.Services.GetRequiredService<HBSort.Core.Services.ISettingsService>();
+        var prevEtag = settings.Current.LastBlImportEtag;
+        var prevHash = settings.Current.LastBlImportContentHash;
+        await RunImportAsync(notif,
+            (progress, ct) => importer.ImportFromGitHubAsync(prevEtag, prevHash, progress, ct));
     }
 
     /// <summary>"Aus lokalem Ordner importieren": parst items/M.xml + M/*.xml direkt.</summary>
@@ -365,6 +372,25 @@ public partial class SettingsWindow : Window
             // Schwere Operation auf den Threadpool - UI-Thread bleibt responsiv,
             // Progress-Reports kommen dank IProgress<T> auf dem UI-Thread an.
             var result = await Task.Run(() => importer(progress, default));
+
+            // UX X.29 (v0.1.16): Skipped-Pfad - keine Daten geaendert,
+            // aber Pruefung wurde durchgefuehrt.
+            var settings = App.Services.GetRequiredService<HBSort.Core.Services.ISettingsService>();
+            settings.Current.LastBlImportCheck = System.DateTime.UtcNow;
+            if (result.Skipped)
+            {
+                _viewModel.ImportResultText =
+                    "BrickStore-DB unveraendert seit letztem Import - keine Aenderungen noetig.";
+                if (!string.IsNullOrEmpty(result.NewEtag))
+                    settings.Current.LastBlImportEtag = result.NewEtag;
+                if (!string.IsNullOrEmpty(result.NewContentHash))
+                    settings.Current.LastBlImportContentHash = result.NewContentHash;
+                await settings.SaveAsync();
+                await _viewModel.RefreshLastBlImportTextAsync();
+                notif.ShowInfo("BrickLink-Daten sind aktuell.");
+                return;
+            }
+
             _viewModel.ImportResultText =
                 $"Import erfolgreich: {result.ItemsImported:N0} Items, " +
                 $"{result.InventoriesImported:N0} Subsets in {result.Duration.TotalSeconds:F1}s." +
@@ -373,8 +399,11 @@ public partial class SettingsWindow : Window
             await _viewModel.RefreshBlCacheStatsAsync();
             // UX X.28 (v0.1.15): manueller Import setzt LastBlImport, damit
             // der Auto-Import-Timer nicht direkt nochmal triggert.
-            var settings = App.Services.GetRequiredService<HBSort.Core.Services.ISettingsService>();
             settings.Current.LastBlImport = System.DateTime.UtcNow;
+            if (!string.IsNullOrEmpty(result.NewEtag))
+                settings.Current.LastBlImportEtag = result.NewEtag;
+            if (!string.IsNullOrEmpty(result.NewContentHash))
+                settings.Current.LastBlImportContentHash = result.NewContentHash;
             await settings.SaveAsync();
             await _viewModel.RefreshLastBlImportTextAsync();
             notif.ShowSuccess("BrickStore-Import abgeschlossen.");

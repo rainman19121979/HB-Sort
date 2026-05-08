@@ -270,9 +270,21 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private int _autoBlImportIntervalDays;
 
-    /// <summary>Anzeige-Text "Letzter Import: 12.04.2026 14:23" oder "noch nie".</summary>
+    /// <summary>Anzeige-Text "Letzte Aktualisierung: 12.04.2026 14:23" oder "noch nie".</summary>
     [ObservableProperty]
     private string _lastBlImportText = "noch nie";
+
+    /// <summary>
+    /// UX X.29 (v0.1.16): Anzeige-Text "Letzte Pruefung: ..." - wird bei jedem
+    /// Auto-Import-Lauf gesetzt (auch wenn die Daten unveraendert waren).
+    /// </summary>
+    [ObservableProperty]
+    private string _lastBlImportCheckText = "noch nie";
+
+    /// <summary>UX X.29: True wenn die letzte Pruefung neuer ist als die letzte
+    /// echte Aktualisierung - dann wird der Pruefung-Text in der UI angezeigt.</summary>
+    [ObservableProperty]
+    private bool _showLastBlImportCheck;
 
     /// <summary>Verfuegbare Intervall-Optionen fuer das Dropdown.</summary>
     public List<int> AutoBlImportIntervalOptions { get; } = new() { 7, 14, 30, 90 };
@@ -280,10 +292,27 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>Refresht die LastBlImportText-Anzeige aus den aktuellen Settings.</summary>
     public Task RefreshLastBlImportTextAsync()
     {
-        var last = _settingsService.Current.LastBlImport;
+        var s = _settingsService.Current;
+        var last = s.LastBlImport;
         LastBlImportText = last is null
             ? "noch nie"
             : last.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm");
+
+        // UX X.29: Pruefung-Anzeige nur wenn sie neuer ist als die letzte
+        // echte Aktualisierung (sonst redundant - User sieht eh den
+        // Aktualisierungs-Zeitstempel).
+        var check = s.LastBlImportCheck;
+        if (check is null)
+        {
+            LastBlImportCheckText = "noch nie";
+            ShowLastBlImportCheck = false;
+        }
+        else
+        {
+            LastBlImportCheckText = check.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm");
+            ShowLastBlImportCheck = last is null
+                || check.Value > last.Value.AddSeconds(5); // 5s Toleranz fuer den Selben-Lauf-Fall
+        }
         return Task.CompletedTask;
     }
 

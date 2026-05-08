@@ -285,20 +285,50 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         Log.Information("Auto-BL-Import wird gestartet (Intervall {Days} Tage)",
             _settingsService.Current.AutoBlImportIntervalDays);
-        _notificationService.ShowInfo("BrickLink-Daten werden im Hintergrund aktualisiert...");
+
+        var settings = _settingsService.Current;
+        var previousEtag = settings.LastBlImportEtag;
+        var previousHash = settings.LastBlImportContentHash;
 
         try
         {
-            // Progress wird nicht in der UI angezeigt (waere zu invasiv fuer
-            // Background-Aktion). Bei Bedarf koennte ein dezenter Status-
-            // Badge im Header oder im Settings-Tab kommen.
-            await _blBulkImport.ImportFromGitHubAsync(progress: null, ct: default);
+            // UX X.29 (v0.1.16): ETag + Hash an den Service weitergeben.
+            // Service liefert bei 304/gleichem Hash sofort Skipped=true zurueck.
+            // Toast-Anzeige nur wenn der Import tatsaechlich Daten zieht -
+            // ein "wird gepruefen"-Toast bei jedem Start waere zu invasiv.
+            var result = await _blBulkImport.ImportFromGitHubAsync(
+                previousEtag: previousEtag,
+                previousContentHash: previousHash,
+                progress: null,
+                ct: default);
 
-            _settingsService.Current.LastBlImport = DateTime.UtcNow;
+            // LastBlImportCheck wird IMMER gesetzt (auch bei Skipped) - User
+            // sieht in Settings dass die Pruefung regelmaessig laeuft.
+            settings.LastBlImportCheck = DateTime.UtcNow;
+
+            if (result.Skipped)
+            {
+                Log.Information("Auto-BL-Import uebersprungen: {Reason}", result.SkipReason);
+                // Nur ETag/Hash aktualisieren falls neue Werte mitgekommen sind.
+                if (!string.IsNullOrEmpty(result.NewEtag))
+                    settings.LastBlImportEtag = result.NewEtag;
+                if (!string.IsNullOrEmpty(result.NewContentHash))
+                    settings.LastBlImportContentHash = result.NewContentHash;
+                await _settingsService.SaveAsync();
+                // Kein Toast - waere bei jedem App-Start zu nervig.
+                return;
+            }
+
+            _notificationService.ShowInfo("BrickLink-Daten werden im Hintergrund aktualisiert...");
+
+            settings.LastBlImport = DateTime.UtcNow;
+            settings.LastBlImportEtag = result.NewEtag;
+            settings.LastBlImportContentHash = result.NewContentHash;
             await _settingsService.SaveAsync();
 
             _notificationService.ShowSuccess("BrickLink-Daten aktualisiert.");
-            Log.Information("Auto-BL-Import erfolgreich abgeschlossen");
+            Log.Information("Auto-BL-Import erfolgreich abgeschlossen ({Items} Items, {Inv} Subsets)",
+                result.ItemsImported, result.InventoriesImported);
         }
         catch (Exception ex)
         {

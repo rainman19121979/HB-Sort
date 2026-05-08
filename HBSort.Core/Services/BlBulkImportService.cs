@@ -3,6 +3,8 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Xml;
 using System.Xml.Linq;
 using HBSort.Core.Models.Bricklink;
@@ -35,15 +37,36 @@ public class BlBulkImportService : IBlBulkImportService
     private readonly HttpClient _http;
 
     public BlBulkImportService(IBlCacheRepository cache)
+        : this(cache, defaultHttpClient: null)
+    {
+    }
+
+    /// <summary>
+    /// UX X.29 (v0.1.16): Test-Konstruktor mit injizierbarem HttpClient.
+    /// Der Default-Konstruktor erzeugt einen eigenen HttpClient; fuer Tests
+    /// kann hier ein HttpClient mit MockHandler reingegeben werden. Bewusst
+    /// public (statt internal + InternalsVisibleTo) - Test-Hook, kein
+    /// Architektur-Risiko.
+    /// </summary>
+    public BlBulkImportService(IBlCacheRepository cache, HttpClient? defaultHttpClient)
     {
         _cache = cache;
-        // Eigener HttpClient mit grosszuegigem Timeout (ZIP-Download ~12 MB,
-        // im schlechten Netz auch mal 1-2 min).
-        _http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd("HBSort/0.5");
+        if (defaultHttpClient != null)
+        {
+            _http = defaultHttpClient;
+        }
+        else
+        {
+            // Eigener HttpClient mit grosszuegigem Timeout (ZIP-Download ~12 MB,
+            // im schlechten Netz auch mal 1-2 min).
+            _http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+            _http.DefaultRequestHeaders.UserAgent.ParseAdd("HBSort/0.5");
+        }
     }
 
     public async Task<BlBulkImportResult> ImportFromGitHubAsync(
+        string? previousEtag = null,
+        string? previousContentHash = null,
         IProgress<BlBulkImportProgress>? progress = null,
         CancellationToken ct = default)
     {
@@ -54,38 +77,111 @@ public class BlBulkImportService : IBlBulkImportService
 
         try
         {
-            // PHASE: Download
+            // PHASE: Download mit ETag-Check
             progress?.Report(new BlBulkImportProgress(
-                "Download", 0, 0, "downloads.zip von GitHub..."));
+                "Download", 0, 0, "Pruefe BrickStore-DB auf Updates..."));
 
-            using (var resp = await _http.GetAsync(GitHubZipUrl,
-                HttpCompletionOption.ResponseHeadersRead, ct))
+            using var request = new HttpRequestMessage(HttpMethod.Get, GitHubZipUrl);
+            if (!string.IsNullOrEmpty(previousEtag))
             {
-                resp.EnsureSuccessStatusCode();
-                var totalBytes = resp.Content.Headers.ContentLength ?? 0L;
-
-                await using var fs = File.Create(zipPath);
-                await using var src = await resp.Content.ReadAsStreamAsync(ct);
-
-                var buffer = new byte[81920];
-                long received = 0;
-                int read;
-                while ((read = await src.ReadAsync(buffer, ct)) > 0)
+                // ETag-Werte werden Quoted serialisiert (z.B. "abc123" oder
+                // W/"abc123"). EntityTagHeaderValue.Parse normalisiert das.
+                if (EntityTagHeaderValue.TryParse(previousEtag, out var etagHeader))
                 {
-                    await fs.WriteAsync(buffer.AsMemory(0, read), ct);
-                    received += read;
-                    if (totalBytes > 0)
-                    {
-                        progress?.Report(new BlBulkImportProgress(
-                            "Download", (int)(received / 1024),
-                            (int)(totalBytes / 1024),
-                            $"{received / 1024 / 1024} / {totalBytes / 1024 / 1024} MB"));
-                    }
+                    request.Headers.IfNoneMatch.Add(etagHeader);
+                }
+                else
+                {
+                    Log.Debug("Konnte ETag '{Etag}' nicht als Header parsen, ueberspringe If-None-Match",
+                        previousEtag);
                 }
             }
 
-            Log.Information("BrickStore-ZIP geladen: {Size:F1} MB",
-                new FileInfo(zipPath).Length / 1024.0 / 1024.0);
+            string? newEtag = null;
+            string? newContentHash = null;
+
+            using (var resp = await _http.SendAsync(request,
+                HttpCompletionOption.ResponseHeadersRead, ct))
+            {
+                if (resp.StatusCode == HttpStatusCode.NotModified)
+                {
+                    Log.Information(
+                        "Auto-BL-Import: BrickStore-DB unveraendert (HTTP 304, ETag={Etag}), ueberspringe",
+                        previousEtag);
+                    return new BlBulkImportResult(
+                        ItemsImported: 0, InventoriesImported: 0,
+                        FilesProcessed: 0, FilesSkipped: 0,
+                        Duration: TimeSpan.Zero, Errors: new())
+                    {
+                        Skipped = true,
+                        SkipReason = "Inhalt unveraendert (HTTP 304 Not Modified)",
+                        NewEtag = previousEtag,
+                        NewContentHash = previousContentHash
+                    };
+                }
+
+                resp.EnsureSuccessStatusCode();
+
+                // ETag fuer den naechsten Lauf merken.
+                newEtag = resp.Headers.ETag?.Tag;
+
+                // Download mit gleichzeitiger Hash-Berechnung. IncrementalHash
+                // streamt bytewise - kein 37 MB-Memory-Buffer.
+                var totalBytes = resp.Content.Headers.ContentLength ?? 0L;
+                progress?.Report(new BlBulkImportProgress(
+                    "Download", 0, totalBytes > 0 ? (int)(totalBytes / 1024) : 0,
+                    "downloads.zip von GitHub..."));
+
+                using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+                await using (var fs = File.Create(zipPath))
+                await using (var src = await resp.Content.ReadAsStreamAsync(ct))
+                {
+                    var buffer = new byte[81920];
+                    long received = 0;
+                    int read;
+                    while ((read = await src.ReadAsync(buffer, ct)) > 0)
+                    {
+                        await fs.WriteAsync(buffer.AsMemory(0, read), ct);
+                        hasher.AppendData(buffer, 0, read);
+                        received += read;
+                        if (totalBytes > 0)
+                        {
+                            progress?.Report(new BlBulkImportProgress(
+                                "Download", (int)(received / 1024),
+                                (int)(totalBytes / 1024),
+                                $"{received / 1024 / 1024} / {totalBytes / 1024 / 1024} MB"));
+                        }
+                    }
+                }
+                var hashBytes = hasher.GetHashAndReset();
+                newContentHash = Convert.ToHexString(hashBytes);
+            }
+
+            // Hash-Fallback-Check: wenn der Server keinen ETag liefert oder der
+            // Cache-ETag verloren geht, vergleichen wir den frischen Hash mit
+            // dem letzten erfolgreichen. Bei gleichem Hash ueberspringen wir
+            // Entpacken + DB-Updates komplett.
+            if (!string.IsNullOrEmpty(previousContentHash)
+                && string.Equals(newContentHash, previousContentHash, StringComparison.OrdinalIgnoreCase))
+            {
+                Log.Information(
+                    "Auto-BL-Import: ZIP-Inhalt unveraendert (gleicher SHA256-Hash), ueberspringe");
+                return new BlBulkImportResult(
+                    ItemsImported: 0, InventoriesImported: 0,
+                    FilesProcessed: 0, FilesSkipped: 0,
+                    Duration: TimeSpan.Zero, Errors: new())
+                {
+                    Skipped = true,
+                    SkipReason = "Inhalt unveraendert (gleicher SHA256-Hash)",
+                    NewEtag = newEtag ?? previousEtag,
+                    NewContentHash = newContentHash
+                };
+            }
+
+            Log.Information("BrickStore-ZIP geladen: {Size:F1} MB, ETag={Etag}, Hash={Hash}",
+                new FileInfo(zipPath).Length / 1024.0 / 1024.0,
+                newEtag ?? "(none)",
+                newContentHash?.Substring(0, Math.Min(16, newContentHash.Length)) ?? "(none)");
 
             // PHASE: Entpacken (entry-by-entry mit Progress; ZIP enthaelt
             // ~37000+ Dateien, ohne Progress wirkt die App eingefroren).
@@ -124,7 +220,12 @@ public class BlBulkImportService : IBlBulkImportService
             File.Delete(zipPath);
 
             // Eigentlicher Import aus dem Temp-Ordner
-            return await ImportFromFolderAsync(tempDir, progress, ct);
+            var folderResult = await ImportFromFolderAsync(tempDir, progress, ct);
+            return folderResult with
+            {
+                NewEtag = newEtag,
+                NewContentHash = newContentHash
+            };
         }
         finally
         {

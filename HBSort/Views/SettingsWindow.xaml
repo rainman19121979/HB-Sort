@@ -653,8 +653,19 @@
                         </TextBlock>
 
                         <TextBlock FontSize="11" Foreground="Gray" Margin="0,0,0,4">
-                            <Run Text="Letzter Import: "/>
+                            <Run Text="Letzte Aktualisierung: "/>
                             <Run Text="{Binding LastBlImportText, Mode=OneWay}"/>
+                        </TextBlock>
+                        <!-- UX X.29 (v0.1.16): "Letzte Pruefung" nur wenn sie
+                             neuer ist als die letzte echte Aktualisierung -
+                             d.h. die letzten Pruefungen waren "schon aktuell"
+                             und haben keine Daten geaendert. -->
+                        <TextBlock FontSize="11" Foreground="Gray" Margin="0,0,0,4"
+                                   Visibility="{Binding ShowLastBlImportCheck, Converter={StaticResource BoolToVisibility}}"
+                                   ToolTip="Hier wurde geprueft, aber die Quelle hat seitdem nichts geaendert.">
+                            <Run Text="Letzte Pruefung: "/>
+                            <Run Text="{Binding LastBlImportCheckText, Mode=OneWay}"/>
+                            <Run Text=" (Daten waren unveraendert)" Foreground="Gray" FontStyle="Italic"/>
                         </TextBlock>
 
                         <CheckBox Content="Automatisch im Hintergrund aktualisieren"

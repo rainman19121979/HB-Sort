@@ -135,9 +135,34 @@ public class AppSettings
 
     /// <summary>
     /// Zeitstempel des letzten erfolgreichen BL-Imports (manuell oder Auto).
-    /// Null = noch nie. UTC.
+    /// "Erfolgreich" hier = Daten wurden tatsaechlich aktualisiert. Bei
+    /// HTTP-304/Hash-unveraendert wird stattdessen <see cref="LastBlImportCheck"/>
+    /// gesetzt. Null = noch nie. UTC.
     /// </summary>
     public DateTime? LastBlImport { get; set; }
+
+    /// <summary>
+    /// UX X.29 (v0.1.16): Zeitstempel der letzten Pruefung (auch wenn der
+    /// Inhalt unveraendert war und der Import uebersprungen wurde). Wird bei
+    /// jedem Auto-Import-Lauf gesetzt - User sieht in Settings dass die
+    /// Pruefung regelmaessig laeuft, auch wenn LastBlImport laenger her ist.
+    /// </summary>
+    public DateTime? LastBlImportCheck { get; set; }
+
+    /// <summary>
+    /// UX X.29 (v0.1.16): ETag aus dem letzten erfolgreichen ZIP-Download.
+    /// Wird beim naechsten Import als If-None-Match-Header geschickt -
+    /// GitHub liefert dann HTTP 304 zurueck wenn das ZIP unveraendert ist.
+    /// </summary>
+    public string? LastBlImportEtag { get; set; }
+
+    /// <summary>
+    /// UX X.29 (v0.1.16): SHA256-Hash des ZIP-Inhalts beim letzten erfolgreichen
+    /// Import. Wird verglichen wenn der Server keinen ETag liefert oder der
+    /// Etag-Cache verloren geht. Bei gleichem Hash wird die Verarbeitung
+    /// uebersprungen.
+    /// </summary>
+    public string? LastBlImportContentHash { get; set; }
 
     // ====================================================================
     // UX X.29 (v0.1.16): Backup-System (Block A)
