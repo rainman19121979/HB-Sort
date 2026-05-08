@@ -117,6 +117,15 @@ public partial class InventoryListView : UserControl
     private async void Delete_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button b || b.Tag is not InventoryRowItem row) return;
+
+        // UX X.28 (v0.1.15) Bug-Fix: ModernWpfUI ContentDialog erlaubt nur
+        // EINEN offenen Dialog gleichzeitig. Schnelles Mehrfach-Klicken auf
+        // verschiedene Loeschen-Buttons hat eine InvalidOperationException
+        // ausgeloest. Button waehrend des Delete-Vorgangs disablen schuetzt
+        // davor + ist UX-konsistent (User sieht "der Button reagiert nicht").
+        if (!b.IsEnabled) return;
+        b.IsEnabled = false;
+
         var notif = Service<INotificationService>();
         var dialogs = Service<IDialogService>();
 
@@ -156,6 +165,13 @@ public partial class InventoryListView : UserControl
         {
             Log.Error(ex, "Inventory Delete fehlgeschlagen");
             await dialogs.ShowErrorAsync("Fehler", ex.Message);
+        }
+        finally
+        {
+            // Button wieder freigeben (auch im Fehler-Fall + bei abgebrochener
+            // Confirmation). Falls der Button im Visual-Tree ersetzt wurde
+            // (z.B. weil die Liste neu geladen hat): kein Effekt, schadet nicht.
+            b.IsEnabled = true;
         }
     }
 }

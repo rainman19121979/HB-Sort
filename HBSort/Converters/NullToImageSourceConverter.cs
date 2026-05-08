@@ -78,7 +78,17 @@ public class NullToImageSourceConverter : IValueConverter
             // Freeze macht das Bild Thread-sicher und WPF-rendering-effizient.
             // Es ist nach dem Freeze unveraenderlich - perfekt fuer ein gecachtes
             // Bild aus einer Datei.
-            bmp.Freeze();
+            //
+            // UX X.28 (v0.1.15) Bug-Fix: bei manchen Quellen (z.B. fehlgeschlagene
+            // Brickognize-Thumbnail-Downloads, gestreamte Remote-Bilder noch im
+            // Download) wirft Freeze() eine InvalidOperationException 'Freezable
+            // kann nicht eingefroren werden'. Defensive: CanFreeze pruefen, sonst
+            // un-frozen zurueckgeben (funktioniert auch, nur weniger performant
+            // weil das Bild dann thread-affin bleibt).
+            if (bmp.CanFreeze)
+            {
+                bmp.Freeze();
+            }
             return bmp;
         }
         catch (Exception ex)
