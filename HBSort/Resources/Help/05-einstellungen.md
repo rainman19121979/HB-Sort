@@ -96,6 +96,41 @@ Manueller Import oben funktioniert immer unabhaengig vom Toggle.
 - **Vorab-Cache** beim Minifig-Scan - laed nach erkannter Figur
   schon mal alle Teile-Bilder im Hintergrund.
 
+## Backups
+
+Im Tab *Backups* kannst du deine Daten (Lagerfaecher, BL-Cache,
+Einstellungen) als ZIP sichern. Backups landen unter
+`%APPDATA%\HBSort\backups\`.
+
+### Automatisch beim App-Start
+
+Wenn aktiviert (Default an), erstellt HB-Sort beim App-Start ein neues
+Backup, sofern das letzte Backup laenger als das gewaehlte Intervall her
+ist (Taeglich / Woechentlich / Monatlich). Aelteste Backups werden
+automatisch entfernt sobald die "Anzahl behaltener Backups" ueberschritten
+wird.
+
+### Manuell
+
+Klick auf **Backup jetzt erstellen** loest einen sofortigen Backup-Lauf
+aus. Status-Text zeigt Erfolg + Datei-Groesse.
+
+### Wiederherstellen
+
+Klick **Wiederherstellen** an einem Backup-Eintrag oeffnet eine
+Bestaetigung. Bei *Ja* legt HB-Sort:
+
+1. ein automatisches Pre-Restore-Backup deines aktuellen Standes an
+   (taucht in derselben Liste auf - wenn etwas schief geht, kannst du
+   damit zurueck);
+2. die Backup-Dateien in einen Pending-Ordner;
+3. **startet die App automatisch neu**. Erst beim Neustart werden die
+   Datenbank-Dateien tatsaechlich ersetzt - direkter Restore zur
+   Laufzeit ist nicht moeglich, weil `userdata.db` und `bl_cache.db`
+   gerade geoeffnet sind.
+
+Loeschen-Button entfernt ein Backup dauerhaft (mit Bestaetigung).
+
 ## Lagerfaecher
 
 Liste aller Faecher mit Belegt/Frei-Status. Buttons:

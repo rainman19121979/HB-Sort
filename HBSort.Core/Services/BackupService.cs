@@ -34,6 +34,18 @@ public class BackupService : IBackupService
     // einen "-2"/"-3"-Counter angehaengt (siehe MakeUniqueFileName).
     private const string TimestampFormat = "yyyy-MM-dd-HHmmss";
 
+    /// <summary>
+    /// Name des Verzeichnisses fuer Pending-Restores. Vor jedem App-Start
+    /// pruefen, ob das existiert; falls ja, die enthaltenen Dateien in den
+    /// AppData-Pfad kopieren (siehe App.xaml.cs::ApplyPendingRestoreIfAny).
+    /// Direkter Restore zur Laufzeit scheitert weil userdata.db / bl_cache.db
+    /// von der laufenden App offen sind.
+    /// </summary>
+    public const string PendingRestoreDirName = ".pending-restore";
+
+    /// <summary>Marker-Datei im Pending-Verzeichnis - signalisiert Pre-DI-Restore.</summary>
+    public const string PendingRestoreMarkerFile = "RESTORE_PENDING.txt";
+
     // Dateien die ins Backup gepackt werden. Reihenfolge ist auch die
     // Reihenfolge im ZIP - macht das manuelle Inspizieren angenehmer.
     private static readonly string[] DbFiles = { "userdata.db", "bl_cache.db" };
@@ -148,62 +160,129 @@ public class BackupService : IBackupService
             return false;
         }
 
-        // Vor dem Restore ein Pre-Restore-Backup anlegen, damit ein
-        // versehentlicher Klick nichts unwiederbringbar zerstoert.
+        // 1. Vor dem Restore ein Pre-Restore-Backup anlegen, damit ein
+        //    versehentlicher Klick nichts unwiederbringbar zerstoert.
+        BackupResult? preRestore = null;
         try
         {
-            await CreateBackupAsync(ct);
-            Log.Information("Restore: Pre-Restore-Backup erfolgreich erzeugt");
+            preRestore = await CreateBackupAsync(ct);
+            Log.Information("Restore: Pre-Restore-Backup erfolgreich erzeugt: {File}",
+                preRestore.FileName);
         }
         catch (Exception ex)
         {
             Log.Warning(ex, "Restore: Pre-Restore-Backup fehlgeschlagen - " +
-                "Restore wird trotzdem fortgesetzt");
+                "Restore wird trotzdem als Pending vorbereitet");
         }
 
+        // 2. Pending-Restore-Verzeichnis vorbereiten. Direkter Restore in den
+        //    AppData-Pfad scheitert weil userdata.db / bl_cache.db von der
+        //    laufenden App offen sind. Stattdessen extrahieren wir die
+        //    Backup-Dateien in einen Pending-Ordner. Beim naechsten App-
+        //    Start (vor DI-Setup) werden sie in den Live-Pfad kopiert.
+        var pendingDir = Path.Combine(_appDataFolder, PendingRestoreDirName);
         try
         {
-            using var zip = ZipFile.OpenRead(backupPath);
+            if (Directory.Exists(pendingDir))
+                Directory.Delete(pendingDir, recursive: true);
+            Directory.CreateDirectory(pendingDir);
 
-            foreach (var entry in zip.Entries)
+            using (var zip = ZipFile.OpenRead(backupPath))
             {
-                ct.ThrowIfCancellationRequested();
-                var targetPath = Path.Combine(_appDataFolder, entry.FullName);
-
-                // Falls die Ziel-Datei vorhanden + offen ist (z.B. WAL aktiv):
-                // wir akzeptieren dass beim naechsten App-Start die WAL-
-                // Restore-Logik von SQLite das wieder zusammenfuehrt.
-                Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
-
-                // Vor dem Ueberschreiben: alte Datei via .restore-old-Suffix
-                // umbenennen, damit Windows den File-Lock loslaesst (falls eine
-                // App noch lebt). Best-effort.
-                if (File.Exists(targetPath))
+                foreach (var entry in zip.Entries)
                 {
-                    try
-                    {
-                        var oldPath = targetPath + ".restore-old-" + Guid.NewGuid().ToString("N");
-                        File.Move(targetPath, oldPath);
-                        try { File.Delete(oldPath); } catch { /* spaeter aufraeumen */ }
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Warning(ex, "Restore: Konnte {File} nicht weg-renamen, " +
-                            "versuche direkt zu ueberschreiben", targetPath);
-                    }
+                    ct.ThrowIfCancellationRequested();
+                    if (string.IsNullOrEmpty(entry.Name)) continue; // Verzeichnis-Eintraege
+                    var targetFile = Path.Combine(pendingDir, entry.Name);
+                    entry.ExtractToFile(targetFile, overwrite: false);
                 }
-
-                entry.ExtractToFile(targetPath, overwrite: true);
             }
 
-            Log.Information("Restore aus '{File}' erfolgreich", backupFileName);
+            // 3. Marker-Datei. Beim App-Start signalisiert sie den
+            //    ApplyPendingRestore-Pfad und enthaelt Audit-Info.
+            var markerPath = Path.Combine(pendingDir, PendingRestoreMarkerFile);
+            await File.WriteAllTextAsync(markerPath,
+                $"Restore wurde am {DateTime.UtcNow:o} aus '{backupFileName}' eingeleitet.\n" +
+                $"Pre-Restore-Backup: {preRestore?.FileName ?? "(fehlgeschlagen)"}\n" +
+                $"Wird beim naechsten App-Start angewendet.\n",
+                ct);
+
+            Log.Information("Restore: {Count} Datei(en) nach {Dir} bereitgelegt - App-Neustart erforderlich",
+                Directory.GetFiles(pendingDir).Length, pendingDir);
             return true;
         }
         catch (InvalidDataException ex)
         {
             Log.Error(ex, "Restore: Backup-ZIP {File} ist beschaedigt", backupFileName);
+            // Pending-Ordner wieder weg damit kein halbfertiges Restore beim
+            // naechsten Start angewendet wird.
+            try { if (Directory.Exists(pendingDir)) Directory.Delete(pendingDir, true); }
+            catch { /* egal */ }
             return false;
         }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Restore: Pending-Vorbereitung fehlgeschlagen");
+            try { if (Directory.Exists(pendingDir)) Directory.Delete(pendingDir, true); }
+            catch { /* egal */ }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Wendet einen vorbereiteten Pending-Restore an. Wird vom App-Startup
+    /// VOR DI-Setup aufgerufen, daher ohne Logger-Dependency und ohne
+    /// Service-Lookups. Liefert true wenn ein Pending-Restore erfolgreich
+    /// angewendet wurde, false wenn keiner vorlag, throwt bei Fehler.
+    ///
+    /// Nicht zur Laufzeit aufrufen - die Restore-Pfade waeren dann blockiert
+    /// von offenen DB-Connections.
+    /// </summary>
+    /// <param name="appDataFolder">AppData-Pfad (Live-Verzeichnis).</param>
+    /// <returns>true wenn etwas restored wurde, false wenn nichts pendete.</returns>
+    public static bool TryApplyPendingRestore(string appDataFolder)
+    {
+        var pendingDir = Path.Combine(appDataFolder, PendingRestoreDirName);
+        var markerPath = Path.Combine(pendingDir, PendingRestoreMarkerFile);
+        if (!Directory.Exists(pendingDir) || !File.Exists(markerPath))
+            return false;
+
+        // Alle Dateien aus dem Pending-Verzeichnis (ausser Marker) in den
+        // AppData-Pfad kopieren. Der Pending-Ordner liegt INNERHALB von
+        // AppData (Hidden-Dot-Folder), wird aber separat behandelt -
+        // wir kopieren nur die einzelnen Dateien rueber.
+        var pendingFiles = Directory.GetFiles(pendingDir, "*", SearchOption.TopDirectoryOnly);
+        var restoredFiles = new List<string>();
+        foreach (var sourcePath in pendingFiles)
+        {
+            var fileName = Path.GetFileName(sourcePath);
+            if (string.Equals(fileName, PendingRestoreMarkerFile, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var targetPath = Path.Combine(appDataFolder, fileName);
+            File.Copy(sourcePath, targetPath, overwrite: true);
+            restoredFiles.Add(fileName);
+        }
+
+        // SQLite-WAL/SHM-Sidecar-Dateien fuer die restorten DBs entfernen.
+        // Sonst denkt SQLite die DB sei in einem inkonsistenten Zustand
+        // (WAL referenziert die alten Pages, restorete DB hat aber neue).
+        foreach (var file in restoredFiles)
+        {
+            // Nur SQLite-Dateien betreffen - Endung .db als Heuristik.
+            if (!file.EndsWith(".db", StringComparison.OrdinalIgnoreCase)) continue;
+            var walPath = Path.Combine(appDataFolder, file + "-wal");
+            var shmPath = Path.Combine(appDataFolder, file + "-shm");
+            try { if (File.Exists(walPath)) File.Delete(walPath); } catch { /* best-effort */ }
+            try { if (File.Exists(shmPath)) File.Delete(shmPath); } catch { /* best-effort */ }
+        }
+
+        // Pending-Ordner aufraeumen damit der naechste Start ihn nicht
+        // erneut anwendet.
+        try { Directory.Delete(pendingDir, recursive: true); }
+        catch { /* nicht kritisch - beim naechsten Start nochmal versuchen */ }
+
+        return true;
     }
 
     public async Task<bool> DeleteBackupAsync(string backupFileName, CancellationToken ct = default)

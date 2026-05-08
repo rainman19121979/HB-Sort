@@ -148,9 +148,11 @@ public class BackupServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task RestoreBackup_overwrites_target_files()
+    public async Task RestoreBackup_prepares_pending_directory_with_files()
     {
-        // Original anlegen + Backup machen.
+        // Restore zur Laufzeit kann die Live-DBs nicht ueberschreiben (File-
+        // Lock von offenen Connections), deshalb extrahiert RestoreBackupAsync
+        // ins .pending-restore-Verzeichnis und der App-Start wendet es an.
         var dbPath = Path.Combine(_tempDir, "userdata.db");
         await SeedSqliteDb(dbPath, "INSERT INTO test VALUES ('original')");
         await File.WriteAllTextAsync(Path.Combine(_tempDir, "settings.json"),
@@ -158,17 +160,74 @@ public class BackupServiceTests : IDisposable
 
         var backup = await _sut.CreateBackupAsync();
 
-        // Original modifizieren.
+        // Live-Dateien modifizieren - Restore darf das jetzt NICHT direkt
+        // ueberschreiben.
         await File.WriteAllTextAsync(Path.Combine(_tempDir, "settings.json"),
             "{\"version\":\"modified\"}");
 
-        // Restore.
         var ok = await _sut.RestoreBackupAsync(backup.FileName);
         Assert.True(ok);
 
-        // settings.json ist wieder Original.
-        var settings = await File.ReadAllTextAsync(Path.Combine(_tempDir, "settings.json"));
-        Assert.Equal("{\"version\":\"original\"}", settings);
+        // Live-Datei ist UNVERAENDERT (Restore noch nicht angewendet).
+        var live = await File.ReadAllTextAsync(Path.Combine(_tempDir, "settings.json"));
+        Assert.Equal("{\"version\":\"modified\"}", live);
+
+        // .pending-restore-Verzeichnis enthaelt die Backup-Dateien.
+        var pendingDir = Path.Combine(_tempDir, BackupService.PendingRestoreDirName);
+        Assert.True(Directory.Exists(pendingDir));
+        var pendingSettings = await File.ReadAllTextAsync(
+            Path.Combine(pendingDir, "settings.json"));
+        Assert.Equal("{\"version\":\"original\"}", pendingSettings);
+
+        // Marker-Datei vorhanden.
+        Assert.True(File.Exists(Path.Combine(pendingDir, BackupService.PendingRestoreMarkerFile)));
+    }
+
+    [Fact]
+    public async Task TryApplyPendingRestore_replaces_live_files_and_cleans_up()
+    {
+        var dbPath = Path.Combine(_tempDir, "userdata.db");
+        await SeedSqliteDb(dbPath, "INSERT INTO test VALUES ('original')");
+        await File.WriteAllTextAsync(Path.Combine(_tempDir, "settings.json"),
+            "{\"version\":\"original\"}");
+
+        var backup = await _sut.CreateBackupAsync();
+
+        // Live-Dateien modifizieren.
+        await File.WriteAllTextAsync(Path.Combine(_tempDir, "settings.json"),
+            "{\"version\":\"modified\"}");
+
+        // Restore vorbereiten (legt Pending an).
+        await _sut.RestoreBackupAsync(backup.FileName);
+
+        // WAL-File simulieren (vom modifizierten DB-Stand).
+        var walPath = dbPath + "-wal";
+        await File.WriteAllTextAsync(walPath, "fake-wal-content");
+        var shmPath = dbPath + "-shm";
+        await File.WriteAllTextAsync(shmPath, "fake-shm-content");
+
+        // Pending anwenden (simuliert App-Start nach Neustart).
+        var applied = BackupService.TryApplyPendingRestore(_tempDir);
+        Assert.True(applied);
+
+        // Live-Datei ist jetzt das Original.
+        var live = await File.ReadAllTextAsync(Path.Combine(_tempDir, "settings.json"));
+        Assert.Equal("{\"version\":\"original\"}", live);
+
+        // Pending-Ordner ist weg.
+        var pendingDir = Path.Combine(_tempDir, BackupService.PendingRestoreDirName);
+        Assert.False(Directory.Exists(pendingDir));
+
+        // WAL/SHM-Sidecar-Files wurden geloescht (sonst inkonsistenter SQLite-State).
+        Assert.False(File.Exists(walPath));
+        Assert.False(File.Exists(shmPath));
+    }
+
+    [Fact]
+    public void TryApplyPendingRestore_returns_false_when_nothing_pending()
+    {
+        var applied = BackupService.TryApplyPendingRestore(_tempDir);
+        Assert.False(applied);
     }
 
     [Fact]
@@ -194,6 +253,25 @@ public class BackupServiceTests : IDisposable
         // Nach dem Restore: 2 Backups (original + Pre-Restore).
         var after = await _sut.ListBackupsAsync();
         Assert.Equal(2, after.Count);
+    }
+
+    [Fact]
+    public async Task RestoreBackup_overwrites_old_pending_restore()
+    {
+        // Wenn ein alter Pending-Restore existiert (z.B. von einem Versuch
+        // den der User nicht zu Ende gebracht hat), soll der neue Restore
+        // ihn ersetzen statt zu mergen.
+        var pendingDir = Path.Combine(_tempDir, BackupService.PendingRestoreDirName);
+        Directory.CreateDirectory(pendingDir);
+        await File.WriteAllTextAsync(Path.Combine(pendingDir, "garbage.txt"), "stale");
+
+        await File.WriteAllTextAsync(Path.Combine(_tempDir, "settings.json"), "{}");
+        var backup = await _sut.CreateBackupAsync();
+
+        var ok = await _sut.RestoreBackupAsync(backup.FileName);
+        Assert.True(ok);
+        // garbage.txt wurde durch das Re-Init des Pending-Ordners entfernt.
+        Assert.False(File.Exists(Path.Combine(pendingDir, "garbage.txt")));
     }
 
     [Fact]

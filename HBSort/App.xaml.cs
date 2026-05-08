@@ -70,7 +70,16 @@ public partial class App : Application
         var splash = new SplashWindow();
         splash.Show();
 
-        // 0. Auto-Migration: alter Datenbestand (LegoMinifigSorter) -> neuer Pfad (HBSort).
+        // 0a. Pending-Restore-Check (UX X.29 / v0.1.16). Muss VOR allem
+        // anderen laufen damit zur Laufzeit keine SQLite-Connection das
+        // userdata.db / bl_cache.db File-Lock haelt. Direkter Restore zur
+        // Laufzeit ist nicht moeglich - deshalb hat der User-Klick auf
+        // "Wiederherstellen" die Files in %APPDATA%\HBSort\.pending-restore\
+        // gelegt + den Prozess neu gestartet. Hier wird das jetzt
+        // angewendet.
+        TryApplyPendingRestoreSafe();
+
+        // 0b. Auto-Migration: alter Datenbestand (LegoMinifigSorter) -> neuer Pfad (HBSort).
         // Muss VOR EnsureDirectories laufen, weil wir den neuen Ordner sonst leer anlegen.
         await MigrateLegacyAppDataIfNeededAsync();
 
@@ -348,6 +357,50 @@ public partial class App : Application
         var context = scope.ServiceProvider.GetRequiredService<UserDataContext>();
         await context.Database.MigrateAsync();
         Log.Information("Datenbank userdata.db bereit");
+    }
+
+    /// <summary>
+    /// UX X.29 (v0.1.16): wendet einen vorbereiteten Pending-Restore an,
+    /// falls einer in %APPDATA%\HBSort\.pending-restore\ liegt.
+    ///
+    /// Wird ZU ANFANG von Application_Startup aufgerufen, BEVOR Logging,
+    /// DI oder DB-Init laufen - sonst haelt eine offene SqliteConnection
+    /// das File-Lock auf userdata.db / bl_cache.db und der Restore
+    /// scheitert mit IOException.
+    ///
+    /// Logging kann hier nur Debug.WriteLine + MessageBox sein, weil
+    /// Serilog noch nicht initialisiert ist.
+    /// </summary>
+    private static void TryApplyPendingRestoreSafe()
+    {
+        try
+        {
+            if (!Directory.Exists(AppDataFolder)) return;
+            var applied = HBSort.Core.Services.BackupService.TryApplyPendingRestore(AppDataFolder);
+            if (applied)
+            {
+                Debug.WriteLine("[Restore] Pending-Restore beim App-Start angewendet.");
+            }
+        }
+        catch (Exception ex)
+        {
+            // Beim Pre-DI-Restore ist der Logger noch nicht initialisiert -
+            // wir muessen den User direkt informieren via MessageBox.
+            Debug.WriteLine($"[Restore] Anwendung des Pending-Restore fehlgeschlagen: {ex}");
+            try
+            {
+                MessageBox.Show(
+                    $"Beim Wiederherstellen eines Backups ist ein Fehler aufgetreten:\n\n" +
+                    $"{ex.Message}\n\n" +
+                    $"Die Backup-Dateien liegen in:\n{Path.Combine(AppDataFolder, ".pending-restore")}\n\n" +
+                    "Bitte schliesse die App, kopiere die Dateien dort manuell in den AppData-Ordner " +
+                    "und starte neu. Der Pending-Ordner wird beim naechsten Erfolg automatisch geloescht.",
+                    "Restore-Fehler",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            catch { /* MessageBox kann auch fehlschlagen wenn das Display nicht da ist */ }
+        }
     }
 
     /// <summary>

@@ -1197,7 +1197,12 @@ public partial class SettingsViewModel : ObservableObject
         }
     }
 
-    /// <summary>Stellt ein Backup wieder her. Mit Pre-Restore-Backup im Service.</summary>
+    /// <summary>
+    /// Bereitet einen Restore vor. Wirft die Backup-Dateien in den
+    /// Pending-Ordner und meldet zurueck dass der App-Neustart noetig ist.
+    /// Tatsaechlicher File-Replace passiert beim naechsten App-Start
+    /// (siehe App.xaml.cs::TryApplyPendingRestoreSafe).
+    /// </summary>
     public async Task<bool> RestoreBackupAsync(string fileName)
     {
         try

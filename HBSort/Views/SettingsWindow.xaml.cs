@@ -425,31 +425,58 @@ public partial class SettingsWindow : Window
                 "Backup wiederherstellen?",
                 $"Aktuelle Daten werden mit dem Backup vom " +
                 $"{row.CreatedAtDisplay} ueberschrieben.\n\n" +
-                $"Vor dem Wiederherstellen wird automatisch ein Pre-Restore-Backup " +
-                $"deines aktuellen Standes angelegt.\n\n" +
-                $"Nach dem Wiederherstellen muss die App neu gestartet werden, " +
-                $"damit die Aenderungen wirksam werden.\n\n" +
-                $"Wirklich wiederherstellen?");
+                $"Vor dem Restore wird automatisch ein Sicherungs-Backup deiner " +
+                $"aktuellen Daten erstellt - falls etwas schiefgeht, kannst du " +
+                $"das ueber dieselbe Liste wiederherstellen.\n\n" +
+                $"Die App startet danach automatisch neu, damit die Datenbank-" +
+                $"Dateien korrekt ersetzt werden koennen.\n\n" +
+                $"Wirklich fortfahren?");
             if (!ok) return;
 
             var success = await _viewModel.RestoreBackupAsync(row.FileName);
-            var notif = App.Services.GetRequiredService<INotificationService>();
-            if (success)
-            {
-                BackupStatusText.Text = $"Wiederhergestellt aus '{row.FileName}'. Bitte App neu starten.";
-                await dialogs.ShowInfoAsync(
-                    "Wiederherstellung erfolgreich",
-                    "Bitte beende die App jetzt und starte sie neu, " +
-                    "damit die wiederhergestellten Daten geladen werden.");
-            }
-            else
+            if (!success)
             {
                 BackupStatusText.Text = "Wiederherstellung fehlgeschlagen.";
                 await dialogs.ShowErrorAsync(
                     "Fehler",
-                    "Das Backup konnte nicht wiederhergestellt werden. " +
+                    "Das Backup konnte nicht vorbereitet werden. " +
                     "Pruefe die Logs fuer Details.");
+                return;
             }
+
+            BackupStatusText.Text = "Restore vorbereitet. App startet jetzt neu...";
+            // Kurz Zeit lassen damit der Status sichtbar wird.
+            await System.Threading.Tasks.Task.Delay(800);
+
+            // Settings sauber speichern + App-Neustart triggern.
+            // Process.Start auf den eigenen Pfad + Application.Shutdown
+            // (analog zu Velopack-Update-Pfad aus UX X.23).
+            await App.Services.GetRequiredService<ISettingsService>().SaveAsync();
+
+            try
+            {
+                var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                if (!string.IsNullOrEmpty(exePath))
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = exePath,
+                        UseShellExecute = true
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Auto-Neustart nach Restore fehlgeschlagen - " +
+                    "User muss manuell starten");
+                await dialogs.ShowInfoAsync(
+                    "Bitte App neu starten",
+                    "Der Auto-Neustart hat nicht funktioniert. Schliesse die " +
+                    "App jetzt manuell und starte sie neu - der Restore wird " +
+                    "dann automatisch angewendet.");
+            }
+
+            Application.Current.Shutdown();
         }
         finally
         {
