@@ -248,4 +248,28 @@ public class PersistMinifigResult
 
     /// <summary>True wenn nach Reverse-Match alle Required-Parts komplett sind.</summary>
     public bool IsFullyComplete { get; init; }
+
+    /// <summary>
+    /// UX X.32 Block C (v0.1.19): Pro konsumiertem FloatingPart eine Info-
+    /// Zeile fuers Sammel-Popup. Wird nur befuellt wenn Reverse-Match
+    /// tatsaechlich Teile genommen hat. Bin-Label ist das Quell-Fach
+    /// (wo der FloatingPart vorher lag).
+    /// </summary>
+    public List<ConsumedFloatingPartInfo> ConsumedFloatingParts { get; init; } = new();
+}
+
+/// <summary>
+/// UX X.32 Block C (v0.1.19): Info-Block ueber einen einzelnen Reverse-
+/// Match-Konsum (vom UI-Layer als BinInstructionItem visualisiert).
+/// </summary>
+public class ConsumedFloatingPartInfo
+{
+    public string BlPartNo { get; init; } = string.Empty;
+    public int BlColorId { get; init; }
+    public string PartName { get; init; } = string.Empty;
+    public string ColorName { get; init; } = string.Empty;
+    public int Quantity { get; init; }
+
+    /// <summary>Label des Quell-Fachs (wo der FloatingPart konsumiert wurde).</summary>
+    public string SourceBinLabel { get; init; } = string.Empty;
 }

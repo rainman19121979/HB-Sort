@@ -60,7 +60,12 @@ public partial class PendingMinifigViewModel : ObservableObject
 
     private void OnPartChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(PendingPartViewModel.IsCollected))
+        // UX X.32 (v0.1.19): auch QuantityCollected einzeln tracken - bei
+        // Quantity > 1 aendert ein Wechsel 0->1 nicht IsCollected, aber
+        // HasAnyCollected geht von false auf true und der "Direkt zerlegen"-
+        // Button muss sichtbar werden.
+        if (e.PropertyName == nameof(PendingPartViewModel.IsCollected)
+         || e.PropertyName == nameof(PendingPartViewModel.QuantityCollected))
             RaiseCollectedDerived();
     }
 
@@ -70,10 +75,19 @@ public partial class PendingMinifigViewModel : ObservableObject
         OnPropertyChanged(nameof(PartsHeaderLabel));
         OnPropertyChanged(nameof(PersistButtonText));
         OnPropertyChanged(nameof(WillBeComplete));
+        OnPropertyChanged(nameof(HasAnyCollected));
     }
 
     /// <summary>Anzahl Teile die der User vorab markiert hat ("habe ich bereits").</summary>
     public int CollectedCount => Parts.Count(p => p.IsCollected);
+
+    /// <summary>
+    /// UX X.32 Block B (v0.1.19): True wenn mindestens ein Teil eine Sammel-
+    /// Menge >0 hat. Steuert die Sichtbarkeit des "Direkt zerlegen"-Buttons
+    /// in der MinifigDetailView - nur sinnvoll wenn ueberhaupt etwas zu
+    /// zerlegen waere.
+    /// </summary>
+    public bool HasAnyCollected => Parts.Count > 0 && Parts.Any(p => p.QuantityCollected > 0);
 
     /// <summary>Header-Label fuer die Teileliste.</summary>
     public string PartsHeaderLabel => CollectedCount > 0

@@ -49,6 +49,29 @@ BrickStore- und BrickLink-Export.
   markieren und gemeinsam loeschen oder verschieben (mit Undo-Support).
   Doppelklick auf Zeile oeffnet Details, Entf-Taste loescht Selektion.
 
+## v0.1.19-beta.1: Beta-Release
+
+Diese Version ist ein **Pre-Release** zum Testen vor v0.1.19 stable.
+Auto-Update aus v0.1.18 zieht NICHT automatisch - manueller Download
+via `HBSort-win-Setup.exe` aus den Release-Assets noetig falls du
+testen willst.
+
+### Was ist neu in v0.1.19
+
+- **Direkt-Zerlegen beim Scannen**: hast du eine Figur gescannt, aber
+  nur einzelne Teile davon und willst nicht die ganze Figur in der
+  Lagerliste haben? Klick auf "Direkt zerlegen" in der Pending-View.
+  Die markierten Teile werden als Einzelteile in passende Faecher
+  einsortiert, die Figur selbst wird verworfen.
+- **Sammel-Popup statt Einzel-Popup**: bei mehreren Teilen auf einmal
+  (Direkt-Zerlegen oder Reverse-Match mit 2+ konsumierten Teilen)
+  zeigt HB-Sort eine Liste mit allen "Lege X in Box Y"-Anweisungen
+  auf einen Blick. Schliesst per Enter, Klick oder Esc.
+- **Lagerfach-Vorschlag pro Teil im Zerlegen-Dialog**: jedes Teil
+  bekommt ein eigenes Default-Fach - wenn dasselbe Teil schon irgendwo
+  liegt, waechst der Stapel; sonst geht es in ein wirklich freies Fach
+  ohne Complete-Figuren drin.
+
 ## Was ist neu in v0.1.18
 
 - **Konsistente Lagerfach-Vorschlaege**: wartende Figuren bekommen ein

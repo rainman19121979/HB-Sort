@@ -116,4 +116,69 @@ public class PendingMinifigViewModelTests
         p.QuantityCollected = 3; Assert.True(vm.WillBeComplete);
         p.QuantityCollected = 2; Assert.False(vm.WillBeComplete);
     }
+
+    // ====================================================================
+    // UX X.32 Block B (v0.1.19): HasAnyCollected (steuert "Direkt zerlegen")
+    // ====================================================================
+
+    [Fact]
+    public void HasAnyCollected_is_false_when_no_parts()
+    {
+        var vm = new PendingMinifigViewModel { NumParts = 0 };
+        Assert.False(vm.HasAnyCollected);
+    }
+
+    [Fact]
+    public void HasAnyCollected_is_false_when_all_parts_uncollected()
+    {
+        var vm = new PendingMinifigViewModel { NumParts = 2 };
+        vm.Parts.Add(MakePart(1, 0));
+        vm.Parts.Add(MakePart(1, 0));
+        Assert.False(vm.HasAnyCollected);
+    }
+
+    [Fact]
+    public void HasAnyCollected_becomes_true_on_first_quantity_increase()
+    {
+        // Quantity=3 + Collected 0->1 aendert NICHT IsCollected, aber
+        // HasAnyCollected geht false->true. Das beweist dass OnPartChanged
+        // auch QuantityCollected (nicht nur IsCollected) trackt.
+        var vm = new PendingMinifigViewModel { NumParts = 2 };
+        var p1 = MakePart(3, 0);
+        var p2 = MakePart(2, 0);
+        vm.Parts.Add(p1);
+        vm.Parts.Add(p2);
+        Assert.False(vm.HasAnyCollected);
+
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        p1.QuantityCollected = 1;
+
+        Assert.True(vm.HasAnyCollected);
+        Assert.Contains(nameof(PendingMinifigViewModel.HasAnyCollected), changed);
+    }
+
+    [Fact]
+    public void HasAnyCollected_drops_back_to_false_when_last_collected_unset()
+    {
+        var vm = new PendingMinifigViewModel { NumParts = 1 };
+        var p = MakePart(2, 1);
+        vm.Parts.Add(p);
+        Assert.True(vm.HasAnyCollected);
+
+        p.QuantityCollected = 0;
+
+        Assert.False(vm.HasAnyCollected);
+    }
+
+    [Fact]
+    public void HasAnyCollected_remains_true_when_one_of_many_collected()
+    {
+        var vm = new PendingMinifigViewModel { NumParts = 3 };
+        vm.Parts.Add(MakePart(1, 1));
+        vm.Parts.Add(MakePart(1, 0));
+        vm.Parts.Add(MakePart(1, 0));
+        Assert.True(vm.HasAnyCollected);
+    }
 }

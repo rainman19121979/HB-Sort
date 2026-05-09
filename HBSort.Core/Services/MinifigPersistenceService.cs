@@ -546,11 +546,18 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         //    bereits FloatingParts mit derselben Part-No+Color-Id liegen.
         var reverseMatched = 0;
         var completedParts = 0;
+        // UX X.32 Block C (v0.1.19): pro Konsum-Vorgang ein Info-Eintrag
+        // fuers Sammel-Popup. Aggregiert pro (PartNo, ColorId, BinId) -
+        // wenn ein Required-Part aus 2 Faechern bedient wird, zwei Eintraege.
+        var consumed = new List<ConsumedFloatingPartInfo>();
 
         foreach (var required in minifig.RequiredParts)
         {
-            // Alle passenden FloatingParts (egal in welchem Fach), aelteste zuerst
+            // Alle passenden FloatingParts (egal in welchem Fach), aelteste zuerst.
+            // Include(StorageBin) damit wir das Fach-Label fuer das Sammel-Popup
+            // ohne Extra-Query haben.
             var candidates = await ctx.FloatingParts
+                .Include(fp => fp.StorageBin)
                 .Where(fp => fp.PartNumber == required.PartNumber
                           && fp.ColorId == required.ColorId)
                 .OrderBy(fp => fp.AddedAt)
@@ -565,6 +572,16 @@ public class MinifigPersistenceService : IMinifigPersistenceService
                 required.QuantityCollected += take;
                 fp.Quantity -= take;
                 reverseMatched += take;
+
+                consumed.Add(new ConsumedFloatingPartInfo
+                {
+                    BlPartNo = required.PartNumber,
+                    BlColorId = required.ColorId,
+                    PartName = required.PartName,
+                    ColorName = required.ColorName,
+                    Quantity = take,
+                    SourceBinLabel = fp.StorageBin?.Label ?? string.Empty
+                });
 
                 if (fp.Quantity <= 0)
                 {
@@ -623,7 +640,8 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             SavedMinifig = minifig,
             ReverseMatchedFloating = reverseMatched,
             CompletedRequiredParts = completedParts,
-            IsFullyComplete = isComplete
+            IsFullyComplete = isComplete,
+            ConsumedFloatingParts = consumed
         };
     }
 

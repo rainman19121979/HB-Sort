@@ -1,6 +1,12 @@
 using System.Windows;
 using System.Windows.Controls;
+using HBSort.Core.Database;
+using HBSort.Core.Services;
+using HBSort.Services;
 using HBSort.ViewModels;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 
 namespace HBSort.Views;
 
@@ -58,5 +64,72 @@ public partial class MinifigDetailView : UserControl
         var vm = GetScanViewModel();
         if (vm == null) return;
         await vm.TransferFloatingPartToPendingAsync(part);
+    }
+
+    /// <summary>
+    /// UX X.32 Block B (v0.1.19): "Direkt zerlegen" - oeffnet den DismantleWizard
+    /// im Pending-Mode. Die Figur landet NICHT in der Lagerliste; nur die
+    /// markierten Teile werden als Einzelteile in die jeweils passenden Faecher
+    /// gelegt. Nach erfolgreichem Wizard-Confirm wird das Pending ausgeblendet
+    /// und das Sammel-Popup mit den Bin-Anweisungen gezeigt.
+    /// </summary>
+    private async void DirectDismantle_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not PendingMinifigViewModel pending) return;
+        var scan = GetScanViewModel();
+        if (scan == null) return;
+
+        var collected = pending.Parts.Where(p => p.QuantityCollected > 0).ToList();
+        if (collected.Count == 0)
+        {
+            App.Services.GetRequiredService<INotificationService>()
+                .ShowWarning("Keine Teile markiert - nichts zu zerlegen.");
+            return;
+        }
+
+        // Wizard im Pending-Mode (TrackedMinifigId=0) bauen, analog zum
+        // Standard-Pfad in MinifigSummaryDialog.
+        var ctxFactory = App.Services.GetRequiredService<IDbContextFactory<UserDataContext>>();
+        var binService = App.Services.GetRequiredService<IStorageBinService>();
+        var persistence = App.Services.GetRequiredService<IMinifigPersistenceService>();
+        var notif = App.Services.GetRequiredService<INotificationService>();
+        var imgProvider = App.Services.GetRequiredService<IPartImageProvider>();
+        var catalog = App.Services.GetRequiredService<IBlCatalogService>();
+        var partLookup = App.Services.GetRequiredService<IPartLookupService>();
+
+        var wizardVm = new DismantleWizardViewModel(
+            trackedMinifigId: 0,
+            ctxFactory, binService, persistence,
+            imgProvider, catalog, partLookup);
+
+        try
+        {
+            await wizardVm.LoadFromPendingAsync(pending);
+        }
+        catch (System.Exception ex)
+        {
+            Log.Error(ex, "DirectDismantle LoadFromPending fehlgeschlagen");
+            notif.ShowError($"Fehler beim Vorbereiten: {ex.Message}");
+            return;
+        }
+
+        var dialog = new DismantleWizardDialog(wizardVm, notif)
+        {
+            Owner = Window.GetWindow(this)
+        };
+
+        var result = dialog.ShowDialog();
+        if (result == true)
+        {
+            // Pending wegblenden (gleicher Pfad wie nach Persist).
+            scan.PendingMinifig = null;
+            scan.MinifigStatusText = string.Empty;
+
+            // Sammel-Popup mit den Bin-Anweisungen aus dem Wizard.
+            if (wizardVm.LastBinInstructionItems.Count > 0)
+            {
+                scan.ShowBinInstructionGroup(wizardVm.LastBinInstructionItems);
+            }
+        }
     }
 }

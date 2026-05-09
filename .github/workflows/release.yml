@@ -28,7 +28,8 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v*.*.*'        # Stable: v0.1.19
+      - 'v*.*.*-*'      # Beta/RC: v0.1.19-beta.1, v0.1.19-rc.1 (UX X.32)
 
 permissions:
   contents: write   # benoetigt fuer das Anlegen des Releases
@@ -47,15 +48,32 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      assembly_version: ${{ steps.version.outputs.assembly_version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - name: Extract version from tag
         id: version
         shell: bash
         run: |
-          # Tag-Name ist "v0.1.0" -> Version "0.1.0".
+          # Tag-Name "v0.1.19" -> Version "0.1.19", prerelease=false
+          # Tag-Name "v0.1.19-beta.1" -> Version "0.1.19-beta.1", prerelease=true
           version="${GITHUB_REF_NAME#v}"
+
+          # AssemblyVersion (Windows-Version-Resource akzeptiert nur Numerik)
+          # = Version ohne Suffix. "0.1.19-beta.1" -> "0.1.19"
+          assembly_version="${version%%-*}"
+
+          # Prerelease wenn Tag einen Suffix nach der Version hat
+          if [[ "$version" == *-* ]]; then
+              prerelease="true"
+          else
+              prerelease="false"
+          fi
+
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Release-Version: $version"
+          echo "assembly_version=$assembly_version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "Release-Version: $version (assembly=$assembly_version, prerelease=$prerelease)"
 
   # ====================================================================
   # JOB 2: Self-Contained Single-File ZIP. Genau wie vor UX X.23.
@@ -88,6 +106,8 @@ jobs:
         # Single-File mit IncludeNativeLibrariesForSelfExtract=true, damit
         # OpenCvSharp4-Native-DLLs beim Start in einen Temp-Ordner extrahiert
         # werden. ReadyToRun fuer schnelleren Erststart.
+        # UX X.32: AssemblyVersion/FileVersion ohne Suffix (Win-Version-
+        # Resource akzeptiert nur Numerik), InformationalVersion mit Suffix.
         run: |
           dotnet publish HBSort/HBSort.csproj `
             -c Release `
@@ -98,8 +118,8 @@ jobs:
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:PublishReadyToRun=true `
             -p:Version=${{ needs.setup.outputs.version }} `
-            -p:AssemblyVersion=${{ needs.setup.outputs.version }}.0 `
-            -p:FileVersion=${{ needs.setup.outputs.version }}.0 `
+            -p:AssemblyVersion=${{ needs.setup.outputs.assembly_version }}.0 `
+            -p:FileVersion=${{ needs.setup.outputs.assembly_version }}.0 `
             -p:InformationalVersion=${{ needs.setup.outputs.version }} `
             -o publish/win-x64
 
@@ -134,7 +154,7 @@ jobs:
           body_path: release_notes.md
           name: HB-Sort ${{ needs.setup.outputs.version }}
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.setup.outputs.prerelease == 'true' }}
 
   # ====================================================================
   # JOB 3: Velopack-Setup.exe + Auto-Update-Artefakte. Laeuft NACH
@@ -166,6 +186,8 @@ jobs:
         # PublishSingleFile hier - im Gegensatz zum ZIP-Job. Self-Contained
         # bleibt true, damit der Setup-User keine .NET-Runtime installieren
         # muss. ReadyToRun gleich.
+        # UX X.32: AssemblyVersion/FileVersion ohne Suffix (Win-Version-
+        # Resource akzeptiert nur Numerik), InformationalVersion mit Suffix.
         run: |
           dotnet publish HBSort/HBSort.csproj `
             -c Release `
@@ -175,8 +197,8 @@ jobs:
             -p:PublishSingleFile=false `
             -p:PublishReadyToRun=true `
             -p:Version=${{ needs.setup.outputs.version }} `
-            -p:AssemblyVersion=${{ needs.setup.outputs.version }}.0 `
-            -p:FileVersion=${{ needs.setup.outputs.version }}.0 `
+            -p:AssemblyVersion=${{ needs.setup.outputs.assembly_version }}.0 `
+            -p:FileVersion=${{ needs.setup.outputs.assembly_version }}.0 `
             -p:InformationalVersion=${{ needs.setup.outputs.version }} `
             -o publish/velopack-input
 
@@ -233,4 +255,4 @@ jobs:
           # name + body weglassen damit kein Overwrite des bestehenden Release-
           # Bodys; softprops behaelt die alten Werte.
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.setup.outputs.prerelease == 'true' }}

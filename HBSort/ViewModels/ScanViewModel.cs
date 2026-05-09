@@ -273,6 +273,29 @@ public partial class ScanViewModel : ObservableObject
     /// </summary>
     public bool IsBinInstructionVisible => BinInstruction.IsVisible;
 
+    // ====================================================================
+    // UX X.32 Block C (v0.1.19): Sammel-Popup fuer mehrere Items auf einmal
+    // (Direkt-Zerlegen + Reverse-Match >=2). Kein Auto-Dismiss-Timer -
+    // User muss aktiv schliessen.
+    // ====================================================================
+
+    public BinInstructionGroupViewModel BinInstructionGroup { get; } = new();
+    public bool IsBinInstructionGroupVisible => BinInstructionGroup.IsVisible;
+
+    /// <summary>Zeigt das Sammel-Popup mit mehreren "Lege X in Y"-Anweisungen.</summary>
+    public void ShowBinInstructionGroup(IEnumerable<BinInstructionItem> items)
+    {
+        BinInstructionGroup.Show(items);
+        OnPropertyChanged(nameof(IsBinInstructionGroupVisible));
+    }
+
+    [RelayCommand]
+    public void DismissBinInstructionGroup()
+    {
+        BinInstructionGroup.Dismiss();
+        OnPropertyChanged(nameof(IsBinInstructionGroupVisible));
+    }
+
     private System.Windows.Threading.DispatcherTimer? _binInstructionTimer;
 
     /// <summary>
@@ -1378,11 +1401,32 @@ public partial class ScanViewModel : ObservableObject
                     toastImage);
             }
 
-            // UX X.31 Block B (v0.1.18): mittiges Anweisungs-Overlay -
-            // klare visuelle Bestaetigung in welches Fach die Figur soll.
-            // Vor dem PendingMinifig=null-Reset ausloesen, damit das Bild
-            // garantiert noch greifbar ist.
-            if (!string.IsNullOrWhiteSpace(binLabelForInstruction))
+            // UX X.31/X.32 Block C (v0.1.19): Anweisungs-Overlay.
+            // - Reverse-Match >=2 konsumierte Teile: Sammel-Popup mit pro
+            //   konsumiertem Teil eine "Lege X aus Fach Y zur Figur"-Zeile.
+            //   PLUS die Figur selbst als erstes Item.
+            // - Sonst: Einzel-Popup (Figur in Bin) wie bisher.
+            if (result.ConsumedFloatingParts.Count >= 2 && !string.IsNullOrWhiteSpace(binLabelForInstruction))
+            {
+                var items = new List<BinInstructionItem>
+                {
+                    new()
+                    {
+                        ItemLabel = $"Figur '{pending.Name}'",
+                        QuantityText = "1 Stueck",
+                        BinLabel = binLabelForInstruction,
+                        ImageUrl = toastImage
+                    }
+                };
+                items.AddRange(result.ConsumedFloatingParts.Select(c => new BinInstructionItem
+                {
+                    ItemLabel = $"{c.PartName} ({c.BlPartNo}) - {c.ColorName}",
+                    QuantityText = $"{c.Quantity} Stueck (aus {c.SourceBinLabel})",
+                    BinLabel = binLabelForInstruction
+                }));
+                ShowBinInstructionGroup(items);
+            }
+            else if (!string.IsNullOrWhiteSpace(binLabelForInstruction))
             {
                 ShowBinInstruction(binLabelForInstruction, toastImage);
             }

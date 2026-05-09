@@ -98,8 +98,26 @@ public partial class DismantleWizardViewModel : ObservableObject
                     // Nicht-gesammelte Teile sind im Wizard deaktiviert (User kann
                     // bei Bedarf manuell ankreuzen, dann werden QuantityNeeded uebernommen).
                     IsKept = p.QuantityCollected > 0,
-                    TargetBin = DefaultBin
                 };
+
+                // UX X.32 Block A (v0.1.19): pro Teil INDIVIDUELLER Default-Bin
+                // via SuggestBinForFloatingPart. Bevorzugt: Fach mit gleichem
+                // Teil (Stapel waechst), sonst freies Fach OHNE Complete drin.
+                StorageBin? perPartBin = null;
+                try
+                {
+                    var suggested = await _binService.SuggestBinForFloatingPartAsync(
+                        p.PartNumber, p.ColorId);
+                    if (suggested != null)
+                        perPartBin = AvailableBins.FirstOrDefault(b => b.Id == suggested.Id);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex,
+                        "SuggestBinForFloatingPart fehlgeschlagen fuer {Part}/{Color}, Fallback DefaultBin",
+                        p.PartNumber, p.ColorId);
+                }
+                partVm.TargetBin = perPartBin ?? DefaultBin;
 
                 // Smart-Sammeln: ist das gleiche Teil schon irgendwo als Einzelteil
                 // gelagert? Dann das Fach mit der hoechsten Menge vor-auswaehlen
@@ -281,9 +299,99 @@ public partial class DismantleWizardViewModel : ObservableObject
         foreach (var p in Parts) p.TargetBin = bin;
     }
 
+    /// <summary>
+    /// UX X.32 Block B (v0.1.19): Pending-Mode-Indikator. TrackedMinifigId == 0
+    /// signalisiert "noch nicht in DB" - Confirm legt FloatingParts direkt
+    /// an statt eine vorhandene Figur zu zerlegen.
+    /// </summary>
+    public bool IsPendingMode => TrackedMinifigId == 0;
+
+    /// <summary>
+    /// UX X.32 Block B (v0.1.19): Direkt-Zerlegen-Pfad ohne dass die Figur
+    /// in userdata.db angelegt wurde. Befuellt die Wizard-Liste aus der
+    /// PendingMinifigViewModel - nur Teile mit QuantityCollected &gt; 0.
+    /// </summary>
+    public async Task LoadFromPendingAsync(PendingMinifigViewModel pending)
+    {
+        IsLoading = true;
+        try
+        {
+            MinifigName = pending.Name;
+            BricklinkId = pending.BricklinkId;
+
+            var bins = await _binService.GetAllAsync();
+            AvailableBins.Clear();
+            foreach (var b in bins) AvailableBins.Add(b);
+
+            // Default-Bin: erstes wirklich freies Fach (UX-X.6-konform).
+            var firstFree = await _binService.SuggestBinForWaitingMinifigAsync();
+            DefaultBin = firstFree != null
+                ? AvailableBins.FirstOrDefault(b => b.Id == firstFree.Id)
+                : AvailableBins.FirstOrDefault();
+
+            Parts.Clear();
+            foreach (var p in pending.Parts
+                .Where(p => p.QuantityCollected > 0)
+                .OrderBy(p => p.PartName))
+            {
+                var partVm = DismantlePartItemViewModel.FromPending(p);
+                partVm.IsKept = true;
+
+                // Pro Teil SuggestBinForFloatingPart (Stapel waechst, sonst freies
+                // Fach OHNE Complete drin).
+                StorageBin? perPartBin = null;
+                try
+                {
+                    var suggested = await _binService.SuggestBinForFloatingPartAsync(
+                        p.BricklinkPartNo, p.BricklinkColorId);
+                    if (suggested != null)
+                        perPartBin = AvailableBins.FirstOrDefault(b => b.Id == suggested.Id);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex,
+                        "PendingMode SuggestBinForFloatingPart fehlgeschlagen fuer {Part}/{Color}",
+                        p.BricklinkPartNo, p.BricklinkColorId);
+                }
+                partVm.TargetBin = perPartBin ?? DefaultBin;
+
+                Parts.Add(partVm);
+            }
+
+            // Bilder + Color-Swatches (best-effort, gleiche Logik wie LoadAsync).
+            if (_imageProvider != null && _catalog != null)
+            {
+                _ = LoadPartImagesAndSwatchesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "DismantleWizard LoadFromPending fehlgeschlagen");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// UX X.32 Block B (v0.1.19): Sammel-Popup-Items pro angelegtem
+    /// FloatingPart. Wird vom UI-Layer (ScanViewModel / MinifigSummaryDialog)
+    /// nach erfolgreichem ConfirmAsync gelesen.
+    /// </summary>
+    public List<BinInstructionItem> LastBinInstructionItems { get; private set; } = new();
+
     /// <summary>Fuehrt den Aufgeben-Vorgang aus und gibt das Service-Resultat zurueck.</summary>
     public async Task<DismantleResult> ConfirmAsync()
     {
+        // UX X.32 Block B (v0.1.19): Pending-Mode -> direkter FloatingPart-
+        // Insert ohne ueber DismantleAsync zu gehen (es gibt keine Figur in
+        // der DB die geloescht werden muesste).
+        if (IsPendingMode)
+        {
+            return await ConfirmPendingModeAsync();
+        }
+
         var choices = Parts.Select(p =>
         {
             // UX X.25: Mode-basiert TargetBinId ODER AssignToTrackedMinifigPartId.
@@ -306,6 +414,94 @@ public partial class DismantleWizardViewModel : ObservableObject
             };
         }).ToList();
         return await _persistence.DismantleAsync(TrackedMinifigId, choices);
+    }
+
+    /// <summary>
+    /// UX X.32 Block B (v0.1.19): Pending-Mode-Persist - die Figur ist NICHT
+    /// in der DB, also nur die markierten Teile direkt als FloatingParts
+    /// einlagern. Bei vorhandenem Eintrag (gleiches Bin + PartNo + ColorId)
+    /// wird die Quantity additiv erhoeht (Stapel-Wachstum). Bin.FreedAt wird
+    /// zurueckgesetzt falls als frei markiert (UX-X.6-Konvention).
+    /// </summary>
+    private async Task<DismantleResult> ConfirmPendingModeAsync()
+    {
+        var keep = Parts.Where(p => p.IsKept).ToList();
+        if (keep.Count == 0)
+        {
+            return new DismantleResult { Success = true, CreatedFloatingParts = 0 };
+        }
+
+        var instructionItems = new List<BinInstructionItem>();
+        var createdCount = 0;
+        var totalQty = 0;
+
+        await using var ctx = await _ctxFactory.CreateDbContextAsync();
+        var now = DateTime.UtcNow;
+
+        foreach (var item in keep)
+        {
+            if (item.TargetBin == null) continue; // ohne Ziel ueberspringen
+
+            var qty = item.QuantityCollected > 0 ? item.QuantityCollected : item.QuantityNeeded;
+            if (qty <= 0) continue;
+
+            // Bin-FreedAt zuruecksetzen falls als frei markiert (UX-X.6).
+            var bin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == item.TargetBin.Id);
+            if (bin == null) continue;
+            if (bin.FreedAt != null)
+            {
+                Log.Information("Pending-Dismantle: Fach '{Label}' war frei seit {FreedAt} - wird wieder belegt",
+                    bin.Label, bin.FreedAt);
+                bin.FreedAt = null;
+            }
+
+            // Bestehender FloatingPart in Ziel-Bin? -> Quantity additiv.
+            var existing = await ctx.FloatingParts.FirstOrDefaultAsync(fp =>
+                fp.PartNumber == item.BlPartNo
+                && fp.ColorId == item.BlColorId
+                && fp.StorageBinId == item.TargetBin.Id);
+
+            if (existing != null)
+            {
+                existing.Quantity += qty;
+            }
+            else
+            {
+                ctx.FloatingParts.Add(new FloatingPart
+                {
+                    PartNumber = item.BlPartNo,
+                    ColorId = item.BlColorId,
+                    PartName = item.PartName,
+                    ColorName = item.ColorName,
+                    Quantity = qty,
+                    StorageBinId = item.TargetBin.Id,
+                    AddedAt = now
+                });
+            }
+
+            createdCount++;
+            totalQty += qty;
+            instructionItems.Add(new BinInstructionItem
+            {
+                ItemLabel = $"{item.PartName} ({item.BlPartNo}) - {item.ColorName}",
+                QuantityText = $"{qty} Stueck",
+                BinLabel = item.TargetBin.Label,
+                ImageUrl = item.ImageUrl
+            });
+        }
+
+        await ctx.SaveChangesAsync();
+        LastBinInstructionItems = instructionItems;
+
+        Log.Information("Pending-Dismantle: {Count} FloatingPart-Eintraege angelegt/aktualisiert ({Total} Stueck)",
+            createdCount, totalQty);
+
+        return new DismantleResult
+        {
+            Success = true,
+            CreatedFloatingParts = createdCount,
+            TotalPartsTransferred = totalQty
+        };
     }
 }
 
@@ -432,6 +628,42 @@ public partial class DismantlePartItemViewModel : ObservableObject
         BlColorId = p.ColorId;
         QuantityNeeded = p.QuantityNeeded;
         QuantityCollected = p.QuantityCollected;
+    }
+
+    /// <summary>
+    /// UX X.32 Block B (v0.1.19): Privater Konstruktor fuer den Pending-Mode -
+    /// statt einer DB-PK kommen die Werte aus PendingPartViewModel. Id bleibt
+    /// 0 (nicht persistiert), PartName/Color/Quantity werden uebernommen.
+    /// </summary>
+    private DismantlePartItemViewModel(
+        string blPartNo, int blColorId, string partName, string colorName,
+        int quantityNeeded, int quantityCollected, string? imageUrl)
+    {
+        Id = 0;
+        PartName = partName;
+        BlPartNo = blPartNo;
+        ColorName = colorName;
+        BlColorId = blColorId;
+        QuantityNeeded = quantityNeeded;
+        QuantityCollected = quantityCollected;
+        ImageUrl = imageUrl;
+    }
+
+    /// <summary>
+    /// UX X.32 Block B (v0.1.19): Factory fuer den Pending-Mode (Direkt-Zerlegen
+    /// einer noch nicht persistierten Figur). Quelle ist PendingPartViewModel
+    /// statt TrackedMinifigPart.
+    /// </summary>
+    public static DismantlePartItemViewModel FromPending(PendingPartViewModel p)
+    {
+        return new DismantlePartItemViewModel(
+            blPartNo: p.BricklinkPartNo,
+            blColorId: p.BricklinkColorId,
+            partName: p.PartName,
+            colorName: p.ColorName,
+            quantityNeeded: p.Quantity,
+            quantityCollected: p.QuantityCollected,
+            imageUrl: p.ImageUrl);
     }
 
     /// <summary>

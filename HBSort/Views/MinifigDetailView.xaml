@@ -289,6 +289,14 @@
                             <Button Content="Verwerfen" Width="100" MinHeight="34"
                                     Click="Discard_Click"
                                     Margin="0,0,8,0"/>
+                            <!-- UX X.32 Block B (v0.1.19): Direkt-Zerlegen statt Einlagern.
+                                 Nur sichtbar wenn mindestens ein Teil markiert ist - leere
+                                 Auswahl waere ein No-Op. -->
+                            <Button Content="Direkt zerlegen" MinWidth="120" MinHeight="34"
+                                    Click="DirectDismantle_Click"
+                                    Visibility="{Binding HasAnyCollected, Converter={StaticResource BoolToVisibility}}"
+                                    Margin="0,0,8,0"
+                                    ToolTip="Statt die Figur als Ganzes einzulagern: nur die markierten Teile direkt als Einzelteile in die jeweils passenden Faecher legen. Die Figur wird NICHT in die Lagerliste aufgenommen."/>
                             <Button Content="{Binding PersistButtonText}" MinWidth="160" MinHeight="34"
                                     Style="{StaticResource AccentButtonStyle}"
                                     IsEnabled="{Binding CanPersist}"

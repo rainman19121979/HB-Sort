@@ -46,6 +46,14 @@ HB-Sort erkennt automatisch, was du vor die Kamera haelst.
 > gemeint ist - inklusive Bild. Schliesst per Enter, Leertaste, Klick
 > oder nach 8 Sekunden automatisch.
 
+> **Tipp (ab v0.1.19):** Du willst die Figur **nicht** komplett in
+> die Lagerliste aufnehmen, aber einzelne Teile schon behalten?
+> Markiere die gewuenschten Teile und klick **"Direkt zerlegen"**.
+> HB-Sort legt die Teile als Einzelteile in die jeweils passenden
+> Faecher (gleicher Stapel waechst, sonst freies Fach) und verwirft
+> die Figur. Du bekommst ein Sammel-Popup mit allen Anweisungen auf
+> einen Blick.
+
 ### Lagerfach-Vorschlag (ab v0.1.18)
 
 HB-Sort schlaegt dir automatisch ein passendes Lagerfach vor:

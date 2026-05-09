@@ -160,6 +160,34 @@ public class MinifigPersistenceServiceTests : IDisposable
         // FloatingParts komplett konsumiert.
         await using var ctx = await _factory.CreateDbContextAsync();
         Assert.Empty(await ctx.FloatingParts.ToListAsync());
+
+        // UX X.32 Block C (v0.1.19): ConsumedFloatingParts ist befuellt mit
+        // pro Konsum-Zeile einem Eintrag (Quell-Bin-Label aus Include).
+        Assert.Equal(2, result.ConsumedFloatingParts.Count);
+        Assert.All(result.ConsumedFloatingParts,
+            c => Assert.Equal("Box 99-floating", c.SourceBinLabel));
+        var brick = result.ConsumedFloatingParts.Single(c => c.BlPartNo == "3001");
+        Assert.Equal(11, brick.BlColorId);
+        Assert.Equal(1, brick.Quantity);
+        var plate = result.ConsumedFloatingParts.Single(c => c.BlPartNo == "3024");
+        Assert.Equal(0, plate.BlColorId);
+        Assert.Equal(2, plate.Quantity);
+    }
+
+    [Fact]
+    public async Task PersistAndStore_no_match_leaves_ConsumedFloatingParts_empty()
+    {
+        // Kein FloatingPart vorhanden -> keine Konsum-Eintraege.
+        var binId = await SeedBinAsync("Box 02b");
+        var input = MakeInput("arc008b", "X", binId, parts:
+        [
+            ("3001", 11, 1)
+        ]);
+
+        var result = await _sut.PersistAndStoreAsync(input);
+
+        Assert.Empty(result.ConsumedFloatingParts);
+        Assert.Equal(0, result.ReverseMatchedFloating);
     }
 
     [Fact]
