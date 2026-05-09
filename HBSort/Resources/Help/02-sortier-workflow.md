@@ -22,6 +22,11 @@ HB-Sort erkennt automatisch, was du vor die Kamera haelst.
      angezeigt; klick die richtige an.
    - **Unsicher (< 0.7)** - HB-Sort sagt "nicht erkannt"; versuche es
      nochmal mit besserem Licht oder anderem Winkel.
+
+> **Tipp (ab v0.1.17):** Statt mit der Maus auf "Uebernehmen" zu
+> klicken, kannst du nach dem Scan auch die Tasten **1**, **2** oder
+> **3** druecken um den entsprechenden Vorschlag direkt zu uebernehmen.
+> Spart spuerbar Zeit beim schnellen Sortieren.
 5. Nach Auswahl siehst du:
    - Das BL-Bild der Figur
    - Die komplette Teileliste mit BL-Part-Nummer, Farbe und Anzahl
@@ -144,3 +149,19 @@ Beim ersten Komplettierungs-Event:
 - Falls du in den Einstellungen *Auto-Load* aktiviert hast: Preise
   werden geladen und du siehst eine Verkaufsempfehlung
   (siehe Kapitel *Export & Verkauf*).
+
+## Live-Stats-Tab
+
+Im Sortier-Tab unten rechts zeigt der **Live-Stats**-Tab den
+aktuellen Stand auf einen Blick:
+
+- **Heute / 7 Tage**: Anzahl Scans, Komplettierungen + Streak
+- **Bestand**: wieviele Komplett-Figuren, Wartende und Einzelteile
+  du hast (Einzelteile mit "X Eintraege, Y Stueck")
+- **Lagerfaecher** (ab v0.1.17): wieviele Faecher belegt sind +
+  ProgressBar + Top-5-Liste der Faecher mit den meisten Items
+- **Letzte Komplettierungen** (ab v0.1.17): die letzten 5 Figuren
+  die du komplett gemacht hast, mit "vor X Min/Std/Tagen"
+
+Die Werte aktualisieren sich automatisch nach jedem Scan oder
+Lagerfach-Eingriff.

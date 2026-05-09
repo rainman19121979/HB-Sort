@@ -17,6 +17,20 @@ Alle festen Tastatur-Shortcuts in HB-Sort (Stand v0.1.16).
 | **Strg+Q** | App beenden |
 | **Q** | Mehrfach-Scan-Dialog (im Sortier-Tab) |
 
+## Sortier-Tab (nach Brickognize-Scan)
+
+Sobald die Top-3-Karten unter dem Webcam-Bild stehen:
+
+| Hotkey | Aktion |
+|---|---|
+| **1** | Brickognize-Vorschlag #1 uebernehmen |
+| **2** | Brickognize-Vorschlag #2 uebernehmen |
+| **3** | Brickognize-Vorschlag #3 uebernehmen |
+
+Die Tasten reagieren nur im Sortier-Tab (nicht in Lagerliste / Hilfe /
+Verlauf) und nicht in Eingabe-Feldern - du kannst weiter "1 Riss" in
+die Beschreibung tippen.
+
 ## Lagerliste-Shortcuts
 
 | Hotkey | Aktion |

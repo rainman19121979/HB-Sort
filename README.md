@@ -49,6 +49,25 @@ BrickStore- und BrickLink-Export.
   markieren und gemeinsam loeschen oder verschieben (mit Undo-Support).
   Doppelklick auf Zeile oeffnet Details, Entf-Taste loescht Selektion.
 
+## Was ist neu in v0.1.17
+
+- **Tastatur-Shortcuts fuer Brickognize-Vorschlaege**: nach einem Scan
+  kannst du mit den Tasten 1, 2 oder 3 den entsprechenden Vorschlag
+  direkt uebernehmen - kein Maus-Klick mehr noetig.
+- **Statistik-Dashboard erweitert**: der Live-Stats-Tab zeigt jetzt
+  zusaetzlich Lagerfach-Auslastung, Top-5-Faecher mit den meisten Items
+  und die letzten Komplettierungen.
+- **Beschreibung statt Notizen**: das Notiz-Feld in der Figur-Ansicht
+  heisst jetzt "Beschreibung" - der Text landet beim BSX-Export im
+  oeffentlichen BL-Comment-Feld und ist fuer Kaeufer sichtbar
+  (Hinweise wie "kleiner Riss am Helm" hier eintragen).
+- **Einzelteil-Verschieben rueckgaengig**: das Bulk-Verschieben von
+  Einzelteilen kann jetzt auch via Strg+Z rueckgaengig gemacht werden.
+- **DataHeal-Verbesserung**: bei einer einzelnen verlorenen Lagerfach-
+  Zuordnung wird die letzte bekannte Position automatisch wiederhergestellt.
+- **Layout-Fix**: die Teile-Liste in der Figur-Ansicht nutzt jetzt den
+  verfuegbaren Platz, wenn du den Trenner nach unten ziehst.
+
 ## Was ist neu in v0.1.16
 
 - **Backup-System** mit Pending-Restore-Pattern (App startet nach
