@@ -149,28 +149,19 @@
                   MouseDoubleClick="InventoryGrid_MouseDoubleClick"
                   PreviewKeyDown="InventoryGrid_PreviewKeyDown">
             <DataGrid.Columns>
-                <!-- UX X.29 Block C Nachbesserung 2 (v0.1.16):
-                     Visual-Fix fuer wartende Figuren. Der erste Nachbesserung-
-                     Fix entfernte den Visibility-DataTrigger - aber das
-                     Haekchen-Visual blieb bei Wartenden unsichtbar trotz
-                     erfolgreichem Click-Hit-Test (Counter zaehlte).
-                     Vermutete Ursache: WPF-CheckBox-Visual-States werden in
-                     IsReadOnly=True-DataGrid-Cells nicht zuverlaessig vom
-                     Click-Through-Pfad aktualisiert.
-                     Loesung: explizite Visual-Properties + Click-Handler
-                     im Code-Behind der IsSelected direkt toggelt (umgeht
-                     den Binding-Visual-Update-Pfad). -->
-                <DataGridTemplateColumn Header="Aus..." Width="60" CanUserSort="False">
+                <!-- UX X.29 Block C Nachbesserung 2 KORRIGIERT (v0.1.16):
+                     Echtes Problem war die Spalten-Breite. Width=60 war zu
+                     schmal fuer die ModernWpfUI-Theme-CheckBox (inkl.
+                     Padding/Margin) - Haekchen wurde ausserhalb des
+                     sichtbaren Cell-Bereichs gerendert. User hat das
+                     entdeckt durch manuelles Verbreitern der Spalte.
+                     Fix: Width=50, kein expliziter CheckBox-Style. -->
+                <DataGridTemplateColumn Header="Aus..." Width="50" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                      Click="SelectionCheckBox_Click"
-                                      Width="18" Height="18"
                                       HorizontalAlignment="Center"
                                       VerticalAlignment="Center"
-                                      Focusable="True"
-                                      IsTabStop="True"
-                                      Visibility="Visible"
                                       ToolTip="Fuer Bulk-Aktionen auswaehlen (Loeschen / Verschieben / Exportieren)"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>

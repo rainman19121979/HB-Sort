@@ -146,33 +146,6 @@ public partial class InventoryListView : UserControl
     }
 
     /// <summary>
-    /// UX X.29 Block C Nachbesserung 2 (v0.1.16): expliziter Click-Handler
-    /// fuer die Auswahl-Checkbox.
-    ///
-    /// Hintergrund: in einem DataGrid mit IsReadOnly=True wird der CheckBox-
-    /// Click teilweise von der DataGridCell-Mouse-Logik verschluckt - das
-    /// IsSelected-Binding feuert zwar (TwoWay+PropertyChanged-Trigger), aber
-    /// die WPF-CheckBox-Visual-States (Checked/Unchecked) werden vom
-    /// Property-Setter-Pfad in manchen Themes nicht zuverlaessig aktualisiert.
-    /// Resultat: User klickt, Source ist true, aber Haekchen-Glyph fehlt.
-    ///
-    /// Fix: Click-Handler toggelt IsChecked + IsSelected explizit. Damit ist
-    /// sowohl Source-Property als auch Visual-State immer synchron.
-    /// </summary>
-    private void SelectionCheckBox_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not CheckBox cb || cb.DataContext is not InventoryRowItem row) return;
-        // Source-Property auf den Click-State der CheckBox setzen.
-        row.IsSelected = cb.IsChecked == true;
-        // Counter (SelectedTotalCount + SelectedExportableCount + SelectionCounterText)
-        // explizit refreshen damit die Action-Bar sofort reagiert.
-        if (DataContext is InventoryListViewModel vm)
-            vm.RecalculateSelection();
-        // Click NICHT als handled markieren - DataGrid soll die Cell weiter
-        // selektieren koennen.
-    }
-
-    /// <summary>
     /// UX X.29 Block C (v0.1.16): Doppelklick auf eine Zeile oeffnet die
     /// Detail-Ansicht (gleicher Pfad wie der Details-Button).
     /// </summary>
