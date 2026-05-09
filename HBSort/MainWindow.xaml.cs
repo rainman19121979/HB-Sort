@@ -84,6 +84,21 @@ public partial class MainWindow : Window
     /// </summary>
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // UX X.31 Block B (v0.1.18): wenn das Anweisungs-Overlay sichtbar ist,
+        // schliesst Enter / Leertaste / Esc das Overlay - und NUR das. Damit
+        // bricht ein versehentliches doppeltes Enter nicht den naechsten
+        // Scan oder Persist aus.
+        var scanVm = _viewModel.ScanViewModel;
+        if (scanVm != null && scanVm.IsBinInstructionVisible
+            && (e.Key == Key.Enter || e.Key == Key.Return
+             || e.Key == Key.Space || e.Key == Key.Escape))
+        {
+            if (IsTextInputFocused()) return;
+            scanVm.DismissBinInstruction();
+            e.Handled = true;
+            return;
+        }
+
         // Leertaste = Scan ausloesen.
         if (e.Key == Key.Space)
         {
@@ -92,6 +107,26 @@ public partial class MainWindow : Window
             if (scan.CanExecute(null))
             {
                 scan.Execute(null);
+                e.Handled = true;
+            }
+            return;
+        }
+
+        // UX X.31 Block B (v0.1.18): Enter = "In Fach legen" fuer eine Pending-
+        // Figur. Spart den Mausklick auf den Persist-Button beim Sortieren
+        // vieler Figuren. Nur im Sortier-Tab + nicht in Eingabefeldern;
+        // CanPersist-Check verhindert ungueltige Aufrufe (kein Lagerfach
+        // gewaehlt, gerade am Speichern, etc.).
+        if (e.Key == Key.Enter || e.Key == Key.Return)
+        {
+            if (IsTextInputFocused()) return;
+            if (!_viewModel.IsMainTabSorting) return;
+            var pending = scanVm?.PendingMinifig;
+            if (pending == null || !pending.CanPersist) return;
+            var cmd = scanVm!.PersistPendingCommand;
+            if (cmd.CanExecute(null))
+            {
+                cmd.Execute(null);
                 e.Handled = true;
             }
             return;

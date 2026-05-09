@@ -155,6 +155,20 @@
                             Du kannst die Auswahl pro Figur immer noch manuell anpassen.
                         </TextBlock>
 
+                        <!-- UX X.31 (v0.1.18): Maximum Complete-Figuren pro Lagerfach -->
+                        <TextBlock Text="Maximale Complete-Figuren pro Lagerfach:"
+                                   FontWeight="SemiBold" Margin="0,12,0,4"/>
+                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
+                                   Margin="0,0,0,4">
+                            Bestimmt wie viele zusammengebaute Figuren sich ein Fach teilen
+                            duerfen. Beim Vorschlag fuers Einlagern wird so lange ins gleiche
+                            Fach gestapelt, bis dieses Limit erreicht ist; danach schlaegt
+                            die App ein neues freies Fach vor. Default: 5. Min 1, Max 999.
+                        </TextBlock>
+                        <TextBox Text="{Binding MaxCompleteFiguresPerBin, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 Width="80" HorizontalAlignment="Left"
+                                 ToolTip="Wieviele komplette Figuren duerfen sich ein Fach teilen? Default 5."/>
+
                         <Separator/>
 
                         <TextBlock Text="Sonstiges" FontSize="16" FontWeight="SemiBold"/>

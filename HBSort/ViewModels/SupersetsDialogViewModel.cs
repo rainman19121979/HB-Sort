@@ -237,7 +237,13 @@ public partial class SupersetsDialogViewModel : ObservableObject
 
     /// <summary>Liefert alle Lagerfaecher (fuer den Sammeln-Auswahl-Dialog).</summary>
     public Task<List<StorageBin>> GetAllBinsAsync() => _binService.GetAllAsync();
-    public Task<StorageBin?> GetNextFreeBinAsync() => _binService.GetNextFreeAsync();
+
+    /// <summary>
+    /// UX X.31 (v0.1.18): Default-Vorschlag fuer "Diese Figur sammeln" -
+    /// die Figur wird wartend angelegt, also wirklich freies Fach
+    /// (kein Bin mit Complete drin).
+    /// </summary>
+    public Task<StorageBin?> GetNextFreeBinAsync() => _binService.SuggestBinForWaitingMinifigAsync();
 }
 
 /// <summary>Eine Zeile im SupersetsDialog (eine Minifigur).</summary>

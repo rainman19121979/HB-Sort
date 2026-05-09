@@ -337,6 +337,10 @@ public partial class SettingsViewModel : ObservableObject
         set { if (value) DefaultPartsCollected = true; }
     }
 
+    // --- UX X.31 (v0.1.18): Maximum Complete-Figuren pro Lagerfach ---
+    [ObservableProperty]
+    private int _maxCompleteFiguresPerBin;
+
     // --- UX X.29 (v0.1.16): Backup-Tab ---
 
     [ObservableProperty]
@@ -499,6 +503,7 @@ public partial class SettingsViewModel : ObservableObject
         ScanCooldownMs = s.ScanCooldownMs;
         SoundEnabled = s.SoundEnabled;
         DefaultPartsCollected = s.DefaultPartsCollected;
+        MaxCompleteFiguresPerBin = s.MaxCompleteFiguresPerBin;
         ShowTooltips = s.ShowTooltips;
         AutoCheckForUpdates = s.AutoCheckForUpdates;
         AutoBlImport = s.AutoBlImport;
@@ -551,6 +556,10 @@ public partial class SettingsViewModel : ObservableObject
         s.ScanCooldownMs = ScanCooldownMs;
         s.SoundEnabled = SoundEnabled;
         s.DefaultPartsCollected = DefaultPartsCollected;
+        // UX X.31: clamp auf [1..999] beim Speichern, damit ein leeres
+        // Eingabefeld oder ein versehentlicher 0/Negativ-Wert die App nicht
+        // ins Endlos-Fallback laufen laesst.
+        s.MaxCompleteFiguresPerBin = Math.Clamp(MaxCompleteFiguresPerBin <= 0 ? 5 : MaxCompleteFiguresPerBin, 1, 999);
         s.ShowTooltips = ShowTooltips;
         s.AutoCheckForUpdates = AutoCheckForUpdates;
         s.AutoBlImport = AutoBlImport;

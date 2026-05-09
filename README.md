@@ -49,6 +49,22 @@ BrickStore- und BrickLink-Export.
   markieren und gemeinsam loeschen oder verschieben (mit Undo-Support).
   Doppelklick auf Zeile oeffnet Details, Entf-Taste loescht Selektion.
 
+## Was ist neu in v0.1.18
+
+- **Konsistente Lagerfach-Vorschlaege**: wartende Figuren bekommen ein
+  eigenes Fach, Einzelteile vom gleichen Typ landen immer im gleichen
+  Fach, Complete-Figuren duerfen sich ein Fach teilen.
+- **Maximum Complete-Figuren pro Fach** in den Einstellungen
+  konfigurierbar (Default: 5).
+- **Live-Anpassung des Lagerfachs**: waehrend du Teile markierst,
+  wechselt das vorgeschlagene Lagerfach automatisch - alle Teile da ->
+  Complete-Fach, fehlt eins -> Wartend-Fach.
+- **Enter-Taste = "In Fach legen"**: kein Maus-Klick mehr noetig - nach
+  dem Markieren der Teile einfach Enter druecken.
+- **Klare Anweisung wo das Item hin soll**: nach Druck auf Enter oder
+  "In Fach legen"-Button erscheint mittig oben ein Hinweis welches
+  Fach gemeint ist (mit Bild).
+
 ## Was ist neu in v0.1.17
 
 - **Tastatur-Shortcuts fuer Brickognize-Vorschlaege**: nach einem Scan

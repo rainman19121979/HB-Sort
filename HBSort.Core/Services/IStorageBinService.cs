@@ -20,6 +20,34 @@ public interface IStorageBinService
     /// <summary>Erstes freies Fach (sortiert nach Label) oder null wenn keins frei.</summary>
     Task<StorageBin?> GetNextFreeAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// UX X.31 (v0.1.18): Schlaegt das naechste wirklich freie Fach fuer eine
+    /// wartende Figur vor. "Frei" hier bedeutet streng nach UX-X.6-Konvention:
+    /// keine wartende Figur, KEINE Complete-Figur (auch wenn UX-X.6 sagt
+    /// "Faecher bleiben belegt"), keine FloatingParts.
+    /// Sortierung nach Label aufsteigend; null wenn alle Faecher belegt sind.
+    /// </summary>
+    Task<StorageBin?> SuggestBinForWaitingMinifigAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// UX X.31 (v0.1.18): Schlaegt ein Fach fuer eine Complete-Figur vor.
+    /// Bevorzugt: Fach das bereits Complete-Figuren enthaelt, aber WENIGER als
+    /// <paramref name="maxCompleteLimit"/> Stueck UND keine wartenden Figuren
+    /// UND keine FloatingParts (sonst wuerde gemischt). Sortierung: Fach mit
+    /// MEISTEN Complete-Figuren zuerst, danach Label.
+    /// Fallback: naechstes wirklich freies Fach (analog SuggestBinForWaitingMinifigAsync).
+    /// </summary>
+    Task<StorageBin?> SuggestBinForCompleteMinifigAsync(int maxCompleteLimit, CancellationToken ct = default);
+
+    /// <summary>
+    /// UX X.31 (v0.1.18): Schlaegt ein Fach fuer ein Einzelteil vor.
+    /// Wenn das Teil (gleiche BlPartNo + BlColorId) bereits in einem Fach liegt:
+    /// dieses Fach (Stapel wachsen lassen, FIFO bei mehreren Treffern nach AddedAt).
+    /// Sonst: naechstes Fach OHNE Complete-Figuren, OHNE wartende Figuren,
+    /// OHNE andere FloatingParts. Null wenn alle Faecher blockiert sind.
+    /// </summary>
+    Task<StorageBin?> SuggestBinForFloatingPartAsync(string blPartNo, int blColorId, CancellationToken ct = default);
+
     Task<StorageBin> CreateSingleAsync(string label, string? notes = null, CancellationToken ct = default);
 
     /// <summary>

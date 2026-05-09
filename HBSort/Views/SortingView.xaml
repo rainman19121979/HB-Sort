@@ -14,8 +14,13 @@
         Persistierung (UX X.19 Teil 3b): die Splitter-Verhaeltnisse werden
         beim DragCompleted in AppSettings.SortingTabLayout gespeichert und
         beim Loaded auf die GridDefinitions angewendet (siehe Code-Behind).
+
+        UX X.31 Block B (v0.1.18): Wrapper-Grid mit BinInstructionOverlay
+        als Sibling auf ZIndex=100 - Overlay erscheint ueber dem ganzen
+        Sortier-Tab nach erfolgreichem Persist.
     -->
-    <Grid x:Name="MainQuadrantsGrid">
+    <Grid>
+        <Grid x:Name="MainQuadrantsGrid">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" x:Name="LeftCol"/>
             <ColumnDefinition Width="5"/>
@@ -460,5 +465,14 @@
                 </ContentControl>
             </Border>
         </Grid>
+        </Grid>
+
+        <!-- UX X.31 Block B (v0.1.18): Anweisungs-Overlay nach Persist.
+             ZIndex=100 - liegt ueber dem ganzen Sortier-Tab.
+             Sichtbarkeit gebunden an ScanViewModel.IsBinInstructionVisible. -->
+        <views:BinInstructionOverlay
+            Panel.ZIndex="100"
+            Visibility="{Binding ScanViewModel.IsBinInstructionVisible,
+                                 Converter={StaticResource BoolToVisibility}}"/>
     </Grid>
 </UserControl>

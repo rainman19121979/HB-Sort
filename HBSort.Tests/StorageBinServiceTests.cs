@@ -197,6 +197,215 @@ public class StorageBinServiceTests : IDisposable
         Assert.Equal("Box 02", free[0].Label);
     }
 
+    // ====================================================================
+    // UX X.31 (v0.1.18) - Bin-Vorschlag-Konsistenz
+    // ====================================================================
+
+    [Fact]
+    public async Task SuggestBinForWaitingMinifig_skips_bin_with_complete_minifig()
+    {
+        // Bug-Repro: GetFreeAsync wertet ein Fach mit nur Complete-Figuren als
+        // "frei" - das war der Hauptbefund. SuggestBin* muss Complete-Figuren
+        // strikt als belegend werten (UX-X.6-Konvention).
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedMinifigInBinAsync(b1!.Id, "arc007", TrackedMinifigStatus.Complete);
+
+        var suggestion = await _sut.SuggestBinForWaitingMinifigAsync();
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForWaitingMinifig_skips_bin_with_floating_part()
+    {
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedFloatingPartInBinAsync(b1!.Id, "3001", 1);
+
+        var suggestion = await _sut.SuggestBinForWaitingMinifigAsync();
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForWaitingMinifig_skips_bin_with_waiting_minifig()
+    {
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedMinifigInBinAsync(b1!.Id, "arc007", TrackedMinifigStatus.Waiting);
+
+        var suggestion = await _sut.SuggestBinForWaitingMinifigAsync();
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForWaitingMinifig_picks_completely_empty_bin()
+    {
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+
+        var suggestion = await _sut.SuggestBinForWaitingMinifigAsync();
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 01", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForWaitingMinifig_returns_null_when_all_blocked()
+    {
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        var b2 = await _sut.GetByLabelAsync("Box 02");
+        await SeedMinifigInBinAsync(b1!.Id, "arc007", TrackedMinifigStatus.Complete);
+        await SeedMinifigInBinAsync(b2!.Id, "cty0685", TrackedMinifigStatus.Waiting);
+
+        var suggestion = await _sut.SuggestBinForWaitingMinifigAsync();
+
+        Assert.Null(suggestion);
+    }
+
+    [Fact]
+    public async Task SuggestBinForCompleteMinifig_under_limit_picks_existing_complete_bin()
+    {
+        // Bin mit 4 Complete-Figuren + Limit 5 -> der Stapel waechst.
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        for (int i = 0; i < 4; i++)
+            await SeedMinifigInBinAsync(b1!.Id, $"fig{i}", TrackedMinifigStatus.Complete);
+
+        var suggestion = await _sut.SuggestBinForCompleteMinifigAsync(5);
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 01", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForCompleteMinifig_at_limit_picks_new_free_bin()
+    {
+        // Bin mit 5 Complete-Figuren + Limit 5 -> erreichtes Limit, neues
+        // freies Fach wird vorgeschlagen.
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        for (int i = 0; i < 5; i++)
+            await SeedMinifigInBinAsync(b1!.Id, $"fig{i}", TrackedMinifigStatus.Complete);
+
+        var suggestion = await _sut.SuggestBinForCompleteMinifigAsync(5);
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForCompleteMinifig_skips_bin_with_waiting()
+    {
+        // Bin mit 2 Complete + 1 Waiting -> nicht vorschlagen (Mischung
+        // wuerde "1 Waiting pro Fach"-Regel brechen).
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Complete);
+        await SeedMinifigInBinAsync(b1!.Id, "fig2", TrackedMinifigStatus.Complete);
+        await SeedMinifigInBinAsync(b1!.Id, "fig3", TrackedMinifigStatus.Waiting);
+
+        var suggestion = await _sut.SuggestBinForCompleteMinifigAsync(5);
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForCompleteMinifig_skips_bin_with_floating_part()
+    {
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Complete);
+        await SeedFloatingPartInBinAsync(b1!.Id, "3001", 1);
+
+        var suggestion = await _sut.SuggestBinForCompleteMinifigAsync(5);
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForCompleteMinifig_prefers_fuller_bin_when_multiple_under_limit()
+    {
+        // Sortierung: meiste Complete zuerst (Stapel wachsen statt parallele Faecher).
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02", "Box 03" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        var b2 = await _sut.GetByLabelAsync("Box 02");
+        await SeedMinifigInBinAsync(b1!.Id, "f1", TrackedMinifigStatus.Complete);
+        await SeedMinifigInBinAsync(b2!.Id, "f2", TrackedMinifigStatus.Complete);
+        await SeedMinifigInBinAsync(b2!.Id, "f3", TrackedMinifigStatus.Complete);
+
+        var suggestion = await _sut.SuggestBinForCompleteMinifigAsync(5);
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForFloatingPart_picks_existing_bin_with_same_part_color()
+    {
+        // Spec: gleiches Teil + gleiche Farbe -> bestehendes Bin.
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedFloatingPartInBinAsync(b1!.Id, "3001", 5);
+
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3001", 0);
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 01", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForFloatingPart_new_part_picks_bin_without_complete()
+    {
+        // Spec: neuer Typ+Farbe -> naechstes Fach OHNE Complete drin.
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Complete);
+
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3024", 11);
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForFloatingPart_returns_null_when_all_have_complete_or_waiting()
+    {
+        // Edge-Case aus dem Spec-Hinweis: alle Bins haben Complete -> null
+        // (kein Vorschlag).
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        var b2 = await _sut.GetByLabelAsync("Box 02");
+        await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Complete);
+        await SeedMinifigInBinAsync(b2!.Id, "fig2", TrackedMinifigStatus.Complete);
+
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3024", 11);
+
+        Assert.Null(suggestion);
+    }
+
+    [Fact]
+    public async Task SuggestBinForFloatingPart_different_color_gets_separate_bin()
+    {
+        // 3001/Black liegt in Box 01. Wir scannen 3001/Red -> sollte ein
+        // anderes (sauberes) Bin bekommen, nicht in Box 01 gemischt werden.
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedFloatingPartInBinAsync(b1!.Id, "3001", 3); // ColorId=0 (Black)
+
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3001", 5); // ColorId=5 (Red)
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
     // ---- FindBinsThatWouldBeEmpty + ReleaseBins (Phase 7) ----
 
     [Fact]
@@ -413,14 +622,14 @@ public class StorageBinServiceTests : IDisposable
         return m.Id;
     }
 
-    private async Task SeedFloatingPartInBinAsync(int binId, string partNo, int qty)
+    private async Task SeedFloatingPartInBinAsync(int binId, string partNo, int qty, int colorId = 0)
     {
         await using var ctx = await _factory.CreateDbContextAsync();
         ctx.FloatingParts.Add(new FloatingPart
         {
             PartNumber = partNo,
-            ColorId = 0,
-            ColorName = "Black",
+            ColorId = colorId,
+            ColorName = colorId == 0 ? "Black" : $"Color{colorId}",
             PartName = partNo,
             Quantity = qty,
             StorageBinId = binId,

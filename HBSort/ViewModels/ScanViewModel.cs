@@ -167,9 +167,71 @@ public partial class ScanViewModel : ObservableObject
     /// raeumen wir auch die Preis-Anzeige weg. Der "Aufbau" findet beim
     /// PendingMinifig-Setzen explizit statt - hier nur das Cleanup.
     /// </summary>
-    partial void OnPendingMinifigChanged(PendingMinifigViewModel? value)
+    partial void OnPendingMinifigChanged(PendingMinifigViewModel? oldValue, PendingMinifigViewModel? newValue)
     {
-        if (value == null) PriceInfo = null;
+        // UX X.31 Block B Bug-Fix v2 (v0.1.18): Live-Bin-Re-Suggest beim Toggeln
+        // der Teile-Haekchen. PendingMinifigViewModel feuert bereits WillBeComplete
+        // PropertyChanged bei jeder Teil-Aenderung (siehe RaiseCollectedDerived);
+        // wir hoeren hier zu und wechseln den Bin-Vorschlag zwischen Waiting- und
+        // Complete-Pfad.
+        if (oldValue != null) oldValue.PropertyChanged -= OnPendingMinifigPropertyChanged;
+        if (newValue != null) newValue.PropertyChanged += OnPendingMinifigPropertyChanged;
+
+        if (newValue == null) PriceInfo = null;
+    }
+
+    /// <summary>
+    /// UX X.31 Block B Bug-Fix v2 (v0.1.18): hoert auf WillBeComplete-Wechsel
+    /// am Pending und stupst den Bin-Vorschlag an. Subscriber wird in
+    /// OnPendingMinifigChanged gemanaged.
+    /// </summary>
+    private async void OnPendingMinifigPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(PendingMinifigViewModel.WillBeComplete)) return;
+        if (sender is not PendingMinifigViewModel pending) return;
+        await ReSuggestBinForPendingAsync(pending);
+    }
+
+    /// <summary>
+    /// Re-evaluiert den Bin-Vorschlag basierend auf pending.WillBeComplete und
+    /// wechselt das SelectedBin im Dropdown wenn ein besserer Vorschlag
+    /// existiert. UX X.31 Block B Bug-Fix v2 (v0.1.18) - "pragmatischster
+    /// Ansatz": immer wechseln. Manuelles Wechseln durch den User triggert
+    /// diese Logik nicht (nur WillBeComplete-Wechsel tut das).
+    /// </summary>
+    private async Task ReSuggestBinForPendingAsync(PendingMinifigViewModel pending)
+    {
+        try
+        {
+            StorageBin? newBest;
+            if (pending.WillBeComplete)
+            {
+                var maxComplete = _settingsService.Current.MaxCompleteFiguresPerBin;
+                newBest = await _binService.SuggestBinForCompleteMinifigAsync(maxComplete);
+                Log.Information("Re-Suggest (Complete-Pfad, Limit={Limit}): {Bin}",
+                    maxComplete, newBest?.Label ?? "(keiner)");
+            }
+            else
+            {
+                newBest = await _binService.SuggestBinForWaitingMinifigAsync();
+                Log.Information("Re-Suggest (Waiting-Pfad): {Bin}", newBest?.Label ?? "(keiner)");
+            }
+
+            if (newBest == null) return;
+
+            System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+            {
+                var newBin = pending.AvailableBins.FirstOrDefault(b => b.Id == newBest.Id);
+                if (newBin != null && newBin.Id != pending.SelectedBin?.Id)
+                {
+                    pending.SelectedBin = newBin;
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Re-Suggest-Bin-Logik fehlgeschlagen");
+        }
     }
 
     /// <summary>Hinweis-Text bei Minifig-Erkennung ohne Catalog-Treffer.</summary>
@@ -188,6 +250,77 @@ public partial class ScanViewModel : ObservableObject
     private PartLookupViewModel? _pendingPart;
 
     public bool HasPendingPart => PendingPart != null;
+
+    // ====================================================================
+    // UX X.31 (v0.1.18) Block B: Bin-Anweisungs-Overlay
+    //
+    // Nach erfolgreichem Persist (Minifig oder Floating-Part) wird ein
+    // mittiges, prominentes Overlay angezeigt: "Lege diese Figur in
+    // Box 005" + Item-Bild. Schliesst per Enter / Leertaste / Klick /
+    // 8s-Timeout. Damit weiss der User nach der Tastatur-Aktion
+    // (Enter-Hotkey) eindeutig wo das Item physisch hin soll.
+    //
+    // Implementation in BinInstructionViewModel ausgelagert, damit das
+    // Verhalten ohne ScanViewModel-Mock-Stack testbar ist. Hier nur die
+    // Timer-Verwaltung (DispatcherTimer braucht WPF-Dispatcher).
+    // ====================================================================
+
+    public BinInstructionViewModel BinInstruction { get; } = new();
+
+    /// <summary>
+    /// Convenience-Property fuer XAML-DataTrigger-Bindings die Single-Path-
+    /// Pfaden vorziehen (Visibility am Overlay).
+    /// </summary>
+    public bool IsBinInstructionVisible => BinInstruction.IsVisible;
+
+    private System.Windows.Threading.DispatcherTimer? _binInstructionTimer;
+
+    /// <summary>
+    /// Zeigt das Anweisungs-Overlay mit Bin-Label + Item-Bild. Wird vom
+    /// PersistPendingAsync-Pfad sowie vom Einzelteil-Lager-Pfad
+    /// (PartLookupView.StoreFloating_Click) aufgerufen. Beendet sich nach
+    /// 8 Sekunden automatisch.
+    /// </summary>
+    public void ShowBinInstruction(string binLabel, string? imageUrl)
+    {
+        BinInstruction.Show(binLabel, imageUrl);
+        OnPropertyChanged(nameof(IsBinInstructionVisible));
+
+        // Bestehenden Timer aus einem vorherigen Aufruf abbrechen.
+        // DispatcherTimer braucht einen WPF-Dispatcher; defensive Try-Catch
+        // damit Tests/Headless-Pfade nicht stolpern.
+        try
+        {
+            _binInstructionTimer?.Stop();
+            _binInstructionTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(8)
+            };
+            _binInstructionTimer.Tick += (_, _) =>
+            {
+                _binInstructionTimer?.Stop();
+                DismissBinInstruction();
+            };
+            _binInstructionTimer.Start();
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Auto-Dismiss-Timer konnte nicht gestartet werden");
+        }
+    }
+
+    /// <summary>
+    /// Schliesst das Anweisungs-Overlay (manuell durch Enter / Leertaste /
+    /// Klick oder durch Timer).
+    /// </summary>
+    [RelayCommand]
+    public void DismissBinInstruction()
+    {
+        try { _binInstructionTimer?.Stop(); } catch { /* Timer ohne Dispatcher */ }
+        _binInstructionTimer = null;
+        BinInstruction.Dismiss();
+        OnPropertyChanged(nameof(IsBinInstructionVisible));
+    }
 
     public ScanViewModel(
         ICameraService cameraService,
@@ -982,12 +1115,17 @@ public partial class ScanViewModel : ObservableObject
         try
         {
             var allBins = await _binService.GetAllAsync();
-            var firstFree = await _binService.GetNextFreeAsync();
+            // UX X.31 (v0.1.18): konsistente Bin-Vorschlaege - Default-Fallback
+            // ist jetzt SuggestBinForFloatingPart (kein Bin mit Complete-Figuren)
+            // statt GetNextFreeAsync (das ignorierte Complete-Figuren).
+            var firstFree = await _binService.SuggestBinForFloatingPartAsync(
+                pending.BlPartNo, pending.BlColorId);
 
             // UX-Iteration X.7: Smart-Storage-Suggestion. Vor der Default-Auswahl
             // pruefen ob das Teil bereits in einem Fach liegt - dann dieses Fach
             // statt "naechstes freies" vorauswaehlen, damit Stapel weiter wachsen
-            // statt sich zu zerstreuen.
+            // statt sich zu zerstreuen. (Liefert reicheren Hint-Datenkranz mit
+            // Quantity + AnzahlMatchingBins fuer den UI-Hint-Text.)
             var suggestion = await _floatingTransfer.FindBestStorageBinSuggestionAsync(
                 pending.BlPartNo, pending.BlColorId);
 
@@ -1112,7 +1250,20 @@ public partial class ScanViewModel : ObservableObject
         try
         {
             var allBins = await _binService.GetAllAsync();
-            var firstFree = await _binService.GetNextFreeAsync();
+            // UX X.31 Block B Bug-Fix v2 (v0.1.18): Initial-Suggest abhaengig
+            // vom Pending-Status. "Alles vorab abgehakt" + Reverse-Match heisst:
+            // Pending kann beim Erscheinen schon Complete sein - dann Complete-
+            // Pfad nutzen statt Waiting. Live-Updates ueber ReSuggestBinForPendingAsync.
+            StorageBin? firstFree;
+            if (pending.WillBeComplete)
+            {
+                var maxComplete = _settingsService.Current.MaxCompleteFiguresPerBin;
+                firstFree = await _binService.SuggestBinForCompleteMinifigAsync(maxComplete);
+            }
+            else
+            {
+                firstFree = await _binService.SuggestBinForWaitingMinifigAsync();
+            }
 
             // ComboBox auf UI-Thread befuellen
             System.Windows.Application.Current?.Dispatcher.Invoke(() =>
@@ -1206,6 +1357,7 @@ public partial class ScanViewModel : ObservableObject
             // UX X.20 Teil 5: Toast mit Item-Bild. Bei Auto-Komplettierung
             // kombinierter Hinweis ("komplett in Box X").
             var toastImage = pending.ImageUrl;
+            var binLabelForInstruction = pending.SelectedBin?.Label ?? string.Empty;
             if (result.IsFullyComplete)
             {
                 _notifications.ShowSuccess(
@@ -1224,6 +1376,15 @@ public partial class ScanViewModel : ObservableObject
                 _notifications.ShowSuccess(
                     $"'{pending.Name}' in {pending.SelectedBin?.Label} eingelagert.",
                     toastImage);
+            }
+
+            // UX X.31 Block B (v0.1.18): mittiges Anweisungs-Overlay -
+            // klare visuelle Bestaetigung in welches Fach die Figur soll.
+            // Vor dem PendingMinifig=null-Reset ausloesen, damit das Bild
+            // garantiert noch greifbar ist.
+            if (!string.IsNullOrWhiteSpace(binLabelForInstruction))
+            {
+                ShowBinInstruction(binLabelForInstruction, toastImage);
             }
 
             // Pending ausblenden, Top-3 wiederherstellen

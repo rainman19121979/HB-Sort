@@ -110,8 +110,20 @@ public partial class PartLookupView : UserControl
                 $"{vm.FloatingQuantity}x '{vm.PartName}' in {vm.SelectedFloatingBin.Label} eingelagert.",
                 vm.ImageUrl);
 
+            // UX X.31 Block B (v0.1.18): Anweisungs-Overlay auch fuer
+            // Einzelteile - User soll wissen wo das Teil physisch hin soll.
+            var binLabel = vm.SelectedFloatingBin.Label;
+            var partImage = vm.ImageUrl;
+
             var scan = GetScanViewModel();
-            if (scan != null) scan.PendingPart = null;
+            if (scan != null)
+            {
+                scan.PendingPart = null;
+                if (!string.IsNullOrWhiteSpace(binLabel))
+                {
+                    scan.ShowBinInstruction(binLabel, partImage);
+                }
+            }
         }
         catch (System.Exception ex)
         {
@@ -142,9 +154,10 @@ public partial class PartLookupView : UserControl
         var binService = Service<IStorageBinService>();
 
         // Default-Bin: aktuell in der Floating-Combo selektiertes Fach,
-        // sonst erstes freies (Konsistenz mit dem Lager-Workflow).
+        // sonst Suggest-Service (wartende Figur -> wirklich freies Fach,
+        // UX X.31 v0.1.18 - kein Bin mit Complete drin).
         var bin = vm.SelectedFloatingBin
-                  ?? await binService.GetNextFreeAsync()
+                  ?? await binService.SuggestBinForWaitingMinifigAsync()
                   ?? vm.AvailableBins.FirstOrDefault();
         if (bin == null)
         {

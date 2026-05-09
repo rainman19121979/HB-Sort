@@ -47,6 +47,15 @@ public class AppSettings
     public bool DefaultPartsCollected { get; set; } = false;
 
     /// <summary>
+    /// UX X.31 (v0.1.18): Maximale Anzahl Complete-Figuren die sich ein Lagerfach
+    /// teilen duerfen. Wenn dieses Limit erreicht ist, schlaegt
+    /// <see cref="IStorageBinService.SuggestBinForCompleteMinifigAsync"/> ein neues
+    /// freies Fach vor statt weiter ins gleiche Fach zu stapeln.
+    /// Default 5. Min 1, Max 999 (UI-seitig validiert).
+    /// </summary>
+    public int MaxCompleteFiguresPerBin { get; set; } = 5;
+
+    /// <summary>
     /// UX-Iteration X.9: Tooltips global an/ausschalten. Der TooltipsService
     /// schreibt diesen Wert in eine Application-Resource, die als
     /// DynamicResource an ToolTipService.IsEnabled der Wurzel-Windows gebunden

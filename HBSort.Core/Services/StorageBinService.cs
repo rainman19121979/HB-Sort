@@ -73,6 +73,97 @@ public class StorageBinService : IStorageBinService
         return free.FirstOrDefault();
     }
 
+    // ====================================================================
+    // UX X.31 (v0.1.18): Konsistente Bin-Vorschlaege pro Item-Typ.
+    // Strenge Auslegung der UX-X.6-Konvention: Complete-Figuren BLOCKIEREN
+    // ein Fach. Die alten GetFreeAsync/GetNextFreeAsync ignorieren das aus
+    // Backwards-Compat-Gruenden. Diese drei Suggest-Methoden sind der
+    // korrekte Default-Vorschlag fuer den Sortier-Workflow.
+    // ====================================================================
+
+    public async Task<StorageBin?> SuggestBinForWaitingMinifigAsync(CancellationToken ct = default)
+    {
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+        // Wirklich frei: keine wartende, KEINE Complete, keine FloatingParts.
+        return await ctx.StorageBins
+            .AsNoTracking()
+            .Where(b => !b.TrackedMinifigs.Any()
+                     && !b.FloatingParts.Any())
+            .OrderBy(b => b.Label)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<StorageBin?> SuggestBinForCompleteMinifigAsync(int maxCompleteLimit, CancellationToken ct = default)
+    {
+        // Defensive Clamping - UI sollte 1..999 garantieren, aber wir
+        // verlassen uns nicht drauf.
+        if (maxCompleteLimit < 1) maxCompleteLimit = 1;
+
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+
+        // 1) Bevorzugt: Bin mit anderen Complete-Figuren (unter Limit) und
+        //    keinen Waiting-Figuren und keinen FloatingParts. Sortierung:
+        //    meiste Complete-Figuren zuerst (wir wollen den vorhandenen
+        //    Stapel wachsen lassen, nicht parallele anlegen).
+        var candidates = await ctx.StorageBins
+            .AsNoTracking()
+            .Where(b => !b.TrackedMinifigs.Any(m => m.Status == TrackedMinifigStatus.Waiting)
+                     && !b.FloatingParts.Any())
+            .Select(b => new
+            {
+                Bin = b,
+                CompleteCount = b.TrackedMinifigs.Count(m => m.Status == TrackedMinifigStatus.Complete)
+            })
+            .Where(x => x.CompleteCount > 0 && x.CompleteCount < maxCompleteLimit)
+            .OrderByDescending(x => x.CompleteCount)
+            .ThenBy(x => x.Bin.Label)
+            .FirstOrDefaultAsync(ct);
+
+        if (candidates != null) return candidates.Bin;
+
+        // 2) Fallback: wirklich freies Fach (analog SuggestBinForWaitingMinifig).
+        return await ctx.StorageBins
+            .AsNoTracking()
+            .Where(b => !b.TrackedMinifigs.Any() && !b.FloatingParts.Any())
+            .OrderBy(b => b.Label)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<StorageBin?> SuggestBinForFloatingPartAsync(string blPartNo, int blColorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(blPartNo))
+            throw new ArgumentException("BL-Part-No darf nicht leer sein.", nameof(blPartNo));
+
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+
+        // 1) Bevorzugt: Bin in dem das gleiche Teil (PartNo + ColorId) schon liegt.
+        //    FIFO nach AddedAt, damit konsistente Wahl bei mehreren Treffern.
+        //    Bin muss noch existieren (FK-Pfad, falls Bin via DELETE wegging).
+        var existingFp = await ctx.FloatingParts
+            .AsNoTracking()
+            .Where(p => p.PartNumber == blPartNo && p.ColorId == blColorId)
+            .OrderBy(p => p.AddedAt)
+            .FirstOrDefaultAsync(ct);
+        if (existingFp != null)
+        {
+            var bin = await ctx.StorageBins
+                .AsNoTracking()
+                .FirstOrDefaultAsync(b => b.Id == existingFp.StorageBinId, ct);
+            if (bin != null) return bin;
+        }
+
+        // 2) Fallback: naechstes Fach OHNE Complete-Figuren, OHNE wartende
+        //    Figuren, OHNE andere FloatingParts. (Spec UX X.31:
+        //    "neuer Typ+Farbe -> naechstes wirklich freies Fach OHNE
+        //    Complete-Figuren drin".)
+        return await ctx.StorageBins
+            .AsNoTracking()
+            .Where(b => !b.TrackedMinifigs.Any()
+                     && !b.FloatingParts.Any())
+            .OrderBy(b => b.Label)
+            .FirstOrDefaultAsync(ct);
+    }
+
     // ---- Create ----
 
     public async Task<StorageBin> CreateSingleAsync(string label, string? notes = null, CancellationToken ct = default)

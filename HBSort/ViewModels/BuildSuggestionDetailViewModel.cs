@@ -174,7 +174,15 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
         var occupied = await binService.GetOccupiedAsync();
         foreach (var b in free) AvailableBins.Add(b);
         foreach (var b in occupied) AvailableBins.Add(b);
-        SelectedBin = AvailableBins.FirstOrDefault(); // Default: erstes freies
+
+        // UX X.31 (v0.1.18): Default-Auswahl aus Suggest-Service holen, damit
+        // Faecher mit Complete-Figuren NICHT als "frei" vorgeschlagen werden
+        // (UX-X.6-Konvention). Aus AvailableBins per Reference-Equality holen,
+        // damit die ComboBox den Eintrag findet.
+        var suggested = await binService.SuggestBinForWaitingMinifigAsync();
+        SelectedBin = suggested != null
+            ? AvailableBins.FirstOrDefault(b => b.Id == suggested.Id) ?? AvailableBins.FirstOrDefault()
+            : AvailableBins.FirstOrDefault();
 
         // 7) Bild im Hintergrund laden falls noch nicht da
         if (string.IsNullOrEmpty(ImageUrl))

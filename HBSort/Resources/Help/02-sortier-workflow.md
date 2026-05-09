@@ -40,6 +40,29 @@ HB-Sort erkennt automatisch, was du vor die Kamera haelst.
    konsumiert (Reverse-Match) - falls bereits alle Teile da sind,
    ist die Figur sofort komplett.
 
+> **Tipp (ab v0.1.18):** Statt mit der Maus auf "In Fach legen" zu
+> klicken, kannst du auch einfach **Enter** druecken. Anschliessend
+> zeigt dir HB-Sort mittig auf dem Bildschirm welches Lagerfach
+> gemeint ist - inklusive Bild. Schliesst per Enter, Leertaste, Klick
+> oder nach 8 Sekunden automatisch.
+
+### Lagerfach-Vorschlag (ab v0.1.18)
+
+HB-Sort schlaegt dir automatisch ein passendes Lagerfach vor:
+
+- **Wartende Figuren** (noch fehlende Teile) bekommen ihr eigenes
+  Fach - kein Mischen mit anderen wartenden Figuren oder Einzelteilen.
+- **Komplette Figuren** duerfen sich ein Fach teilen
+  (Limit konfigurierbar in **Einstellungen > Erkennung > Sortier-
+  Workflow > "Maximale Complete-Figuren pro Lagerfach"**, Default 5).
+- **Einzelteile** vom gleichen Typ + Farbe landen immer im gleichen
+  Fach (Stapel waechst). Neue Einzelteile bekommen ein Fach ohne
+  Complete-Figuren drin.
+
+Der Vorschlag wechselt **live waehrend du Teile markierst**: alle Teile
+da -> Complete-Fach, fehlt mindestens eins -> Wartend-Fach. Du musst
+nichts manuell umschalten.
+
 > Du kannst direkt im Pending-Block einzelne Teile als "vorhanden"
 > markieren oder per **Aus Fach**-Button (siehe unten) einen
 > Floating-Part aus einem anderen Fach uebernehmen.

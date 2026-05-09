@@ -1,6 +1,6 @@
 # Tastatur-Shortcuts
 
-Alle festen Tastatur-Shortcuts in HB-Sort (Stand v0.1.16).
+Alle festen Tastatur-Shortcuts in HB-Sort (Stand v0.1.18).
 
 ## Globale Shortcuts (jederzeit aktiv)
 
@@ -30,6 +30,15 @@ Sobald die Top-3-Karten unter dem Webcam-Bild stehen:
 Die Tasten reagieren nur im Sortier-Tab (nicht in Lagerliste / Hilfe /
 Verlauf) und nicht in Eingabe-Feldern - du kannst weiter "1 Riss" in
 die Beschreibung tippen.
+
+### Pending-Figur-Aktionen (ab v0.1.18)
+
+Sobald die Pending-Figur sichtbar ist (mit Lagerfach-Dropdown):
+
+| Hotkey | Aktion |
+|---|---|
+| **Enter** | "In Fach legen" / "Direkt als Complete speichern" |
+| **Enter** / **Leertaste** / **Esc** | Anweisungs-Popup nach Persist schliessen |
 
 ## Lagerliste-Shortcuts
 

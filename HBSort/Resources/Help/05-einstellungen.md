@@ -34,6 +34,26 @@ initial befuellt wird:
 Du kannst die Auswahl pro Figur weiterhin manuell anpassen - die
 Setting steuert nur die Vorbelegung beim Scan.
 
+### Maximale Complete-Figuren pro Lagerfach (ab v0.1.18)
+
+Bestimmt wie viele zusammengebaute Figuren sich ein Lagerfach teilen
+duerfen. Default: **5**.
+
+- **1** = jede Complete-Figur bekommt ihr eigenes Fach (streng).
+- **5** (Default) = praktischer Kompromiss.
+- **999** = praktisch unbegrenzt zusammenpacken.
+
+Wo: **Einstellungen > Erkennung > Sortier-Workflow > Maximale
+Complete-Figuren pro Lagerfach**.
+
+Der Wert wirkt nur auf den **Lagerfach-Vorschlag**: HB-Sort sucht ein
+Fach mit unter dem Limit Complete-Figuren drin (und keinen wartenden /
+Einzelteilen). Erst wenn das aktuelle Sammelfach das Limit erreicht
+hat, schlaegt HB-Sort ein neues freies Fach vor.
+
+Manuell kannst du im Dropdown weiter beliebige Faecher waehlen - das
+Limit gilt nur fuer den Default-Vorschlag.
+
 ### Hotkeys
 
 Im Tab **Hotkeys** (ab v0.1.16) findest du eine Tabelle aller
