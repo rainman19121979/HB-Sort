@@ -149,19 +149,20 @@
                   MouseDoubleClick="InventoryGrid_MouseDoubleClick"
                   PreviewKeyDown="InventoryGrid_PreviewKeyDown">
             <DataGrid.Columns>
-                <!-- UX X.29 Block C Nachbesserung 2 KORRIGIERT (v0.1.16):
-                     Echtes Problem war die Spalten-Breite. Width=60 war zu
-                     schmal fuer die ModernWpfUI-Theme-CheckBox (inkl.
-                     Padding/Margin) - Haekchen wurde ausserhalb des
-                     sichtbaren Cell-Bereichs gerendert. User hat das
-                     entdeckt durch manuelles Verbreitern der Spalte.
-                     Fix: Width=50, kein expliziter CheckBox-Style. -->
-                <DataGridTemplateColumn Header="Aus..." Width="50" CanUserSort="False">
+                <!-- UX X.29 Block C Nachbesserung 3 (v0.1.16):
+                     Aus...-Spalte schmaler (40px) + ModernWpfUI-CheckBox-
+                     ContentPresenter-Padding via MinWidth/Padding/Margin=0
+                     deaktivieren. Vorher: tote rechte Haelfte der Cell
+                     wegen Default-Content-Platz neben der Box. -->
+                <DataGridTemplateColumn Header="Aus..." Width="40" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                       HorizontalAlignment="Center"
                                       VerticalAlignment="Center"
+                                      MinWidth="0"
+                                      Padding="0"
+                                      Margin="0"
                                       ToolTip="Fuer Bulk-Aktionen auswaehlen (Loeschen / Verschieben / Exportieren)"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
