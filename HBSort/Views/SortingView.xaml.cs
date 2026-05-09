@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Threading;
 using HBSort.Core.Services;
 using HBSort.Services;
@@ -70,6 +71,35 @@ public partial class SortingView : UserControl
         {
             _ = VM.ScanViewModel.SelectCardAsync(rank - 1);
         }
+    }
+
+    /// <summary>
+    /// UX X.30 (v0.1.17) Block D: Tasten 1/2/3 (NumPad oder Top-Row) uebernehmen
+    /// den entsprechenden Brickognize-Vorschlag direkt - ohne Maus-Klick auf
+    /// "Uebernehmen". TextBox-Schutz ist Pflicht damit Eingabe-Felder weiter
+    /// Zahlen aufnehmen koennen.
+    /// </summary>
+    private void SortingView_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        // Eingabe-Felder haben Vorrang: User soll "1 Riss" o.ae. tippen koennen.
+        if (Keyboard.FocusedElement is TextBox or PasswordBox) return;
+        // ComboBox in Edit-Mode auch ausnehmen.
+        if (Keyboard.FocusedElement is ComboBox cb && cb.IsEditable) return;
+
+        var index = e.Key switch
+        {
+            Key.D1 or Key.NumPad1 => 0,
+            Key.D2 or Key.NumPad2 => 1,
+            Key.D3 or Key.NumPad3 => 2,
+            _ => -1
+        };
+        if (index < 0) return;
+
+        var cards = VM?.ScanViewModel?.ResultCards;
+        if (cards == null || index >= cards.Count) return;
+
+        e.Handled = true;
+        _ = VM!.ScanViewModel.SelectCardAsync(index);
     }
 
     // ====================================================================

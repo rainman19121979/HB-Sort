@@ -63,4 +63,18 @@ public partial class ScanResultCard : ObservableObject
     /// </summary>
     [ObservableProperty]
     private bool _isSelected;
+
+    /// <summary>
+    /// UX X.30 (v0.1.17) Block D: Tastatur-Hotkey-Label fuer das Badge oben
+    /// links auf der Karte. Tasten 1/2/3 in der SortingView triggern den
+    /// jeweiligen Vorschlag direkt - das Badge zeigt dem User welche
+    /// Taste welche Karte uebernimmt.
+    /// </summary>
+    public string HotkeyLabel => Rank switch
+    {
+        1 => "[1]",
+        2 => "[2]",
+        3 => "[3]",
+        _ => string.Empty
+    };
 }

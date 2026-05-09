@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -31,7 +32,17 @@ public partial class LiveStatsViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int _currentWaitingCount;
     [ObservableProperty] private int _currentCompleteCount;
     [ObservableProperty] private int _currentFloatingTotal;
+    [ObservableProperty] private int _currentFloatingEntries;
     [ObservableProperty] private string _streakText = string.Empty;
+
+    // UX X.30 (v0.1.17) Block C: Lagerfach-Auslastung + Letzte Komplettierungen.
+    [ObservableProperty] private int _binsTotalCount;
+    [ObservableProperty] private int _binsOccupiedCount;
+    [ObservableProperty] private double _binsOccupiedPercent;
+    [ObservableProperty] private string _binsOccupancyText = string.Empty;
+
+    public ObservableCollection<TopBinRow> TopBins { get; } = new();
+    public ObservableCollection<RecentCompletionRow> LastCompletions { get; } = new();
 
     public LiveStatsViewModel(
         IDbContextFactory<UserDataContext> ctxFactory,
@@ -86,6 +97,78 @@ public partial class LiveStatsViewModel : ObservableObject, IDisposable
                 .CountAsync(m => m.Status == TrackedMinifigStatus.Complete);
             CurrentFloatingTotal = await ctx.FloatingParts.AsNoTracking()
                 .SumAsync(f => (int?)f.Quantity) ?? 0;
+            CurrentFloatingEntries = await ctx.FloatingParts.AsNoTracking().CountAsync();
+
+            // UX X.30 (v0.1.17): Lagerfach-Auslastung.
+            // Bin gilt als belegt wenn FreedAt=null UND mind. eine Minifig
+            // ODER ein FloatingPart drin liegt.
+            var allBins = await ctx.StorageBins.AsNoTracking().ToListAsync();
+            var minifigBinIds = await ctx.TrackedMinifigs.AsNoTracking()
+                .Where(m => m.StorageBinId != null)
+                .Select(m => m.StorageBinId!.Value)
+                .Distinct().ToListAsync();
+            var floatingBinIds = await ctx.FloatingParts.AsNoTracking()
+                .Select(f => f.StorageBinId)
+                .Distinct().ToListAsync();
+            var occupiedBinIds = new HashSet<int>(minifigBinIds);
+            occupiedBinIds.UnionWith(floatingBinIds);
+
+            BinsTotalCount = allBins.Count;
+            BinsOccupiedCount = allBins.Count(b => occupiedBinIds.Contains(b.Id));
+            BinsOccupiedPercent = BinsTotalCount > 0
+                ? (BinsOccupiedCount * 100.0 / BinsTotalCount)
+                : 0;
+            BinsOccupancyText = BinsTotalCount == 0
+                ? "Noch keine Lagerfaecher angelegt"
+                : $"{BinsOccupiedCount} von {BinsTotalCount} Faechern belegt ({BinsOccupiedPercent:F0} %)";
+
+            // Top-5-Faecher nach Item-Count (Minifigs + FloatingParts).
+            // Pragmatischer Ansatz: alle Bin-Counts aus Memory aggregieren -
+            // bei realistischen Bin-Zahlen (< 100) effizient genug.
+            var binItemCounts = new Dictionary<int, int>();
+            foreach (var bId in minifigBinIds)
+                binItemCounts[bId] = binItemCounts.GetValueOrDefault(bId);
+            var minifigGroupCounts = await ctx.TrackedMinifigs.AsNoTracking()
+                .Where(m => m.StorageBinId != null)
+                .GroupBy(m => m.StorageBinId!.Value)
+                .Select(g => new { BinId = g.Key, Count = g.Count() })
+                .ToListAsync();
+            var floatingGroupCounts = await ctx.FloatingParts.AsNoTracking()
+                .GroupBy(f => f.StorageBinId)
+                .Select(g => new { BinId = g.Key, Count = g.Count() })
+                .ToListAsync();
+            foreach (var g in minifigGroupCounts)
+                binItemCounts[g.BinId] = binItemCounts.GetValueOrDefault(g.BinId) + g.Count;
+            foreach (var g in floatingGroupCounts)
+                binItemCounts[g.BinId] = binItemCounts.GetValueOrDefault(g.BinId) + g.Count;
+
+            var topBins = allBins
+                .Where(b => binItemCounts.ContainsKey(b.Id) && binItemCounts[b.Id] > 0)
+                .Select(b => new { Bin = b, Count = binItemCounts[b.Id] })
+                .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Bin.Label)
+                .Take(5)
+                .ToList();
+
+            TopBins.Clear();
+            foreach (var t in topBins)
+                TopBins.Add(new TopBinRow(t.Bin.Label, t.Count));
+
+            // Letzte 5 Komplettierungen (Status=Complete, sortiert nach CompletedAt DESC).
+            var recentCompletions = await ctx.TrackedMinifigs.AsNoTracking()
+                .Where(m => m.Status == TrackedMinifigStatus.Complete && m.CompletedAt != null)
+                .OrderByDescending(m => m.CompletedAt)
+                .Take(5)
+                .Select(m => new { m.BricklinkId, m.FigNum, m.Name, m.CompletedAt })
+                .ToListAsync();
+            LastCompletions.Clear();
+            var nowUtc = DateTime.UtcNow;
+            foreach (var rc in recentCompletions)
+            {
+                var blId = string.IsNullOrEmpty(rc.BricklinkId) ? rc.FigNum : rc.BricklinkId;
+                var ago = FormatTimeAgo(nowUtc - rc.CompletedAt!.Value);
+                LastCompletions.Add(new RecentCompletionRow(blId, rc.Name, ago));
+            }
 
             // Streak: aufeinanderfolgende Tage rueckwaerts mit ScanCount > 0.
             // Wir holen einen 30-Tage-Slice damit auch laengere Streaks abgedeckt sind.
@@ -115,4 +198,27 @@ public partial class LiveStatsViewModel : ObservableObject, IDisposable
             Log.Error(ex, "LiveStats Refresh fehlgeschlagen");
         }
     }
+
+    /// <summary>UX X.30 (v0.1.17): "vor X Min/Std/Tagen"-Formatter.</summary>
+    private static string FormatTimeAgo(TimeSpan span)
+    {
+        if (span.TotalSeconds < 0) return "gerade eben";
+        if (span.TotalMinutes < 1) return "gerade eben";
+        if (span.TotalMinutes < 60) return $"vor {(int)span.TotalMinutes} Min";
+        if (span.TotalHours < 24) return $"vor {(int)span.TotalHours} Std";
+        if (span.TotalDays < 30) return $"vor {(int)span.TotalDays} Tagen";
+        return $"vor {(int)(span.TotalDays / 30)} Monat(en)";
+    }
+}
+
+/// <summary>UX X.30 (v0.1.17): Top-Bin-Zeile in der Live-Stats-Liste.</summary>
+public record TopBinRow(string Label, int ItemCount)
+{
+    public string Display => $"{Label} - {ItemCount} Item{(ItemCount == 1 ? "" : "s")}";
+}
+
+/// <summary>UX X.30 (v0.1.17): Letzte-Komplettierung-Zeile.</summary>
+public record RecentCompletionRow(string BricklinkId, string Name, string TimeAgo)
+{
+    public string Display => $"{BricklinkId} - {Name} ({TimeAgo})";
 }

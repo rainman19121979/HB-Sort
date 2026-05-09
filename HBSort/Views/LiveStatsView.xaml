@@ -91,10 +91,74 @@
                 <TextBlock Grid.Row="1" Grid.Column="1"
                            Text="{Binding CurrentCompleteCount}" FontWeight="SemiBold"
                            Foreground="{StaticResource StatusSuccessBrush}"/>
-                <TextBlock Grid.Row="2" Grid.Column="0" Text="Lose Teile:"/>
-                <TextBlock Grid.Row="2" Grid.Column="1"
-                           Text="{Binding CurrentFloatingTotal}" FontWeight="SemiBold"/>
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Einzelteile:"/>
+                <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal">
+                    <TextBlock Text="{Binding CurrentFloatingEntries}" FontWeight="SemiBold"/>
+                    <TextBlock Text=" Eintraege, "/>
+                    <TextBlock Text="{Binding CurrentFloatingTotal}" FontWeight="SemiBold"/>
+                    <TextBlock Text=" Stueck"/>
+                </StackPanel>
             </Grid>
+
+            <!-- UX X.30 (v0.1.17) Block C: Lagerfach-Auslastung. -->
+            <Separator Margin="0,8"/>
+            <TextBlock Text="Lagerfaecher" FontWeight="SemiBold"
+                       Foreground="{StaticResource StatusInfoBrush}" Margin="0,4,0,4"/>
+            <TextBlock Text="{Binding BinsOccupancyText}"
+                       Margin="0,0,0,4"/>
+            <ProgressBar Maximum="100"
+                         Value="{Binding BinsOccupiedPercent, Mode=OneWay}"
+                         Height="12"
+                         Margin="0,0,0,8"
+                         ToolTip="Anteil der Lagerfaecher mit Inhalt"/>
+            <TextBlock Text="Top 5 nach Belegung:"
+                       FontStyle="Italic" Foreground="Gray"
+                       Margin="0,4,0,4"/>
+            <ItemsControl ItemsSource="{Binding TopBins}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Display}" Margin="8,2,0,0"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="(noch keine belegten Faecher)"
+                       FontStyle="Italic" Foreground="Gray" Margin="8,2,0,0">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding TopBins.Count}" Value="0">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <!-- UX X.30 (v0.1.17) Block C: Letzte Komplettierungen. -->
+            <Separator Margin="0,8"/>
+            <TextBlock Text="Letzte Komplettierungen" FontWeight="SemiBold"
+                       Foreground="{StaticResource StatusInfoBrush}" Margin="0,4,0,4"/>
+            <ItemsControl ItemsSource="{Binding LastCompletions}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Display}" Margin="8,2,0,0" TextTrimming="CharacterEllipsis"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="(noch keine Figur komplett)"
+                       FontStyle="Italic" Foreground="Gray" Margin="8,2,0,0">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding LastCompletions.Count}" Value="0">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
         </StackPanel>
     </ScrollViewer>
 </UserControl>
