@@ -10,6 +10,8 @@ BrickStore- und BrickLink-Export.
 > unabhaengiges, kostenloses Werkzeug ohne offizielle Verbindung zur
 > LEGO-Gruppe.
 
+![HB-Sort beim Sortieren einer erkannten Minifigur](docs/screenshots/01-sortieren-erkennung.png)
+
 ## Features
 
 - **Webcam-Erkennung** ueber Brickognize-API: Minifiguren und Einzelteile
@@ -62,6 +64,37 @@ BrickStore- und BrickLink-Export.
 - **Quality-of-Life**: Doppelklick oeffnet Details, Entf-Taste
   loescht, Suche findet auch Lagerfach-Labels, Default-Auswahl
   beim Scannen konfigurierbar.
+
+## Screenshots
+
+### Einzelteil-Erkennung mit Reverse-Match
+
+![Einzelteil-Scan mit Brickognize, automatische Zuordnung zu wartenden Figuren](docs/screenshots/02-einzelteil-erkennung.png)
+
+Gescannte Einzelteile werden automatisch wartenden Figuren zugeordnet
+(Reverse-Match). Die rechte Seite zeigt mit welchen wartenden Figuren
+das Teil kombinierbar ist.
+
+### Lagerliste mit Bulk-Aktionen
+
+![Lagerliste mit Filter, Such-Feld und Action-Bar fuer Bulk-Loeschen/Verschieben/Exportieren](docs/screenshots/04-lagerliste.png)
+
+Komplette Bestandsuebersicht mit Filtern (Status, Lagerfach, Suche),
+Multi-Select-Checkboxen und Bulk-Operationen (ab v0.1.16).
+
+### Figur-Detail mit Verkaufs-Preisen
+
+![Detail-Dialog einer kompletten Figur mit BL-Preis-Empfehlung und Verschieben/Zerlegen-Buttons](docs/screenshots/05-figur-detail.png)
+
+Pro Figur: Status, Teile-Liste, BrickLink-Preis-Empfehlung
+(optional), Verschieben in anderes Fach, Zerlegen-Wizard.
+
+### Figur zerlegen (DismantleWizard)
+
+![DismantleWizard mit Auswahl pro Teil: behalten/verwerfen + Ziel-Lagerfach](docs/screenshots/03-figur-zerlegen.png)
+
+Beim Zerlegen kannst du pro Teil entscheiden: in den Pool legen, einer
+wartenden Figur zuordnen (UX X.25) oder verwerfen.
 
 ## Voraussetzungen
 
