@@ -215,9 +215,14 @@ public partial class InventoryListViewModel : ObservableObject
         if (!string.IsNullOrWhiteSpace(SearchText))
         {
             var s = SearchText.Trim();
+            // UX X.29 Block C (v0.1.16): Lagerfach-Label mitsuchen - der Tooltip
+            // behauptete das schon laenger, jetzt entspricht der Code dem Tooltip.
             if (!r.ItemId.Contains(s, StringComparison.OrdinalIgnoreCase)
                 && !r.Description.Contains(s, StringComparison.OrdinalIgnoreCase)
-                && !r.ColorName.Contains(s, StringComparison.OrdinalIgnoreCase)) return false;
+                && !r.ColorName.Contains(s, StringComparison.OrdinalIgnoreCase)
+                && (string.IsNullOrEmpty(r.StorageBinLabel)
+                    || !r.StorageBinLabel.Contains(s, StringComparison.OrdinalIgnoreCase)))
+                return false;
         }
         return true;
     }
@@ -263,10 +268,14 @@ public partial class InventoryListViewModel : ObservableObject
             if (FilterByBin == null) FilterByBin = AllBinsSentinel;
 
             // Alle Figuren (Waiting + Complete; Dismantled gibt's dank Cleanup nicht mehr).
+            // UX X.29 Block C (v0.1.16): Sold raus - UX-X.6-Konvention sieht
+            // keinen Sold-Workflow vor, der Status taucht in der Praxis nicht
+            // auf. Falls historische Sold-Eintraege existieren, werden sie
+            // jetzt aus der Lagerliste-Anzeige ausgeblendet (DB-Eintraege
+            // bleiben unveraendert).
             var allMinifigs = await ctx.TrackedMinifigs.AsNoTracking()
                 .Where(m => m.Status == TrackedMinifigStatus.Waiting
-                         || m.Status == TrackedMinifigStatus.Complete
-                         || m.Status == TrackedMinifigStatus.Sold)
+                         || m.Status == TrackedMinifigStatus.Complete)
                 .Include(m => m.RequiredParts)
                 .Include(m => m.StorageBin)
                 .OrderBy(m => m.Status)

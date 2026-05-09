@@ -34,8 +34,22 @@ public interface IStorageBinService
     /// Setzt FreedAt=now, loest TrackedMinifigs vom Fach (StorageBinId=null) und
     /// loescht alle FloatingParts in diesem Fach. Liefert false wenn das Fach
     /// nicht existiert.
+    ///
+    /// UX X.29 Block C (v0.1.16): schreibt jetzt zusaetzlich pro entkoppelter
+    /// Minifig + pro geloeschtem FloatingPart ScanEvents mit UndoData. Die
+    /// Aktion ist damit via Strg+Z / Verlauf-Tab teilweise rueckgaengigmachbar
+    /// (Minifigs lassen sich zurueckverschieben, FloatingParts wiederherstellen).
     /// </summary>
     Task<bool> EmptyAsync(int id, CancellationToken ct = default);
+
+    /// <summary>
+    /// UX X.29 Block C (v0.1.16): Vorab-Inventur fuer den "Fach leeren"-Workflow.
+    /// Gibt zurueck wieviele wartende / komplette Figuren + FloatingParts im
+    /// Bin liegen, ohne etwas zu aendern. UI zeigt damit eine differenzierte
+    /// Confirmation - vor allem die Anzahl Complete-Figuren ist wichtig
+    /// (die verlieren ihr Lagerfach beim Leeren).
+    /// </summary>
+    Task<BinEmptyPreview?> GetEmptyPreviewAsync(int id, CancellationToken ct = default);
 
     /// <summary>Loescht das Fach. Schlaegt fehl wenn noch Figuren oder FloatingParts darin sind.</summary>
     Task<bool> DeleteAsync(int id, CancellationToken ct = default);
@@ -71,6 +85,17 @@ public interface IStorageBinService
     /// </summary>
     Task<int> ReleaseBinsAsync(IEnumerable<int> binIds, CancellationToken ct = default);
 }
+
+/// <summary>
+/// UX X.29 Block C (v0.1.16): Vorab-Info fuer den "Fach leeren"-Workflow.
+/// </summary>
+public record BinEmptyPreview(
+    int BinId,
+    string Label,
+    int WaitingMinifigsCount,
+    int CompleteMinifigsCount,
+    int SoldMinifigsCount,
+    int FloatingPartsCount);
 
 /// <summary>Daten-Struktur fuer den BinDetailDialog.</summary>
 public class BinDetailData

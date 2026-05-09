@@ -626,4 +626,207 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             IsFullyComplete = isComplete
         };
     }
+
+    // ====================================================================
+    // UX X.29 Block C (v0.1.16): Bulk-Operationen fuer die Lagerliste
+    // ====================================================================
+
+    public async Task<(int Minifigs, int FloatingParts)> DeleteSelectionAsync(
+        IEnumerable<int> minifigIds,
+        IEnumerable<int> floatingPartIds,
+        CancellationToken ct = default)
+    {
+        var mIds = minifigIds?.ToList() ?? new List<int>();
+        var fIds = floatingPartIds?.ToList() ?? new List<int>();
+        if (mIds.Count == 0 && fIds.Count == 0) return (0, 0);
+
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+
+        // Minifigs laden inkl. RequiredParts fuer den Snapshot.
+        var minifigs = await ctx.TrackedMinifigs
+            .Include(m => m.RequiredParts)
+            .Where(m => mIds.Contains(m.Id))
+            .ToListAsync(ct);
+
+        // FloatingParts (mit OriginMinifigId-Verbindung zu loeschenden Minifigs entkoppeln).
+        var floats = await ctx.FloatingParts
+            .Where(p => fIds.Contains(p.Id))
+            .ToListAsync(ct);
+
+        // OriginMinifigId-Verbindungen kappen, damit Cascade-Delete der Minifigs
+        // nicht versucht die FloatingParts mit zu loeschen.
+        var minifigIdsToDelete = minifigs.Select(m => m.Id).ToHashSet();
+        if (minifigIdsToDelete.Count > 0)
+        {
+            var origins = await ctx.FloatingParts
+                .Where(fp => fp.OriginMinifigId != null
+                          && minifigIdsToDelete.Contains(fp.OriginMinifigId.Value))
+                .ToListAsync(ct);
+            foreach (var fp in origins) fp.OriginMinifigId = null;
+        }
+
+        var now = DateTime.UtcNow;
+
+        // ScanEvent + UndoData pro Minifig.
+        foreach (var minifig in minifigs)
+        {
+            ct.ThrowIfCancellationRequested();
+            var snapshot = new UndoSnapshotMinifigDelete
+            {
+                OriginalMinifigId = minifig.Id,
+                BricklinkId = minifig.BricklinkId ?? string.Empty,
+                FigNum = minifig.FigNum,
+                Name = minifig.Name,
+                ImageUrl = minifig.ImageUrl,
+                LocalImagePath = minifig.LocalImagePath,
+                UserNotes = minifig.UserNotes,
+                CreatedAt = minifig.CreatedAt,
+                CompletedAt = minifig.CompletedAt,
+                Status = minifig.Status.ToString(),
+                StorageBinId = minifig.StorageBinId,
+                RequiredParts = minifig.RequiredParts.Select(p => new UndoSnapshotPart
+                {
+                    PartNumber = p.PartNumber,
+                    ColorId = p.ColorId,
+                    PartName = p.PartName,
+                    ColorName = p.ColorName,
+                    QuantityNeeded = p.QuantityNeeded,
+                    QuantityCollected = p.QuantityCollected
+                }).ToList()
+            };
+            ctx.ScanEvents.Add(new ScanEvent
+            {
+                Timestamp = now,
+                Type = ScanType.Delete,
+                RecognizedId = minifig.BricklinkId ?? minifig.FigNum,
+                ResultDescription = $"Bulk-Delete: Figur '{minifig.Name}' geloescht",
+                WasUndone = false,
+                UndoData = System.Text.Json.JsonSerializer.Serialize(snapshot)
+            });
+        }
+
+        // ScanEvent + UndoData pro FloatingPart.
+        foreach (var fp in floats)
+        {
+            ct.ThrowIfCancellationRequested();
+            var snapshot = new UndoSnapshotFloatingDelete
+            {
+                OriginalFloatingId = fp.Id,
+                PartNumber = fp.PartNumber,
+                ColorId = fp.ColorId,
+                PartName = fp.PartName,
+                ColorName = fp.ColorName,
+                Quantity = fp.Quantity,
+                StorageBinId = fp.StorageBinId,
+                AddedAt = fp.AddedAt,
+                OriginMinifigId = fp.OriginMinifigId
+            };
+            ctx.ScanEvents.Add(new ScanEvent
+            {
+                Timestamp = now,
+                Type = ScanType.Delete,
+                RecognizedId = fp.PartNumber,
+                ResultDescription = $"Bulk-Delete: Einzelteil '{fp.PartName}' (BL:{fp.PartNumber}/{fp.ColorId}) x{fp.Quantity} geloescht",
+                WasUndone = false,
+                UndoData = System.Text.Json.JsonSerializer.Serialize(snapshot)
+            });
+        }
+
+        ctx.TrackedMinifigs.RemoveRange(minifigs);
+        ctx.FloatingParts.RemoveRange(floats);
+        await ctx.SaveChangesAsync(ct);
+
+        Log.Information("Bulk-Delete: {M} Minifigs, {F} FloatingParts geloescht",
+            minifigs.Count, floats.Count);
+        DataChanged?.Invoke(this, EventArgs.Empty);
+        return (minifigs.Count, floats.Count);
+    }
+
+    public async Task<(int Minifigs, int FloatingParts)> MoveSelectionAsync(
+        IEnumerable<int> minifigIds,
+        IEnumerable<int> floatingPartIds,
+        int targetBinId,
+        CancellationToken ct = default)
+    {
+        var mIds = minifigIds?.ToList() ?? new List<int>();
+        var fIds = floatingPartIds?.ToList() ?? new List<int>();
+        if (mIds.Count == 0 && fIds.Count == 0) return (0, 0);
+
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+
+        // Ziel-Bin existiert? Sonst werfen - kein Halbzustand.
+        var targetBin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == targetBinId, ct);
+        if (targetBin == null)
+            throw new InvalidOperationException($"Lagerfach {targetBinId} existiert nicht.");
+
+        // Bug-B-Fix-Konvention: wenn Ziel-Bin als frei markiert war, reaktivieren.
+        if (targetBin.FreedAt != null)
+        {
+            Log.Information("Fach '{Label}' war als frei markiert (seit {FreedAt}) - wird durch Bulk-Verschieben wieder belegt",
+                targetBin.Label, targetBin.FreedAt);
+            targetBin.FreedAt = null;
+        }
+
+        var minifigs = await ctx.TrackedMinifigs
+            .Where(m => mIds.Contains(m.Id))
+            .ToListAsync(ct);
+        var floats = await ctx.FloatingParts
+            .Where(p => fIds.Contains(p.Id))
+            .ToListAsync(ct);
+
+        var now = DateTime.UtcNow;
+
+        foreach (var m in minifigs)
+        {
+            if (m.StorageBinId == targetBinId) continue; // No-op
+            var snap = new UndoSnapshotMove
+            {
+                MinifigId = m.Id,
+                OldStorageBinId = m.StorageBinId,
+                NewStorageBinId = targetBinId
+            };
+            ctx.ScanEvents.Add(new ScanEvent
+            {
+                Timestamp = now,
+                Type = ScanType.Move,
+                RecognizedId = m.BricklinkId ?? m.FigNum,
+                ResultDescription = $"Bulk-Move: Figur '{m.Name}' nach '{targetBin.Label}' verschoben",
+                WasUndone = false,
+                UndoData = System.Text.Json.JsonSerializer.Serialize(snap)
+            });
+            m.StorageBinId = targetBinId;
+        }
+
+        // FloatingParts: Move via Snapshot des FloatingPart-State (Delete+Recreate-Pattern
+        // ist die einfachste Undo-Variante - StorageBinId-Aenderung von FloatingPart hat
+        // kein eigenes UndoSnapshot-Format, deshalb nutzen wir UndoSnapshotMove auf
+        // negative virtuelle MinifigId waere unsauber. Pragmatisch: nur StorageBinId
+        // setzen, ScanEvent ohne UndoData (kein Undo fuer FloatingPart-Move - User muss
+        // manuell zurueckschieben). Hinweis im Toast-Text fuer User-Erwartungs-Klarheit.
+        var floatingMoved = 0;
+        foreach (var fp in floats)
+        {
+            if (fp.StorageBinId == targetBinId) continue; // No-op
+            ctx.ScanEvents.Add(new ScanEvent
+            {
+                Timestamp = now,
+                Type = ScanType.Move,
+                RecognizedId = fp.PartNumber,
+                ResultDescription = $"Bulk-Move: Einzelteil '{fp.PartName}' (BL:{fp.PartNumber}/{fp.ColorId}) nach '{targetBin.Label}' verschoben",
+                WasUndone = false,
+                // Kein UndoData fuer FloatingPart-Move (Snapshot-Format fokussiert auf
+                // Minifig). User kann manuell zurueck-verschieben falls gewuenscht.
+                UndoData = null
+            });
+            fp.StorageBinId = targetBinId;
+            floatingMoved++;
+        }
+
+        await ctx.SaveChangesAsync(ct);
+
+        Log.Information("Bulk-Move: {M} Minifigs, {F} FloatingParts nach '{Bin}' verschoben",
+            minifigs.Count, floatingMoved, targetBin.Label);
+        DataChanged?.Invoke(this, EventArgs.Empty);
+        return (minifigs.Count, floatingMoved);
+    }
 }

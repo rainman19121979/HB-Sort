@@ -98,6 +98,40 @@ public interface IMinifigPersistenceService
     Task<int> RemoveExportedFloatingPartsAsync(
         IEnumerable<int> floatingPartIds,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// UX X.29 Block C (v0.1.16): Bulk-Loeschen aus der Lagerliste.
+    /// Loescht die uebergebenen Minifigs UND FloatingParts in einer
+    /// atomaren Transaction. Pro geloeschtes Item wird ein ScanEvent
+    /// vom Typ Delete + UndoData geschrieben (analog Block-B-Mechanik) -
+    /// Strg+Z kann Undo machen, Item fuer Item ueber den Verlauf-Tab.
+    ///
+    /// Liefert (deletedMinifigs, deletedFloatings).
+    /// Fehler wirft - kein Halbzustand.
+    /// </summary>
+    Task<(int Minifigs, int FloatingParts)> DeleteSelectionAsync(
+        IEnumerable<int> minifigIds,
+        IEnumerable<int> floatingPartIds,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// UX X.29 Block C (v0.1.16): Bulk-Verschieben aus der Lagerliste.
+    /// Setzt StorageBinId fuer die uebergebenen Minifigs und FloatingParts
+    /// auf <paramref name="targetBinId"/>. Falls der Ziel-Bin als frei
+    /// markiert war (FreedAt!=null), wird er reaktiviert.
+    ///
+    /// Pro verschobenes Item ein ScanEvent vom Typ Move + UndoData -
+    /// Strg+Z stellt die alten StorageBinIds wieder her.
+    ///
+    /// Liefert (movedMinifigs, movedFloatings).
+    /// Fehler wirft - kein Halbzustand. Wirft auch wenn der targetBin
+    /// nicht existiert.
+    /// </summary>
+    Task<(int Minifigs, int FloatingParts)> MoveSelectionAsync(
+        IEnumerable<int> minifigIds,
+        IEnumerable<int> floatingPartIds,
+        int targetBinId,
+        CancellationToken ct = default);
 }
 
 /// <summary>

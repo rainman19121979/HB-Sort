@@ -169,16 +169,40 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        // Warnung: was passiert beim Leeren - destruktive Aktion -> "Ja"/"Nein".
-        var msg = $"Fach '{row.Label}' enthaelt {row.MinifigCount} Figur(en) und " +
-                  $"{row.FloatingPartCount} Einzelteil(e).\n\n" +
+        // UX X.29 Block C (v0.1.16): differenzierte Inventur via GetEmptyPreviewAsync,
+        // damit Complete-Figuren explizit hervorgehoben werden (sie verlieren beim
+        // Leeren ihr Lagerfach - siehe Diagnose-Befund).
+        var binService = App.Services.GetRequiredService<IStorageBinService>();
+        var preview = await binService.GetEmptyPreviewAsync(row.Id);
+        if (preview == null) return;
+
+        string msg;
+        if (preview.CompleteMinifigsCount > 0)
+        {
+            // Sonderwarnung mit Achtung-Hinweis.
+            msg = $"ACHTUNG: Fach '{preview.Label}' enthaelt " +
+                  $"{preview.CompleteMinifigsCount} KOMPLETT zusammengebaute Figur(en)!\n\n" +
+                  $"Diese verlieren beim Leeren ihr Lagerfach (StorageBinId=null) und " +
+                  $"erscheinen in der Lagerliste ohne Fach-Zuordnung. " +
+                  $"Strg+Z (Verlauf-Tab) macht jede Entkopplung einzeln rueckgaengig.\n\n" +
+                  $"Inhalt:\n" +
+                  $"  - {preview.WaitingMinifigsCount} wartende Figur(en)\n" +
+                  $"  - {preview.CompleteMinifigsCount} komplette Figur(en) - !!!\n" +
+                  $"  - {preview.FloatingPartsCount} Einzelteil-Eintrag/Eintraege (werden geloescht)\n\n" +
+                  $"Wirklich fortfahren?";
+        }
+        else
+        {
+            msg = $"Fach '{preview.Label}' enthaelt {preview.WaitingMinifigsCount} wartende Figur(en) und " +
+                  $"{preview.FloatingPartsCount} Einzelteil(e).\n\n" +
                   "Beim Leeren werden:\n" +
-                  "  - Figuren vom Fach geloest (bleiben in der DB)\n" +
+                  "  - Wartende Figuren vom Fach geloest (bleiben in der DB)\n" +
                   "  - Einzelteile geloescht\n\n" +
+                  "Strg+Z (Verlauf-Tab) macht die Aktion rueckgaengig.\n\n" +
                   "Fortfahren?";
+        }
         if (!await dialogs.ShowQuestionAsync("Lagerfach leeren", msg)) return;
 
-        var binService = App.Services.GetRequiredService<IStorageBinService>();
         var notif = App.Services.GetRequiredService<INotificationService>();
         try
         {

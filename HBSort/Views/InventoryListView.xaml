@@ -110,6 +110,18 @@
                             Command="{Binding DeselectAllExportableCommand}"
                             Padding="8,2" Margin="0,0,8,0"
                             ToolTip="Auswahl aufheben"/>
+                    <!-- UX X.29 Block C (v0.1.16): Bulk-Verschieben + Bulk-Loeschen -->
+                    <Button Content="Verschieben in..."
+                            Click="BulkMove_Click"
+                            IsEnabled="{Binding HasSelectedExportables}"
+                            Padding="8,2" Margin="0,0,4,0"
+                            ToolTip="Markierte Items in ein anderes Lagerfach verschieben."/>
+                    <Button Content="Loeschen"
+                            Click="BulkDelete_Click"
+                            IsEnabled="{Binding HasSelectedExportables}"
+                            Padding="8,2" Margin="0,0,8,0"
+                            Background="#D32F2F" Foreground="White"
+                            ToolTip="Markierte Items dauerhaft loeschen (Strg+Z fuer Rueckgaengig)."/>
                     <Button Content="Exportieren"
                             Click="ExportSelected_Click"
                             IsEnabled="{Binding HasSelectedExportables}"
@@ -122,7 +134,8 @@
         </Border>
 
         <!-- DataGrid -->
-        <DataGrid Grid.Row="3"
+        <DataGrid x:Name="InventoryGrid"
+                  Grid.Row="3"
                   ItemsSource="{Binding ItemsView}"
                   AutoGenerateColumns="False"
                   CanUserAddRows="False" CanUserDeleteRows="False"
@@ -131,7 +144,9 @@
                   GridLinesVisibility="Horizontal"
                   AlternatingRowBackground="#F8F8F8"
                   SelectionMode="Single"
-                  RowHeight="48">
+                  RowHeight="48"
+                  MouseDoubleClick="InventoryGrid_MouseDoubleClick"
+                  PreviewKeyDown="InventoryGrid_PreviewKeyDown">
             <DataGrid.Columns>
                 <!-- Phase 7 + UX X.6: Multi-Select-Checkbox fuer BSX-Export.
                      Sichtbar bei Komplett-Figuren UND Einzelteilen; Wartende

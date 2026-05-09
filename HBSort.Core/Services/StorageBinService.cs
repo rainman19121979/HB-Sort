@@ -200,6 +200,26 @@ public class StorageBinService : IStorageBinService
         return true;
     }
 
+    public async Task<BinEmptyPreview?> GetEmptyPreviewAsync(int id, CancellationToken ct = default)
+    {
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+        var bin = await ctx.StorageBins.AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+        if (bin == null) return null;
+        var minifigs = await ctx.TrackedMinifigs.AsNoTracking()
+            .Where(m => m.StorageBinId == id)
+            .ToListAsync(ct);
+        var floatingCount = await ctx.FloatingParts.AsNoTracking()
+            .CountAsync(f => f.StorageBinId == id, ct);
+        return new BinEmptyPreview(
+            BinId: bin.Id,
+            Label: bin.Label,
+            WaitingMinifigsCount: minifigs.Count(m => m.Status == TrackedMinifigStatus.Waiting),
+            CompleteMinifigsCount: minifigs.Count(m => m.Status == TrackedMinifigStatus.Complete),
+            SoldMinifigsCount: minifigs.Count(m => m.Status == TrackedMinifigStatus.Sold),
+            FloatingPartsCount: floatingCount);
+    }
+
     public async Task<bool> EmptyAsync(int id, CancellationToken ct = default)
     {
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
@@ -209,20 +229,83 @@ public class StorageBinService : IStorageBinService
             .FirstOrDefaultAsync(b => b.Id == id, ct);
         if (bin == null) return false;
 
-        // TrackedMinifigs: aus dem Fach loesen, aber NICHT loeschen (sie bleiben in der DB)
-        foreach (var minifig in bin.TrackedMinifigs.ToList())
+        var now = DateTime.UtcNow;
+        var minifigsList = bin.TrackedMinifigs.ToList();
+        var floatingsList = bin.FloatingParts.ToList();
+
+        // UX X.29 Block C (v0.1.16): TrackedMinifigs werden aus dem Fach geloest,
+        // aber NICHT geloescht. Jede Entkopplung schreibt einen Move-ScanEvent
+        // mit UndoData (von old-bin zu null) - User kann via Verlauf-Tab eine
+        // einzelne Figur zurueckverschieben.
+        foreach (var minifig in minifigsList)
         {
+            ct.ThrowIfCancellationRequested();
+            var snap = new UndoSnapshotMove
+            {
+                MinifigId = minifig.Id,
+                OldStorageBinId = id,
+                NewStorageBinId = null
+            };
+            ctx.ScanEvents.Add(new ScanEvent
+            {
+                Timestamp = now,
+                Type = ScanType.Move,
+                RecognizedId = minifig.BricklinkId ?? minifig.FigNum,
+                ResultDescription = $"Fach geleert: Figur '{minifig.Name}' aus '{bin.Label}' geloest",
+                WasUndone = false,
+                UndoData = System.Text.Json.JsonSerializer.Serialize(snap)
+            });
             minifig.StorageBinId = null;
         }
 
-        // FloatingParts: vollstaendig loeschen (siehe CLAUDE.md "Beim Leeren ...
-        // werden FloatingParts geloescht")
-        ctx.FloatingParts.RemoveRange(bin.FloatingParts);
+        // UX X.29 Block C: FloatingParts werden geloescht (siehe CLAUDE.md
+        // "Beim Leeren werden FloatingParts geloescht"). Pro geloeschtem
+        // FloatingPart ein Delete-ScanEvent mit UndoData - Strg+Z stellt
+        // den Eintrag wieder her.
+        foreach (var fp in floatingsList)
+        {
+            ct.ThrowIfCancellationRequested();
+            var snap = new UndoSnapshotFloatingDelete
+            {
+                OriginalFloatingId = fp.Id,
+                PartNumber = fp.PartNumber,
+                ColorId = fp.ColorId,
+                PartName = fp.PartName,
+                ColorName = fp.ColorName,
+                Quantity = fp.Quantity,
+                StorageBinId = fp.StorageBinId,
+                AddedAt = fp.AddedAt,
+                OriginMinifigId = fp.OriginMinifigId
+            };
+            ctx.ScanEvents.Add(new ScanEvent
+            {
+                Timestamp = now,
+                Type = ScanType.Delete,
+                RecognizedId = fp.PartNumber,
+                ResultDescription = $"Fach geleert: Einzelteil '{fp.PartName}' (BL:{fp.PartNumber}/{fp.ColorId}) x{fp.Quantity} aus '{bin.Label}' geloescht",
+                WasUndone = false,
+                UndoData = System.Text.Json.JsonSerializer.Serialize(snap)
+            });
+        }
+        ctx.FloatingParts.RemoveRange(floatingsList);
 
-        bin.FreedAt = DateTime.UtcNow;
+        // BinFreed-ScanEvent mit UndoData - Strg+Z koennte das Fach wieder als
+        // belegt markieren (FreedAt=null), aendert aber NICHT die Item-
+        // Zuordnungen rueckgaengig (das machen die einzelnen Move/Delete-Undos).
+        var freedSnap = new UndoSnapshotBinFreed { BinId = bin.Id, PreviousFreedAt = now };
+        ctx.ScanEvents.Add(new ScanEvent
+        {
+            Timestamp = now,
+            Type = ScanType.BinFreed,
+            ResultDescription = $"Lagerfach '{bin.Label}' geleert ({minifigsList.Count} Figuren geloest, {floatingsList.Count} FloatingParts geloescht)",
+            WasUndone = false,
+            UndoData = System.Text.Json.JsonSerializer.Serialize(freedSnap)
+        });
+
+        bin.FreedAt = now;
         await ctx.SaveChangesAsync(ct);
         Log.Information("Lagerfach '{Label}' geleert ({Mfgs} Figuren geloest, {Parts} FloatingParts geloescht)",
-            bin.Label, bin.TrackedMinifigs.Count, bin.FloatingParts.Count);
+            bin.Label, minifigsList.Count, floatingsList.Count);
         return true;
     }
 

@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using HBSort.Core.Services;
 using HBSort.Services;
 using HBSort.ViewModels;
@@ -112,6 +113,226 @@ public partial class InventoryListView : UserControl
             var dialog = new FloatingPartDetailDialog(row, imgProvider) { Owner = window };
             dialog.ShowDialog();
         }
+    }
+
+    /// <summary>
+    /// UX X.29 Block C (v0.1.16): Doppelklick auf eine Zeile oeffnet die
+    /// Detail-Ansicht (gleicher Pfad wie der Details-Button).
+    /// </summary>
+    private void InventoryGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        // Klick auf einen Button im Cell-Template darf nicht das Doppelklick
+        // auf die Zeile triggern.
+        if (e.OriginalSource is FrameworkElement fe
+            && (FindAncestor<Button>(fe) != null))
+            return;
+        if (InventoryGrid.SelectedItem is InventoryRowItem row)
+        {
+            OpenDetailsForRow(row);
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// UX X.29 Block C (v0.1.16): Entf-Taste loescht die selektierten Items.
+    /// Wenn Multi-Select via Checkboxen aktiv: Bulk-Loeschen.
+    /// Sonst: einzelne markierte Zeile via DataGrid.SelectedItem.
+    /// In TextBoxen (z.B. Such-Feld) NICHT greifen.
+    /// </summary>
+    private async void InventoryGrid_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Delete) return;
+        if (Keyboard.FocusedElement is TextBox || Keyboard.FocusedElement is PasswordBox) return;
+        if (DataContext is not InventoryListViewModel vm) return;
+
+        if (vm.SelectedExportableCount > 0)
+        {
+            await BulkDeleteAsync(vm);
+            e.Handled = true;
+            return;
+        }
+
+        if (InventoryGrid.SelectedItem is InventoryRowItem row)
+        {
+            await DeleteSingleAsync(row);
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>UX X.29 Block C: Toolbar-Button Bulk-Loeschen.</summary>
+    private async void BulkDelete_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button b) return;
+        if (DataContext is not InventoryListViewModel vm) return;
+        if (!b.IsEnabled) return;
+        b.IsEnabled = false;
+        try
+        {
+            await BulkDeleteAsync(vm);
+        }
+        finally
+        {
+            b.IsEnabled = true;
+        }
+    }
+
+    private async Task BulkDeleteAsync(InventoryListViewModel vm)
+    {
+        var minifigIds = vm.SelectedCompletes.Select(r => r.UnderlyingMinifigId!.Value).ToList();
+        var floatingIds = vm.SelectedFloatings.Select(r => r.UnderlyingFloatingId!.Value).ToList();
+        var total = minifigIds.Count + floatingIds.Count;
+        if (total == 0) return;
+
+        var dialogs = Service<IDialogService>();
+        var msg = $"{total} markierte(s) Item(s) loeschen?\n\n" +
+                  $"  - {minifigIds.Count} Figur(en)\n" +
+                  $"  - {floatingIds.Count} Einzelteil-Eintrag/Eintraege\n\n" +
+                  $"Strg+Z (oder Verlauf-Tab) macht die Aktion rueckgaengig.";
+        if (!await dialogs.ShowQuestionAsync("Markierte loeschen?", msg)) return;
+
+        try
+        {
+            var persistence = Service<IMinifigPersistenceService>();
+            var (mDel, fDel) = await persistence.DeleteSelectionAsync(minifigIds, floatingIds);
+            var notif = Service<INotificationService>();
+            notif.ShowSuccess($"{mDel} Figur(en) und {fDel} Einzelteil(e) geloescht. Strg+Z fuer Rueckgaengig.");
+        }
+        catch (System.Exception ex)
+        {
+            Log.Error(ex, "Bulk-Delete fehlgeschlagen");
+            await dialogs.ShowErrorAsync("Fehler", ex.Message);
+        }
+    }
+
+    /// <summary>UX X.29 Block C: Toolbar-Button Bulk-Verschieben.</summary>
+    private async void BulkMove_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button b) return;
+        if (DataContext is not InventoryListViewModel vm) return;
+        if (!b.IsEnabled) return;
+        b.IsEnabled = false;
+        try
+        {
+            var minifigIds = vm.SelectedCompletes.Select(r => r.UnderlyingMinifigId!.Value).ToList();
+            var floatingIds = vm.SelectedFloatings.Select(r => r.UnderlyingFloatingId!.Value).ToList();
+            var total = minifigIds.Count + floatingIds.Count;
+            if (total == 0) return;
+
+            var binService = Service<IStorageBinService>();
+            var allBins = await binService.GetAllAsync();
+            if (allBins.Count == 0)
+            {
+                await Service<IDialogService>().ShowInfoAsync(
+                    "Keine Lagerfaecher",
+                    "Es sind noch keine Lagerfaecher angelegt. Lege erst eines an in Einstellungen -> Lagerfaecher.");
+                return;
+            }
+
+            // Bin-Picker (Phase-5-Helper aus SupersetsDialog.xaml.cs - statische
+            // Show-Methode, kein eigener Dialog noetig).
+            var targetBin = BinPickerDialog.Show(
+                Window.GetWindow(this)!,
+                allBins,
+                defaultBin: null);
+            if (targetBin == null) return;
+            var targetBinId = targetBin.Id;
+
+            var dialogs = Service<IDialogService>();
+            var msg = $"{total} markierte(s) Item(s) in '{targetBin.Label}' verschieben?\n\n" +
+                      $"  - {minifigIds.Count} Figur(en)\n" +
+                      $"  - {floatingIds.Count} Einzelteil-Eintrag/Eintraege\n\n" +
+                      $"Strg+Z macht die Verschiebung von Figuren rueckgaengig. " +
+                      $"Einzelteile muessten manuell zurueckverschoben werden.";
+            if (!await dialogs.ShowConfirmAsync("Bulk-Verschieben?", msg, okText: "Verschieben", cancelText: "Abbrechen")) return;
+
+            try
+            {
+                var persistence = Service<IMinifigPersistenceService>();
+                var (mMov, fMov) = await persistence.MoveSelectionAsync(minifigIds, floatingIds, targetBinId);
+                var notif = Service<INotificationService>();
+                notif.ShowSuccess($"{mMov} Figur(en) und {fMov} Einzelteil(e) nach '{targetBin.Label}' verschoben.");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "Bulk-Move fehlgeschlagen");
+                await dialogs.ShowErrorAsync("Fehler", ex.Message);
+            }
+        }
+        finally
+        {
+            b.IsEnabled = true;
+        }
+    }
+
+    /// <summary>Hilfsmethode: oeffnet Details-Dialog fuer eine Zeile.</summary>
+    private void OpenDetailsForRow(InventoryRowItem row)
+    {
+        var window = Window.GetWindow(this);
+        if (row.Type == InventoryItemType.Minifig && row.UnderlyingMinifigId.HasValue)
+        {
+            var ctxFactory = Service<Microsoft.EntityFrameworkCore.IDbContextFactory<Core.Database.UserDataContext>>();
+            var binService = Service<IStorageBinService>();
+            var notif = Service<INotificationService>();
+            var persistence = Service<IMinifigPersistenceService>();
+            var imgProvider = Service<IPartImageProvider>();
+            var catalog = Service<IBlCatalogService>();
+            var vm = new MinifigSummaryViewModel(row.UnderlyingMinifigId.Value, ctxFactory, binService, imgProvider, catalog);
+            var dialog = new MinifigSummaryDialog(vm, notif, persistence) { Owner = window };
+            dialog.ShowDialog();
+        }
+        else if (row.Type == InventoryItemType.FloatingPart && row.UnderlyingFloatingId.HasValue)
+        {
+            var imgProvider = Service<IPartImageProvider>();
+            var dialog = new FloatingPartDetailDialog(row, imgProvider) { Owner = window };
+            dialog.ShowDialog();
+        }
+    }
+
+    /// <summary>Hilfsmethode: einzelne Zeile loeschen (Pfad analog Loeschen-Button).</summary>
+    private async Task DeleteSingleAsync(InventoryRowItem row)
+    {
+        var notif = Service<INotificationService>();
+        var dialogs = Service<IDialogService>();
+        try
+        {
+            if (row.Type == InventoryItemType.Minifig && row.UnderlyingMinifigId.HasValue)
+            {
+                var statusLabel = row.Status switch
+                {
+                    StatusKind.Waiting  => "Wartende",
+                    StatusKind.Complete => "Komplette",
+                    StatusKind.Sold     => "Verkaufte",
+                    _                    => string.Empty
+                };
+                var msg = $"{statusLabel} Figur '{row.Description}' loeschen?\n\nStrg+Z macht die Aktion rueckgaengig.";
+                if (!await dialogs.ShowQuestionAsync("Figur loeschen?", msg)) return;
+                await Service<IMinifigPersistenceService>().DeleteAsync(row.UnderlyingMinifigId.Value);
+                notif.ShowSuccess($"Figur '{row.Description}' geloescht.");
+            }
+            else if (row.Type == InventoryItemType.FloatingPart && row.UnderlyingFloatingId.HasValue)
+            {
+                var msg = $"Einzelteil '{row.Description}' x{row.Quantity} loeschen?\n\nStrg+Z macht die Aktion rueckgaengig.";
+                if (!await dialogs.ShowQuestionAsync("Einzelteil loeschen?", msg)) return;
+                await Service<IPartLookupService>().DeleteFloatingPartAsync(row.UnderlyingFloatingId.Value);
+                notif.ShowSuccess($"Einzelteil '{row.Description}' geloescht.");
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Log.Error(ex, "Inventory Delete fehlgeschlagen");
+            await dialogs.ShowErrorAsync("Fehler", ex.Message);
+        }
+    }
+
+    /// <summary>Sucht den naechsten Vorfahren eines bestimmten Typs im Visual-/Logical-Tree.</summary>
+    private static T? FindAncestor<T>(DependencyObject? d) where T : DependencyObject
+    {
+        while (d != null)
+        {
+            if (d is T t) return t;
+            d = System.Windows.Media.VisualTreeHelper.GetParent(d);
+        }
+        return null;
     }
 
     private async void Delete_Click(object sender, RoutedEventArgs e)
