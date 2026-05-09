@@ -10,7 +10,7 @@ BrickStore- und BrickLink-Export.
 > unabhaengiges, kostenloses Werkzeug ohne offizielle Verbindung zur
 > LEGO-Gruppe.
 
-![HB-Sort beim Sortieren einer erkannten Minifigur](docs/screenshots/01-sortieren-erkennung.png)
+![HB-Sort beim Sortieren: Webcam-Erkennung, Pending-Teile mit Auto-Markierung, Reverse-Match-Vorschlaege und BL-Preise](docs/screenshots/01-sortieren-erkennung.png)
 
 ## Features
 
@@ -77,10 +77,12 @@ das Teil kombinierbar ist.
 
 ### Lagerliste mit Bulk-Aktionen
 
-![Lagerliste mit Filter, Such-Feld und Action-Bar fuer Bulk-Loeschen/Verschieben/Exportieren](docs/screenshots/04-lagerliste.png)
+![Lagerliste mit Filter, Such-Feld und Bulk-Action-Bar (Loeschen/Verschieben/Exportieren)](docs/screenshots/04-lagerliste.png)
 
-Komplette Bestandsuebersicht mit Filtern (Status, Lagerfach, Suche),
-Multi-Select-Checkboxen und Bulk-Operationen (ab v0.1.16).
+Komplette Bestandsuebersicht mit Filtern (Status, Lagerfach,
+Volltext-Suche), Multi-Select-Checkboxen und Bulk-Operationen
+(ab v0.1.16). Status-Badges zeigen auf einen Blick was komplett,
+wartend oder ein Einzelteil ist.
 
 ### Figur-Detail mit Verkaufs-Preisen
 
