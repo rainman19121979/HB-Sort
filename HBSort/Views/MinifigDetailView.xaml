@@ -231,26 +231,25 @@
             <!-- ===== FOOTER ===== -->
             <StackPanel Grid.Row="4" Margin="0,12,0,0">
 
-                <!-- Notizen-Feld -->
-                <Grid Margin="0,0,0,8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="80"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <!-- UX X.30 (v0.1.17): "Notizen" -> "Beschreibung".
-                         Klarer Hinweis dass das Feld beim BSX-Export im
-                         oeffentlichen Comments-Feld landet (sichtbar fuer
-                         Kaeufer auf BrickLink), nicht im internen
-                         Remarks-Feld. Internes DB-Feld heisst weiter
-                         UserNotes (kein Schema-Change noetig). -->
-                    <TextBlock Grid.Column="0" Text="Beschreibung:"
-                               VerticalAlignment="Top" Margin="0,4,8,0"/>
-                    <TextBox Grid.Column="1"
-                             Text="{Binding UserNotes, UpdateSourceTrigger=PropertyChanged}"
+                <!-- Beschreibung-Feld
+                     UX X.30 (v0.1.17): "Notizen" -> "Beschreibung". Landet
+                     beim BSX-Export im oeffentlichen Comments-Feld (sichtbar
+                     fuer Kaeufer auf BrickLink), internes DB-Feld heisst
+                     weiter UserNotes.
+                     UX X.30 Block D Bug-Fix (v0.1.17): Label OBEN, TextBox
+                     darunter - vorher 80px-Spalte schnitt "Beschreibung:" auf
+                     "Beschreibur" ab. Vertikales Layout gibt beiden mehr
+                     Platz und passt besser zum laengeren Label-Text. -->
+                <StackPanel Margin="0,0,0,8">
+                    <TextBlock Text="Beschreibung:"
+                               FontSize="11"
+                               Foreground="Gray"
+                               Margin="0,0,0,4"/>
+                    <TextBox Text="{Binding UserNotes, UpdateSourceTrigger=PropertyChanged}"
                              AcceptsReturn="True" TextWrapping="Wrap"
-                             Height="40" VerticalScrollBarVisibility="Auto"
+                             Height="50" VerticalScrollBarVisibility="Auto"
                              ToolTip="Oeffentliche Beschreibung fuer den BrickLink-Verkauf (z.B. 'kleiner Riss am Helm', 'Helm fehlt original'). Wird beim BSX-Export im Comments-Feld hinterlegt und ist fuer Kaeufer sichtbar."/>
-                </Grid>
+                </StackPanel>
 
                 <!--
                     UX X.20 Teil 4: Lagerfach-Bereich prominenter. Akzentfarben-
