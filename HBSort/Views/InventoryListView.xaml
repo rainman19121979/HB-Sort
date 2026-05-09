@@ -149,24 +149,28 @@
                   MouseDoubleClick="InventoryGrid_MouseDoubleClick"
                   PreviewKeyDown="InventoryGrid_PreviewKeyDown">
             <DataGrid.Columns>
-                <!-- UX X.29 Block C Nachbesserung (v0.1.16): Checkbox jetzt
-                     fuer ALLE Items sichtbar (auch Wartende), damit Bulk-
-                     Loeschen + Bulk-Verschieben fuer den ganzen Bestand
-                     funktionieren. Vorher: nur Complete + Floating -> Wartende
-                     waren von Bulk-Aktionen ausgeschlossen.
-                     Export-Pfad filtert intern auf CanBeExported=true und
-                     uebespringt Wartende mit User-Hinweis im Toast. -->
+                <!-- UX X.29 Block C Nachbesserung 2 (v0.1.16):
+                     Visual-Fix fuer wartende Figuren. Der erste Nachbesserung-
+                     Fix entfernte den Visibility-DataTrigger - aber das
+                     Haekchen-Visual blieb bei Wartenden unsichtbar trotz
+                     erfolgreichem Click-Hit-Test (Counter zaehlte).
+                     Vermutete Ursache: WPF-CheckBox-Visual-States werden in
+                     IsReadOnly=True-DataGrid-Cells nicht zuverlaessig vom
+                     Click-Through-Pfad aktualisiert.
+                     Loesung: explizite Visual-Properties + Click-Handler
+                     im Code-Behind der IsSelected direkt toggelt (umgeht
+                     den Binding-Visual-Update-Pfad). -->
                 <DataGridTemplateColumn Header="Aus..." Width="60" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <!--
-                                UX X.13b/d (Bugfix): UpdateSourceTrigger=PropertyChanged
-                                ist Pflicht fuer DataGrid-Cell-CheckBoxes - LostFocus
-                                feuert in IsReadOnly-DataGrid nicht zuverlaessig.
-                            -->
                             <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      Click="SelectionCheckBox_Click"
+                                      Width="18" Height="18"
                                       HorizontalAlignment="Center"
                                       VerticalAlignment="Center"
+                                      Focusable="True"
+                                      IsTabStop="True"
+                                      Visibility="Visible"
                                       ToolTip="Fuer Bulk-Aktionen auswaehlen (Loeschen / Verschieben / Exportieren)"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
