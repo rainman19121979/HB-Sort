@@ -376,19 +376,106 @@ public class StorageBinServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SuggestBinForFloatingPart_returns_null_when_all_have_complete_or_waiting()
+    public async Task SuggestBinForFloatingPart_falls_back_to_least_loaded_when_all_have_complete()
     {
-        // Edge-Case aus dem Spec-Hinweis: alle Bins haben Complete -> null
-        // (kein Vorschlag).
+        // Bug-Fix v0.1.19-beta.2: vorher lieferte die Methode null wenn alle
+        // Bins Complete-Figuren haben. Neu: Stufe-4-Fallback liefert das am
+        // wenigsten belegte Fach (am wenigsten Complete, am wenigsten
+        // FloatingParts, dann Label) - User sieht "kein perfektes Fach,
+        // hier die beste Wahl" statt eines kommentarlosen null.
         await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
         var b1 = await _sut.GetByLabelAsync("Box 01");
         var b2 = await _sut.GetByLabelAsync("Box 02");
+        // b1 hat 2 Complete, b2 hat 1 Complete -> b2 ist weniger belegt.
         await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Complete);
+        await SeedMinifigInBinAsync(b1!.Id, "fig1b", TrackedMinifigStatus.Complete);
         await SeedMinifigInBinAsync(b2!.Id, "fig2", TrackedMinifigStatus.Complete);
 
         var suggestion = await _sut.SuggestBinForFloatingPartAsync("3024", 11);
 
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForFloatingPart_returns_null_only_when_no_bins_exist()
+    {
+        // Bug-Fix v0.1.19-beta.2: ohne Bins gibt's logischerweise nichts
+        // vorzuschlagen.
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3024", 11);
         Assert.Null(suggestion);
+    }
+
+    [Fact]
+    public async Task SuggestBinForFloatingPart_falls_back_to_floating_only_bin_when_no_truly_free()
+    {
+        // Bug-Fix v0.1.19-beta.2 Stufe 3: keine wirklich freien Bins, aber
+        // ein Bin nur mit FloatingParts. Mix erlauben statt Stufe-4-Fallback.
+        // (Stufe 1 trifft nicht, weil das gesuchte Teil andere PartNo hat.)
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        var b2 = await _sut.GetByLabelAsync("Box 02");
+        await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Complete);
+        await SeedFloatingPartInBinAsync(b2!.Id, "9999", qty: 1, colorId: 99);
+
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3024", 11);
+
+        Assert.NotNull(suggestion);
+        // Box 02 hat zwar einen FloatingPart, aber keine Minifig - Stufe 3.
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    // ===== Bug-Fix v0.1.19-beta.2: excludeMinifigId fuer DismantleWizard =====
+
+    [Fact]
+    public async Task SuggestBinForFloatingPart_excludeMinifigId_treats_excluded_bin_as_free()
+    {
+        // Szenario: Box 01 hat eine Complete-Figur (cty0685). Sie soll gleich
+        // zerlegt werden -> ihr Fach ist eigentlich ein guter Kandidat fuer
+        // die Teile. Mit excludeMinifigId=cty0685.Id soll Box 01 als Stufe-2-
+        // Treffer (wirklich frei) zurueckkommen.
+        await _sut.CreateBulkAsync(new[] { "Box 01" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        var minifigId = await SeedMinifigInBinAsync(b1!.Id, "cty0685", TrackedMinifigStatus.Complete);
+
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync(
+            "3024", 11, excludeMinifigId: minifigId);
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 01", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForFloatingPart_without_excludeMinifigId_skips_bin_with_complete()
+    {
+        // Sanity: ohne excludeMinifigId zaehlt Complete weiterhin als
+        // belegend - User-Bug-Repro vor dem Fix wuerde Box 01 nicht
+        // vorschlagen, sondern Box 02 oder Stufe-4-Fallback.
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedMinifigInBinAsync(b1!.Id, "cty0685", TrackedMinifigStatus.Complete);
+
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3024", 11);
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForFloatingPart_excludeMinifigId_does_not_mask_other_minifigs()
+    {
+        // Box 01 hat ZWEI Complete-Figuren (fig1 + fig2). Wir excluden nur
+        // fig1 - fig2 bleibt belegend, Box 01 darf nicht als frei gelten.
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        var fig1 = await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Complete);
+        await SeedMinifigInBinAsync(b1!.Id, "fig2", TrackedMinifigStatus.Complete);
+
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync(
+            "3024", 11, excludeMinifigId: fig1);
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
     }
 
     [Fact]

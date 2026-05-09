@@ -100,14 +100,18 @@ public partial class DismantleWizardViewModel : ObservableObject
                     IsKept = p.QuantityCollected > 0,
                 };
 
-                // UX X.32 Block A (v0.1.19): pro Teil INDIVIDUELLER Default-Bin
-                // via SuggestBinForFloatingPart. Bevorzugt: Fach mit gleichem
-                // Teil (Stapel waechst), sonst freies Fach OHNE Complete drin.
+                // UX X.32 Block A (v0.1.19) + Bug-Fix v0.1.19-beta.2: pro Teil
+                // INDIVIDUELLER Default-Bin via SuggestBinForFloatingPart.
+                // excludeMinifigId = TrackedMinifigId, weil die Figur durch das
+                // Zerlegen gleich verschwindet - ihr Fach kommt also als
+                // Kandidat infrage (sonst wuerde Suggest die Figur als
+                // belegend werten und das Fach ausschliessen).
                 StorageBin? perPartBin = null;
                 try
                 {
                     var suggested = await _binService.SuggestBinForFloatingPartAsync(
-                        p.PartNumber, p.ColorId);
+                        p.PartNumber, p.ColorId,
+                        excludeMinifigId: TrackedMinifigId);
                     if (suggested != null)
                         perPartBin = AvailableBins.FirstOrDefault(b => b.Id == suggested.Id);
                 }

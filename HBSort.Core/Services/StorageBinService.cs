@@ -129,7 +129,10 @@ public class StorageBinService : IStorageBinService
             .FirstOrDefaultAsync(ct);
     }
 
-    public async Task<StorageBin?> SuggestBinForFloatingPartAsync(string blPartNo, int blColorId, CancellationToken ct = default)
+    public async Task<StorageBin?> SuggestBinForFloatingPartAsync(
+        string blPartNo, int blColorId,
+        int? excludeMinifigId = null,
+        CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(blPartNo))
             throw new ArgumentException("BL-Part-No darf nicht leer sein.", nameof(blPartNo));
@@ -152,15 +155,44 @@ public class StorageBinService : IStorageBinService
             if (bin != null) return bin;
         }
 
-        // 2) Fallback: naechstes Fach OHNE Complete-Figuren, OHNE wartende
-        //    Figuren, OHNE andere FloatingParts. (Spec UX X.31:
-        //    "neuer Typ+Farbe -> naechstes wirklich freies Fach OHNE
-        //    Complete-Figuren drin".)
+        // Bug-Fix v0.1.19-beta.2: 4-stufiger Fallback statt nur "wirklich frei
+        // -> null". Damit kann ein Aufrufer (z.B. DismantleWizard) sicher sein
+        // dass IMMER ein Vorschlag kommt, sofern ueberhaupt Bins existieren.
+        // excludeMinifigId beruecksichtigen: Bins in denen NUR die zu
+        // entfernende Figur liegt zaehlen wie "frei" (sie wird gleich weg sein).
+        var hasExclude = excludeMinifigId.HasValue;
+
+        // 2) Wirklich freies Fach: keine Minifigs (ausser excluded), keine FloatingParts.
+        var trulyFree = await ctx.StorageBins
+            .AsNoTracking()
+            .Where(b =>
+                !b.TrackedMinifigs.Any(m => !hasExclude || m.Id != excludeMinifigId!.Value)
+                && !b.FloatingParts.Any())
+            .OrderBy(b => b.Label)
+            .FirstOrDefaultAsync(ct);
+        if (trulyFree != null) return trulyFree;
+
+        // 3) Erweitert: Fach OHNE Complete- und Waiting-Figuren (FloatingParts
+        //    erlaubt - Mix-Fach OK wenn keine wirklich freien mehr da sind).
+        var noMinifigOnly = await ctx.StorageBins
+            .AsNoTracking()
+            .Where(b =>
+                !b.TrackedMinifigs.Any(m => !hasExclude || m.Id != excludeMinifigId!.Value))
+            .OrderBy(b => b.Label)
+            .FirstOrDefaultAsync(ct);
+        if (noMinifigOnly != null) return noMinifigOnly;
+
+        // 4) Letzter Fallback: irgendein Fach, sortiert nach am wenigsten
+        //    belegt (Complete-Count zuerst, dann FloatingParts-Count, dann Label).
+        //    User sieht "kein perfektes Fach, hier die beste Wahl" statt eines
+        //    kommentarlosen null. Excluded Minifig zaehlt nicht.
         return await ctx.StorageBins
             .AsNoTracking()
-            .Where(b => !b.TrackedMinifigs.Any()
-                     && !b.FloatingParts.Any())
-            .OrderBy(b => b.Label)
+            .OrderBy(b => b.TrackedMinifigs.Count(m =>
+                m.Status == TrackedMinifigStatus.Complete
+                && (!hasExclude || m.Id != excludeMinifigId!.Value)))
+            .ThenBy(b => b.FloatingParts.Count)
+            .ThenBy(b => b.Label)
             .FirstOrDefaultAsync(ct);
     }
 

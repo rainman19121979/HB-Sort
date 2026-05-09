@@ -40,13 +40,26 @@ public interface IStorageBinService
     Task<StorageBin?> SuggestBinForCompleteMinifigAsync(int maxCompleteLimit, CancellationToken ct = default);
 
     /// <summary>
-    /// UX X.31 (v0.1.18): Schlaegt ein Fach fuer ein Einzelteil vor.
-    /// Wenn das Teil (gleiche BlPartNo + BlColorId) bereits in einem Fach liegt:
-    /// dieses Fach (Stapel wachsen lassen, FIFO bei mehreren Treffern nach AddedAt).
-    /// Sonst: naechstes Fach OHNE Complete-Figuren, OHNE wartende Figuren,
-    /// OHNE andere FloatingParts. Null wenn alle Faecher blockiert sind.
+    /// UX X.31 (v0.1.18) / Bug-Fix v0.1.19-beta.2: Schlaegt ein Fach fuer ein
+    /// Einzelteil vor. Vier-stufiger Fallback:
+    ///   1) Bin in dem das gleiche Teil (PartNo + ColorId) schon liegt
+    ///      (FIFO nach AddedAt). Stapel wachsen lassen.
+    ///   2) Wirklich freies Fach (keine Minifigs, keine FloatingParts).
+    ///   3) Erweitert: Fach OHNE Complete-Figuren (FloatingParts erlaubt).
+    ///   4) Letzter Fallback: irgendein Fach, sortiert nach am wenigsten
+    ///      belegt. Damit liefert die Methode immer einen Vorschlag (sofern
+    ///      ueberhaupt Bins existieren) - Aufrufer muss nicht selbst auf null
+    ///      reagieren und auf Default-Bin zurueckfallen.
+    ///
+    /// Optionaler <paramref name="excludeMinifigId"/>: ignoriert das Fach
+    /// IGNORE einer Figur die durch den Aufrufer-Pfad selbst gleich
+    /// "verschwindet" (z.B. die zu zerlegende Figur im DismantleWizard - ihr
+    /// Fach wird dadurch frei). Wenn null gesetzt: keine Filterung.
     /// </summary>
-    Task<StorageBin?> SuggestBinForFloatingPartAsync(string blPartNo, int blColorId, CancellationToken ct = default);
+    Task<StorageBin?> SuggestBinForFloatingPartAsync(
+        string blPartNo, int blColorId,
+        int? excludeMinifigId = null,
+        CancellationToken ct = default);
 
     Task<StorageBin> CreateSingleAsync(string label, string? notes = null, CancellationToken ct = default);
 
