@@ -57,6 +57,19 @@ public sealed record UndoSnapshotMove
     public int? NewStorageBinId { get; init; }
 }
 
+/// <summary>
+/// UX X.30 (v0.1.17): Snapshot fuer FloatingPart-Verschiebungen via
+/// Bulk-Move. Eigener Record damit der UndoService klar zwischen Minifig-
+/// und FloatingPart-Move unterscheiden kann (TrackedMinifigPart bzw.
+/// FloatingPart sind unterschiedliche Entity-Typen).
+/// </summary>
+public sealed record UndoSnapshotFloatingMove
+{
+    public int FloatingPartId { get; init; }
+    public int? OldStorageBinId { get; init; }
+    public int? NewStorageBinId { get; init; }
+}
+
 public sealed record UndoSnapshotBinFreed
 {
     public int BinId { get; init; }

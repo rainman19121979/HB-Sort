@@ -797,16 +797,20 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             m.StorageBinId = targetBinId;
         }
 
-        // FloatingParts: Move via Snapshot des FloatingPart-State (Delete+Recreate-Pattern
-        // ist die einfachste Undo-Variante - StorageBinId-Aenderung von FloatingPart hat
-        // kein eigenes UndoSnapshot-Format, deshalb nutzen wir UndoSnapshotMove auf
-        // negative virtuelle MinifigId waere unsauber. Pragmatisch: nur StorageBinId
-        // setzen, ScanEvent ohne UndoData (kein Undo fuer FloatingPart-Move - User muss
-        // manuell zurueckschieben). Hinweis im Toast-Text fuer User-Erwartungs-Klarheit.
+        // FloatingParts: Move mit eigenem Snapshot-Typ UndoSnapshotFloatingMove
+        // (UX X.30 / v0.1.17). UndoService unterscheidet jetzt Minifig- vs.
+        // FloatingPart-Move-Snapshots und stellt jeweils die alte StorageBinId
+        // wieder her.
         var floatingMoved = 0;
         foreach (var fp in floats)
         {
             if (fp.StorageBinId == targetBinId) continue; // No-op
+            var fpSnap = new UndoSnapshotFloatingMove
+            {
+                FloatingPartId = fp.Id,
+                OldStorageBinId = fp.StorageBinId,
+                NewStorageBinId = targetBinId
+            };
             ctx.ScanEvents.Add(new ScanEvent
             {
                 Timestamp = now,
@@ -814,9 +818,7 @@ public class MinifigPersistenceService : IMinifigPersistenceService
                 RecognizedId = fp.PartNumber,
                 ResultDescription = $"Bulk-Move: Einzelteil '{fp.PartName}' (BL:{fp.PartNumber}/{fp.ColorId}) nach '{targetBin.Label}' verschoben",
                 WasUndone = false,
-                // Kein UndoData fuer FloatingPart-Move (Snapshot-Format fokussiert auf
-                // Minifig). User kann manuell zurueck-verschieben falls gewuenscht.
-                UndoData = null
+                UndoData = System.Text.Json.JsonSerializer.Serialize(fpSnap)
             });
             fp.StorageBinId = targetBinId;
             floatingMoved++;

@@ -87,10 +87,16 @@
                        FontStyle="Italic" Foreground="Gray"
                        Margin="0,0,0,4"/>
 
-            <!-- ===== TEILELISTE ===== -->
+            <!-- ===== TEILELISTE =====
+                 UX X.30 (v0.1.17): MaxHeight=320 entfernt damit die Liste den
+                 verfuegbaren Platz nutzt wenn der User den horizontalen
+                 Splitter nach unten zieht. KEIN MinHeight - der Grid.Row="*"-
+                 Layout schrumpft die Liste automatisch wenn das Feld kleiner
+                 wird, ScrollViewer scrollt dann mehr. Footer (Beschreibung +
+                 Lagerfach + Buttons) bleibt dank Grid.Row="4" Height="Auto"
+                 immer sichtbar. -->
             <ScrollViewer Grid.Row="3"
-                          VerticalScrollBarVisibility="Auto"
-                          MaxHeight="320">
+                          VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding Parts}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
@@ -231,13 +237,19 @@
                         <ColumnDefinition Width="80"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Notizen:"
+                    <!-- UX X.30 (v0.1.17): "Notizen" -> "Beschreibung".
+                         Klarer Hinweis dass das Feld beim BSX-Export im
+                         oeffentlichen Comments-Feld landet (sichtbar fuer
+                         Kaeufer auf BrickLink), nicht im internen
+                         Remarks-Feld. Internes DB-Feld heisst weiter
+                         UserNotes (kein Schema-Change noetig). -->
+                    <TextBlock Grid.Column="0" Text="Beschreibung:"
                                VerticalAlignment="Top" Margin="0,4,8,0"/>
                     <TextBox Grid.Column="1"
                              Text="{Binding UserNotes, UpdateSourceTrigger=PropertyChanged}"
                              AcceptsReturn="True" TextWrapping="Wrap"
                              Height="40" VerticalScrollBarVisibility="Auto"
-                             ToolTip="Optionale Notiz zur Figur (z.B. 'Helm fehlt original')"/>
+                             ToolTip="Oeffentliche Beschreibung fuer den BrickLink-Verkauf (z.B. 'kleiner Riss am Helm', 'Helm fehlt original'). Wird beim BSX-Export im Comments-Feld hinterlegt und ist fuer Kaeufer sichtbar."/>
                 </Grid>
 
                 <!--

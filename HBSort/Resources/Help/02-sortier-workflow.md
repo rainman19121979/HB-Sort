@@ -26,7 +26,10 @@ HB-Sort erkennt automatisch, was du vor die Kamera haelst.
    - Das BL-Bild der Figur
    - Die komplette Teileliste mit BL-Part-Nummer, Farbe und Anzahl
    - Ein **Lagerfach-Dropdown** (Default: erstes freies Fach)
-   - Ein optionales **Notiz-Feld**
+   - Ein optionales **Beschreibung**-Feld (landet beim BSX-Export im
+     oeffentlichen `<Comments>`-Feld - perfekt fuer Hinweise wie
+     *"kleiner Riss am Helm"* oder *"Helm fehlt original"*, die der
+     Kaeufer auf BrickLink sehen soll)
 6. Klick **In Fach legen**. Die Figur landet als *Wartend* in deinem
    Lagerfach. Floating-Parts, die zur Figur passen, werden automatisch
    konsumiert (Reverse-Match) - falls bereits alle Teile da sind,

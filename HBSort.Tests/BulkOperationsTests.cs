@@ -150,6 +150,33 @@ public class BulkOperationsTests : IDisposable
     }
 
     [Fact]
+    public async Task MoveSelection_floating_writes_undoData()
+    {
+        // UX X.30 (v0.1.17): FloatingPart-Move schreibt jetzt UndoSnapshotFloatingMove
+        // statt UndoData=null. Strg+Z stellt die alte StorageBinId wieder her.
+        var oldBin = await SeedBinAsync("FpOld");
+        var newBin = await SeedBinAsync("FpNew");
+        var fpId = await SeedFloatingAsync(oldBin, "3001", 11, qty: 5);
+
+        var (mMov, fMov) = await _persistence.MoveSelectionAsync(
+            Array.Empty<int>(), new[] { fpId }, newBin);
+        Assert.Equal(0, mMov);
+        Assert.Equal(1, fMov);
+
+        await using var ctx = await _factory.CreateDbContextAsync();
+        var fp = await ctx.FloatingParts.SingleAsync(p => p.Id == fpId);
+        Assert.Equal(newBin, fp.StorageBinId);
+
+        var moveEvent = await ctx.ScanEvents.SingleAsync(e => e.Type == ScanType.Move);
+        Assert.NotNull(moveEvent.UndoData);
+        var snap = System.Text.Json.JsonSerializer.Deserialize<UndoSnapshotFloatingMove>(moveEvent.UndoData!);
+        Assert.NotNull(snap);
+        Assert.Equal(fpId, snap!.FloatingPartId);
+        Assert.Equal(oldBin, snap.OldStorageBinId);
+        Assert.Equal(newBin, snap.NewStorageBinId);
+    }
+
+    [Fact]
     public async Task MoveSelection_skips_no_op_moves()
     {
         // Move nach demselben Bin = no-op (kein ScanEvent geschrieben).

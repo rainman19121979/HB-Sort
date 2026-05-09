@@ -123,12 +123,15 @@
                       SelectedItem="{Binding SelectedBin}"
                       DisplayMemberPath="Label"/>
 
+            <!-- UX X.30 (v0.1.17): "Notizen" -> "Beschreibung", landet beim
+                 BSX-Export im oeffentlichen Comments-Feld. -->
             <TextBlock Grid.Row="1" Grid.Column="0"
-                       Text="Notizen (optional):" VerticalAlignment="Center"
+                       Text="Beschreibung (optional):" VerticalAlignment="Center"
                        Margin="0,8,0,0"/>
             <TextBox Grid.Row="1" Grid.Column="1"
                      Text="{Binding UserNotes, UpdateSourceTrigger=PropertyChanged}"
-                     Margin="0,8,0,0"/>
+                     Margin="0,8,0,0"
+                     ToolTip="Oeffentliche Beschreibung fuer den BrickLink-Verkauf - wird beim BSX-Export ins Comments-Feld geschrieben und ist fuer Kaeufer sichtbar."/>
         </Grid>
 
         <!-- Buttons -->

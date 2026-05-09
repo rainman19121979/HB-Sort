@@ -124,6 +124,103 @@ public class DataHealServiceTests : IDisposable
         Assert.Equal(0, second.ResetFreedAtCount);
     }
 
+    // ====================================================================
+    // UX X.30 (v0.1.17): Auto-Heal von Bug-A-Folgen via ScanEvent-History
+    // ====================================================================
+
+    [Fact]
+    public async Task Heal_restores_orphan_complete_from_move_event()
+    {
+        // Setup: orphaned Complete-Figur + Move-Event mit Snapshot
+        // (Snapshot.NewStorageBinId zeigt die letzte bekannte Position).
+        var bin = await SeedBinAsync("Restored", freedAt: null);
+        var minifigId = await SeedOrphanCompleteAsync("cty007");
+
+        // Move-Event: Figur wurde zuletzt nach `bin` verschoben (NewStorageBinId=bin).
+        await SeedMoveScanEventAsync("cty007", minifigId, oldBin: 999, newBin: bin);
+
+        var result = await _sut.HealAsync();
+        Assert.Equal(1, result.RestoredBinAssignments);
+
+        await using var ctx = await _factory.CreateDbContextAsync();
+        var m = await ctx.TrackedMinifigs.SingleAsync(x => x.Id == minifigId);
+        Assert.Equal(bin, m.StorageBinId);
+    }
+
+    [Fact]
+    public async Task Heal_does_not_restore_when_target_bin_no_longer_exists()
+    {
+        var minifigId = await SeedOrphanCompleteAsync("cty008");
+        // Move-Event verweist auf Bin 999 - existiert nicht.
+        await SeedMoveScanEventAsync("cty008", minifigId, oldBin: 998, newBin: 999);
+
+        var result = await _sut.HealAsync();
+        Assert.Equal(0, result.RestoredBinAssignments);
+
+        await using var ctx = await _factory.CreateDbContextAsync();
+        var m = await ctx.TrackedMinifigs.SingleAsync(x => x.Id == minifigId);
+        Assert.Null(m.StorageBinId);
+    }
+
+    [Fact]
+    public async Task Heal_does_not_restore_when_no_history_available()
+    {
+        // Orphan ohne ScanEvents -> Warnung, kein Heal.
+        var minifigId = await SeedOrphanCompleteAsync("cty009");
+        var result = await _sut.HealAsync();
+        Assert.Equal(0, result.RestoredBinAssignments);
+    }
+
+    [Fact]
+    public async Task Heal_uses_newest_move_event_when_multiple_exist()
+    {
+        // Setup: zwei Move-Events fuer die gleiche Figur, der neueste
+        // zeigt nach binFinal.
+        var binEarly = await SeedBinAsync("Early");
+        var binFinal = await SeedBinAsync("Final");
+        var minifigId = await SeedOrphanCompleteAsync("cty010");
+
+        await SeedMoveScanEventAsync("cty010", minifigId, oldBin: 998, newBin: binEarly,
+            timestamp: DateTime.UtcNow.AddHours(-2));
+        await SeedMoveScanEventAsync("cty010", minifigId, oldBin: binEarly, newBin: binFinal,
+            timestamp: DateTime.UtcNow.AddMinutes(-5));
+
+        var result = await _sut.HealAsync();
+        Assert.Equal(1, result.RestoredBinAssignments);
+
+        await using var ctx = await _factory.CreateDbContextAsync();
+        var m = await ctx.TrackedMinifigs.SingleAsync(x => x.Id == minifigId);
+        Assert.Equal(binFinal, m.StorageBinId);
+    }
+
+    [Fact]
+    public async Task Heal_falls_back_to_delete_event_snapshot()
+    {
+        // Setup: kein Move-Event, aber ein Delete-Event mit StorageBinId
+        // im Snapshot (Figur wurde geloescht + restored).
+        var bin = await SeedBinAsync("FromDelete");
+        var minifigId = await SeedOrphanCompleteAsync("cty011");
+
+        var snap = new HBSort.Core.Services.UndoSnapshotMinifigDelete
+        {
+            OriginalMinifigId = minifigId,
+            BricklinkId = "cty011",
+            FigNum = "cty011",
+            Name = "Test",
+            Status = "Complete",
+            StorageBinId = bin
+        };
+        await SeedScanEventRawAsync(ScanType.Delete, "cty011",
+            System.Text.Json.JsonSerializer.Serialize(snap));
+
+        var result = await _sut.HealAsync();
+        Assert.Equal(1, result.RestoredBinAssignments);
+
+        await using var ctx = await _factory.CreateDbContextAsync();
+        var m = await ctx.TrackedMinifigs.SingleAsync(x => x.Id == minifigId);
+        Assert.Equal(bin, m.StorageBinId);
+    }
+
     [Fact]
     public async Task Heal_handles_multiple_bins_in_one_pass()
     {
@@ -147,7 +244,7 @@ public class DataHealServiceTests : IDisposable
 
     // ---- Helpers ----
 
-    private async Task<int> SeedBinAsync(string label, DateTime? freedAt)
+    private async Task<int> SeedBinAsync(string label, DateTime? freedAt = null)
     {
         await using var ctx = await _factory.CreateDbContextAsync();
         var bin = new StorageBin
@@ -195,6 +292,55 @@ public class DataHealServiceTests : IDisposable
         ctx.FloatingParts.Add(fp);
         await ctx.SaveChangesAsync();
         return fp.Id;
+    }
+
+    /// <summary>UX X.30 Helper: Orphan-Complete-Figur ohne Bin anlegen.</summary>
+    private async Task<int> SeedOrphanCompleteAsync(string blId)
+    {
+        await using var ctx = await _factory.CreateDbContextAsync();
+        var m = new TrackedMinifig
+        {
+            FigNum = blId,
+            BricklinkId = blId,
+            Name = $"Orphan {blId}",
+            CreatedAt = DateTime.UtcNow.AddDays(-1),
+            CompletedAt = DateTime.UtcNow.AddHours(-1),
+            Status = TrackedMinifigStatus.Complete,
+            StorageBinId = null
+        };
+        ctx.TrackedMinifigs.Add(m);
+        await ctx.SaveChangesAsync();
+        return m.Id;
+    }
+
+    /// <summary>UX X.30 Helper: Move-ScanEvent mit UndoSnapshotMove anlegen.</summary>
+    private async Task SeedMoveScanEventAsync(string blId, int minifigId,
+        int oldBin, int newBin, DateTime? timestamp = null)
+    {
+        var snap = new HBSort.Core.Services.UndoSnapshotMove
+        {
+            MinifigId = minifigId,
+            OldStorageBinId = oldBin,
+            NewStorageBinId = newBin
+        };
+        await SeedScanEventRawAsync(ScanType.Move, blId,
+            System.Text.Json.JsonSerializer.Serialize(snap), timestamp);
+    }
+
+    private async Task SeedScanEventRawAsync(ScanType type, string recognizedId,
+        string? undoData, DateTime? timestamp = null)
+    {
+        await using var ctx = await _factory.CreateDbContextAsync();
+        ctx.ScanEvents.Add(new ScanEvent
+        {
+            Timestamp = timestamp ?? DateTime.UtcNow,
+            Type = type,
+            RecognizedId = recognizedId,
+            ResultDescription = "Test",
+            WasUndone = false,
+            UndoData = undoData
+        });
+        await ctx.SaveChangesAsync();
     }
 
     private sealed class SimpleContextFactory : IDbContextFactory<UserDataContext>

@@ -169,6 +169,44 @@ public class UndoServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task UndoAsync_FloatingMove_restores_old_storage_bin()
+    {
+        // UX X.30 (v0.1.17): FloatingPart-Move via UndoSnapshotFloatingMove.
+        var oldBin = await SeedBinAsync("FpOld");
+        var newBin = await SeedBinAsync("FpNew");
+
+        await using var ctx0 = await _factory.CreateDbContextAsync();
+        var fp = new FloatingPart
+        {
+            PartNumber = "3001",
+            ColorId = 11,
+            Quantity = 5,
+            PartName = string.Empty,
+            ColorName = string.Empty,
+            StorageBinId = newBin, // gerade nach NewBin verschoben
+            AddedAt = DateTime.UtcNow
+        };
+        ctx0.FloatingParts.Add(fp);
+        await ctx0.SaveChangesAsync();
+        var fpId = fp.Id;
+
+        var snap = new UndoSnapshotFloatingMove
+        {
+            FloatingPartId = fpId,
+            OldStorageBinId = oldBin,
+            NewStorageBinId = newBin
+        };
+        var eventId = await SeedScanEventAsync(ScanType.Move, snap);
+
+        var result = await _sut.UndoAsync(eventId);
+        Assert.True(result.Success);
+
+        await using var verify = await _factory.CreateDbContextAsync();
+        var restored = await verify.FloatingParts.SingleAsync(p => p.Id == fpId);
+        Assert.Equal(oldBin, restored.StorageBinId);
+    }
+
+    [Fact]
     public async Task UndoAsync_BinFreed_clears_freed_at()
     {
         var binId = await SeedBinAsync("Box", freedAt: DateTime.UtcNow);

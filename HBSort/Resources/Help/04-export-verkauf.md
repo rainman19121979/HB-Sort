@@ -38,14 +38,15 @@ sichtbar sind:
   automatisch mit dem **Lagerfach-Label** gefuellt (z.B. `Box 003`).
   So weisst du beim spaeteren Verkauf, woher der Eintrag stammt.
 - **`<Comments>` = oeffentlich (Kaeufer sieht es im Listing):** wird
-  fuer komplette Figuren mit deinen **Notizen** aus dem Sortier-Tab
-  gefuellt. Wenn du das Notizfeld in der MinifigDetailView leer
-  laesst, bleibt auch `<Comments>` leer.
+  fuer komplette Figuren mit deiner **Beschreibung** aus dem Sortier-
+  Tab gefuellt (Feld hiess vor v0.1.17 noch "Notizen"). Wenn du das
+  Beschreibung-Feld in der MinifigDetailView leer laesst, bleibt
+  auch `<Comments>` leer.
 
-> **Tipp:** Wenn du eine oeffentliche Beschreibung wie "leichte
-> Gebrauchsspuren" oder "vergilbt" mit ausliefern willst, schreib
-> sie schon beim Sortieren ins Notizfeld. So landet sie automatisch
-> im BSX-Comment.
+> **Tipp:** Wenn du eine oeffentliche Beschreibung wie *"leichte
+> Gebrauchsspuren"* oder *"vergilbt"* mit ausliefern willst, schreib
+> sie schon beim Sortieren ins **Beschreibung**-Feld. So landet sie
+> automatisch im BSX-Comment.
 
 ### Was passiert beim Cleanup?
 

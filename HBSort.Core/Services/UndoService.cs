@@ -224,24 +224,61 @@ public class UndoService : IUndoService
 
     private static async Task<string?> UndoMoveAsync(UserDataContext ctx, ScanEvent ev, CancellationToken ct)
     {
-        var snap = TryDeserialize<UndoSnapshotMove>(ev.UndoData)
-            ?? throw new InvalidOperationException("Move-Snapshot konnte nicht gelesen werden.");
+        // UX X.30 (v0.1.17): unterscheidet Minifig-Move (UndoSnapshotMove) von
+        // FloatingPart-Move (UndoSnapshotFloatingMove). Beide Records haben
+        // unterschiedliche Property-Namen (MinifigId vs FloatingPartId), so
+        // dass die JSON-Deserialisierung klar entscheiden kann.
 
-        var minifig = await ctx.TrackedMinifigs.FirstOrDefaultAsync(m => m.Id == snap.MinifigId, ct);
-        if (minifig == null)
-            throw new InvalidOperationException("Figur existiert nicht mehr - kein Undo moeglich.");
-
-        // Ziel-Bin (= ursprungs-Bin) muss noch existieren.
-        if (snap.OldStorageBinId.HasValue)
+        // Versuch 1: Minifig-Move (haeufigster Pfad).
+        var minifigSnap = TryDeserialize<UndoSnapshotMove>(ev.UndoData);
+        if (minifigSnap != null && minifigSnap.MinifigId > 0)
         {
-            var oldBin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == snap.OldStorageBinId.Value, ct);
-            if (oldBin == null)
-                throw new InvalidOperationException(
-                    "Das urspruengliche Lagerfach existiert nicht mehr - kein Undo moeglich.");
-            if (oldBin.FreedAt != null) oldBin.FreedAt = null;
+            var minifig = await ctx.TrackedMinifigs.FirstOrDefaultAsync(m => m.Id == minifigSnap.MinifigId, ct);
+            if (minifig == null)
+                throw new InvalidOperationException("Figur existiert nicht mehr - kein Undo moeglich.");
+
+            if (minifigSnap.OldStorageBinId.HasValue)
+            {
+                var oldBin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == minifigSnap.OldStorageBinId.Value, ct);
+                if (oldBin == null)
+                    throw new InvalidOperationException(
+                        "Das urspruengliche Lagerfach existiert nicht mehr - kein Undo moeglich.");
+                if (oldBin.FreedAt != null) oldBin.FreedAt = null;
+            }
+            minifig.StorageBinId = minifigSnap.OldStorageBinId;
+            return $"Figur '{minifig.Name}' zurueck in altes Fach";
         }
-        minifig.StorageBinId = snap.OldStorageBinId;
-        return $"Figur '{minifig.Name}' zurueck in altes Fach";
+
+        // Versuch 2: FloatingPart-Move (UX X.30 neu).
+        var fpSnap = TryDeserialize<UndoSnapshotFloatingMove>(ev.UndoData);
+        if (fpSnap != null && fpSnap.FloatingPartId > 0)
+        {
+            var fp = await ctx.FloatingParts.FirstOrDefaultAsync(p => p.Id == fpSnap.FloatingPartId, ct);
+            if (fp == null)
+                throw new InvalidOperationException("Einzelteil existiert nicht mehr - kein Undo moeglich.");
+
+            if (fpSnap.OldStorageBinId.HasValue)
+            {
+                var oldBin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == fpSnap.OldStorageBinId.Value, ct);
+                if (oldBin == null)
+                    throw new InvalidOperationException(
+                        "Das urspruengliche Lagerfach existiert nicht mehr - kein Undo moeglich.");
+                if (oldBin.FreedAt != null) oldBin.FreedAt = null;
+                fp.StorageBinId = oldBin.Id;
+            }
+            else
+            {
+                // FloatingPart hat kein nullable StorageBinId in der DB - falls
+                // OldStorageBinId null waere (theoretisch nicht moeglich, weil
+                // FloatingPart immer einem Bin gehoert), wuerde der Cast scheitern.
+                throw new InvalidOperationException(
+                    "Einzelteil hatte kein urspruengliches Lagerfach - inkonsistenter Snapshot.");
+            }
+            return $"Einzelteil '{fp.PartName}' zurueck in altes Fach";
+        }
+
+        throw new InvalidOperationException(
+            "Move-Snapshot ist weder Minifig- noch FloatingPart-Variante.");
     }
 
     private static async Task<string?> UndoCompleteAsync(UserDataContext ctx, ScanEvent ev, CancellationToken ct)
