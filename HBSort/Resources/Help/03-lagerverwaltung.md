@@ -86,9 +86,39 @@ So machst du aus deinem Floating-Pool effizient neue Figuren.
 Der Tab **Lagerliste** (oben in der Header-Leiste) zeigt deinen
 gesamten Bestand:
 
-- **Suchfeld** oben - Filter nach Name, BL-ID oder Farbe
+- **Suchfeld** oben - Filter nach Name, BL-ID, Farbe oder Lagerfach-
+  Label (ab v0.1.16 auch Lagerfach-Suche).
 - **Status-Filter** - Wartend / Komplett / Floating / Alle
 - **Klick auf Bilder** - oeffnet eine grosse Vorschau (siehe Kapitel
   *Tipps & Tricks*)
+- **Doppelklick auf eine Zeile** (ab v0.1.16) - oeffnet die Detail-
+  Ansicht (gleicher Pfad wie der "Details"-Button).
+- **Markieren via Checkbox** (ab v0.1.16 auch fuer wartende Figuren) -
+  mehrere Items gleichzeitig adressieren.
 - **Komplette Figuren + Einzelteile** koennen markiert und in einem
-  Rutsch via BSX exportiert werden (siehe Kapitel *Export & Verkauf*)
+  Rutsch via BSX exportiert werden (siehe Kapitel *Export & Verkauf*).
+
+### Bulk-Aktionen (ab v0.1.16)
+
+In der Action-Bar ueber der Liste:
+
+- **Alle / Keine** - markiert/demarkiert alle sichtbaren Items
+  (respektiert die Filter).
+- **Verschieben in...** - oeffnet einen Bin-Picker, alle markierten
+  Items wandern ins gewaehlte Fach. Strg+Z macht den Verschub
+  rueckgaengig (bei Figuren - Einzelteile muessten manuell zurueck-
+  geschoben werden).
+- **Loeschen** (rot) - loescht alle markierten Items dauerhaft. Strg+Z
+  oder der Verlauf-Tab macht das Item-fuer-Item rueckgaengig.
+- **Exportieren** (gruen) - exportiert die markierten kompletten
+  Figuren + Einzelteile als BSX. Wartende werden dabei uebersprungen
+  und im Toast vermerkt.
+- **Entf-Taste** auf der Liste loescht die Selektion (Bulk wenn
+  Checkboxen markiert sind, sonst die fokussierte Zeile).
+
+### Counter-Anzeige
+
+In der Action-Bar siehst du *"X markiert"* oder *"X markiert
+(Y exportierbar)"*. Der zweite Wert taucht nur auf wenn wartende
+Figuren mit-markiert sind - sie werden zwar bei Loeschen/Verschieben
+behandelt, aber nicht beim Export.

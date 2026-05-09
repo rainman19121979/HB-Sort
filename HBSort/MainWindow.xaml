@@ -42,17 +42,23 @@
         <KeyBinding Key="F1"
                     Command="{Binding OpenHelpCommand}"/>
 
-        <!-- UX X.20 Teil 6: Tab-Wechsel via Strg+S/L/H -->
+        <!-- UX X.20 Teil 6: Tab-Wechsel via Strg+S/L. -->
         <KeyBinding Modifiers="Control" Key="S"
                     Command="{Binding SwitchToSortingTabCommand}"/>
         <KeyBinding Modifiers="Control" Key="L"
                     Command="{Binding SwitchToInventoryTabCommand}"/>
+        <!-- UX X.29 Block F (v0.1.16): Strg+H umgebogen auf Verlauf-Tab.
+             Hilfe ist weiterhin via F1 erreichbar. -->
         <KeyBinding Modifiers="Control" Key="H"
-                    Command="{Binding SwitchToHelpTabCommand}"/>
+                    Command="{Binding SwitchToHistoryTabCommand}"/>
 
         <!-- UX X.20 Teil 6: Einstellungen via Strg+Komma (Standard-Konvention). -->
         <KeyBinding Modifiers="Control" Key="OemComma"
                     Command="{Binding OpenSettingsCommand}"/>
+
+        <!-- UX X.29 Block F (v0.1.16): Strg+B = sofortiges manuelles Backup. -->
+        <KeyBinding Modifiers="Control" Key="B"
+                    Command="{Binding CreateBackupNowCommand}"/>
 
         <!-- UX-Iteration X.21 Teil 3: Strg+Q = App beenden. Alt+F4 ist Windows-
              Standard und funktioniert ohnehin (dort greift Window_Closing →

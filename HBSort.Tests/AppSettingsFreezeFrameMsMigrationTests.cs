@@ -75,4 +75,42 @@ public class AppSettingsFreezeFrameMsMigrationTests
         Assert.DoesNotContain("FreezeFrameMs", roundTrip);
         Assert.Contains("\"ScanCooldownMs\":1000", roundTrip);
     }
+
+    /// <summary>
+    /// UX X.29 Block G (v0.1.16): DefaultPartsCollected ueberlebt einen
+    /// Round-Trip durch JSON-Serialisierung.
+    /// </summary>
+    [Fact]
+    public void DefaultPartsCollected_round_trips_through_json()
+    {
+        var s = new AppSettings { DefaultPartsCollected = true };
+        var json = JsonSerializer.Serialize(s, Options);
+        Assert.Contains("\"DefaultPartsCollected\":true", json);
+
+        var loaded = JsonSerializer.Deserialize<AppSettings>(json, Options);
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.DefaultPartsCollected);
+    }
+
+    [Fact]
+    public void DefaultPartsCollected_default_value_is_false()
+    {
+        var s = new AppSettings();
+        Assert.False(s.DefaultPartsCollected);
+    }
+
+    [Fact]
+    public void Old_settings_json_without_DefaultPartsCollected_loads_with_default_false()
+    {
+        // Alte settings.json vor v0.1.16 hatte das Feld nicht.
+        var oldJson = """
+        {
+            "SelectedCameraIndex": 0,
+            "ScanCooldownMs": 1000
+        }
+        """;
+        var loaded = JsonSerializer.Deserialize<AppSettings>(oldJson, Options);
+        Assert.NotNull(loaded);
+        Assert.False(loaded!.DefaultPartsCollected);
+    }
 }

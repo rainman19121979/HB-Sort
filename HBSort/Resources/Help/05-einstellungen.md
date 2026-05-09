@@ -20,6 +20,29 @@ in der Header-Leiste. Sie sind in Tabs gegliedert.
 - **Tooltips anzeigen** - blendet alle Tooltips aus, falls sie dich
   stoeren. Default an.
 
+### Sortier-Workflow (ab v0.1.16)
+
+**Beim Scannen einer Figur** kannst du waehlen wie die Teile-Liste
+initial befuellt wird:
+
+- *Nichts vorab abgehakt - ich klicke an was ich habe* (Default):
+  Standardpfad. Du sammelst Teil fuer Teil und bestaetigst sie.
+- *Alles vorab abgehakt - ich klicke ab was fehlt*: nuetzlich wenn
+  du ohnehin meistens komplette Figuren hast und nur einzelne
+  fehlende Teile abklickst.
+
+Du kannst die Auswahl pro Figur weiterhin manuell anpassen - die
+Setting steuert nur die Vorbelegung beim Scan.
+
+### Hotkeys
+
+Im Tab **Hotkeys** (ab v0.1.16) findest du eine Tabelle aller
+Tastatur-Shortcuts (Leertaste, Strg+Z, Strg+B, F1 etc.). Die
+gleiche Liste steht in der Hilfe (F1) → Kapitel "Tastatur-
+Shortcuts".
+
+User-konfigurierbare Hotkeys sind aktuell nicht vorgesehen.
+
 ## BrickLink-API
 
 Hier hinterlegst du deine BL-Tokens, damit HB-Sort Live-Daten und
@@ -138,6 +161,12 @@ Liste aller Faecher mit Belegt/Frei-Status. Buttons:
 - **Anlegen** / **Bulk anlegen**
 - **Umbenennen**
 - **Fach leeren** - gibt das Fach frei und loest alle Zuweisungen.
+  Ab v0.1.16 mit differenzierter Confirmation:
+  - Bei wartenden Figuren + Einzelteilen: normale Bestaetigung,
+    Strg+Z (Verlauf-Tab) macht jede Entkopplung einzeln rueckgaengig.
+  - **Bei kompletten Figuren im Fach**: gesonderte ACHTUNG-Warnung
+    mit dem Hinweis dass sie ihr Lagerfach verlieren. Strg+Z stellt
+    die Zuordnung pro Figur wieder her.
 - **Loeschen** - nur moeglich, wenn frei.
 
 ## Preise

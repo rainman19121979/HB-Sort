@@ -37,6 +37,31 @@ BrickStore- und BrickLink-Export.
   Setup-Installation, Portable-ZIP zeigt den Tab deaktiviert.
 - **Auto-BL-Import** (ab v0.1.15, optional) - aktualisiert die BrickLink-
   Stammdaten alle 7/14/30/90 Tage im Hintergrund.
+- **Backup-System** (ab v0.1.16) - automatische taegliche Backups deiner
+  Daten in `%APPDATA%\HBSort\backups\`. Restore mit Pre-Restore-Backup
+  als Sicherheitsnetz, Auto-Neustart der App nach Wiederherstellung.
+- **Verlauf + Rueckgaengig** (ab v0.1.16) - Tab "Verlauf" zeigt alle
+  Aktionen (Loeschen, Verschieben, Komplettieren, Fach-Aenderungen).
+  Strg+Z macht die letzte Aktion rueckgaengig.
+- **Bulk-Operationen** (ab v0.1.16) - mehrere Items in der Lagerliste
+  markieren und gemeinsam loeschen oder verschieben (mit Undo-Support).
+  Doppelklick auf Zeile oeffnet Details, Entf-Taste loescht Selektion.
+
+## Was ist neu in v0.1.16
+
+- **Backup-System** mit Pending-Restore-Pattern (App startet nach
+  Wiederherstellung automatisch neu).
+- **Verlauf-Tab + Strg+Z** fuer Undo aller wichtigen Aktionen.
+- **Bulk-Loeschen + Bulk-Verschieben** in der Lagerliste, inkl.
+  wartender Figuren.
+- **EmptyAsync-Warnung**: beim "Fach leeren" wird gewarnt wenn
+  komplette Figuren im Bin sind (sie verlieren ihr Lagerfach).
+- **Auto-BL-Import optimiert**: HTTP 304 + SHA256-Hash-Check -
+  Update-Pruefung dauert jetzt ~50 ms statt 5-10 Min wenn die
+  BrickStore-DB unveraendert ist.
+- **Quality-of-Life**: Doppelklick oeffnet Details, Entf-Taste
+  loescht, Suche findet auch Lagerfach-Labels, Default-Auswahl
+  beim Scannen konfigurierbar.
 
 ## Voraussetzungen
 

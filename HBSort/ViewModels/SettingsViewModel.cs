@@ -316,6 +316,27 @@ public partial class SettingsViewModel : ObservableObject
         return Task.CompletedTask;
     }
 
+    // --- UX X.29 Block G (v0.1.16): Default-Auswahl beim Scannen ---
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DefaultPartsNothingCollected))]
+    [NotifyPropertyChangedFor(nameof(DefaultPartsAllCollected))]
+    private bool _defaultPartsCollected;
+
+    /// <summary>RadioButton-Helper fuer "Nichts vorab abgehakt".</summary>
+    public bool DefaultPartsNothingCollected
+    {
+        get => !DefaultPartsCollected;
+        set { if (value) DefaultPartsCollected = false; }
+    }
+
+    /// <summary>RadioButton-Helper fuer "Alles vorab abgehakt".</summary>
+    public bool DefaultPartsAllCollected
+    {
+        get => DefaultPartsCollected;
+        set { if (value) DefaultPartsCollected = true; }
+    }
+
     // --- UX X.29 (v0.1.16): Backup-Tab ---
 
     [ObservableProperty]
@@ -335,6 +356,31 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private string _backupsSummary = string.Empty;
+
+    // --- UX X.29 Block F (v0.1.16): Hotkey-Tab ---
+
+    /// <summary>
+    /// Statische Liste aller festen Tastatur-Shortcuts. Zentrale
+    /// Quelle der Wahrheit - synchron halten mit MainWindow.xaml InputBindings
+    /// + MainWindow_PreviewKeyDown + 09-hotkeys.md.
+    /// </summary>
+    public List<HotkeyEntry> HotkeyEntries { get; } = new()
+    {
+        new("Leertaste",     "Scan ausloesen (im Sortier-Tab)"),
+        new("Q",             "Mehrfach-Scan-Dialog (im Sortier-Tab)"),
+        new("F1",            "Hilfe-Tab oeffnen"),
+        new("Strg+Z",        "Letzte Aktion rueckgaengig (Verlauf-Tab)"),
+        new("Strg+S",        "Sortieren-Tab"),
+        new("Strg+L",        "Lagerliste-Tab"),
+        new("Strg+H",        "Verlauf-Tab"),
+        new("Strg+,",        "Einstellungen oeffnen"),
+        new("Strg+B",        "Backup jetzt erstellen"),
+        new("Strg+Q",        "App beenden"),
+        new("Doppelklick",   "Detail-Dialog oeffnen (Lagerliste)"),
+        new("Entf",          "Markierte Items loeschen (Lagerliste)"),
+        new("Esc",           "Dialog/Modal-Overlay schliessen"),
+        new("Enter",         "Primaeren Button ausloesen (OK / Speichern)")
+    };
 
     /// <summary>UX X.26 (v0.1.13): True wenn ein Update verfuegbar ist.
     /// Steuert die Sichtbarkeit der "Jetzt updaten"-Box im Updates-Tab.</summary>
@@ -452,6 +498,7 @@ public partial class SettingsViewModel : ObservableObject
         ScoreThresholdShowSelection = s.ScoreThresholdShowSelection;
         ScanCooldownMs = s.ScanCooldownMs;
         SoundEnabled = s.SoundEnabled;
+        DefaultPartsCollected = s.DefaultPartsCollected;
         ShowTooltips = s.ShowTooltips;
         AutoCheckForUpdates = s.AutoCheckForUpdates;
         AutoBlImport = s.AutoBlImport;
@@ -503,6 +550,7 @@ public partial class SettingsViewModel : ObservableObject
         s.ScoreThresholdShowSelection = ScoreThresholdShowSelection;
         s.ScanCooldownMs = ScanCooldownMs;
         s.SoundEnabled = SoundEnabled;
+        s.DefaultPartsCollected = DefaultPartsCollected;
         s.ShowTooltips = ShowTooltips;
         s.AutoCheckForUpdates = AutoCheckForUpdates;
         s.AutoBlImport = AutoBlImport;
@@ -1271,6 +1319,11 @@ public partial class SettingsViewModel : ObservableObject
     }
 
 }
+
+/// <summary>
+/// UX X.29 Block F (v0.1.16): eine Zeile im Hotkeys-Tab.
+/// </summary>
+public record HotkeyEntry(string Key, string Action);
 
 /// <summary>
 /// UX X.29 (v0.1.16): eine Zeile in der Backup-DataGrid.

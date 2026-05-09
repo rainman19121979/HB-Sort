@@ -39,6 +39,14 @@ public class AppSettings
     public bool SoundEnabled { get; set; } = false;
 
     /// <summary>
+    /// UX X.29 Block G (v0.1.16): Default-Auswahl beim Scannen einer Figur.
+    /// false = nichts vorab abgehakt (Default - "ich klicke an was ich habe")
+    /// true  = alles vorab abgehakt ("ich klicke ab was fehlt")
+    /// User kann pro Figur immer noch manuell anpassen.
+    /// </summary>
+    public bool DefaultPartsCollected { get; set; } = false;
+
+    /// <summary>
     /// UX-Iteration X.9: Tooltips global an/ausschalten. Der TooltipsService
     /// schreibt diesen Wert in eine Application-Resource, die als
     /// DynamicResource an ToolTipService.IsEnabled der Wurzel-Windows gebunden

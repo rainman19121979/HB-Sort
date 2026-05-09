@@ -249,8 +249,15 @@ public partial class PendingPartViewModel : ObservableObject
 
     /// <summary>
     /// Factory: aus einem BlSubset-Eintrag + BL-Color-Lookup baut sich das ViewModel.
+    ///
+    /// UX X.29 Block G (v0.1.16): defaultCollected steuert die initiale
+    /// Vorbelegung von QuantityCollected. False = nichts vorab abgehakt
+    /// (Default), True = alles vorab abgehakt. Caller liest die Setting
+    /// AppSettings.DefaultPartsCollected und reicht sie hier durch.
     /// </summary>
-    public static PendingPartViewModel FromSubset(BlSubset subset, BlColor? color, string? itemName = null)
+    public static PendingPartViewModel FromSubset(
+        BlSubset subset, BlColor? color, string? itemName = null,
+        bool defaultCollected = false)
     {
         return new PendingPartViewModel
         {
@@ -262,7 +269,8 @@ public partial class PendingPartViewModel : ObservableObject
             Quantity = subset.Quantity,
             ExtraQuantity = subset.ExtraQuantity,
             IsAlternate = subset.IsAlternate,
-            MatchId = subset.MatchId
+            MatchId = subset.MatchId,
+            QuantityCollected = defaultCollected ? subset.Quantity : 0
         };
     }
 }

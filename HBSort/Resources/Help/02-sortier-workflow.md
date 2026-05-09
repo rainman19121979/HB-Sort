@@ -36,6 +36,11 @@ HB-Sort erkennt automatisch, was du vor die Kamera haelst.
 > markieren oder per **Aus Fach**-Button (siehe unten) einen
 > Floating-Part aus einem anderen Fach uebernehmen.
 
+> **Default-Auswahl beim Scannen** (ab v0.1.16): in den Einstellungen
+> → Erkennung kannst du umschalten ob Teile beim Scan vorab abgehakt
+> sind ("ich klicke ab was fehlt") oder nicht ("ich klicke an was ich
+> habe", Default).
+
 ## Ein Einzelteil scannen
 
 1. Lege das einzelne Teil vor die Webcam.

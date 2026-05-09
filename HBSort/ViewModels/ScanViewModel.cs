@@ -787,11 +787,13 @@ public partial class ScanViewModel : ObservableObject
                 NumParts = subsets.Count
             };
 
+            // UX X.29 Block G (v0.1.16): Default-Auswahl beim Scannen aus Settings.
+            var defaultCollected = _settingsService.Current.DefaultPartsCollected;
             foreach (var subset in subsets)
             {
                 colorLookup.TryGetValue(subset.ColorId, out var color);
                 var itemName = await GetCachedItemNameOrEmptyAsync(subset.ItemType, subset.ItemNo);
-                pending.Parts.Add(PendingPartViewModel.FromSubset(subset, color, itemName));
+                pending.Parts.Add(PendingPartViewModel.FromSubset(subset, color, itemName, defaultCollected));
             }
 
             // Wenn der Token zwischenzeitlich gecancelt wurde -> nicht ueberschreiben

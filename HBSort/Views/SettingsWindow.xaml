@@ -136,6 +136,27 @@
 
                         <Separator/>
 
+                        <TextBlock Text="Sortier-Workflow" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock Text="Beim Scannen einer Figur:"
+                                   Margin="0,4,0,4"/>
+                        <RadioButton Content="Nichts vorab abgehakt - ich klicke an was ich habe"
+                                     GroupName="DefaultPartsCollectedGroup"
+                                     IsChecked="{Binding DefaultPartsNothingCollected, Mode=TwoWay}"
+                                     Margin="0,2,0,2"
+                                     ToolTip="Gewohnheitspfad fuer User die einzelne Teile sammeln und bestaetigen."/>
+                        <RadioButton Content="Alles vorab abgehakt - ich klicke ab was fehlt"
+                                     GroupName="DefaultPartsCollectedGroup"
+                                     IsChecked="{Binding DefaultPartsAllCollected, Mode=TwoWay}"
+                                     Margin="0,2,0,2"
+                                     ToolTip="Geeignet wenn du die meisten Teile schon hast und nur fehlende rausnimmst."/>
+                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
+                                   Margin="0,4,0,8">
+                            Diese Einstellung gilt fuer das Anlegen einer neu gescannten Figur.
+                            Du kannst die Auswahl pro Figur immer noch manuell anpassen.
+                        </TextBlock>
+
+                        <Separator/>
+
                         <TextBlock Text="Sonstiges" FontSize="16" FontWeight="SemiBold"/>
 
                         <CheckBox Content="Sound-Effekte aktivieren"
@@ -1481,6 +1502,49 @@
                             %APPDATA%\HBSort\ (settings.json, Datenbanken, Logs)
                             unveraendert - nur die App selbst wird ausgetauscht.
                         </TextBlock>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ====================================== -->
+            <!-- TAB: HOTKEYS (UX X.29 Block F / v0.1.16) -->
+            <!-- Read-only-Tabelle aller statischen Tastatur-Shortcuts. -->
+            <!-- ====================================== -->
+            <TabItem Header="Hotkeys">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                    <StackPanel MaxWidth="700">
+
+                        <TextBlock Text="Tastatur-Shortcuts"
+                                   FontSize="18" FontWeight="SemiBold"
+                                   Margin="0,0,0,8"/>
+                        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Gray"
+                                   Margin="0,0,0,16">
+                            Alle festen Shortcuts in HB-Sort. User-konfigurierbare Hotkeys
+                            sind aktuell nicht vorgesehen. Vollstaendige Erlaeuterung in der
+                            integrierten Hilfe (F1) → Kapitel "Tastatur-Shortcuts".
+                        </TextBlock>
+
+                        <DataGrid ItemsSource="{Binding HotkeyEntries}"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  IsReadOnly="True"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal"
+                                  AlternatingRowBackground="#F8F8F8"
+                                  RowHeight="32">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Hotkey"
+                                                    Binding="{Binding Key}"
+                                                    Width="180"
+                                                    FontFamily="Consolas"
+                                                    FontWeight="SemiBold"/>
+                                <DataGridTextColumn Header="Aktion"
+                                                    Binding="{Binding Action}"
+                                                    Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
 
                     </StackPanel>
                 </ScrollViewer>

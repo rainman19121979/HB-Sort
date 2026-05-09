@@ -31,6 +31,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly IUpdateService _updateService;
     private readonly IBlBulkImportService _blBulkImport;
     private readonly IUndoService? _undoService;
+    private readonly IBackupService? _backupService;
 
     // 60s-Timer fuer Status-Refresh damit die Anzeige aktuell bleibt auch ohne neue Calls
     // (Eintraege fallen aus dem rolling 24h-Window).
@@ -151,7 +152,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         HistoryViewModel history,
         IUpdateService updateService,
         IBlBulkImportService blBulkImport,
-        IUndoService undoService)
+        IUndoService undoService,
+        IBackupService backupService)
     {
         _settingsService = settingsService;
         ScanViewModel = scanViewModel;
@@ -163,6 +165,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         Help = help;
         History = history;
         _undoService = undoService;
+        _backupService = backupService;
         _brickognizeClient = brickognizeClient;
         // Wir brauchen die konkrete Implementierung wegen ActiveToasts -
         // das DI registriert beide Wege auf die selbe Singleton-Instanz.
@@ -391,6 +394,39 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Strg+H: Hilfe-Tab (gleiche Aktion wie OpenHelp/F1, aber
     /// eigener Command-Name fuer den Strg+H-Shortcut).</summary>
     [RelayCommand] public void SwitchToHelpTab()      => MainTabIndex = 2;
+
+    /// <summary>
+    /// UX X.29 Block F (v0.1.16): Strg+B - sofortiges manuelles Backup ueber
+    /// den globalen Hotkey. Toast bei Erfolg/Fehler. Settings-Tab "Backups"
+    /// hat einen eigenen Button mit Status-Anzeige; dieser hier ist die
+    /// Quick-Aktion ohne Tab-Wechsel.
+    /// </summary>
+    [RelayCommand]
+    public async Task CreateBackupNowAsync()
+    {
+        if (_backupService == null) return;
+        try
+        {
+            var result = await _backupService.CreateBackupAsync();
+            _settingsService.Current.LastBackup = result.CreatedAt;
+            await _settingsService.SaveAsync();
+            await _backupService.CleanupOldBackupsAsync(_settingsService.Current.BackupKeepCount);
+            _notificationService.ShowSuccess(
+                $"Backup erstellt: {result.FileName} ({FormatBytes(result.SizeBytes)})");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Backup via Strg+B fehlgeschlagen");
+            _notificationService.ShowError("Backup fehlgeschlagen: " + ex.Message);
+        }
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024.0).ToString("F1") + " KB";
+        return (bytes / (1024.0 * 1024.0)).ToString("F2") + " MB";
+    }
 
     /// <summary>UX X.29 (v0.1.16): Verlauf-Tab.</summary>
     [RelayCommand]

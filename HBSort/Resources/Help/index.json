@@ -5,5 +5,7 @@
   { "title": "Export & Verkauf",   "fileName": "04-export-verkauf.md",   "order": 4 },
   { "title": "Einstellungen",      "fileName": "05-einstellungen.md",    "order": 5 },
   { "title": "Tipps & Tricks",     "fileName": "06-tipps.md",            "order": 6 },
-  { "title": "FAQ",                "fileName": "07-faq.md",              "order": 7 }
+  { "title": "FAQ",                "fileName": "07-faq.md",              "order": 7 },
+  { "title": "Verlauf & Undo",     "fileName": "08-verlauf.md",          "order": 8 },
+  { "title": "Tastatur-Shortcuts", "fileName": "09-hotkeys.md",          "order": 9 }
 ]
