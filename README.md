@@ -84,12 +84,12 @@ Volltext-Suche), Multi-Select-Checkboxen und Bulk-Operationen
 (ab v0.1.16). Status-Badges zeigen auf einen Blick was komplett,
 wartend oder ein Einzelteil ist.
 
-### Figur-Detail mit Verkaufs-Preisen
+### Figur-Detail
 
-![Detail-Dialog einer kompletten Figur mit BL-Preis-Empfehlung und Verschieben/Zerlegen-Buttons](docs/screenshots/05-figur-detail.png)
+![Detail-Dialog einer kompletten Figur mit Teile-Liste, Verschieben/Zerlegen-Buttons](docs/screenshots/05-figur-detail.png)
 
-Pro Figur: Status, Teile-Liste, BrickLink-Preis-Empfehlung
-(optional), Verschieben in anderes Fach, Zerlegen-Wizard.
+Pro Figur: Status, Teile-Liste mit Bildern, Verschieben in anderes
+Fach, Zerlegen-Wizard, Loeschen.
 
 ### Figur zerlegen (DismantleWizard)
 
