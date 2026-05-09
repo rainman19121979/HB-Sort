@@ -65,10 +65,9 @@ public partial class ScanResultCard : ObservableObject
     private bool _isSelected;
 
     /// <summary>
-    /// UX X.30 (v0.1.17) Block D: Tastatur-Hotkey-Label fuer das Badge oben
-    /// links auf der Karte. Tasten 1/2/3 in der SortingView triggern den
-    /// jeweiligen Vorschlag direkt - das Badge zeigt dem User welche
-    /// Taste welche Karte uebernimmt.
+    /// UX X.30 (v0.1.17) Block D: Tastatur-Hotkey-Label - intern fuer Tests
+    /// und ggf. ToolTip-Texte. Im UI selbst wird der Hotkey via
+    /// <see cref="UebernehmenButtonLabel"/> direkt im Button-Content gezeigt.
     /// </summary>
     public string HotkeyLabel => Rank switch
     {
@@ -77,4 +76,14 @@ public partial class ScanResultCard : ObservableObject
         3 => "[3]",
         _ => string.Empty
     };
+
+    /// <summary>
+    /// UX X.30 Block D Bug-Fix (v0.1.17): Button-Content fuer den
+    /// "Uebernehmen"-Button mit vorangestelltem Hotkey-Label. Saubere
+    /// Variante statt eines schwarzen Badges oben links - der User sieht
+    /// den Hotkey genau dort wo er klicken wuerde.
+    /// </summary>
+    public string UebernehmenButtonLabel => string.IsNullOrEmpty(HotkeyLabel)
+        ? "Uebernehmen"
+        : $"{HotkeyLabel} Uebernehmen";
 }

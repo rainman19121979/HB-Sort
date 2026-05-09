@@ -245,4 +245,16 @@ public class ScanResultCardTests
         var card = new ScanResultCard { Rank = rank };
         Assert.Equal(expected, card.HotkeyLabel);
     }
+
+    [Theory]
+    [InlineData(1, "[1] Uebernehmen")]
+    [InlineData(2, "[2] Uebernehmen")]
+    [InlineData(3, "[3] Uebernehmen")]
+    [InlineData(4, "Uebernehmen")]
+    [InlineData(0, "Uebernehmen")]
+    public void UebernehmenButtonLabel_includes_hotkey_when_present(int rank, string expected)
+    {
+        var card = new ScanResultCard { Rank = rank };
+        Assert.Equal(expected, card.UebernehmenButtonLabel);
+    }
 }

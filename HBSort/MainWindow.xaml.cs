@@ -111,6 +111,34 @@ public partial class MainWindow : Window
                 undo.Execute(null);
                 e.Handled = true;
             }
+            return;
+        }
+
+        // UX X.30 Block D Bug-Fix (v0.1.17): Hotkeys 1/2/3 fuer Brickognize-
+        // Vorschlaege. Vorher in SortingView_PreviewKeyDown - aber das hat
+        // nur gefeuert wenn der Focus innerhalb der SortingView lag, was
+        // nach einem Scan oft NICHT der Fall ist (Window-Level-Focus).
+        // Hier auf MainWindow-Ebene faengt es alles. Tab-Check verhindert
+        // dass die Tasten in Lagerliste/Hilfe/Verlauf reagieren.
+        if (e.Key is Key.D1 or Key.NumPad1 or Key.D2 or Key.NumPad2 or Key.D3 or Key.NumPad3
+            && (Keyboard.Modifiers & ModifierKeys.Control) == 0
+            && (Keyboard.Modifiers & ModifierKeys.Alt) == 0)
+        {
+            if (IsTextInputFocused()) return;
+            if (!_viewModel.IsMainTabSorting) return;
+
+            var index = e.Key switch
+            {
+                Key.D1 or Key.NumPad1 => 0,
+                Key.D2 or Key.NumPad2 => 1,
+                Key.D3 or Key.NumPad3 => 2,
+                _ => -1
+            };
+            var cards = _viewModel.ScanViewModel?.ResultCards;
+            if (cards == null || index < 0 || index >= cards.Count) return;
+
+            _ = _viewModel.ScanViewModel!.SelectCardAsync(index);
+            e.Handled = true;
         }
     }
 
