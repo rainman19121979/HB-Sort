@@ -90,6 +90,16 @@ public partial class DismantleWizardViewModel : ObservableObject
             DefaultBin = targetBin ?? AvailableBins.FirstOrDefault();
 
             Parts.Clear();
+
+            // UX X.32 Bug-Fix v0.1.19-beta.3: Wizard-Session-State, damit
+            // verschiedene Teile auf verschiedene frische Bins verteilt
+            // werden. Stapel-Bins (Step 1: gleiche PartNo+ColorId schon im
+            // Pool) bleiben als wiederverwendbar - mehrere Teile vom gleichen
+            // Typ landen im gleichen Stapel.
+            var usedBinsInThisSession = new HashSet<int>();
+            var lastPickWasStackBin = false;
+            int? lastNonStackBinId = null;
+
             foreach (var p in m.RequiredParts.OrderBy(p => p.PartName))
             {
                 var partVm = new DismantlePartItemViewModel(p)
@@ -100,25 +110,30 @@ public partial class DismantleWizardViewModel : ObservableObject
                     IsKept = p.QuantityCollected > 0,
                 };
 
-                // UX X.32 Block A (v0.1.19) + Bug-Fix v0.1.19-beta.2: pro Teil
-                // INDIVIDUELLER Default-Bin via SuggestBinForFloatingPart.
-                // excludeMinifigId = TrackedMinifigId, weil die Figur durch das
-                // Zerlegen gleich verschwindet - ihr Fach kommt also als
-                // Kandidat infrage (sonst wuerde Suggest die Figur als
-                // belegend werten und das Fach ausschliessen).
+                // UX X.32 Block A (v0.1.19) + Bug-Fix v0.1.19-beta.2/beta.3:
+                // pro Teil INDIVIDUELLER Default-Bin via PickPerPartBin
+                // (mit Wizard-Session-State + excludeMinifigId).
                 StorageBin? perPartBin = null;
+                lastPickWasStackBin = false;
+                lastNonStackBinId = null;
                 try
                 {
-                    var suggested = await _binService.SuggestBinForFloatingPartAsync(
+                    var (bin, wasStack) = await PickPerPartBinAsync(
                         p.PartNumber, p.ColorId,
+                        usedBinsInThisSession,
                         excludeMinifigId: TrackedMinifigId);
-                    if (suggested != null)
-                        perPartBin = AvailableBins.FirstOrDefault(b => b.Id == suggested.Id);
+                    perPartBin = bin;
+                    lastPickWasStackBin = wasStack;
+                    if (perPartBin != null && !wasStack)
+                    {
+                        usedBinsInThisSession.Add(perPartBin.Id);
+                        lastNonStackBinId = perPartBin.Id;
+                    }
                 }
                 catch (Exception ex)
                 {
                     Log.Warning(ex,
-                        "SuggestBinForFloatingPart fehlgeschlagen fuer {Part}/{Color}, Fallback DefaultBin",
+                        "PickPerPartBin fehlgeschlagen fuer {Part}/{Color}, Fallback DefaultBin",
                         p.PartNumber, p.ColorId);
                 }
                 partVm.TargetBin = perPartBin ?? DefaultBin;
@@ -149,8 +164,20 @@ public partial class DismantleWizardViewModel : ObservableObject
                             var bin = AvailableBins.FirstOrDefault(b => b.Id == best.StorageBinId);
                             if (bin != null)
                             {
+                                // UX X.32 Bug-Fix v0.1.19-beta.3: SmartHint
+                                // schaltet auf einen Stapel-Bin um. Falls der
+                                // vorige Pick ein FRISCHES Bin war (in usedBins
+                                // eingetragen), nehmen wir's wieder raus -
+                                // sonst blockiert es das naechste Teil
+                                // unnoetig.
+                                if (!lastPickWasStackBin && lastNonStackBinId.HasValue)
+                                {
+                                    usedBinsInThisSession.Remove(lastNonStackBinId.Value);
+                                    lastNonStackBinId = null;
+                                }
                                 partVm.TargetBin = bin;
                                 partVm.SmartHint = $"+{best.TotalQuantity} schon dort";
+                                lastPickWasStackBin = true;
                             }
                             else
                             {
@@ -334,6 +361,13 @@ public partial class DismantleWizardViewModel : ObservableObject
                 : AvailableBins.FirstOrDefault();
 
             Parts.Clear();
+
+            // UX X.32 Bug-Fix v0.1.19-beta.3: Wizard-Session-State, damit
+            // verschiedene Teile auf verschiedene frische Bins verteilt
+            // werden (vorher: alle 4 Teile bekamen das gleiche "naechste freie"
+            // Fach weil die DB sich waehrend des Wizard-Aufbaus nicht aendert).
+            var usedBinsInThisSession = new HashSet<int>();
+
             foreach (var p in pending.Parts
                 .Where(p => p.QuantityCollected > 0)
                 .OrderBy(p => p.PartName))
@@ -341,20 +375,27 @@ public partial class DismantleWizardViewModel : ObservableObject
                 var partVm = DismantlePartItemViewModel.FromPending(p);
                 partVm.IsKept = true;
 
-                // Pro Teil SuggestBinForFloatingPart (Stapel waechst, sonst freies
-                // Fach OHNE Complete drin).
                 StorageBin? perPartBin = null;
                 try
                 {
-                    var suggested = await _binService.SuggestBinForFloatingPartAsync(
-                        p.BricklinkPartNo, p.BricklinkColorId);
-                    if (suggested != null)
-                        perPartBin = AvailableBins.FirstOrDefault(b => b.Id == suggested.Id);
+                    // Pending-Mode: keine Figur in DB, kein excludeMinifigId.
+                    var (bin, wasStack) = await PickPerPartBinAsync(
+                        p.BricklinkPartNo, p.BricklinkColorId,
+                        usedBinsInThisSession,
+                        excludeMinifigId: null);
+                    perPartBin = bin;
+                    if (perPartBin != null && !wasStack)
+                        usedBinsInThisSession.Add(perPartBin.Id);
+
+                    Log.Information("PendingDismantle Bin-Pick: Part={Part}/{Color}, Bin={Bin}, Stack={Stack}, used=[{Used}]",
+                        p.BricklinkPartNo, p.BricklinkColorId,
+                        perPartBin?.Label ?? "(null)", wasStack,
+                        string.Join(",", usedBinsInThisSession));
                 }
                 catch (Exception ex)
                 {
                     Log.Warning(ex,
-                        "PendingMode SuggestBinForFloatingPart fehlgeschlagen fuer {Part}/{Color}",
+                        "PendingMode PickPerPartBin fehlgeschlagen fuer {Part}/{Color}",
                         p.BricklinkPartNo, p.BricklinkColorId);
                 }
                 partVm.TargetBin = perPartBin ?? DefaultBin;
@@ -384,6 +425,101 @@ public partial class DismantleWizardViewModel : ObservableObject
     /// nach erfolgreichem ConfirmAsync gelesen.
     /// </summary>
     public List<BinInstructionItem> LastBinInstructionItems { get; private set; } = new();
+
+    /// <summary>
+    /// UX X.32 Bug-Fix v0.1.19-beta.3: Verteilt Teile innerhalb EINER Wizard-
+    /// Session auf verschiedene Bins. Hintergrund: ohne diesen In-Memory-State
+    /// liefert <see cref="IStorageBinService.SuggestBinForFloatingPartAsync"/>
+    /// fuer JEDES Teil das gleiche "naechste freie Fach", weil sich die DB
+    /// waehrend des Wizard-Aufbaus nicht aendert. Folge: alle Teile bekommen
+    /// den gleichen Default-Bin (das war der User-Bug-Repro mit Box20-01).
+    ///
+    /// Step 1 (bestehender FloatingPart-Stapel mit gleicher PartNo+ColorId)
+    /// liefert IMMER das Stapel-Fach - mehrere Teile von gleichem Typ landen
+    /// im gleichen Stapel, das ist korrektes Verhalten. Steps 2-4 (frische
+    /// Bins) skippen Bins die in <paramref name="usedBinsInThisSession"/>
+    /// schon vergeben wurden.
+    ///
+    /// <paramref name="excludeMinifigId"/>: Fach der zu zerlegenden Figur
+    /// zaehlt als frei (Pending-Mode null, Normal-Mode TrackedMinifigId).
+    /// </summary>
+    /// <returns>
+    /// Tupel (Bin, WasStackBin). WasStackBin=true heisst Step 1 hat gegriffen
+    /// - Aufrufer soll das Bin NICHT in usedBins aufnehmen. WasStackBin=false
+    /// heisst frisches Fach - Aufrufer soll es zu usedBins adden, damit das
+    /// naechste Teil ein anderes Fach bekommt.
+    /// </returns>
+    private async Task<(StorageBin? Bin, bool WasStackBin)> PickPerPartBinAsync(
+        string blPartNo, int blColorId,
+        HashSet<int> usedBinsInThisSession,
+        int? excludeMinifigId)
+    {
+        await using var ctx = await _ctxFactory.CreateDbContextAsync();
+
+        // Step 1: bestehender Stapel mit gleicher PartNo+ColorId.
+        // FIFO nach AddedAt - mehrere Teile gleichen Typs landen im gleichen
+        // Stapel, das wollen wir explizit (kein usedBin-Skip).
+        var existingFp = await ctx.FloatingParts
+            .AsNoTracking()
+            .Where(p => p.PartNumber == blPartNo && p.ColorId == blColorId)
+            .OrderBy(p => p.AddedAt)
+            .FirstOrDefaultAsync();
+        if (existingFp != null)
+        {
+            var stackBin = AvailableBins.FirstOrDefault(b => b.Id == existingFp.StorageBinId);
+            if (stackBin != null) return (stackBin, WasStackBin: true);
+        }
+
+        var hasExclude = excludeMinifigId.HasValue;
+
+        // Step 2: wirklich freies Fach (keine Minifigs ausser excluded, keine
+        // Floating), nicht bereits in dieser Session vergeben.
+        var trulyFree = await ctx.StorageBins
+            .AsNoTracking()
+            .Where(b => !usedBinsInThisSession.Contains(b.Id)
+                     && !b.TrackedMinifigs.Any(m => !hasExclude || m.Id != excludeMinifigId!.Value)
+                     && !b.FloatingParts.Any())
+            .OrderBy(b => b.Label)
+            .FirstOrDefaultAsync();
+        if (trulyFree != null)
+        {
+            var bin = AvailableBins.FirstOrDefault(b => b.Id == trulyFree.Id);
+            if (bin != null) return (bin, WasStackBin: false);
+        }
+
+        // Step 3: Fach ohne Minifigs (Floating erlaubt - Mix), nicht in usedBins.
+        var noMinifigOnly = await ctx.StorageBins
+            .AsNoTracking()
+            .Where(b => !usedBinsInThisSession.Contains(b.Id)
+                     && !b.TrackedMinifigs.Any(m => !hasExclude || m.Id != excludeMinifigId!.Value))
+            .OrderBy(b => b.Label)
+            .FirstOrDefaultAsync();
+        if (noMinifigOnly != null)
+        {
+            var bin = AvailableBins.FirstOrDefault(b => b.Id == noMinifigOnly.Id);
+            if (bin != null) return (bin, WasStackBin: false);
+        }
+
+        // Step 4: am wenigsten belegtes Fach, nicht in usedBins.
+        var fallback = await ctx.StorageBins
+            .AsNoTracking()
+            .Where(b => !usedBinsInThisSession.Contains(b.Id))
+            .OrderBy(b => b.TrackedMinifigs.Count(m =>
+                m.Status == TrackedMinifigStatus.Complete
+                && (!hasExclude || m.Id != excludeMinifigId!.Value)))
+            .ThenBy(b => b.FloatingParts.Count)
+            .ThenBy(b => b.Label)
+            .FirstOrDefaultAsync();
+        if (fallback != null)
+        {
+            var bin = AvailableBins.FirstOrDefault(b => b.Id == fallback.Id);
+            if (bin != null) return (bin, WasStackBin: false);
+        }
+
+        // Letzter Fallback: alle Bins schon in usedBins - nimm halt das erste
+        // verfuegbare. Sollte praktisch nie passieren (mehr Teile als Bins).
+        return (AvailableBins.FirstOrDefault(), WasStackBin: false);
+    }
 
     /// <summary>Fuehrt den Aufgeben-Vorgang aus und gibt das Service-Resultat zurueck.</summary>
     public async Task<DismantleResult> ConfirmAsync()

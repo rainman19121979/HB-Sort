@@ -74,6 +74,7 @@ public partial class PendingMinifigViewModel : ObservableObject
         OnPropertyChanged(nameof(CollectedCount));
         OnPropertyChanged(nameof(PartsHeaderLabel));
         OnPropertyChanged(nameof(PersistButtonText));
+        OnPropertyChanged(nameof(PersistButtonTooltip));
         OnPropertyChanged(nameof(WillBeComplete));
         OnPropertyChanged(nameof(HasAnyCollected));
     }
@@ -97,15 +98,30 @@ public partial class PendingMinifigViewModel : ObservableObject
     /// <summary>True wenn alle Teile manuell markiert sind -> Figur wird COMPLETE.</summary>
     public bool WillBeComplete => NumParts > 0 && CollectedCount == NumParts;
 
-    /// <summary>Dynamischer Button-Text fuer "In Fach legen".</summary>
-    public string PersistButtonText
+    /// <summary>
+    /// UX X.32 Bug-Fix v0.1.19-beta.3: Button-Text einheitlich "Speichern"
+    /// (egal ob Complete- oder Wartend-Modus) - der Tooltip erklaert was
+    /// passiert. Vorher waren die Texte zu lang fuer den Footer und haben
+    /// die Lagerfach-Combobox verdraengt.
+    /// </summary>
+    public string PersistButtonText => "Speichern";
+
+    /// <summary>
+    /// UX X.32 Bug-Fix v0.1.19-beta.3: Tooltip mit kontextabhaengigem Text -
+    /// macht klar, ob die Figur als Wartend oder als Complete gespeichert
+    /// wird (haengt davon ab, ob alle Teile markiert sind).
+    /// </summary>
+    public string PersistButtonTooltip
     {
         get
         {
-            if (NumParts == 0) return "In Fach legen";
-            if (WillBeComplete) return "Direkt als COMPLETE speichern";
-            if (CollectedCount > 0) return $"In Fach legen ({CollectedCount}/{NumParts} markiert)";
-            return "In Fach legen";
+            if (NumParts == 0)
+                return "Figur in das gewaehlte Lagerfach legen.";
+            if (WillBeComplete)
+                return "Alle Teile markiert - Figur wird direkt als COMPLETE gespeichert.";
+            if (CollectedCount > 0)
+                return $"Figur als wartend speichern ({CollectedCount}/{NumParts} Teile markiert).";
+            return "Figur als wartend in das gewaehlte Lagerfach legen.";
         }
     }
 

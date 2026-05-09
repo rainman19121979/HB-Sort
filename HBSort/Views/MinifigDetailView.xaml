@@ -252,66 +252,59 @@
                 </StackPanel>
 
                 <!--
-                    UX X.20 Teil 4 + Bug-Fix v0.1.19-beta.2: Lagerfach-Bereich
-                    prominenter. Vorher: 3-Spalten-Grid mit ComboBox in der
-                    Mitte und Buttons rechts - bei drei Buttons (Verwerfen +
-                    Direkt zerlegen + Direkt als COMPLETE) wurde die ComboBox
-                    abgeschnitten.
-
-                    Jetzt: Lagerfach-Block oben full-width, Buttons darunter
-                    in einem WrapPanel - umbricht bei schmaler Spalte sauber
-                    in eine zweite Zeile, ComboBox bleibt immer lesbar.
+                    UX X.20 Teil 4 + Bug-Fix v0.1.19-beta.3: Lagerfach-Bereich
+                    prominenter. Buttons mit kurzen Texten ("Verwerfen" /
+                    "Zerlegen" / "Speichern") damit alles wieder in eine Zeile
+                    passt - der Persist-Button erklaert via ToolTip was
+                    passiert (Wartend vs. Complete je nach Markierungs-Stand).
                 -->
                 <Border Background="{StaticResource InfoBoxBackground}"
                         BorderBrush="{StaticResource StatusInfoBrush}"
                         BorderThickness="1"
                         CornerRadius="4"
                         Padding="10">
-                    <StackPanel>
-                        <Grid Margin="0,0,0,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
 
-                            <TextBlock Grid.Column="0"
-                                       FontSize="12" FontWeight="SemiBold"
-                                       Foreground="{StaticResource StatusInfoBrush}"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,8,0">
-                                <Run Text="📦"/>
-                                <Run Text="Lagerfach:"/>
-                            </TextBlock>
-                            <ComboBox Grid.Column="1" MinHeight="34" FontSize="13"
-                                      ItemsSource="{Binding AvailableBins}"
-                                      SelectedItem="{Binding SelectedBin}"
-                                      DisplayMemberPath="Label"
-                                      ToolTip="Fach in das die Figur gelegt wird (Default: erstes freies Fach)"/>
-                        </Grid>
+                        <TextBlock Grid.Column="0"
+                                   FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{StaticResource StatusInfoBrush}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0">
+                            <Run Text="📦"/>
+                            <Run Text="Lagerfach:"/>
+                        </TextBlock>
+                        <ComboBox Grid.Column="1" MinHeight="34" FontSize="13"
+                                  ItemsSource="{Binding AvailableBins}"
+                                  SelectedItem="{Binding SelectedBin}"
+                                  DisplayMemberPath="Label"
+                                  ToolTip="Fach in das die Figur gelegt wird (Default: erstes freies Fach)"/>
 
-                        <!-- Buttons-Reihe als WrapPanel - umbricht bei
-                             schmaler Spalte. Reihenfolge: links Verwerfen
-                             (sekundaer), dann Direkt-Zerlegen, rechts
-                             Persist (Akzent). -->
-                        <WrapPanel Orientation="Horizontal">
-                            <Button Content="Verwerfen" MinWidth="100" MinHeight="34"
+                        <!-- Buttons rechtsbuendig in 1 Zeile -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                    HorizontalAlignment="Right" Margin="12,0,0,0">
+                            <Button Content="Verwerfen" MinWidth="90" MinHeight="34"
                                     Click="Discard_Click"
-                                    Margin="0,0,8,4"/>
+                                    Margin="0,0,8,0"/>
                             <!-- UX X.32 Block B (v0.1.19): Direkt-Zerlegen statt Einlagern.
                                  Nur sichtbar wenn mindestens ein Teil markiert ist - leere
                                  Auswahl waere ein No-Op. -->
-                            <Button Content="Direkt zerlegen" MinWidth="130" MinHeight="34"
+                            <Button Content="Zerlegen" MinWidth="90" MinHeight="34"
                                     Click="DirectDismantle_Click"
                                     Visibility="{Binding HasAnyCollected, Converter={StaticResource BoolToVisibility}}"
-                                    Margin="0,0,8,4"
+                                    Margin="0,0,8,0"
                                     ToolTip="Statt die Figur als Ganzes einzulagern: nur die markierten Teile direkt als Einzelteile in die jeweils passenden Faecher legen. Die Figur wird NICHT in die Lagerliste aufgenommen."/>
-                            <Button Content="{Binding PersistButtonText}" MinWidth="180" MinHeight="34"
+                            <Button Content="{Binding PersistButtonText}" MinWidth="100" MinHeight="34"
                                     Style="{StaticResource AccentButtonStyle}"
                                     IsEnabled="{Binding CanPersist}"
                                     Click="Persist_Click"
-                                    Margin="0,0,0,4"/>
-                        </WrapPanel>
-                    </StackPanel>
+                                    ToolTip="{Binding PersistButtonTooltip}"/>
+                        </StackPanel>
+                    </Grid>
                 </Border>
             </StackPanel>
         </Grid>
