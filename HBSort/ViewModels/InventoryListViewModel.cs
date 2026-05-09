@@ -66,22 +66,33 @@ public partial class InventoryListViewModel : ObservableObject
     private string _summaryText = string.Empty;
 
     // Phase 7 + UX X.6: Multi-Select fuer BSX-Export. Komplette Figuren UND
-    // Einzelteile sind auswaehlbar. Counter zeigt Summe beider.
+    // Einzelteile sind auswaehlbar.
+    // UX X.29 Block C Nachbesserung (v0.1.16): Wartende sind jetzt auch
+    // markierbar fuer Bulk-Loeschen + Bulk-Verschieben. Export-Pfad
+    // filtert weiterhin auf Complete+Floating (CanBeExported).
     [ObservableProperty]
     private int _selectedExportableCount;
 
+    [ObservableProperty]
+    private int _selectedTotalCount;
+
+    [ObservableProperty]
+    private string _selectionCounterText = "0 markiert";
+
     public bool HasSelectedExportables => SelectedExportableCount > 0;
+    public bool HasAnySelected => SelectedTotalCount > 0;
+
     partial void OnSelectedExportableCountChanged(int value)
         => OnPropertyChanged(nameof(HasSelectedExportables));
+    partial void OnSelectedTotalCountChanged(int value)
+        => OnPropertyChanged(nameof(HasAnySelected));
 
     /// <summary>
-    /// True wenn mindestens eine komplette Figur ODER ein Einzelteil in der
-    /// aktuellen DataGrid-Sicht ist (steuert Sichtbarkeit der Action-Bar).
+    /// True wenn die DataGrid mindestens ein Item enthaelt (steuert Sichtbarkeit
+    /// der Action-Bar). Action-Bar wird jetzt fuer alle Status angezeigt -
+    /// Wartende sind via Bulk-Loeschen + Bulk-Verschieben adressierbar.
     /// </summary>
-    public bool HasAnyExportable =>
-        Items.Any(r =>
-            (r.Status == StatusKind.Complete && r.UnderlyingMinifigId.HasValue)
-            || (r.Status == StatusKind.Floating && r.UnderlyingFloatingId.HasValue));
+    public bool HasAnyExportable => Items.Count > 0;
 
     /// <summary>Aktuell selektierte komplette Figuren.</summary>
     public IEnumerable<InventoryRowItem> SelectedCompletes =>
@@ -95,18 +106,31 @@ public partial class InventoryListViewModel : ObservableObject
                       && r.Status == StatusKind.Floating
                       && r.UnderlyingFloatingId.HasValue);
 
+    /// <summary>
+    /// UX X.29 Block C Nachbesserung: alle markierten Minifig-IDs (Wartend +
+    /// Complete). Fuer Bulk-Loeschen + Bulk-Verschieben.
+    /// </summary>
+    public IEnumerable<int> SelectedMinifigIds =>
+        Items.Where(r => r.IsSelected
+                      && (r.Status == StatusKind.Waiting || r.Status == StatusKind.Complete)
+                      && r.UnderlyingMinifigId.HasValue)
+             .Select(r => r.UnderlyingMinifigId!.Value);
+
+    /// <summary>UX X.29 Block C Nachbesserung: alle markierten FloatingPart-IDs.</summary>
+    public IEnumerable<int> SelectedFloatingPartIds =>
+        Items.Where(r => r.IsSelected
+                      && r.Status == StatusKind.Floating
+                      && r.UnderlyingFloatingId.HasValue)
+             .Select(r => r.UnderlyingFloatingId!.Value);
+
     [RelayCommand]
     public void SelectAllExportable()
     {
-        // Selektiert alle aktuell SICHTBAREN kompletten Figuren UND Einzelteile
-        // (respektiert die Filter). Wartende werden ignoriert.
+        // UX X.29 Block C Nachbesserung: markiert ALLE aktuell sichtbaren
+        // Items (Wartend + Complete + Floating), nicht mehr nur Exportierbare.
+        // Button-Label "Alle" reflektiert den neuen Scope.
         foreach (var r in ItemsView.Cast<object>().Cast<InventoryRowItem>().ToList())
-        {
-            if (r.Status == StatusKind.Complete && r.UnderlyingMinifigId.HasValue)
-                r.IsSelected = true;
-            else if (r.Status == StatusKind.Floating && r.UnderlyingFloatingId.HasValue)
-                r.IsSelected = true;
-        }
+            r.IsSelected = true;
         RecalculateSelection();
     }
 
@@ -120,15 +144,25 @@ public partial class InventoryListViewModel : ObservableObject
 
     /// <summary>
     /// Wird vom Code-Behind nach jedem CheckBox-Click gerufen, um den globalen
-    /// Counter (SelectedExportableCount) zu refreshen.
+    /// Counter (SelectedExportableCount + SelectedTotalCount + Counter-Text)
+    /// zu refreshen.
     /// </summary>
     public void RecalculateSelection()
     {
         var c = SelectedCompletes.Count();
         var f = SelectedFloatings.Count();
-        // Debug-Level: bei Bedarf in den Settings auf Verbose schalten.
-        Log.Debug("[SELECTION] RecalculateSelection: completes={C}, floatings={F}", c, f);
+        var w = Items.Count(r => r.IsSelected && r.Status == StatusKind.Waiting);
+        Log.Debug("[SELECTION] RecalculateSelection: completes={C}, floatings={F}, waiting={W}", c, f, w);
         SelectedExportableCount = c + f;
+        SelectedTotalCount = c + f + w;
+        // Counter-Text: bei Mismatch (= Wartende mit drin) wird "(Y exportierbar)"
+        // angehaengt damit der User weiss dass Export nicht alle markierten anfasst.
+        if (SelectedTotalCount == 0)
+            SelectionCounterText = "0 markiert";
+        else if (SelectedTotalCount == SelectedExportableCount)
+            SelectionCounterText = $"{SelectedTotalCount} markiert";
+        else
+            SelectionCounterText = $"{SelectedTotalCount} markiert ({SelectedExportableCount} exportierbar)";
     }
 
     public InventoryListViewModel(

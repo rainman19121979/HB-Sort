@@ -195,38 +195,73 @@ public class InventoryListViewModelTests : IDisposable
     }
 
     [Fact]
-    public void OnlyWaitingRows_HasAnyExportable_isFalse()
+    public void OnlyWaitingRows_HasAnyExportable_isTrue_post_blockC_nachbesserung()
     {
-        // Wartende Figuren haben keine Checkbox - die Action-Bar mit dem
-        // Exportieren-Button wird ueber HasAnyExportable ausgeblendet.
+        // UX X.29 Block C Nachbesserung (v0.1.16): Action-Bar wird jetzt
+        // sichtbar sobald IRGENDWELCHE Items in der Liste sind - Wartende
+        // koennen via Bulk-Loeschen + Bulk-Verschieben adressiert werden.
         _sut.Items.Add(MakeWaiting(id: 1));
         _sut.Items.Add(MakeWaiting(id: 2));
 
-        Assert.False(_sut.HasAnyExportable);
+        Assert.True(_sut.HasAnyExportable);
 
-        // Auch wenn der User per Code-Trick IsSelected setzt: SelectedExportables
-        // filtert diese raus, weil Status != Complete/Floating.
+        // SelectedExportables filtert weiter auf Complete + Floating (nur
+        // diese sind exportierbar). Wartende Auswahl zaehlt fuer
+        // SelectedTotalCount aber nicht fuer SelectedExportableCount.
         _sut.Items[0].IsSelected = true;
         _sut.RecalculateSelection();
         Assert.False(_sut.HasSelectedExportables);
+        Assert.True(_sut.HasAnySelected);
+        Assert.Equal(0, _sut.SelectedExportableCount);
+        Assert.Equal(1, _sut.SelectedTotalCount);
     }
 
     // ===== Aktions-Commands =====
 
     [Fact]
-    public void SelectAllExportable_marks_completes_AND_floatings_skips_waiting()
+    public void SelectAllExportable_marks_all_visible_items_post_blockC_nachbesserung()
     {
+        // UX X.29 Block C Nachbesserung (v0.1.16): "Alle"-Button markiert
+        // jetzt ALLE sichtbaren Items - Wartende sind nicht mehr ausgenommen
+        // (damit Bulk-Loeschen + Bulk-Verschieben sie erreichen).
         _sut.Items.Add(MakeComplete(id: 1));
-        _sut.Items.Add(MakeWaiting(id: 2));     // soll uebersprungen werden
+        _sut.Items.Add(MakeWaiting(id: 2));
         _sut.Items.Add(MakeFloating(id: 3));
 
         _sut.SelectAllExportableCommand.Execute(null);
 
         Assert.True(_sut.Items[0].IsSelected);
-        Assert.False(_sut.Items[1].IsSelected); // Wartende NICHT markiert
+        Assert.True(_sut.Items[1].IsSelected); // Wartende JETZT markiert
         Assert.True(_sut.Items[2].IsSelected);
-        Assert.Equal(2, _sut.SelectedExportableCount);
+        Assert.Equal(2, _sut.SelectedExportableCount); // nur Complete + Floating
+        Assert.Equal(3, _sut.SelectedTotalCount);      // alle drei
         Assert.True(_sut.HasSelectedExportables);
+        Assert.True(_sut.HasAnySelected);
+    }
+
+    [Fact]
+    public void SelectionCounterText_shows_exportable_split_when_waiting_selected()
+    {
+        // Wenn Wartende mit-markiert sind: Counter zeigt "(Y exportierbar)"
+        // Hinweis-Suffix.
+        _sut.Items.Add(MakeComplete(id: 1));
+        _sut.Items.Add(MakeWaiting(id: 2));
+
+        _sut.SelectAllExportableCommand.Execute(null);
+
+        Assert.Contains("2 markiert", _sut.SelectionCounterText);
+        Assert.Contains("1 exportierbar", _sut.SelectionCounterText);
+    }
+
+    [Fact]
+    public void SelectionCounterText_shows_simple_count_when_only_exportable_selected()
+    {
+        _sut.Items.Add(MakeComplete(id: 1));
+        _sut.Items.Add(MakeFloating(id: 2));
+
+        _sut.SelectAllExportableCommand.Execute(null);
+
+        Assert.Equal("2 markiert", _sut.SelectionCounterText);
     }
 
     [Fact]

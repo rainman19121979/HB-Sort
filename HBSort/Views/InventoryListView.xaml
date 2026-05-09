@@ -80,9 +80,12 @@
                     ToolTip="Setzt Suche und Filter zurueck."/>
         </Grid>
 
-        <!-- Phase 7 + UX X.6: BSX-Export Multi-Select-Action-Bar.
-             Sichtbar wenn entweder komplette Figuren ODER Einzelteile da sind.
-             "Alle" markiert beide Typen; Wartende bleiben ignoriert. -->
+        <!-- Phase 7 + UX X.6 + UX X.29 Block C Nachbesserung: Multi-Select-
+             Action-Bar fuer Bulk-Loeschen / Verschieben / Exportieren.
+             Sichtbar sobald die Liste mind. 1 Item hat. "Alle" markiert
+             alle sichtbaren Items (Wartend + Complete + Floating).
+             Loeschen + Verschieben funktionieren fuer alle markierten;
+             Exportieren ueberspringt Wartende mit Toast-Hinweis. -->
         <Border Grid.Row="2"
                 Background="#F1F8E9" BorderBrush="#558B2F"
                 BorderThickness="1" CornerRadius="4"
@@ -93,32 +96,30 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" VerticalAlignment="Center">
-                    <Run Text="Komplette Figuren und Einzelteile bereit zum Export."
-                         Foreground="#33691E"/>
-                    <Run Text="Auswahl:" Foreground="#33691E"/>
-                    <Run Text="{Binding SelectedExportableCount, Mode=OneWay}"
-                         FontWeight="SemiBold" Foreground="#33691E"/>
-                    <Run Text="markiert" Foreground="#33691E"/>
-                </TextBlock>
+                <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                           Foreground="#33691E"
+                           Text="{Binding SelectionCounterText, Mode=OneWay}"
+                           FontWeight="SemiBold"
+                           ToolTip="Anzahl markierter Items. Wartende koennen geloescht/verschoben werden, aber nicht exportiert."/>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <Button Content="Alle"
                             Command="{Binding SelectAllExportableCommand}"
                             Padding="8,2" Margin="0,0,4,0"
-                            ToolTip="Alle sichtbaren kompletten Figuren UND Einzelteile auswaehlen"/>
+                            ToolTip="Alle sichtbaren Items markieren (Wartend + Komplett + Einzelteile)."/>
                     <Button Content="Keine"
                             Command="{Binding DeselectAllExportableCommand}"
                             Padding="8,2" Margin="0,0,8,0"
                             ToolTip="Auswahl aufheben"/>
-                    <!-- UX X.29 Block C (v0.1.16): Bulk-Verschieben + Bulk-Loeschen -->
+                    <!-- UX X.29 Block C (v0.1.16): Bulk-Verschieben + Bulk-Loeschen
+                         arbeiten fuer ALLE markierten Items (auch Wartende). -->
                     <Button Content="Verschieben in..."
                             Click="BulkMove_Click"
-                            IsEnabled="{Binding HasSelectedExportables}"
+                            IsEnabled="{Binding HasAnySelected}"
                             Padding="8,2" Margin="0,0,4,0"
                             ToolTip="Markierte Items in ein anderes Lagerfach verschieben."/>
                     <Button Content="Loeschen"
                             Click="BulkDelete_Click"
-                            IsEnabled="{Binding HasSelectedExportables}"
+                            IsEnabled="{Binding HasAnySelected}"
                             Padding="8,2" Margin="0,0,8,0"
                             Background="#D32F2F" Foreground="White"
                             ToolTip="Markierte Items dauerhaft loeschen (Strg+Z fuer Rueckgaengig)."/>
@@ -128,7 +129,7 @@
                             Padding="12,2"
                             Background="#558B2F" Foreground="White"
                             FontWeight="SemiBold"
-                            ToolTip="Markierte Figuren + Einzelteile als BSX-XML exportieren"/>
+                            ToolTip="Markierte Komplett-Figuren und Einzelteile als BSX-XML exportieren. Wartende werden uebersprungen."/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -148,53 +149,25 @@
                   MouseDoubleClick="InventoryGrid_MouseDoubleClick"
                   PreviewKeyDown="InventoryGrid_PreviewKeyDown">
             <DataGrid.Columns>
-                <!-- Phase 7 + UX X.6: Multi-Select-Checkbox fuer BSX-Export.
-                     Sichtbar bei Komplett-Figuren UND Einzelteilen; Wartende
-                     bleiben bewusst ohne Checkbox (saubere Optik - "kann nicht
-                     exportiert werden weil unkomplett"). -->
+                <!-- UX X.29 Block C Nachbesserung (v0.1.16): Checkbox jetzt
+                     fuer ALLE Items sichtbar (auch Wartende), damit Bulk-
+                     Loeschen + Bulk-Verschieben fuer den ganzen Bestand
+                     funktionieren. Vorher: nur Complete + Floating -> Wartende
+                     waren von Bulk-Aktionen ausgeschlossen.
+                     Export-Pfad filtert intern auf CanBeExported=true und
+                     uebespringt Wartende mit User-Hinweis im Toast. -->
                 <DataGridTemplateColumn Header="Aus..." Width="60" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <!--
-                                UX X.13b/d (Bugfix): zwei kritische Binding-
-                                Optionen, sonst aktualisiert die CheckBox die
-                                Source-Property NIE wenn die DataGrid auf
-                                IsReadOnly=True steht:
-
-                                1) UpdateSourceTrigger=PropertyChanged - Default
-                                   waere LostFocus, aber die CheckBox in einer
-                                   read-only-DataGrid-Cell behaelt den Tastatur-
-                                   Focus nicht zuverlaessig, daher wuerde der
-                                   Source-Update nie feuern.
-
-                                2) Die Cell IsHitTestVisible="True" + DataGrid-
-                                   intern: die DataGrid-Cell-Mouse-Logik fangt
-                                   Click-Events. Mit PropertyChanged-Trigger geht
-                                   das jetzt aber direkt ueber das Toggle-Event
-                                   der CheckBox (intern), kein Click-Bubble noetig.
-
-                                Dadurch laeuft der IsSelected-Setter SOFORT beim
-                                Toggle -> SelectionChanged-Event -> Parent-VM
-                                RecalculateSelection.
+                                UX X.13b/d (Bugfix): UpdateSourceTrigger=PropertyChanged
+                                ist Pflicht fuer DataGrid-Cell-CheckBoxes - LostFocus
+                                feuert in IsReadOnly-DataGrid nicht zuverlaessig.
                             -->
                             <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                       HorizontalAlignment="Center"
                                       VerticalAlignment="Center"
-                                      ToolTip="Fuer BSX-Export auswaehlen">
-                                <CheckBox.Style>
-                                    <Style TargetType="CheckBox">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Status}" Value="Complete">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Status}" Value="Floating">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </CheckBox.Style>
-                            </CheckBox>
+                                      ToolTip="Fuer Bulk-Aktionen auswaehlen (Loeschen / Verschieben / Exportieren)"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>

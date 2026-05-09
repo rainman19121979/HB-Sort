@@ -61,8 +61,13 @@ public partial class InventoryListView : UserControl
     /// kompletten Figuren UND Einzelteilen. Beide Listen werden separat an den
     /// Dialog uebergeben - der zeigt sie in zwei Sektionen an und exportiert beides
     /// in dieselbe BSX-Datei.
+    ///
+    /// UX X.29 Block C Nachbesserung (v0.1.16): Wartende Figuren in der
+    /// Selektion werden uebersprungen und im Hinweis-Toast vermerkt - sonst
+    /// koennte der User markieren, exportieren und sich wundern warum
+    /// Wartende fehlen.
     /// </summary>
-    private void ExportSelected_Click(object sender, RoutedEventArgs e)
+    private async void ExportSelected_Click(object sender, RoutedEventArgs e)
     {
         if (DataContext is not InventoryListViewModel vm) return;
         var minifigIds = vm.SelectedCompletes
@@ -71,7 +76,32 @@ public partial class InventoryListView : UserControl
         var floatingIds = vm.SelectedFloatings
             .Select(r => r.UnderlyingFloatingId!.Value)
             .ToList();
-        if (minifigIds.Count == 0 && floatingIds.Count == 0) return;
+
+        // Wartende-Anteil zaehlen (fuer User-Hinweis).
+        var waitingSelected = vm.SelectedTotalCount - vm.SelectedExportableCount;
+
+        if (minifigIds.Count == 0 && floatingIds.Count == 0)
+        {
+            // Kein einziger exportierbarer Eintrag in der Auswahl - moeglich
+            // wenn nur Wartende markiert sind.
+            if (waitingSelected > 0)
+            {
+                await Service<IDialogService>().ShowInfoAsync(
+                    "Keine exportierbaren Items",
+                    $"In der Auswahl sind {waitingSelected} wartende Figur(en) - " +
+                    "diese koennen nicht exportiert werden, weil sie noch nicht " +
+                    "alle Teile haben. Markiere komplette Figuren oder Einzelteile.");
+            }
+            return;
+        }
+
+        // Hinweis-Toast falls Wartende uebersprungen werden.
+        if (waitingSelected > 0)
+        {
+            Service<INotificationService>().ShowInfo(
+                $"{waitingSelected} wartende Figur(en) werden uebersprungen - nur " +
+                $"komplette Figuren und Einzelteile koennen exportiert werden.");
+        }
 
         var dialog = Service<BsxExportDialog>();
         dialog.Initialize(minifigIds, floatingIds);
@@ -145,7 +175,9 @@ public partial class InventoryListView : UserControl
         if (Keyboard.FocusedElement is TextBox || Keyboard.FocusedElement is PasswordBox) return;
         if (DataContext is not InventoryListViewModel vm) return;
 
-        if (vm.SelectedExportableCount > 0)
+        // UX X.29 Block C Nachbesserung: Bulk-Loeschen wirkt jetzt auch auf
+        // Wartende. SelectedTotalCount enthaelt alle markierten Items.
+        if (vm.SelectedTotalCount > 0)
         {
             await BulkDeleteAsync(vm);
             e.Handled = true;
@@ -178,14 +210,16 @@ public partial class InventoryListView : UserControl
 
     private async Task BulkDeleteAsync(InventoryListViewModel vm)
     {
-        var minifigIds = vm.SelectedCompletes.Select(r => r.UnderlyingMinifigId!.Value).ToList();
-        var floatingIds = vm.SelectedFloatings.Select(r => r.UnderlyingFloatingId!.Value).ToList();
+        // UX X.29 Block C Nachbesserung: SelectedMinifigIds umfasst Wartende +
+        // Complete - Bulk-Loeschen wirkt jetzt auch auf wartende Figuren.
+        var minifigIds = vm.SelectedMinifigIds.ToList();
+        var floatingIds = vm.SelectedFloatingPartIds.ToList();
         var total = minifigIds.Count + floatingIds.Count;
         if (total == 0) return;
 
         var dialogs = Service<IDialogService>();
         var msg = $"{total} markierte(s) Item(s) loeschen?\n\n" +
-                  $"  - {minifigIds.Count} Figur(en)\n" +
+                  $"  - {minifigIds.Count} Figur(en) (wartend + komplett)\n" +
                   $"  - {floatingIds.Count} Einzelteil-Eintrag/Eintraege\n\n" +
                   $"Strg+Z (oder Verlauf-Tab) macht die Aktion rueckgaengig.";
         if (!await dialogs.ShowQuestionAsync("Markierte loeschen?", msg)) return;
@@ -213,8 +247,10 @@ public partial class InventoryListView : UserControl
         b.IsEnabled = false;
         try
         {
-            var minifigIds = vm.SelectedCompletes.Select(r => r.UnderlyingMinifigId!.Value).ToList();
-            var floatingIds = vm.SelectedFloatings.Select(r => r.UnderlyingFloatingId!.Value).ToList();
+            // UX X.29 Block C Nachbesserung: Bulk-Verschieben wirkt auch auf
+            // Wartende - SelectedMinifigIds enthaelt Wartend + Complete.
+            var minifigIds = vm.SelectedMinifigIds.ToList();
+            var floatingIds = vm.SelectedFloatingPartIds.ToList();
             var total = minifigIds.Count + floatingIds.Count;
             if (total == 0) return;
 
