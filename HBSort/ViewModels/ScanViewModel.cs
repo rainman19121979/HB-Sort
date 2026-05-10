@@ -356,6 +356,72 @@ public partial class ScanViewModel : ObservableObject
         OnPropertyChanged(nameof(IsBinInstructionVisible));
     }
 
+    /// <summary>
+    /// UX X.33 v0.1.19-beta.7 Block M Erweiterung: Pending-Part lagern.
+    /// Zentraler Pfad fuer "Lagern"-Button-Klick + Enter-Hotkey im
+    /// MainWindow. Liefert true wenn das Lagern erfolgreich durchgelaufen
+    /// ist (Toast + Anweisungs-Popup wurden gezeigt, PendingPart wurde
+    /// auf null gesetzt). false bei Validierungs-Fehler oder Exception.
+    /// </summary>
+    public async Task<bool> StoreFloatingFromPendingPartAsync()
+    {
+        var pending = PendingPart;
+        if (pending == null) return false;
+        if (pending.SelectedFloatingBin == null)
+        {
+            _notifications.ShowWarning("Bitte ein Lagerfach auswaehlen.");
+            return false;
+        }
+        if (pending.FloatingQuantity <= 0)
+        {
+            _notifications.ShowWarning("Anzahl muss > 0 sein.");
+            return false;
+        }
+
+        pending.IsBusy = true;
+        try
+        {
+            await _partLookup.AddPartToFloatingAsync(
+                pending.BlPartNo, pending.BlColorId,
+                pending.PartName, pending.ColorName,
+                pending.FloatingQuantity, pending.SelectedFloatingBin.Id,
+                pending.BrickognizeCategory);
+
+            // UX X.33 Block N (v0.1.19-beta.7 Refactor): Auto-Mapping
+            // entfernt. Settings-Tab "Kategorien" befuellt sich nicht mehr
+            // automatisch beim Lagern - User pflegt Mapping nur manuell.
+            // Default-Regel ("max 1 PartId pro Kategorie pro Bin") greift
+            // wenn kein Mapping da ist.
+
+            _notifications.ShowSuccess(
+                $"{pending.FloatingQuantity}x '{pending.PartName}' in {pending.SelectedFloatingBin.Label} eingelagert.",
+                pending.ImageUrl);
+
+            var binLabel = pending.SelectedFloatingBin.Label;
+            var partImage = pending.ImageUrl;
+
+            PendingPart = null;
+            if (!string.IsNullOrWhiteSpace(binLabel))
+            {
+                ShowBinInstruction(binLabel, partImage);
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "StoreFloating fehlgeschlagen");
+            _notifications.ShowError($"Fehler beim Lagern: {ex.Message}");
+            return false;
+        }
+        finally
+        {
+            // pending kann bei Erfolg null sein - Defensive-Check.
+            if (PendingPart != null) PendingPart.IsBusy = false;
+        }
+    }
+
+    private readonly ICategoryBinMappingService _categoryMapping;
+
     public ScanViewModel(
         ICameraService cameraService,
         ISettingsService settingsService,
@@ -371,7 +437,8 @@ public partial class ScanViewModel : ObservableObject
         IPartLookupService partLookup,
         IDialogService dialogs,
         IFloatingPartTransferService floatingTransfer,
-        IBlPriceCacheService priceCache)
+        IBlPriceCacheService priceCache,
+        ICategoryBinMappingService categoryMapping)
     {
         _cameraService = cameraService;
         _settingsService = settingsService;
@@ -388,6 +455,7 @@ public partial class ScanViewModel : ObservableObject
         _dialogs = dialogs;
         _floatingTransfer = floatingTransfer;
         _priceCache = priceCache;
+        _categoryMapping = categoryMapping;
 
         _cameraService.FrameReceived += OnFrameReceived;
     }
@@ -1057,7 +1125,10 @@ public partial class ScanViewModel : ObservableObject
         if (RecognizedColors.Count > 0 && RecognizedColors[0].BricklinkId.HasValue)
             blColorId = RecognizedColors[0].BricklinkId!.Value;
 
-        var pending = new PartLookupViewModel(blPartNo, blColorId);
+        // UX X.33 v0.1.19-beta.7 Block M: Brickognize-Category an die VM
+        // durchreichen damit der CategoryBinMappingService das Mapping
+        // pro Scan zur Hand hat.
+        var pending = new PartLookupViewModel(blPartNo, blColorId, card.RawItem?.Category);
         PendingPart = pending;
 
         // Initial-Lookup
@@ -1149,62 +1220,80 @@ public partial class ScanViewModel : ObservableObject
         try
         {
             var allBins = await _binService.GetAllAsync();
-            // UX X.31 (v0.1.18) + UX X.32 v0.1.19-beta.4: konsistente Bin-
-            // Vorschlaege. MaxFloatingPartTypesPerBin steuert ob mehrere
-            // BL-Kategorien zusammen gelagert werden duerfen.
-            var maxCats = _settingsService.Current.MaxFloatingPartTypesPerBin;
-            var firstFree = await _binService.SuggestBinForFloatingPartAsync(
-                pending.BlPartNo, pending.BlColorId,
-                maxCategoriesPerBin: maxCats,
-                partName: pending.PartName);
 
-            // UX-Iteration X.7: Smart-Storage-Suggestion. Vor der Default-Auswahl
-            // pruefen ob das Teil bereits in einem Fach liegt - dann dieses Fach
-            // statt "naechstes freies" vorauswaehlen, damit Stapel weiter wachsen
-            // statt sich zu zerstreuen. (Liefert reicheren Hint-Datenkranz mit
-            // Quantity + AnzahlMatchingBins fuer den UI-Hint-Text.)
-            var suggestion = await _floatingTransfer.FindBestStorageBinSuggestionAsync(
+            // UX X.33 v0.1.19-beta.7 Block N: alle drei Stufen (Stapel ->
+            // User-Mapping -> Default-Regel "max 1 PartId pro Kategorie pro
+            // Bin") sind im neuen Service-Aufruf gebuendelt. Reihenfolge
+            // ist im Service fest verdrahtet, hier nur EIN Aufruf.
+            //
+            // Brickognize-Kategorie zur Seen-Liste hinzufuegen damit das
+            // Settings-UI sie zeigt (organisch wachsende Liste). KEIN
+            // Auto-Mapping mehr - User pflegt Settings manuell.
+            if (!string.IsNullOrWhiteSpace(pending.BrickognizeCategory))
+            {
+                await _categoryMapping.RememberSeenCategoryAsync(pending.BrickognizeCategory);
+            }
+
+            // UX-X.7-Hint: nur Anzeige ("Liegt schon in Box X (5x)") -
+            // der Stapel-Match selbst wird im Service-Aufruf erneut
+            // berechnet, das ist preiswert und vermeidet Doppel-Logik.
+            var stackHint = await _floatingTransfer.FindBestStorageBinSuggestionAsync(
                 pending.BlPartNo, pending.BlColorId);
+
+            var suggested = await _binService.SuggestBinForFloatingPartAsync(
+                pending.BlPartNo, pending.BlColorId,
+                pending.BrickognizeCategory ?? string.Empty,
+                userMapping: _settingsService.Current.CategoryToBinMapping);
 
             System.Windows.Application.Current?.Dispatcher.Invoke(() =>
             {
                 pending.AvailableBins.Clear();
                 foreach (var b in allBins) pending.AvailableBins.Add(b);
 
-                // WICHTIG: Bin-Objekt aus AvailableBins holen (Reference-Equality),
-                // sonst findet die ComboBox den Eintrag nicht in ItemsSource.
-                StorageBin? defaultBin;
-                if (suggestion != null)
-                {
-                    defaultBin = pending.AvailableBins.FirstOrDefault(b => b.Id == suggestion.BinId);
+                // Reference-Equality-Lookup damit die ComboBox den Eintrag
+                // in ItemsSource findet.
+                var defaultBin = suggested != null
+                    ? pending.AvailableBins.FirstOrDefault(b => b.Id == suggested.Id)
+                    : null;
 
-                    // Hint-Properties setzen -> TextBlock unter dem Dropdown
-                    // wird via Binding sichtbar.
+                pending.SelectedFloatingBin = defaultBin;
+
+                // UX-X.7-Hint nur dann zeigen, wenn der Service auch das
+                // Stapel-Bin als Default genommen hat (sonst waere der Hint
+                // irrefuehrend - "schon dort" zeigt auf ein anderes Bin als
+                // SelectedFloatingBin).
+                if (stackHint != null && defaultBin?.Id == stackHint.BinId)
+                {
                     pending.HasMatchingFloatingBin = true;
-                    pending.MatchingFloatingBinLabel = suggestion.BinLabel;
-                    pending.MatchingFloatingBinQuantity = suggestion.QuantityInThisBin;
-                    pending.MatchingFloatingBinCount = suggestion.TotalMatchingBinsCount;
+                    pending.MatchingFloatingBinLabel = stackHint.BinLabel;
+                    pending.MatchingFloatingBinQuantity = stackHint.QuantityInThisBin;
+                    pending.MatchingFloatingBinCount = stackHint.TotalMatchingBinsCount;
                 }
                 else
                 {
-                    // Kein Match -> bisheriges Verhalten: naechstes freies Fach.
-                    defaultBin = firstFree != null
-                        ? pending.AvailableBins.FirstOrDefault(b => b.Id == firstFree.Id)
-                        : null;
-
                     pending.HasMatchingFloatingBin = false;
                     pending.MatchingFloatingBinLabel = null;
                     pending.MatchingFloatingBinQuantity = 0;
                     pending.MatchingFloatingBinCount = 0;
                 }
 
-                pending.SelectedFloatingBin = defaultBin
-                    ?? pending.AvailableBins.FirstOrDefault();
+                // UX X.33 Block K: bei null vom Service Banner zeigen,
+                // kein Silent-Fallback.
+                if (defaultBin == null)
+                {
+                    pending.NoFreeBinWarning = pending.AvailableBins.Count == 0
+                        ? "Es gibt noch keine Lagerfaecher. Lege zuerst eines an."
+                        : "Kein passendes Fach frei (Default-Regel: max 1 Teil-Typ pro Kategorie pro Bin). Bitte neues Fach anlegen oder im Settings-Tab 'Kategorien' ein Mapping setzen.";
+                }
+                else
+                {
+                    pending.NoFreeBinWarning = null;
+                }
 
                 Log.Information(
-                    "PartLookup-Bins: {Count} Faecher, Suggestion={Sug}, Selected.Id={Sel}",
+                    "PartLookup-Bins: {Count} Faecher, Cat='{Cat}', Selected.Id={Sel}",
                     pending.AvailableBins.Count,
-                    suggestion?.BinLabel ?? "(kein Match)",
+                    pending.BrickognizeCategory ?? "(empty)",
                     pending.SelectedFloatingBin?.Id);
             });
         }
@@ -1311,13 +1400,24 @@ public partial class ScanViewModel : ObservableObject
                 foreach (var bin in allBins)
                     pending.AvailableBins.Add(bin);
 
-                // WICHTIG: Bin-Objekt aus AvailableBins holen (gleiche Id),
-                // nicht das separate firstFree-Objekt verwenden, sonst findet
-                // die ComboBox den Eintrag nicht in ItemsSource (Reference-Equality).
-                pending.SelectedBin = firstFree != null
-                    ? pending.AvailableBins.FirstOrDefault(b => b.Id == firstFree.Id)
-                      ?? pending.AvailableBins.FirstOrDefault()
-                    : pending.AvailableBins.FirstOrDefault();
+                // UX X.33 v0.1.19-beta.7 Block K: bei null vom Service NICHT
+                // mehr stillschweigend auf irgendein Fach fallback - User
+                // soll Warnung sehen und ein neues Fach anlegen oder leeren.
+                if (firstFree != null)
+                {
+                    // WICHTIG: Bin-Objekt aus AvailableBins holen (gleiche Id),
+                    // nicht das separate firstFree-Objekt verwenden, sonst findet
+                    // die ComboBox den Eintrag nicht in ItemsSource (Reference-Equality).
+                    pending.SelectedBin = pending.AvailableBins.FirstOrDefault(b => b.Id == firstFree.Id);
+                    pending.NoFreeBinWarning = null;
+                }
+                else
+                {
+                    pending.SelectedBin = null;
+                    pending.NoFreeBinWarning = allBins.Count == 0
+                        ? "Es gibt noch keine Lagerfaecher. Lege zuerst eines an."
+                        : "Alle Lagerfaecher sind belegt. Bitte ein neues Fach anlegen oder ein bestehendes leeren.";
+                }
             });
         }
         catch (Exception ex)

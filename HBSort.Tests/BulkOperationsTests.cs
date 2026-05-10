@@ -209,7 +209,6 @@ public class BulkOperationsTests : IDisposable
         Assert.NotNull(preview);
         Assert.Equal(2, preview!.WaitingMinifigsCount);
         Assert.Equal(1, preview.CompleteMinifigsCount);
-        Assert.Equal(0, preview.SoldMinifigsCount);
         Assert.Equal(2, preview.FloatingPartsCount);
     }
 

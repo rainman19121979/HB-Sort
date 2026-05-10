@@ -29,6 +29,19 @@ public partial class PartLookupView : UserControl
 
     private static T Service<T>() where T : notnull => App.Services.GetRequiredService<T>();
 
+    /// <summary>
+    /// UX X.33 v0.1.19-beta.7 Block K: oeffnet Settings damit der User ein
+    /// neues Fach anlegen oder ein bestehendes leeren kann.
+    /// </summary>
+    private void OpenBinManagement_Click(object sender, RoutedEventArgs e)
+    {
+        var window = Window.GetWindow(this);
+        if (window?.DataContext is MainViewModel main)
+        {
+            main.OpenSettings();
+        }
+    }
+
     /// <summary>Verwerfen: Pending-Part ausblenden, kein DB-Zugriff.</summary>
     private void Discard_Click(object sender, RoutedEventArgs e)
     {
@@ -57,6 +70,19 @@ public partial class PartLookupView : UserControl
                 notif.ShowSuccess($"Teil zu '{match.MinifigName}' zugeordnet.");
             }
 
+            // UX X.33 v0.1.19-beta.7 Block J: Anweisungs-Popup mit Ziel-Bin
+            // der wartenden Figur. Konsistent zum StoreFloating_Click-Pfad.
+            // Bin-Label ist im WaitingMinifigMatchViewModel direkt verfuegbar
+            // (StorageBinLabel - null wenn die Figur kein Fach hat, dann
+            // wird kein Popup gezeigt).
+            var targetBinLabel = match.StorageBinLabel;
+            var partImage = vm.ImageUrl;
+            var scan = GetScanViewModel();
+            if (scan != null && !string.IsNullOrWhiteSpace(targetBinLabel))
+            {
+                scan.ShowBinInstruction(targetBinLabel!, partImage);
+            }
+
             // Nach erfolgreichem Assign: PartLookup neu, damit ggf. weitere Mengen
             // dieses Teils noch zuordbar sind (Quantity>1).
             var refreshed = await lookup.LookupPartAsync(vm.BlPartNo, vm.BlColorId);
@@ -65,7 +91,6 @@ public partial class PartLookupView : UserControl
             // Wenn keine wartenden Treffer mehr: Pending ausblenden.
             if (refreshed.WaitingMatches.Count == 0)
             {
-                var scan = GetScanViewModel();
                 if (scan != null) scan.PendingPart = null;
             }
         }
@@ -80,60 +105,18 @@ public partial class PartLookupView : UserControl
         }
     }
 
-    /// <summary>"Lagern"-Button: AddPartToFloatingAsync.</summary>
+    /// <summary>
+    /// "Lagern"-Button: delegiert an <see cref="ScanViewModel.StoreFloatingFromPendingPartAsync"/>.
+    /// UX X.33 v0.1.19-beta.7 Block M Erweiterung: gesamte Logik (Service-
+    /// Calls, Auto-Mapping, Toast, Anweisungs-Popup, PendingPart=null) lebt
+    /// im ScanViewModel - damit der Enter-Hotkey im MainWindow den gleichen
+    /// Pfad ausloesen kann.
+    /// </summary>
     private async void StoreFloating_Click(object sender, RoutedEventArgs e)
     {
-        if (DataContext is not PartLookupViewModel vm) return;
-        if (vm.SelectedFloatingBin == null)
-        {
-            Service<INotificationService>().ShowWarning("Bitte ein Lagerfach auswaehlen.");
-            return;
-        }
-        if (vm.FloatingQuantity <= 0)
-        {
-            Service<INotificationService>().ShowWarning("Anzahl muss > 0 sein.");
-            return;
-        }
-
-        var lookup = Service<IPartLookupService>();
-        var notif = Service<INotificationService>();
-        vm.IsBusy = true;
-        try
-        {
-            await lookup.AddPartToFloatingAsync(
-                vm.BlPartNo, vm.BlColorId,
-                vm.PartName, vm.ColorName,
-                vm.FloatingQuantity, vm.SelectedFloatingBin.Id);
-
-            // UX X.20 Teil 5: Toast mit Item-Bild + neue Wortwahl "eingelagert".
-            notif.ShowSuccess(
-                $"{vm.FloatingQuantity}x '{vm.PartName}' in {vm.SelectedFloatingBin.Label} eingelagert.",
-                vm.ImageUrl);
-
-            // UX X.31 Block B (v0.1.18): Anweisungs-Overlay auch fuer
-            // Einzelteile - User soll wissen wo das Teil physisch hin soll.
-            var binLabel = vm.SelectedFloatingBin.Label;
-            var partImage = vm.ImageUrl;
-
-            var scan = GetScanViewModel();
-            if (scan != null)
-            {
-                scan.PendingPart = null;
-                if (!string.IsNullOrWhiteSpace(binLabel))
-                {
-                    scan.ShowBinInstruction(binLabel, partImage);
-                }
-            }
-        }
-        catch (System.Exception ex)
-        {
-            Log.Error(ex, "Floating-Lagern fehlgeschlagen");
-            notif.ShowError($"Fehler: {ex.Message}");
-        }
-        finally
-        {
-            vm.IsBusy = false;
-        }
+        var scan = GetScanViewModel();
+        if (scan == null) return;
+        await scan.StoreFloatingFromPendingPartAsync();
     }
 
     // (ShowSupersets_Click + Button entfernt - Spec UX-1 FIX 5.

@@ -172,22 +172,31 @@ public class StorageBinService : IStorageBinService
 
     public async Task<StorageBin?> SuggestBinForFloatingPartAsync(
         string blPartNo, int blColorId,
+        string brickognizeCategory,
         int? excludeMinifigId = null,
-        int maxCategoriesPerBin = 1,
-        string? partName = null,
+        Dictionary<string, int>? userMapping = null,
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(blPartNo))
             throw new ArgumentException("BL-Part-No darf nicht leer sein.", nameof(blPartNo));
 
-        // Defensive Clamping.
-        if (maxCategoriesPerBin < 1) maxCategoriesPerBin = 1;
+        // UX X.33 Block N + Pre-Tag-Fix (v0.1.19-beta.7): leere/null Kategorie
+        // wird als Pseudo-Kategorie "Unbekannt" behandelt - Default-Regel
+        // "max 1 PartId pro Kategorie pro Bin" greift damit auch fuer
+        // Bestand-FloatingParts (Migration A hat Spalte mit null gefuellt)
+        // und fuer Items wo die Heuristik kein Match findet (z.B.
+        // "Minifigure Air Tanks" ohne Komma).
+        var category = string.IsNullOrWhiteSpace(brickognizeCategory)
+            ? ICategoryBinMappingService.UnknownCategory
+            : brickognizeCategory;
 
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
 
-        // 1) Bevorzugt: Bin in dem das gleiche Teil (PartNo + ColorId) schon liegt.
-        //    FIFO nach AddedAt, damit konsistente Wahl bei mehreren Treffern.
-        //    Bin muss noch existieren (FK-Pfad, falls Bin via DELETE wegging).
+        // ============================================================
+        // 1) Stapel-Match: Bin in dem das gleiche Teil (PartNo + ColorId)
+        //    schon liegt. FIFO nach AddedAt. Hat absoluten Vorrang -
+        //    gleiche Items stapeln sich immer.
+        // ============================================================
         var existingFp = await ctx.FloatingParts
             .AsNoTracking()
             .Where(p => p.PartNumber == blPartNo && p.ColorId == blColorId)
@@ -201,142 +210,71 @@ public class StorageBinService : IStorageBinService
             if (bin != null) return bin;
         }
 
+        // ============================================================
+        // 2) User-Mapping: wenn die Kategorie im
+        //    AppSettings.CategoryToBinMapping einem Bin zugewiesen ist,
+        //    wird das genommen - selbst wenn dort schon andere PartIds
+        //    der gleichen Kategorie liegen (User hat das so gewollt).
+        // ============================================================
+        if (userMapping != null
+            && !string.IsNullOrEmpty(category)
+            && userMapping.TryGetValue(category, out var mappedBinId))
+        {
+            var mappedBin = await ctx.StorageBins
+                .AsNoTracking()
+                .FirstOrDefaultAsync(b => b.Id == mappedBinId, ct);
+            if (mappedBin != null) return mappedBin;
+            // Mapping zeigt auf geloeschtes Bin -> Fall-through auf Default-Regel.
+        }
+
         var hasExclude = excludeMinifigId.HasValue;
 
-        // 2) UX X.32 v0.1.19-beta.4 (User-Befund): Kategorie-Stapel-Pfad
-        //    laeuft IMMER (auch bei Limit=1) - Phase A der Helper-Methode
-        //    sucht ein Bin wo die gleiche Kategorie schon drin ist
-        //    (z.B. zweites Bein-Teil zum bestehenden Bein-Bin). Phase B
-        //    (Mix-Fach mit verschiedenen Kategorien) greift nur bei
-        //    Limit > 1. Kategorie kommt aus PartName-Praefix (BL-Naming
-        //    "Minifig Head, ..."), Fallback PartNo-Praefix.
-        var categoryStackBin = await TryFindCategoryStackBinAsync(
-            ctx, blPartNo, blColorId, partName, excludeMinifigId, maxCategoriesPerBin, ct);
-        if (categoryStackBin != null) return categoryStackBin;
-
-        // 3) Wirklich freies Fach: keine Minifigs (ausser excluded), keine FloatingParts.
-        var trulyFree = await ctx.StorageBins
-            .AsNoTracking()
-            .Where(b =>
-                !b.TrackedMinifigs.Any(m => !hasExclude || m.Id != excludeMinifigId!.Value)
-                && !b.FloatingParts.Any())
-            .OrderBy(b => b.Label)
-            .FirstOrDefaultAsync(ct);
-        if (trulyFree != null) return trulyFree;
-
-        // 4) Erweitert: Fach OHNE Complete- und Waiting-Figuren (FloatingParts
-        //    erlaubt - Mix-Fach OK wenn keine wirklich freien mehr da sind).
-        var noMinifigOnly = await ctx.StorageBins
-            .AsNoTracking()
-            .Where(b =>
-                !b.TrackedMinifigs.Any(m => !hasExclude || m.Id != excludeMinifigId!.Value))
-            .OrderBy(b => b.Label)
-            .FirstOrDefaultAsync(ct);
-        if (noMinifigOnly != null) return noMinifigOnly;
-
-        // 5) Letzter Fallback: irgendein Fach, sortiert nach am wenigsten
-        //    belegt (Complete-Count zuerst, dann FloatingParts-Count, dann Label).
-        //    User sieht "kein perfektes Fach, hier die beste Wahl" statt eines
-        //    kommentarlosen null. Excluded Minifig zaehlt nicht.
-        return await ctx.StorageBins
-            .AsNoTracking()
-            .OrderBy(b => b.TrackedMinifigs.Count(m =>
-                m.Status == TrackedMinifigStatus.Complete
-                && (!hasExclude || m.Id != excludeMinifigId!.Value)))
-            .ThenBy(b => b.FloatingParts.Count)
-            .ThenBy(b => b.Label)
-            .FirstOrDefaultAsync(ct);
-    }
-
-    /// <summary>
-    /// UX X.32 v0.1.19-beta.4 (User-Befund): zwei Phasen.
-    ///
-    /// Phase A (gilt IMMER, auch bei Limit=1): Bin wo die NEUE Kategorie
-    /// schon vorhanden ist - dort STAPELT die neue Kategorie-Instanz mit
-    /// (z.B. zweites Bein-Teil zum bestehenden Bein-Bin). Step 1
-    /// (gleicher PartNo+ColorId-Stapel) deckt das nur fuer identische
-    /// Teile ab; verschiedene Bein-Varianten haben aber unterschiedliche
-    /// PartNos.
-    ///
-    /// Phase B (nur bei Limit > 1): Bin wo die neue Kategorie noch NICHT
-    /// vorhanden ist UND Set-Count unter Limit - der User hat im Setting
-    /// erlaubt mehrere Kategorien zu mischen.
-    ///
-    /// Kategorie-Bestimmung:
-    /// 1. <see cref="IBlCacheRepository.GetCategoryIdsForPartsAsync"/>
-    ///    (bl_items.category_id - meist nur fuer 'full'-Eintraege gesetzt)
-    /// 2. Fallback: <see cref="BlPartCategoryHeuristic.GetPseudoCategory"/>
-    ///    (numerischer Praefix der PartNo + Aliase fuer Bein/Arm/Hand-
-    ///    Varianten).
-    /// </summary>
-    private async Task<StorageBin?> TryFindCategoryStackBinAsync(
-        UserDataContext ctx,
-        string blPartNo,
-        int blColorId,
-        string? partName,
-        int? excludeMinifigId,
-        int maxCategoriesPerBin,
-        CancellationToken ct)
-    {
-        var hasExclude = excludeMinifigId.HasValue;
-
-        // Kandidaten-Bins: haben FloatingParts UND keine Minifigs (ausser excluded).
+        // ============================================================
+        // 3) Default-Regel: erstes Bin OHNE Minifigs (ausser excluded)
+        //    UND OHNE einen FloatingPart der gleichen Brickognize-
+        //    Kategorie aber anderer PartNo. Verschiedene Kategorien
+        //    duerfen sich ein Bin teilen, gleiche Kategorie nicht
+        //    (sonst landen Helm-A + Helm-B zusammen -> doppelter Stapel).
+        //    Sortiert nach Label fuer Stabilitaet.
+        // ============================================================
         var candidates = await ctx.StorageBins
             .AsNoTracking()
             .Include(b => b.FloatingParts)
-            .Where(b =>
-                b.FloatingParts.Any()
-                && !b.TrackedMinifigs.Any(m => !hasExclude || m.Id != excludeMinifigId!.Value))
+            .Where(b => !b.TrackedMinifigs.Any(m =>
+                !hasExclude || m.Id != excludeMinifigId!.Value))
+            .OrderBy(b => b.Label)
             .ToListAsync(ct);
-        if (candidates.Count == 0) return null;
 
-        // Kategorie der NEUEN PartNo bestimmen - PartName-Praefix bevorzugt
-        // (BL-Naming "Minifig Head, ..."), Fallback PartNo-Praefix. ColorId
-        // wird in den Schluessel einbezogen damit verschiedene Farben des
-        // gleichen Teils nicht zusammengewuerfelt werden.
-        var newCategory = BlPartCategoryHeuristic.Resolve(blPartNo, blColorId, partName);
-
-        // Pro Kandidat: Set seiner Kategorien (PartName + PartNo + ColorId
-        // aus dem FloatingPart-Object - kein Cache-Roundtrip noetig).
-        var ranked = candidates
-            .Select(b => new
-            {
-                Bin = b,
-                Categories = b.FloatingParts
-                    .Select(fp => BlPartCategoryHeuristic.Resolve(
-                        fp.PartNumber, fp.ColorId, fp.PartName))
-                    .ToHashSet()
-            })
-            .ToList();
-
-        Log.Information(
-            "BinSuggest CategoryStack: NewPart={Part}/{Color} Name='{Name}' -> Key='{Key}'. Kandidaten: {Cnt}",
-            blPartNo, blColorId, partName ?? "(null)", newCategory, ranked.Count);
-        foreach (var r in ranked)
+        foreach (var bin in candidates)
         {
-            Log.Information("  - Bin '{Label}': Cats=[{Cats}]",
-                r.Bin.Label, string.Join(",", r.Categories));
+            // Bin-Konflikt = ein anderer FloatingPart-Item (PartNo+ColorId
+            // verschieden vom neuen Item) mit GLEICHER Brickognize-Kategorie.
+            //
+            // Stapel-Match (exakt gleiche PartNo+ColorId) wurde schon in
+            // Schritt 1 abgehandelt - wenn wir hier sind, hat KEIN Stapel
+            // gegriffen. Trotzdem kann das gleiche PartNo aber andere Farbe
+            // im Bin liegen (z.B. 3001/Black + neue 3001/Red): das ist
+            // ebenfalls ein "anderes Item" und kollidiert.
+            //
+            // Bestand mit BrickognizeCategory=null wird wie Pseudo-Kategorie
+            // "Unbekannt" behandelt - wenn der neue Part auch in "Unbekannt"
+            // faellt, kollidiert er mit allen ungelabelten Bestand-Parts.
+            // So bleibt die Migration A sauber: ungelabelte Bestand-Stapel
+            // werden aufgeteilt sobald neue Items mit "Unbekannt" reinkommen.
+            var hasConflict = bin.FloatingParts.Any(fp =>
+                (fp.PartNumber != blPartNo || fp.ColorId != blColorId)
+                && (string.IsNullOrEmpty(fp.BrickognizeCategory)
+                        ? ICategoryBinMappingService.UnknownCategory
+                        : fp.BrickognizeCategory) == category);
+
+            if (!hasConflict)
+                return bin;
         }
 
-        // UX X.32 v0.1.19-beta.4 (User-Befund 2x Helm): strikte Trennung
-        // pro Kategorie. Step 1 (gleicher PartNo+ColorId-Stapel) hat schon
-        // davor zugeschlagen - nur identische Teile stapeln dort.
-        // Hier: Bin wo newCategory NOCH NICHT drin ist + Set-Count unter
-        // Limit. Bei Limit=1 heisst das: Bin muss leer sein (count < 1).
-        // Bei Limit > 1 wird Mischen erlaubt.
-        var fitBin = ranked
-            .Where(x => !x.Categories.Contains(newCategory)
-                     && x.Categories.Count < maxCategoriesPerBin)
-            .OrderByDescending(x => x.Categories.Count)
-            .ThenBy(x => x.Bin.Label)
-            .FirstOrDefault();
-        if (fitBin != null)
-        {
-            Log.Information("BinSuggest: Kategorie-Filter trifft, Bin='{Label}'", fitBin.Bin.Label);
-            return fitBin.Bin;
-        }
-
-        Log.Information("BinSuggest: kein Kategorie-Bin passt - Fallback auf Stufe 3-5");
+        // ============================================================
+        // 4) Kein passendes Bin -> null. Block-K-Konvention: Aufrufer
+        //    zeigt Banner, kein Silent-Fallback.
+        // ============================================================
         return null;
     }
 
@@ -483,7 +421,6 @@ public class StorageBinService : IStorageBinService
             Label: bin.Label,
             WaitingMinifigsCount: minifigs.Count(m => m.Status == TrackedMinifigStatus.Waiting),
             CompleteMinifigsCount: minifigs.Count(m => m.Status == TrackedMinifigStatus.Complete),
-            SoldMinifigsCount: minifigs.Count(m => m.Status == TrackedMinifigStatus.Sold),
             FloatingPartsCount: floatingCount);
     }
 
@@ -701,7 +638,7 @@ public class StorageBinService : IStorageBinService
     }
 
     // Bug A (UX X.28, 2026-05-08): CleanupStaleBinAssignmentsAsync ersatzlos entfernt.
-    // Pre-X.6-Altlast - hat StorageBinId von Complete/Sold-Figuren beim App-Start
+    // Pre-X.6-Altlast - hat StorageBinId von Complete-Figuren beim App-Start
     // auf null gesetzt, widersprach UX-X.6-Konvention "Faecher bleiben belegt".
 
     public async Task<BinDetailData?> GetDetailAsync(int id, CancellationToken ct = default)

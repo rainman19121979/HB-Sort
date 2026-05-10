@@ -62,17 +62,10 @@ public class PriceSettings
     /// </summary>
     public int BlPriceCacheTtlPartDays { get; set; } = 90;
 
-    /// <summary>
-    /// Beim Oeffnen einer kompletten Figur Preise sofort laden (sonst Button).
-    /// </summary>
-    /// <remarks>
-    /// DEPRECATED ab UX-Iteration X.10 (2026-05-04): wird durch
-    /// <see cref="AutoLoadCompletePrice"/> ersetzt. Feld bleibt aus
-    /// Backwards-Compat-Gruenden in der settings.json erhalten, wird aber
-    /// nirgends mehr gelesen. Kann in einer spaeteren Iteration entfernt
-    /// werden.
-    /// </remarks>
-    public bool AutoLoadOnComplete { get; set; } = true;
+    // UX X.33 v0.1.19-beta.7: AutoLoadOnComplete (DEPRECATED seit UX X.10,
+    // ersetzt durch AutoLoadCompletePrice) entfernt. Wurde nicht mehr im
+    // UI gebunden und nicht mehr von Konsumenten gelesen. Alte settings.json
+    // mit "autoLoadOnComplete"-Eintrag wird von System.Text.Json ignoriert.
 
     /// <summary>
     /// UX-Iteration X.10 (2026-05-04): wann der Komplett-Figur-Preis im

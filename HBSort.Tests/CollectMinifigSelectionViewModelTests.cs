@@ -237,7 +237,9 @@ public class CollectMinifigSelectionViewModelTests
             => throw new NotImplementedException();
         public Task<FloatingPart> AddPartToFloatingAsync(
             string blPartNo, int blColorId, string partName, string colorName,
-            int quantity, int storageBinId, CancellationToken ct = default)
+            int quantity, int storageBinId,
+            string? brickognizeCategory = null,
+            CancellationToken ct = default)
             => throw new NotImplementedException();
         public Task<TrackedMinifig> CollectMinifigFromSupersetAsync(
             string blMinifigId, int storageBinId,

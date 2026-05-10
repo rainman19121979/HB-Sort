@@ -38,10 +38,18 @@ public interface IPartLookupService
     /// <summary>
     /// Legt das Teil als FloatingPart in das angegebene Fach. Wenn schon ein
     /// FloatingPart mit gleichem (BlPart, BlColor, Bin) existiert, wird Quantity addiert.
+    ///
+    /// UX X.33 Block N (v0.1.19-beta.7): <paramref name="brickognizeCategory"/>
+    /// optional - wird beim Anlegen am FloatingPart gespeichert. Beim
+    /// Stapel-Match wird die bestehende Category beibehalten (nicht
+    /// ueberschrieben). Null/Empty = "Unbekannt"-Kategorie fuer die
+    /// Default-Regel "max 1 PartId pro Kategorie pro Bin".
     /// </summary>
     Task<FloatingPart> AddPartToFloatingAsync(
         string blPartNo, int blColorId, string partName, string colorName,
-        int quantity, int storageBinId, CancellationToken ct = default);
+        int quantity, int storageBinId,
+        string? brickognizeCategory = null,
+        CancellationToken ct = default);
 
     /// <summary>
     /// "Diese Figur sammeln" aus dem Supersets-Dialog: legt eine neue

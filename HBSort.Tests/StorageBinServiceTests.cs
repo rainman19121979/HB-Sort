@@ -417,12 +417,12 @@ public class StorageBinServiceTests : IDisposable
     [Fact]
     public async Task SuggestBinForFloatingPart_picks_existing_bin_with_same_part_color()
     {
-        // Spec: gleiches Teil + gleiche Farbe -> bestehendes Bin.
+        // Spec: gleiches Teil + gleiche Farbe -> bestehendes Bin (Stapel-Match).
         await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
         var b1 = await _sut.GetByLabelAsync("Box 01");
         await SeedFloatingPartInBinAsync(b1!.Id, "3001", 5);
 
-        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3001", 0);
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3001", 0, "");
 
         Assert.NotNull(suggestion);
         Assert.Equal("Box 01", suggestion!.Label);
@@ -436,32 +436,30 @@ public class StorageBinServiceTests : IDisposable
         var b1 = await _sut.GetByLabelAsync("Box 01");
         await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Complete);
 
-        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3024", 11);
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3024", 11, "");
 
         Assert.NotNull(suggestion);
         Assert.Equal("Box 02", suggestion!.Label);
     }
 
     [Fact]
-    public async Task SuggestBinForFloatingPart_falls_back_to_least_loaded_when_all_have_complete()
+    public async Task SuggestBinForFloatingPart_returns_null_when_all_bins_have_complete_figures()
     {
-        // Bug-Fix v0.1.19-beta.2: vorher lieferte die Methode null wenn alle
-        // Bins Complete-Figuren haben. Neu: Stufe-4-Fallback liefert das am
-        // wenigsten belegte Fach (am wenigsten Complete, am wenigsten
-        // FloatingParts, dann Label) - User sieht "kein perfektes Fach,
-        // hier die beste Wahl" statt eines kommentarlosen null.
+        // UX X.33 v0.1.19-beta.7 Block K: vorher (beta.2) hat ein Step 5
+        // ("am wenigsten belegt"-Fallback) das am wenigsten gefuellte Bin
+        // mit Complete-Figuren stillschweigend zurueckgegeben - Teile wurden
+        // dann mit verkaufsfertigen Figuren vermischt. Step 5 ist jetzt raus,
+        // die Methode liefert null. Aufrufer muss eine Warnung anzeigen.
         await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
         var b1 = await _sut.GetByLabelAsync("Box 01");
         var b2 = await _sut.GetByLabelAsync("Box 02");
-        // b1 hat 2 Complete, b2 hat 1 Complete -> b2 ist weniger belegt.
         await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Complete);
         await SeedMinifigInBinAsync(b1!.Id, "fig1b", TrackedMinifigStatus.Complete);
         await SeedMinifigInBinAsync(b2!.Id, "fig2", TrackedMinifigStatus.Complete);
 
-        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3024", 11);
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3024", 11, "");
 
-        Assert.NotNull(suggestion);
-        Assert.Equal("Box 02", suggestion!.Label);
+        Assert.Null(suggestion);
     }
 
     [Fact]
@@ -469,27 +467,114 @@ public class StorageBinServiceTests : IDisposable
     {
         // Bug-Fix v0.1.19-beta.2: ohne Bins gibt's logischerweise nichts
         // vorzuschlagen.
-        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3024", 11);
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3024", 11, "");
         Assert.Null(suggestion);
     }
 
     [Fact]
-    public async Task SuggestBinForFloatingPart_falls_back_to_floating_only_bin_when_no_truly_free()
+    public async Task SuggestBinForFloatingPart_picks_bin_with_floating_of_different_category()
     {
-        // Bug-Fix v0.1.19-beta.2 Stufe 3: keine wirklich freien Bins, aber
-        // ein Bin nur mit FloatingParts. Mix erlauben statt Stufe-4-Fallback.
-        // (Stufe 1 trifft nicht, weil das gesuchte Teil andere PartNo hat.)
+        // UX X.33 Block N (v0.1.19-beta.7): Bin mit anderem FloatingPart-Typ
+        // ist OK wenn die Brickognize-Kategorien unterschiedlich sind.
+        // Verschiedene Kategorien duerfen sich ein Bin teilen.
         await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
         var b1 = await _sut.GetByLabelAsync("Box 01");
         var b2 = await _sut.GetByLabelAsync("Box 02");
         await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Complete);
-        await SeedFloatingPartInBinAsync(b2!.Id, "9999", qty: 1, colorId: 99);
+        await SeedFloatingPartInBinAsync(b2!.Id, "9999", qty: 1, colorId: 99,
+            brickognizeCategory: "Minifigure, Hair");
 
-        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3024", 11);
+        // Neuer Part hat ANDERE Kategorie ("Minifigure, Head") - darf zu
+        // Box 02 weil Hair und Head verschiedene Kategorien sind.
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync(
+            "3024", 11, "Minifigure, Head");
 
         Assert.NotNull(suggestion);
-        // Box 02 hat zwar einen FloatingPart, aber keine Minifig - Stufe 3.
         Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForFloatingPart_skips_bin_with_floating_of_same_category()
+    {
+        // UX X.33 Block N: Default-Regel "max 1 PartId pro Kategorie pro Bin".
+        // Box 01 hat schon einen Helm-A. Helm-B (gleiche Kategorie, andere
+        // PartNo) kommt nicht ins gleiche Bin.
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedFloatingPartInBinAsync(b1!.Id, "2446", qty: 1, colorId: 5,
+            brickognizeCategory: "Minifigure, Headgear");
+
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync(
+            "193a2", 5, "Minifigure, Headgear");
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForFloatingPart_unknown_category_collides_with_other_unknown()
+    {
+        // UX X.33 Block N + Migration A: Bestand-FloatingParts haben
+        // BrickognizeCategory=null = "Unbekannt"-Pseudo-Kategorie. Ein
+        // neuer ungelabelter Part mit anderer PartNo kollidiert. Damit
+        // wird der Bestand-Stapel sauber gehalten und neue ungelabelte
+        // Items landen in eigenen Bins.
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedFloatingPartInBinAsync(b1!.Id, "9999", qty: 1, colorId: 99,
+            brickognizeCategory: null);
+
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync(
+            "3024", 11, "");
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForFloatingPart_user_mapping_overrides_default_rule()
+    {
+        // UX X.33 Block N: User-Mapping gewinnt ueber die Default-Regel.
+        // Box 01 hat Helm-A, neuer Helm-B wuerde via Default-Regel in Box 02
+        // gehen. Aber User hat "Minifigure, Headgear" -> Box 01 gemappt -
+        // also kommt Helm-B trotzdem in Box 01 (User-Wille gilt).
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedFloatingPartInBinAsync(b1!.Id, "2446", qty: 1, colorId: 5,
+            brickognizeCategory: "Minifigure, Headgear");
+
+        var userMapping = new Dictionary<string, int>
+        {
+            ["Minifigure, Headgear"] = b1.Id
+        };
+
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync(
+            "193a2", 5, "Minifigure, Headgear",
+            userMapping: userMapping);
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 01", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForFloatingPart_user_mapping_falls_through_when_bin_deleted()
+    {
+        // Mapping zeigt auf eine ungueltige Bin-Id (z.B. weil das Fach
+        // geloescht wurde). Service faellt auf Default-Regel zurueck.
+        await _sut.CreateBulkAsync(new[] { "Box 01" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+
+        var userMapping = new Dictionary<string, int>
+        {
+            ["Minifigure, Head"] = 9999 // existiert nicht
+        };
+
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync(
+            "3024", 11, "Minifigure, Head",
+            userMapping: userMapping);
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 01", suggestion!.Label);
     }
 
     // ===== Bug-Fix v0.1.19-beta.2: excludeMinifigId fuer DismantleWizard =====
@@ -506,7 +591,7 @@ public class StorageBinServiceTests : IDisposable
         var minifigId = await SeedMinifigInBinAsync(b1!.Id, "cty0685", TrackedMinifigStatus.Complete);
 
         var suggestion = await _sut.SuggestBinForFloatingPartAsync(
-            "3024", 11, excludeMinifigId: minifigId);
+            "3024", 11, "", excludeMinifigId: minifigId);
 
         Assert.NotNull(suggestion);
         Assert.Equal("Box 01", suggestion!.Label);
@@ -522,7 +607,7 @@ public class StorageBinServiceTests : IDisposable
         var b1 = await _sut.GetByLabelAsync("Box 01");
         await SeedMinifigInBinAsync(b1!.Id, "cty0685", TrackedMinifigStatus.Complete);
 
-        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3024", 11);
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3024", 11, "");
 
         Assert.NotNull(suggestion);
         Assert.Equal("Box 02", suggestion!.Label);
@@ -539,7 +624,7 @@ public class StorageBinServiceTests : IDisposable
         await SeedMinifigInBinAsync(b1!.Id, "fig2", TrackedMinifigStatus.Complete);
 
         var suggestion = await _sut.SuggestBinForFloatingPartAsync(
-            "3024", 11, excludeMinifigId: fig1);
+            "3024", 11, "", excludeMinifigId: fig1);
 
         Assert.NotNull(suggestion);
         Assert.Equal("Box 02", suggestion!.Label);
@@ -548,13 +633,16 @@ public class StorageBinServiceTests : IDisposable
     [Fact]
     public async Task SuggestBinForFloatingPart_different_color_gets_separate_bin()
     {
-        // 3001/Black liegt in Box 01. Wir scannen 3001/Red -> sollte ein
-        // anderes (sauberes) Bin bekommen, nicht in Box 01 gemischt werden.
+        // 3001/Black liegt in Box 01. Wir scannen 3001/Red -> Stapel-Match
+        // schlaegt fehl (verschiedene Farbe). Default-Regel: Box 01 hat
+        // schon einen FloatingPart mit gleicher Kategorie aber anderer
+        // PartId-Color-Kombination - kollidiert wenn Cat gleich. Mit
+        // beiden Cat="" gilt das. -> Box 02.
         await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
         var b1 = await _sut.GetByLabelAsync("Box 01");
         await SeedFloatingPartInBinAsync(b1!.Id, "3001", 3); // ColorId=0 (Black)
 
-        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3001", 5); // ColorId=5 (Red)
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync("3001", 5, ""); // ColorId=5 (Red)
 
         Assert.NotNull(suggestion);
         Assert.Equal("Box 02", suggestion!.Label);
@@ -776,7 +864,8 @@ public class StorageBinServiceTests : IDisposable
         return m.Id;
     }
 
-    private async Task SeedFloatingPartInBinAsync(int binId, string partNo, int qty, int colorId = 0)
+    private async Task SeedFloatingPartInBinAsync(int binId, string partNo, int qty,
+        int colorId = 0, string? brickognizeCategory = null)
     {
         await using var ctx = await _factory.CreateDbContextAsync();
         ctx.FloatingParts.Add(new FloatingPart
@@ -787,7 +876,8 @@ public class StorageBinServiceTests : IDisposable
             PartName = partNo,
             Quantity = qty,
             StorageBinId = binId,
-            AddedAt = DateTime.UtcNow
+            AddedAt = DateTime.UtcNow,
+            BrickognizeCategory = brickognizeCategory
         });
         await ctx.SaveChangesAsync();
     }

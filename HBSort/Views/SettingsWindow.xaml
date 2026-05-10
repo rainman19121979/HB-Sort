@@ -183,30 +183,10 @@
                                  Width="80" HorizontalAlignment="Left"
                                  ToolTip="Wieviele wartende Figuren duerfen sich ein Fach teilen? Default 3."/>
 
-                        <!-- UX X.32 v0.1.19-beta.4: Maximum Kategorien pro Lagerfach -->
-                        <TextBlock Text="Maximale Teile-Kategorien pro Lagerfach:"
-                                   FontWeight="SemiBold" Margin="0,12,0,4"/>
-                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
-                                   Margin="0,0,0,4">
-                            Bestimmt wie viele verschiedene BL-Kategorien (Kopf, Torso,
-                            Beine, Kopfbedeckung, ...) sich ein Lagerfach teilen duerfen.
-                            <LineBreak/>
-                            Default 999 = praktisch unbegrenztes Mischen, aber pro
-                            Kategorie immer nur EIN unique Item (z.B. Box 16 darf einen
-                            Kopf + eine Kopfbedeckung + Beine enthalten, aber kein
-                            zweiter Helm dazu).
-                            <LineBreak/>
-                            Bei 1 = strikte Trennung pro Kategorie (Koepfe in einem
-                            Fach, Torsos in einem anderen, kein Mix erlaubt).
-                            <LineBreak/>
-                            Gleiche Teile (gleiche Teilenummer UND Farbe) stapeln IMMER
-                            unabhaengig von diesem Limit.
-                            <LineBreak/>
-                            Min 1, Max 999.
-                        </TextBlock>
-                        <TextBox Text="{Binding MaxFloatingPartTypesPerBin, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                 Width="80" HorizontalAlignment="Left"
-                                 ToolTip="Wieviele verschiedene Kategorien duerfen sich ein Fach teilen? Default 999."/>
+                        <!-- UX X.33 v0.1.19-beta.7 Block M: Maximale Teile-Kategorien pro
+                             Lagerfach entfernt - die alte Heuristik wurde durch das user-
+                             pflegbare CategoryToBinMapping (Tab "Lagerfaecher" -> Sektion
+                             "Kategorien-Zuordnung") abgeloest. -->
 
                         <Separator/>
 
@@ -932,6 +912,80 @@
                                      IsIndeterminate="True"
                                      Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}"/>
                     </Grid>
+                </Grid>
+            </TabItem>
+
+            <!-- ============================================================ -->
+            <!-- TAB: KATEGORIEN (UX X.33 v0.1.19-beta.7 Block M)
+                 User-pflegbares Mapping einer Brickognize-Kategorie auf ein
+                 Lagerfach. Beim Einzelteil-Scan wird zuerst die Kategorie
+                 hier nachgeschlagen - bei Treffer landet das Teil im
+                 zugeordneten Fach (egal ob Stapel oder neu). Die Liste
+                 fuellt sich organisch durch's Scannen: jede neue
+                 Brickognize-Kategorie taucht hier auf, sobald sie zum
+                 ersten Mal erkannt wurde. -->
+            <!-- ============================================================ -->
+            <TabItem Header="Kategorien">
+                <Grid Margin="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                        <TextBlock Text="Kategorien-Zuordnung" FontSize="16" FontWeight="SemiBold"
+                                   Margin="0,0,0,8"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12">
+                            Hier ordnest du Brickognize-Kategorien manuell festen Lagerfaechern zu.
+                            Wenn du z.B. "Minifigure, Headgear" auf "Box21-3" setzt, landen ALLE
+                            Helme (egal welche Teile-Nummer, egal welche Farbe) in diesem Fach.
+                            <LineBreak/><LineBreak/>
+                            <Run FontWeight="SemiBold">Wenn du keine Zuordnung machst</Run>
+                            ("(kein Mapping)"), greift die Standard-Regel: HBSort sortiert maximal
+                            eine Teile-Nummer pro Brickognize-Kategorie in ein Lagerfach. Verschiedene
+                            Kategorien (z.B. Helm + Kopf + Hose) duerfen sich ein Fach teilen, aber
+                            nicht zwei verschiedene Helme.
+                            <LineBreak/><LineBreak/>
+                            <Run FontWeight="SemiBold">Hinweis:</Run>
+                            Stapel-Match (gleiche Teile-Nummer und Farbe) hat immer Vorrang -
+                            identische Teile sammeln sich automatisch im gleichen Fach,
+                            unabhaengig vom Mapping.
+                            <LineBreak/><LineBreak/>
+                            Die Liste zeigt alle Kategorien die HBSort bisher gesehen hat. Neue
+                            Kategorien tauchen hier auf nachdem du Teile dieser Kategorie gescannt
+                            hast.
+                        </TextBlock>
+                    </StackPanel>
+
+                    <DataGrid Grid.Row="1"
+                              ItemsSource="{Binding CategoryMappings}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              CanUserReorderColumns="False"
+                              IsReadOnly="False"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal"
+                              SelectionMode="Single"
+                              RowHeight="36">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Brickognize-Kategorie"
+                                                Binding="{Binding Category}"
+                                                Width="*"
+                                                IsReadOnly="True"/>
+                            <DataGridTemplateColumn Header="Lagerfach" Width="240">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <ComboBox ItemsSource="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=DataContext.CategoryMappingAvailableBins}"
+                                                  SelectedItem="{Binding SelectedBin, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  DisplayMemberPath="Label"
+                                                  IsEditable="False"
+                                                  ToolTip="Lagerfach fuer diese Brickognize-Kategorie. '(kein Mapping)' = Default-Regel greift."/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
                 </Grid>
             </TabItem>
 

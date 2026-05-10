@@ -49,7 +49,6 @@ public partial class MinifigSummaryDialog : Window
             Core.Models.TrackedMinifigStatus.Waiting    => "wartende",
             Core.Models.TrackedMinifigStatus.Complete   => "komplette",
             Core.Models.TrackedMinifigStatus.Dismantled => "zerlegte",
-            Core.Models.TrackedMinifigStatus.Sold       => "verkaufte",
             _                                            => string.Empty
         };
 
@@ -90,10 +89,15 @@ public partial class MinifigSummaryDialog : Window
         var imgProvider = App.Services.GetRequiredService<IPartImageProvider>();
         var catalog = App.Services.GetRequiredService<IBlCatalogService>();
         var partLookup = App.Services.GetRequiredService<IPartLookupService>();
+        var settings = App.Services.GetRequiredService<HBSort.Core.Services.ISettingsService>();
+        // UX X.33 v0.1.19-beta.7 Block M: Wizard nutzt das Category-Mapping
+        // ueber PartName-Praefix-Match (BL-Part-Name beginnt typischerweise
+        // mit dem Brickognize-Category-String).
+        var categoryMapping = App.Services.GetRequiredService<HBSort.Core.Services.ICategoryBinMappingService>();
 
         var wizardVm = new ViewModels.DismantleWizardViewModel(
             _viewModel.MinifigId, ctxFactory, binService, persistence,
-            imgProvider, catalog, partLookup);
+            imgProvider, catalog, partLookup, settings, categoryMapping);
         var wizard = new DismantleWizardDialog(wizardVm, notif) { Owner = this };
         if (wizard.ShowDialog() == true)
         {

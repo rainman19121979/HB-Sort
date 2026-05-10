@@ -91,7 +91,7 @@
                                         <StackPanel Grid.Column="4" VerticalAlignment="Center">
                                             <ComboBox ItemsSource="{Binding DataContext.AvailableBins,
                                                           RelativeSource={RelativeSource AncestorType=Window}}"
-                                                      SelectedItem="{Binding TargetBin, Mode=TwoWay}"
+                                                      SelectedItem="{Binding TargetBin, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                       DisplayMemberPath="Label"
                                                       IsEnabled="{Binding IsKept}"/>
                                             <TextBlock Text="{Binding SmartHint}"
@@ -99,6 +99,16 @@
                                                        Foreground="#2196F3"
                                                        Margin="0,2,0,0"
                                                        Visibility="{Binding HasSmartHint,
+                                                           Converter={StaticResource BoolToVisibility}}"/>
+                                            <!-- UX X.33 Block N: Volle-Faecher-Hinweis pro Teil
+                                                 wenn der Service kein passendes Bin liefern konnte.
+                                                 User muss manuell ein Fach in der Combobox waehlen
+                                                 (oder erst ein neues anlegen / Mapping setzen). -->
+                                            <TextBlock Text="Kein Fach frei - manuell waehlen"
+                                                       FontSize="10" FontStyle="Italic"
+                                                       Foreground="#E65100" FontWeight="SemiBold"
+                                                       Margin="0,2,0,0"
+                                                       Visibility="{Binding HasNoFreeBinWarning,
                                                            Converter={StaticResource BoolToVisibility}}"/>
                                         </StackPanel>
                                         <TextBlock Grid.Column="5"

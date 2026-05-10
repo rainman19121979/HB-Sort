@@ -389,7 +389,6 @@ public partial class InventoryListView : UserControl
                 {
                     StatusKind.Waiting  => "Wartende",
                     StatusKind.Complete => "Komplette",
-                    StatusKind.Sold     => "Verkaufte",
                     _                    => string.Empty
                 };
                 var msg = $"{statusLabel} Figur '{row.Description}' loeschen?\n\nStrg+Z macht die Aktion rueckgaengig.";
@@ -446,7 +445,6 @@ public partial class InventoryListView : UserControl
                 {
                     StatusKind.Waiting  => "Wartende",
                     StatusKind.Complete => "Komplette",
-                    StatusKind.Sold     => "Verkaufte",
                     _                    => string.Empty
                 };
                 var msg = $"{statusLabel} Figur '{row.Description}' wirklich loeschen?\n\n" +

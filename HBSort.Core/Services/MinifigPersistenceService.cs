@@ -24,12 +24,24 @@ namespace HBSort.Core.Services;
 public class MinifigPersistenceService : IMinifigPersistenceService
 {
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
+    private readonly ICategoryBinMappingService? _categoryMapping;
 
     public event EventHandler? DataChanged;
 
-    public MinifigPersistenceService(IDbContextFactory<UserDataContext> ctxFactory)
+    /// <summary>
+    /// Pre-Tag-Fix v0.1.19-beta.7: <paramref name="categoryMapping"/> ist
+    /// optional damit bestehende Tests den Service ohne den neuen Service
+    /// instanziieren koennen. Wenn null: BrickognizeCategory wird beim
+    /// Zerlegen auf "Unbekannt" gesetzt (Default-Regel-konform). Production
+    /// (DI) reicht den echten Service durch -> Heuristik ueber den PartName
+    /// findet typischerweise die Kategorie.
+    /// </summary>
+    public MinifigPersistenceService(
+        IDbContextFactory<UserDataContext> ctxFactory,
+        ICategoryBinMappingService? categoryMapping = null)
     {
         _ctxFactory = ctxFactory;
+        _categoryMapping = categoryMapping;
     }
 
     public void RaiseDataChanged() => DataChanged?.Invoke(this, EventArgs.Empty);
@@ -255,6 +267,13 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             }
             else
             {
+                // Pre-Tag-Fix v0.1.19-beta.7: BrickognizeCategory IMMER setzen
+                // (Heuristik via PartName-Praefix, Fallback "Unbekannt").
+                // Sonst greift die Default-Regel "max 1 PartId pro Kategorie
+                // pro Bin" nicht und gleichkategorische Teile (z.B. zwei
+                // verschiedene Koepfe) wuerden im selben Fach landen.
+                var derivedCategory = _categoryMapping?.DeriveCategoryFromPartName(part.PartName)
+                    ?? ICategoryBinMappingService.UnknownCategory;
                 ctx.FloatingParts.Add(new FloatingPart
                 {
                     PartNumber = part.PartNumber,
@@ -263,6 +282,7 @@ public class MinifigPersistenceService : IMinifigPersistenceService
                     PartName = part.PartName,
                     Quantity = qty,
                     StorageBinId = binId,
+                    BrickognizeCategory = derivedCategory,
                     AddedAt = now
                 });
             }

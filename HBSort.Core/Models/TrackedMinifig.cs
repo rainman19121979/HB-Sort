@@ -48,12 +48,14 @@ public class TrackedMinifig
 /// <summary>
 /// Die moeglichen Zustaende einer verfolgten Minifigur.
 /// WAITING = Teile werden gesammelt, COMPLETE = alle Teile da,
-/// DISMANTLED = wieder zerlegt, SOLD = verkauft.
+/// DISMANTLED = wieder zerlegt.
+/// UX X.33 v0.1.19-beta.7: SOLD-Status entfernt - der Workflow wurde
+/// nie eingebaut (siehe CLAUDE.md "Status=Sold wird nicht eingefuehrt -
+/// der BSX-Export uebernimmt die Uebergabe ans richtige Lagersystem").
 /// </summary>
 public enum TrackedMinifigStatus
 {
     Waiting,
     Complete,
-    Dismantled,
-    Sold
+    Dismantled
 }

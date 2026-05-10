@@ -252,6 +252,29 @@
                 </StackPanel>
 
                 <!--
+                    UX X.33 v0.1.19-beta.7 Block K: Warnung wenn alle Faecher
+                    belegt sind. Wird erst sichtbar wenn der Service keinen
+                    Vorschlag mehr liefert (NoFreeBinWarning != null). Klick
+                    auf den Button oeffnet die Fach-Verwaltung in den Settings.
+                -->
+                <Border Background="#FFF4E5" BorderBrush="#E65100"
+                        BorderThickness="1" CornerRadius="4" Padding="10"
+                        Margin="0,0,0,8"
+                        Visibility="{Binding HasNoFreeBinWarning, Converter={StaticResource BoolToVisibility}}">
+                    <DockPanel>
+                        <Button Content="Lagerfach-Verwaltung oeffnen"
+                                DockPanel.Dock="Right"
+                                Click="OpenBinManagement_Click"
+                                MinHeight="30" Padding="10,4"
+                                Margin="8,0,0,0"
+                                ToolTip="Oeffnet die Einstellungen mit dem Lagerfach-Tab. Dort neues Fach anlegen oder bestehendes leeren."/>
+                        <TextBlock Text="{Binding NoFreeBinWarning}"
+                                   TextWrapping="Wrap" VerticalAlignment="Center"
+                                   FontWeight="SemiBold" Foreground="#E65100"/>
+                    </DockPanel>
+                </Border>
+
+                <!--
                     UX X.20 Teil 4 + Bug-Fix v0.1.19-beta.3: Lagerfach-Bereich
                     prominenter. Buttons mit kurzen Texten ("Verwerfen" /
                     "Zerlegen" / "Speichern") damit alles wieder in eine Zeile

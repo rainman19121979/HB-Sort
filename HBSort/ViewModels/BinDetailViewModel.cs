@@ -167,7 +167,6 @@ public partial class TrackedMinifigSummaryViewModel : ObservableObject
             TrackedMinifigStatus.Waiting => "WAITING",
             TrackedMinifigStatus.Complete => "COMPLETE",
             TrackedMinifigStatus.Dismantled => "DISMANTLED",
-            TrackedMinifigStatus.Sold => "SOLD",
             _ => m.Status.ToString().ToUpperInvariant()
         };
         TotalParts = m.RequiredParts.Count;

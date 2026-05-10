@@ -133,6 +133,17 @@ public partial class PartLookupViewModel : ObservableObject
     [ObservableProperty]
     private bool _isBusy;
 
+    /// <summary>
+    /// UX X.33 v0.1.19-beta.7 Block K: Warnung wenn alle Lagerfaecher belegt
+    /// sind und der Service-Suggest keinen passenden Vorschlag mehr liefert.
+    /// Null = kein Warnhinweis, sonst der anzuzeigende Text.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNoFreeBinWarning))]
+    private string? _noFreeBinWarning;
+
+    public bool HasNoFreeBinWarning => !string.IsNullOrEmpty(NoFreeBinWarning);
+
     public bool HasWaitingMatches => WaitingMatches.Count > 0;
 
     public string ColorDisplayLabel
@@ -140,10 +151,19 @@ public partial class PartLookupViewModel : ObservableObject
 
     public Brush SwatchBrush => ParseRgbBrush(ColorRgb);
 
-    public PartLookupViewModel(string blPartNo, int blColorId)
+    /// <summary>
+    /// UX X.33 v0.1.19-beta.7 Block M: Brickognize-Kategorie des erkannten
+    /// Teils (z.B. "Minifigure, Head"). Wird vom CategoryBinMappingService
+    /// als Default-Bin-Lookup-Schluessel genutzt. Null wenn der Brickognize-
+    /// Treffer keine Kategorie geliefert hat.
+    /// </summary>
+    public string? BrickognizeCategory { get; init; }
+
+    public PartLookupViewModel(string blPartNo, int blColorId, string? brickognizeCategory = null)
     {
         BlPartNo = blPartNo;
         _blColorId = blColorId;
+        BrickognizeCategory = brickognizeCategory;
     }
 
     /// <summary>Befuellt die Felder aus einem PartLookupResult.</summary>

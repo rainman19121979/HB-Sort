@@ -68,33 +68,28 @@ wartende Figuren pro Lagerfach**.
 
 Wirkt nur auf den Default-Vorschlag - manuell bleibst du frei.
 
-### Maximale Teile-Kategorien pro Lagerfach (ab v0.1.19-beta.4)
+### Kategorien-Mapping (Tab "Kategorien", ab v0.1.19-beta.7)
 
-Bestimmt wie viele verschiedene **Teile-Kategorien** (Kopf, Torso,
-Beine, Kopfbedeckung, ...) sich ein Lagerfach teilen duerfen.
-Default: **999** (praktisch unbegrenztes Mischen).
+Hier ordnest du **Brickognize-Kategorien** (z.B. "Minifigure, Head",
+"Minifigure, Headgear") manuell festen Lagerfaechern zu. Wenn du z.B.
+"Minifigure, Headgear" auf "Box21-3" setzt, landen ALLE Helme in diesem
+Fach - egal welche Teile-Nummer, egal welche Farbe.
 
-Egal welcher Wert hier steht, gilt IMMER: **pro Kategorie nur EIN
-unique Item pro Fach**. Beispiel:
+**Wenn du keine Zuordnung machst** ("(kein Mapping)" im Dropdown):
+greift die Standard-Regel - **maximal eine Teile-Nummer pro Brickognize-
+Kategorie pro Lagerfach**. Verschiedene Kategorien (Helm + Kopf + Hose)
+duerfen sich ein Fach teilen, zwei verschiedene Helme nicht.
 
-- Box 16 hat einen Helm und einen Kopf: weitere Helme oder Koepfe
-  gehen automatisch in andere Faecher (gleiche Kategorie schon belegt).
-- Box 16 darf zusaetzlich Beine bekommen (andere Kategorie, ist
-  noch nicht drin).
+> **Stapel-Match wins immer:** identische Teile (gleiche Teile-Nummer
+> und Farbe) sammeln sich automatisch im gleichen Fach, unabhaengig vom
+> Mapping. Mehrfaches Scannen vom gleichen Brick landet als Stapel im
+> selben Bin.
 
-Spezialfall:
+Die Liste zeigt alle Kategorien die HBSort bisher gesehen hat - sie
+fuellt sich organisch beim Scannen. Neue Kategorien tauchen auf, sobald
+du das erste Teil dieser Kategorie scannst.
 
-- **1** = strikte Trennung. Koepfe in einem Fach, Torsos in einem
-  anderen, kein Mix erlaubt.
-- **999** (Default) = unbegrenztes Mischen verschiedener Kategorien
-  in einem Fach, aber nicht doppelt.
-
-Wo: **Einstellungen > Erkennung > Sortier-Workflow > Maximale
-Teile-Kategorien pro Lagerfach**.
-
-> Wichtig: **gleiche Teile** (gleiche Teile-Nummer UND Farbe) stapeln
-> IMMER im selben Fach - unabhaengig von diesem Limit. Mehrfaches
-> Scannen vom gleichen Brick landet als Stapel im selben Bin.
+Wo: **Einstellungen > Kategorien**.
 
 ### Hotkeys
 

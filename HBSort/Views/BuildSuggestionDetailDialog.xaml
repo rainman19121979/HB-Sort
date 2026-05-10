@@ -22,8 +22,9 @@
             <RowDefinition Height="Auto"/>  <!-- 0: Header (Bild + Name) -->
             <RowDefinition Height="Auto"/>  <!-- 1: Verfuegbarkeits-Hint -->
             <RowDefinition Height="*"/>     <!-- 2: Teile-Liste -->
-            <RowDefinition Height="Auto"/>  <!-- 3: Bin-Auswahl + Notizen -->
-            <RowDefinition Height="Auto"/>  <!-- 4: Buttons -->
+            <RowDefinition Height="Auto"/>  <!-- 3: Volle-Faecher-Banner (O.5) -->
+            <RowDefinition Height="Auto"/>  <!-- 4: Bin-Auswahl + Notizen -->
+            <RowDefinition Height="Auto"/>  <!-- 5: Buttons -->
         </Grid.RowDefinitions>
 
         <!-- Header: Bild links, Titel + Meta rechts -->
@@ -105,8 +106,34 @@
             </ScrollViewer>
         </Border>
 
+        <!--
+            UX X.33 v0.1.19-beta.7 Block O.5 (Pre-Tag): Volle-Faecher-
+            Warnung. Sichtbar wenn der Suggest-Service kein Fach
+            findet (NoFreeBinWarning != null). Klick auf den Button
+            schliesst den Dialog (DialogResult=false) und oeffnet die
+            Settings - User kann dort ein neues Fach anlegen oder eines
+            leeren und den Bauvorschlag erneut anwaehlen.
+        -->
+        <Border Grid.Row="3"
+                Background="#FFF4E5" BorderBrush="#E65100"
+                BorderThickness="1" CornerRadius="4" Padding="10"
+                Margin="0,12,0,0"
+                Visibility="{Binding HasNoFreeBinWarning, Converter={StaticResource BoolToVisibility}}">
+            <DockPanel>
+                <Button Content="Lagerfach-Verwaltung oeffnen"
+                        DockPanel.Dock="Right"
+                        Click="OpenBinManagement_Click"
+                        MinHeight="30" Padding="10,4"
+                        Margin="8,0,0,0"
+                        ToolTip="Schliesst diesen Dialog und oeffnet die Einstellungen mit dem Lagerfach-Tab. Dort neues Fach anlegen oder bestehendes leeren, dann Bauvorschlag erneut anwaehlen."/>
+                <TextBlock Text="{Binding NoFreeBinWarning}"
+                           TextWrapping="Wrap" VerticalAlignment="Center"
+                           FontWeight="SemiBold" Foreground="#E65100"/>
+            </DockPanel>
+        </Border>
+
         <!-- Bin-Auswahl + Notizen -->
-        <Grid Grid.Row="3" Margin="0,12,0,0">
+        <Grid Grid.Row="4" Margin="0,12,0,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -135,7 +162,7 @@
         </Grid>
 
         <!-- Buttons -->
-        <StackPanel Grid.Row="4" Orientation="Horizontal"
+        <StackPanel Grid.Row="5" Orientation="Horizontal"
                     HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button Content="Abbrechen" IsCancel="True"
                     Width="100" Margin="0,0,8,0"

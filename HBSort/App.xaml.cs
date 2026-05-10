@@ -120,6 +120,12 @@ public partial class App : Application
             // Idempotent - mehrfaches Aufrufen ist safe.
             await DataHealAsync();
 
+            // 6.51 BrickognizeCategory-Backfill (Pre-Tag-Fix v0.1.19-beta.7):
+            // Bestand-FloatingParts (vor Migration A oder via Zerlege-Pfaden mit
+            // null-Bug) bekommen ihre Kategorie via Heuristik nachgereicht.
+            // Idempotent - macht nur Eintraege mit null/empty an.
+            await BackfillBrickognizeCategoriesAsync();
+
             // 6.55 Auto-Backup (UX X.29): wenn aktiviert + Intervall faellig,
             // im Hintergrund ein Backup erzeugen + alte aufraeumen. Fire-and-
             // forget - blockiert NICHT den Startup. Task.Run-Wrapping wegen
@@ -272,6 +278,9 @@ public partial class App : Application
         // Phase 4: Lagerfach-Verwaltung + Minifig-Persistenz mit Reverse-Match
         services.AddSingleton<IStorageBinService, StorageBinService>();
         services.AddSingleton<IMinifigPersistenceService, MinifigPersistenceService>();
+
+        // UX X.33 v0.1.19-beta.7 Block M: Brickognize-Category -> Bin Mapping.
+        services.AddSingleton<ICategoryBinMappingService, CategoryBinMappingService>();
 
         // UX X.28: Daten-Heal beim App-Start (Bug-B-Folgen automatisch korrigieren).
         services.AddSingleton<IDataHealService, DataHealService>();
@@ -470,6 +479,54 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log.Warning(ex, "DataHeal geworfen");
+        }
+    }
+
+    /// <summary>
+    /// Pre-Tag-Fix v0.1.19-beta.7: Backfill-Migration fuer FloatingPart.
+    /// BrickognizeCategory. Bestand vor Block-N-Migration A hat die Spalte
+    /// auf null - Default-Regel "max 1 PartId pro Kategorie pro Bin" wuerde
+    /// alle ungelabelten Eintraege als Pseudo-Kategorie "Unbekannt" werten,
+    /// aber ein Backfill macht den Settings-Tab "Kategorien" und
+    /// Konflikt-Diagnose praeziser.
+    ///
+    /// Idempotent: bearbeitet nur Zeilen mit null/empty Kategorie. Heuristik
+    /// findet meist eine echte Kategorie ("Minifigure, Head ..." ->
+    /// "Minifigure, Head"); Edge-Cases wie "Hips and Legs Plain" bleiben
+    /// auf "Unbekannt".
+    /// </summary>
+    private static async Task BackfillBrickognizeCategoriesAsync()
+    {
+        try
+        {
+            using var scope = Services.CreateScope();
+            var ctx = scope.ServiceProvider.GetRequiredService<UserDataContext>();
+            var categoryMapping = scope.ServiceProvider.GetRequiredService<ICategoryBinMappingService>();
+
+            // Track-Query damit wir die Spalte direkt aendern koennen.
+            var withoutCategory = await ctx.FloatingParts
+                .Where(fp => fp.BrickognizeCategory == null || fp.BrickognizeCategory == "")
+                .ToListAsync();
+            if (withoutCategory.Count == 0) return;
+
+            int derivedCount = 0;
+            int unknownCount = 0;
+            foreach (var fp in withoutCategory)
+            {
+                var derived = categoryMapping.DeriveCategoryFromPartName(fp.PartName);
+                fp.BrickognizeCategory = derived;
+                if (derived == ICategoryBinMappingService.UnknownCategory) unknownCount++;
+                else derivedCount++;
+            }
+
+            await ctx.SaveChangesAsync();
+            Log.Information(
+                "BrickognizeCategory-Backfill: {Total} FloatingParts bearbeitet ({Derived} per Heuristik, {Unknown} 'Unbekannt')",
+                withoutCategory.Count, derivedCount, unknownCount);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "BrickognizeCategory-Backfill geworfen");
         }
     }
 

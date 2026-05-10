@@ -50,7 +50,31 @@ public partial class MinifigDetailView : UserControl
     {
         var vm = GetScanViewModel();
         if (vm == null) return;
+        // UX X.33 v0.1.19-beta.7 Block K: ohne ausgewaehltes Fach nicht
+        // speichern. Die Warnung im UI hat den User schon informiert.
+        if (vm.PendingMinifig?.SelectedBin == null)
+        {
+            var dialogs = App.Services.GetRequiredService<IDialogService>();
+            await dialogs.ShowInfoAsync(
+                "Kein Lagerfach ausgewaehlt",
+                "Bitte zuerst ein Lagerfach auswaehlen oder ueber die Lagerfach-Verwaltung ein neues anlegen.");
+            return;
+        }
         await vm.PersistPendingAsync();
+    }
+
+    /// <summary>
+    /// UX X.33 v0.1.19-beta.7 Block K: oeffnet den Settings-Dialog.
+    /// User waehlt dort den Lagerfaecher-Tab und legt manuell ein neues
+    /// Fach an oder leert ein bestehendes.
+    /// </summary>
+    private void OpenBinManagement_Click(object sender, RoutedEventArgs e)
+    {
+        var window = Window.GetWindow(this);
+        if (window?.DataContext is MainViewModel main)
+        {
+            main.OpenSettings();
+        }
     }
 
     /// <summary>
@@ -96,11 +120,16 @@ public partial class MinifigDetailView : UserControl
         var imgProvider = App.Services.GetRequiredService<IPartImageProvider>();
         var catalog = App.Services.GetRequiredService<IBlCatalogService>();
         var partLookup = App.Services.GetRequiredService<IPartLookupService>();
+        var settings = App.Services.GetRequiredService<HBSort.Core.Services.ISettingsService>();
+        // UX X.33 v0.1.19-beta.7 Block M: Category-Mapping auch im Pending-
+        // Mode-Wizard - PartName-Praefix-Match liefert pro Teil das gemappte
+        // Bin (sonst Default-Pfad).
+        var categoryMapping = App.Services.GetRequiredService<HBSort.Core.Services.ICategoryBinMappingService>();
 
         var wizardVm = new DismantleWizardViewModel(
             trackedMinifigId: 0,
             ctxFactory, binService, persistence,
-            imgProvider, catalog, partLookup);
+            imgProvider, catalog, partLookup, settings, categoryMapping);
 
         try
         {

@@ -94,10 +94,12 @@ public partial class CollectMinifigSelectionViewModel : ObservableObject
 
                 var suggested = await _binService.SuggestBinForWaitingMinifigAsync(
                     maxWaitingLimit, ct);
+                // UX X.33 v0.1.19-beta.7 Block K: kein FirstOrDefault-Fallback
+                // mehr - User soll bewusst ein Fach in der Combobox waehlen
+                // wenn der Service keinen Vorschlag mehr liefert.
                 SelectedBin = suggested != null
                     ? AvailableBins.FirstOrDefault(b => b.Id == suggested.Id)
-                      ?? AvailableBins.FirstOrDefault()
-                    : AvailableBins.FirstOrDefault();
+                    : null;
             }
 
             var item = await _catalog.GetMinifigDetailsAsync(blMinifigId, ct);

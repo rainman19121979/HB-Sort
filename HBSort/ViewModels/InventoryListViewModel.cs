@@ -152,7 +152,6 @@ public partial class InventoryListViewModel : ObservableObject
         var c = SelectedCompletes.Count();
         var f = SelectedFloatings.Count();
         var w = Items.Count(r => r.IsSelected && r.Status == StatusKind.Waiting);
-        Log.Debug("[SELECTION] RecalculateSelection: completes={C}, floatings={F}, waiting={W}", c, f, w);
         SelectedExportableCount = c + f;
         SelectedTotalCount = c + f + w;
         // Counter-Text: bei Mismatch (= Wartende mit drin) wird "(Y exportierbar)"
@@ -302,11 +301,9 @@ public partial class InventoryListViewModel : ObservableObject
             if (FilterByBin == null) FilterByBin = AllBinsSentinel;
 
             // Alle Figuren (Waiting + Complete; Dismantled gibt's dank Cleanup nicht mehr).
-            // UX X.29 Block C (v0.1.16): Sold raus - UX-X.6-Konvention sieht
-            // keinen Sold-Workflow vor, der Status taucht in der Praxis nicht
-            // auf. Falls historische Sold-Eintraege existieren, werden sie
-            // jetzt aus der Lagerliste-Anzeige ausgeblendet (DB-Eintraege
-            // bleiben unveraendert).
+            // UX X.33 v0.1.19-beta.7: Sold-Status komplett aus dem System raus
+            // (UX-X.6-Konvention sieht keinen Sold-Workflow vor; in der DB
+            // existierten in der Praxis nie Sold-Eintraege).
             var allMinifigs = await ctx.TrackedMinifigs.AsNoTracking()
                 .Where(m => m.Status == TrackedMinifigStatus.Waiting
                          || m.Status == TrackedMinifigStatus.Complete)
@@ -428,7 +425,6 @@ public partial class InventoryRowItem : ObservableObject
         StatusKind.Complete => "Alle Teile vorhanden. Du kannst die Figur via BSX exportieren.",
         StatusKind.Waiting  => "Mindestens ein Teil fehlt noch. Sammle weiter.",
         StatusKind.Floating => "Loses Einzelteil im Pool. Wird beim Reverse-Match automatisch aufgegriffen.",
-        StatusKind.Sold     => "Bereits verkauft.",
         _ => string.Empty
     };
 
@@ -478,11 +474,6 @@ public partial class InventoryRowItem : ObservableObject
     /// </summary>
     partial void OnIsSelectedChanged(bool value)
     {
-        // Debug-Level - im Standard-Log nicht sichtbar, bei Diagnose-Bedarf
-        // einschaltbar (Settings -> Allgemein -> Logging-Level).
-        Serilog.Log.Debug(
-            "[SELECTION] Row toggled: ItemId={ItemId}, Status={Status}, IsSelected={Value}",
-            ItemId, Status, value);
         SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -491,7 +482,6 @@ public partial class InventoryRowItem : ObservableObject
         var status = m.Status switch
         {
             TrackedMinifigStatus.Complete => StatusKind.Complete,
-            TrackedMinifigStatus.Sold     => StatusKind.Sold,
             _                              => StatusKind.Waiting
         };
         var (icon, label, brush) = StatusVisuals(status);
@@ -554,7 +544,6 @@ public partial class InventoryRowItem : ObservableObject
         StatusKind.Complete => ("OK",  "Komplett",   FreezeBrush(Color.FromRgb(76, 175, 80))),
         StatusKind.Waiting  => ("...", "Wartend",    FreezeBrush(Color.FromRgb(255, 167, 38))),
         StatusKind.Floating => ("[T]", "Einzelteil", FreezeBrush(Color.FromRgb(33, 150, 243))),
-        StatusKind.Sold     => ("$",   "Verkauft",   FreezeBrush(Color.FromRgb(156, 39, 176))),
         _                   => ("?",   "?",           Brushes.Gray)
     };
 
@@ -584,4 +573,5 @@ public partial class InventoryRowItem : ObservableObject
 }
 
 public enum InventoryItemType { Minifig, FloatingPart }
-public enum StatusKind { Complete, Waiting, Floating, Sold }
+// UX X.33 v0.1.19-beta.7: StatusKind.Sold entfernt - Sold-Workflow gibt's nicht.
+public enum StatusKind { Complete, Waiting, Floating }

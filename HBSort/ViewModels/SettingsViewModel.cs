@@ -38,6 +38,35 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>Tab "Lagerfaecher" - eigenes ViewModel mit Liste + Commands.</summary>
     public BinManagerViewModel BinManager { get; }
 
+    /// <summary>
+    /// UX X.33 v0.1.19-beta.7 Block M: User-pflegbares Mapping einer
+    /// Brickognize-Kategorie auf ein Lagerfach. Wird im Tab "Kategorien"
+    /// als ListView angezeigt - bisher gesehene Kategorien aus dem
+    /// Setting werden hier mit einem Bin-Dropdown angereichert.
+    /// </summary>
+    public ObservableCollection<CategoryMappingRow> CategoryMappings { get; } = new();
+
+    /// <summary>
+    /// Bin-Liste fuers Combobox-Binding pro Mapping-Zeile. Wird beim Laden
+    /// einmal befuellt: erstes Element ist ein Sentinel-Bin
+    /// (<see cref="CategoryMappingNoneSentinel"/>) der die "(kein Mapping)"-
+    /// Auswahl darstellt. Save-Pfad behandelt den Sentinel speziell und
+    /// entfernt das Mapping-Dict-Entry.
+    /// </summary>
+    public ObservableCollection<StorageBin> CategoryMappingAvailableBins { get; } = new();
+
+    /// <summary>
+    /// UX X.33 Block N (v0.1.19-beta.7) Mini-Fix: Sentinel-Bin der die
+    /// "(kein Mapping)"-Auswahl in der Kategorien-Tab-ComboBox repraesentiert.
+    /// Id=0 (existiert nicht in DB), Label = "(kein Mapping)". WPF-ComboBox
+    /// haendelt null-Items unsauber - Sentinel-Object ist robuster.
+    /// </summary>
+    public static readonly StorageBin CategoryMappingNoneSentinel = new()
+    {
+        Id = 0,
+        Label = "(kein Mapping)"
+    };
+
     // --- Kamera ---
 
     /// <summary>Liste der verfuegbaren Kameras</summary>
@@ -126,8 +155,9 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _cacheLimitText = string.Empty;
 
-    [ObservableProperty]
-    private string _priceToolUrl = string.Empty;
+    // UX X.33 v0.1.19-beta.7: _priceToolUrl entfernt - die Property war
+    // nirgends im UI gebunden und das zugehoerige AppSettings.PriceToolUrl
+    // ist mit dieser Iteration ebenfalls weggefallen.
 
     // === Phase R1: BrickLink-API ===
 
@@ -345,9 +375,8 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private int _maxWaitingFiguresPerBin;
 
-    // --- UX X.32 v0.1.19-beta.4: Maximum Kategorien pro Lagerfach ---
-    [ObservableProperty]
-    private int _maxFloatingPartTypesPerBin;
+    // UX X.33 v0.1.19-beta.7 Block M: _maxFloatingPartTypesPerBin entfernt -
+    // wurde durch das CategoryToBinMapping abgeloest.
 
     // --- UX X.29 (v0.1.16): Backup-Tab ---
 
@@ -409,6 +438,8 @@ public partial class SettingsViewModel : ObservableObject
     private System.Windows.Media.Brush _updateCheckStatusBrush =
         System.Windows.Media.Brushes.Gray;
 
+    private readonly IStorageBinService _binService;
+
     public SettingsViewModel(
         ISettingsService settingsService,
         ICameraService cameraService,
@@ -424,7 +455,8 @@ public partial class SettingsViewModel : ObservableObject
         IBlPriceCacheService priceCache,
         ITooltipsService tooltips,
         IUpdateService updateService,
-        IBackupService backupService)
+        IBackupService backupService,
+        IStorageBinService binService)
     {
         _settingsService = settingsService;
         _cameraService = cameraService;
@@ -440,6 +472,7 @@ public partial class SettingsViewModel : ObservableObject
         _priceCache = priceCache;
         _updateService = updateService;
         _backupService = backupService;
+        _binService = binService;
         BinManager = binManager;
 
         // Vorhandene BL-Tokens beim Oeffnen der Settings laden, damit der User
@@ -513,7 +546,8 @@ public partial class SettingsViewModel : ObservableObject
         DefaultPartsCollected = s.DefaultPartsCollected;
         MaxCompleteFiguresPerBin = s.MaxCompleteFiguresPerBin;
         MaxWaitingFiguresPerBin = s.MaxWaitingFiguresPerBin;
-        MaxFloatingPartTypesPerBin = s.MaxFloatingPartTypesPerBin;
+        // UX X.33 v0.1.19-beta.7 Block M: MaxFloatingPartTypesPerBin entfernt -
+        // wurde durch das CategoryToBinMapping abgeloest.
         ShowTooltips = s.ShowTooltips;
         AutoCheckForUpdates = s.AutoCheckForUpdates;
         AutoBlImport = s.AutoBlImport;
@@ -530,7 +564,6 @@ public partial class SettingsViewModel : ObservableObject
         PreferBricklinkImages = s.ImageCache.PreferBricklinkImages;
         PreloadOnMinifigScan = s.ImageCache.PreloadOnMinifigScan;
         ImageCacheLimitMb = s.ImageCache.LimitMb;
-        PriceToolUrl = s.PriceToolUrl;
         BsxExportFolder = s.BsxExportFolder ?? string.Empty;
 
         // Phase 8: Preise-Tab
@@ -546,7 +579,6 @@ public partial class SettingsViewModel : ObservableObject
         // aus den zwei dedizierten Minifig/Part-Feldern.
         PriceCacheTtlMinifigDays       = s.Prices.BlPriceCacheTtlMinifigDays;
         PriceCacheTtlPartDays          = s.Prices.BlPriceCacheTtlPartDays;
-        PriceAutoLoadOnComplete        = s.Prices.AutoLoadOnComplete;
         PriceAutoLoadCompletePrice     = s.Prices.AutoLoadCompletePrice;
         PriceAutoLoadPartsPrice        = s.Prices.AutoLoadPartsPrice;
 
@@ -571,7 +603,7 @@ public partial class SettingsViewModel : ObservableObject
         // ins Endlos-Fallback laufen laesst.
         s.MaxCompleteFiguresPerBin = Math.Clamp(MaxCompleteFiguresPerBin <= 0 ? 5 : MaxCompleteFiguresPerBin, 1, 999);
         s.MaxWaitingFiguresPerBin  = Math.Clamp(MaxWaitingFiguresPerBin  <= 0 ? 3 : MaxWaitingFiguresPerBin, 1, 999);
-        s.MaxFloatingPartTypesPerBin = Math.Clamp(MaxFloatingPartTypesPerBin <= 0 ? 999 : MaxFloatingPartTypesPerBin, 1, 999);
+        // UX X.33 v0.1.19-beta.7 Block M: MaxFloatingPartTypesPerBin entfernt.
         s.ShowTooltips = ShowTooltips;
         s.AutoCheckForUpdates = AutoCheckForUpdates;
         s.AutoBlImport = AutoBlImport;
@@ -598,12 +630,59 @@ public partial class SettingsViewModel : ObservableObject
         // Audit W-8: kein CacheDays-Schreiben mehr - Property entfernt.
         s.Prices.BlPriceCacheTtlMinifigDays = Math.Max(1, PriceCacheTtlMinifigDays);
         s.Prices.BlPriceCacheTtlPartDays    = Math.Max(1, PriceCacheTtlPartDays);
-        s.Prices.AutoLoadOnComplete        = PriceAutoLoadOnComplete; // DEPRECATED-Schreiben weiter, fuer Backwards-Compat
         s.Prices.AutoLoadCompletePrice     = PriceAutoLoadCompletePrice;
         s.Prices.AutoLoadPartsPrice        = PriceAutoLoadPartsPrice;
 
+        // UX X.33 v0.1.19-beta.7 Block N Mini-Fix: Mapping-Rows zurueck ins
+        // Dict. Sentinel-Eintrag "(kein Mapping)" hat Id=0 - Save-Pfad
+        // schreibt nur echte Bins (Id > 0); Sentinel-Auswahl entfernt den
+        // Eintrag (clear() macht das schon implizit, der foreach-Add
+        // ueberspringt den Sentinel).
+        s.CategoryToBinMapping.Clear();
+        foreach (var row in CategoryMappings)
+        {
+            if (row.SelectedBin != null && row.SelectedBin.Id > 0)
+                s.CategoryToBinMapping[row.Category] = row.SelectedBin.Id;
+        }
+
         await _settingsService.SaveAsync();
         Log.Information("Einstellungen gespeichert");
+    }
+
+    /// <summary>
+    /// UX X.33 v0.1.19-beta.7 Block M: Befuellt CategoryMappings + verfuegbare
+    /// Bins fuer den Tab. Wird beim Settings-Dialog-Open einmalig gerufen
+    /// (nach LoadFromSettings) und bei Bin-Aenderungen erneut. Behandelt
+    /// fehlende Bins (geloeschte IDs) durch Fallback auf null.
+    /// </summary>
+    public async Task ReloadCategoryMappingsAsync()
+    {
+        var bins = await _binService.GetAllAsync();
+
+        // UX X.33 Block N Mini-Fix: Sentinel-Eintrag "(kein Mapping)" als
+        // erstes Combobox-Item. Damit kann der User ein bestehendes Mapping
+        // entfernen, indem er den Sentinel waehlt. Save-Pfad erkennt den
+        // Sentinel an Id=0 und entfernt den Dict-Entry.
+        CategoryMappingAvailableBins.Clear();
+        CategoryMappingAvailableBins.Add(CategoryMappingNoneSentinel);
+        foreach (var b in bins) CategoryMappingAvailableBins.Add(b);
+
+        var s = _settingsService.Current;
+        CategoryMappings.Clear();
+        foreach (var category in s.SeenBrickognizeCategories.OrderBy(c => c, StringComparer.OrdinalIgnoreCase))
+        {
+            // Bei fehlendem Mapping (oder Mapping auf geloeschtes Bin) wird
+            // der Sentinel als SelectedBin gesetzt - sonst zeigt die ComboBox
+            // ein leeres Feld und der User koennte den Sentinel nicht aktiv
+            // waehlen weil er identisch zum Default-Zustand waere.
+            StorageBin selected = CategoryMappingNoneSentinel;
+            if (s.CategoryToBinMapping.TryGetValue(category, out var binId))
+            {
+                var match = bins.FirstOrDefault(b => b.Id == binId);
+                if (match != null) selected = match;
+            }
+            CategoryMappings.Add(new CategoryMappingRow(category, selected));
+        }
     }
 
     // ========================================================================
@@ -1132,7 +1211,9 @@ public partial class SettingsViewModel : ObservableObject
 
     // Audit W-8 (2026-05-04): _priceCacheDays-Field entfernt; siehe
     // _priceCacheTtlMinifigDays / _priceCacheTtlPartDays unten.
-    [ObservableProperty] private bool _priceAutoLoadOnComplete = true; // DEPRECATED, siehe AutoLoadCompletePrice
+    // UX X.33 v0.1.19-beta.7: _priceAutoLoadOnComplete entfernt - hat
+    // den DEPRECATED PriceSettings.AutoLoadOnComplete bedient, der ist
+    // mit dieser Iteration ebenfalls weggefallen.
 
     // UX#12: getrennte TTLs fuer Stale-While-Revalidate.
     [ObservableProperty] private int _priceCacheTtlMinifigDays = 90;
@@ -1339,6 +1420,25 @@ public partial class SettingsViewModel : ObservableObject
         return (bytes / (1024.0 * 1024.0)).ToString("F2") + " MB";
     }
 
+}
+
+/// <summary>
+/// UX X.33 v0.1.19-beta.7 Block M: Eine Zeile im Kategorien-Tab. Kapselt
+/// einen Brickognize-Kategorie-String (z.B. "Minifigure, Head") plus das
+/// gemappte Bin (oder null = "kein Mapping"). UI-bindbar.
+/// </summary>
+public partial class CategoryMappingRow : ObservableObject
+{
+    public string Category { get; }
+
+    [ObservableProperty]
+    private StorageBin? _selectedBin;
+
+    public CategoryMappingRow(string category, StorageBin? selectedBin)
+    {
+        Category = category;
+        _selectedBin = selectedBin;
+    }
 }
 
 /// <summary>

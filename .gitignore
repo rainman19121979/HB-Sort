@@ -156,6 +156,16 @@ coverage/
 *.swp
 
 # ============================================
+# Diagnose-Files (UX X.33 v0.1.19-beta.7):
+# Praxis-Test-Anleitungen die einmalig waehrend einer Bug-Diagnose
+# geschrieben werden und danach geloescht werden sollen, aber nicht
+# ins Repo gehoeren.
+# ============================================
+*_DIAGNOSE_*.md
+*_PRAXIS_TEST.md
+*_TESTANLEITUNG.md
+
+# ============================================
 # OS
 # ============================================
 Thumbs.db

@@ -134,22 +134,36 @@ public partial class MainWindow : Window
             return;
         }
 
-        // UX X.31 Block B (v0.1.18): Enter = "In Fach legen" fuer eine Pending-
-        // Figur. Spart den Mausklick auf den Persist-Button beim Sortieren
-        // vieler Figuren. Nur im Sortier-Tab + nicht in Eingabefeldern;
-        // CanPersist-Check verhindert ungueltige Aufrufe (kein Lagerfach
-        // gewaehlt, gerade am Speichern, etc.).
+        // UX X.31 Block B (v0.1.18) / UX X.33 Block M Erweiterung: Enter =
+        // "In Fach legen" fuer Pending-Minifig ODER "Lagern" fuer Pending-
+        // Part (Einzelteil). Spart den Mausklick beim Sortieren vieler
+        // Items. Nur im Sortier-Tab + nicht in Eingabefeldern.
         if (e.Key == Key.Enter || e.Key == Key.Return)
         {
             if (IsTextInputFocused()) return;
             if (!_viewModel.IsMainTabSorting) return;
-            var pending = scanVm?.PendingMinifig;
-            if (pending == null || !pending.CanPersist) return;
-            var cmd = scanVm!.PersistPendingCommand;
-            if (cmd.CanExecute(null))
+
+            var pendingMinifig = scanVm?.PendingMinifig;
+            if (pendingMinifig != null && pendingMinifig.CanPersist)
             {
-                cmd.Execute(null);
+                var cmd = scanVm!.PersistPendingCommand;
+                if (cmd.CanExecute(null))
+                {
+                    cmd.Execute(null);
+                    e.Handled = true;
+                }
+                return;
+            }
+
+            // UX X.33 v0.1.19-beta.7 Block M: Pending-Part-Pfad. Enter
+            // ruft StoreFloatingFromPendingPartAsync - inkl. Auto-Mapping
+            // und Anweisungs-Popup wie der Click-Handler.
+            var pendingPart = scanVm?.PendingPart;
+            if (pendingPart != null && !pendingPart.IsBusy && pendingPart.SelectedFloatingBin != null)
+            {
+                _ = scanVm!.StoreFloatingFromPendingPartAsync();
                 e.Handled = true;
+                return;
             }
             return;
         }

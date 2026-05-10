@@ -49,34 +49,37 @@ public interface IStorageBinService
     Task<StorageBin?> SuggestBinForCompleteMinifigAsync(int maxCompleteLimit, CancellationToken ct = default);
 
     /// <summary>
-    /// UX X.31 (v0.1.18) / Bug-Fix v0.1.19-beta.2 / UX X.32 v0.1.19-beta.4:
-    /// Schlaegt ein Fach fuer ein Einzelteil vor. Mehrstufiger Fallback:
-    ///   1) Bin in dem das gleiche Teil (PartNo + ColorId) schon liegt
-    ///      (FIFO nach AddedAt). Stapel wachsen lassen.
-    ///   2) Bei <paramref name="maxCategoriesPerBin"/> &gt; 1: Bin mit
-    ///      bestehenden FloatingParts deren Kategorie-Set die neue
-    ///      Kategorie noch nicht enthaelt UND unter Limit ist. Sortierung
-    ///      vollstes Fach zuerst.
-    ///   3) Wirklich freies Fach (keine Minifigs, keine FloatingParts).
-    ///   4) Fach OHNE Complete-/Waiting-Minifigs (FloatingParts erlaubt).
-    ///   5) Letzter Fallback: irgendein Fach, sortiert nach am wenigsten
-    ///      belegt. Liefert immer einen Vorschlag wenn Bins existieren.
+    /// UX X.31 (v0.1.18) / UX X.33 v0.1.19-beta.7 Block N:
+    /// Schlaegt ein Fach fuer ein Einzelteil vor. Reihenfolge:
+    ///   1) Stapel-Match: Bin mit gleicher PartNo+ColorId (FIFO nach AddedAt).
+    ///      Hat IMMER Vorrang - Stapel wachsen weiter.
+    ///   2) User-Mapping: wenn <paramref name="userMapping"/> die Kategorie
+    ///      einem Bin zugeordnet hat, gewinnt das (auch ueber Default-Regel).
+    ///   3) Default-Regel: erstes Bin OHNE Minifigs (ausser excluded) UND
+    ///      OHNE einen FloatingPart der gleichen Brickognize-Kategorie aber
+    ///      anderer PartNo. Verschiedene Kategorien duerfen sich teilen,
+    ///      gleiche Kategorie mit anderer PartNo nicht.
+    ///   4) Sonst null - Aufrufer zeigt Volle-Faecher-Banner.
     ///
-    /// <paramref name="excludeMinifigId"/>: Fach einer Figur die durch
-    /// den Aufrufer-Pfad gleich verschwindet (z.B. zu zerlegende Figur)
-    /// zaehlt als frei.
+    /// <paramref name="brickognizeCategory"/>: Kategorie des neuen Teils.
+    /// Leer/null wird wie Pseudo-Kategorie "Unbekannt" behandelt - kollidiert
+    /// in der Default-Regel mit anderen ungelabelten Items unterschiedlicher
+    /// PartNo. Wichtig damit Migration A (Bestand mit Category=null) sich
+    /// stabil verhaelt.
     ///
-    /// <paramref name="maxCategoriesPerBin"/> (Default 1, Backwards-Compat):
-    /// strikte Trennung. Bei &gt; 1: bis zu N verschiedene BL-Kategorien
-    /// duerfen sich ein Fach teilen. Greift nur wenn <see cref="StorageBinService"/>
-    /// mit einem <see cref="IBlCacheRepository"/> konstruiert wurde - sonst
-    /// wird Stufe 2 uebersprungen.
+    /// <paramref name="excludeMinifigId"/>: Fach einer Figur die durch den
+    /// Aufrufer-Pfad gleich verschwindet (z.B. zu zerlegende Figur) zaehlt
+    /// als frei.
+    ///
+    /// <paramref name="userMapping"/>: optional. Aufrufer reicht typisch
+    /// <see cref="AppSettings.CategoryToBinMapping"/> durch. Null = kein
+    /// User-Mapping greift, nur Stapel + Default-Regel.
     /// </summary>
     Task<StorageBin?> SuggestBinForFloatingPartAsync(
         string blPartNo, int blColorId,
+        string brickognizeCategory,
         int? excludeMinifigId = null,
-        int maxCategoriesPerBin = 1,
-        string? partName = null,
+        Dictionary<string, int>? userMapping = null,
         CancellationToken ct = default);
 
     Task<StorageBin> CreateSingleAsync(string label, string? notes = null, CancellationToken ct = default);
@@ -148,12 +151,13 @@ public interface IStorageBinService
 /// <summary>
 /// UX X.29 Block C (v0.1.16): Vorab-Info fuer den "Fach leeren"-Workflow.
 /// </summary>
+// UX X.33 v0.1.19-beta.7: SoldMinifigsCount entfernt - der Sold-Status
+// existiert nicht mehr (toter Code seit Anfang an, siehe TrackedMinifig.cs).
 public record BinEmptyPreview(
     int BinId,
     string Label,
     int WaitingMinifigsCount,
     int CompleteMinifigsCount,
-    int SoldMinifigsCount,
     int FloatingPartsCount);
 
 /// <summary>Daten-Struktur fuer den BinDetailDialog.</summary>

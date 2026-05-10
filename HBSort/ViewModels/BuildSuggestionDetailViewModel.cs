@@ -52,6 +52,19 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CanCreate))]
     private bool _isCreating;
 
+    /// <summary>
+    /// UX X.33 v0.1.19-beta.7 Block O.5 (Pre-Tag): Volle-Faecher-Banner-Text.
+    /// Wird in <see cref="LoadAsync"/> gesetzt wenn der Suggest-Service kein
+    /// passendes Fach findet. Der Dialog rendert ueber dem Bin-Dropdown einen
+    /// orangen Banner mit "Lagerfach-Verwaltung oeffnen"-Button. Konsistent
+    /// zum Block-K-Muster aus PendingMinifigViewModel + PartLookupViewModel.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNoFreeBinWarning))]
+    private string? _noFreeBinWarning;
+
+    public bool HasNoFreeBinWarning => !string.IsNullOrEmpty(NoFreeBinWarning);
+
     /// <summary>Gesamt-Anzahl benoetigter Teile (nur fuer Header-Anzeige).</summary>
     public int TotalQuantityNeeded => Parts.Sum(p => p.QuantityNeeded);
 
@@ -178,16 +191,49 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
 
         // UX X.31 (v0.1.18) + UX X.32 v0.1.19-beta.4: Default-Auswahl aus
         // Suggest-Service holen, damit Faecher mit Complete-Figuren NICHT
-        // als "frei" vorgeschlagen werden (UX-X.6-Konvention). Limit
-        // MaxWaitingFiguresPerBin via App.Services - der ViewModel-
-        // Konstruktor hat keinen ISettingsService, ist aber innerhalb der
-        // App-DI sicher erreichbar.
+        // als "frei" vorgeschlagen werden (UX-X.6-Konvention).
+        //
+        // UX X.33 v0.1.19-beta.7 Block L: wenn schon alle Required-Parts
+        // im Floating-Pool liegen, wird die Figur durch den Reverse-Match
+        // SOFORT Complete - dann muss der Default-Bin auch nach Complete-
+        // Logik (MaxCompleteFiguresPerBin) gewaehlt werden. Sonst landet die
+        // Figur in einem Fach mit anderen Wartenden. Limits via App.Services -
+        // der ViewModel-Konstruktor hat keinen ISettingsService, ist aber
+        // innerhalb der App-DI sicher erreichbar.
         var settings = App.Services.GetRequiredService<HBSort.Core.Services.ISettingsService>();
-        var maxWaiting = settings.Current.MaxWaitingFiguresPerBin;
-        var suggested = await binService.SuggestBinForWaitingMinifigAsync(maxWaiting);
-        SelectedBin = suggested != null
-            ? AvailableBins.FirstOrDefault(b => b.Id == suggested.Id) ?? AvailableBins.FirstOrDefault()
-            : AvailableBins.FirstOrDefault();
+        var willBeComplete = Parts.Count > 0 && Parts.All(p => p.IsFullyAvailable);
+        StorageBin? suggested;
+        if (willBeComplete)
+        {
+            var maxComplete = settings.Current.MaxCompleteFiguresPerBin;
+            suggested = await binService.SuggestBinForCompleteMinifigAsync(maxComplete);
+        }
+        else
+        {
+            var maxWaiting = settings.Current.MaxWaitingFiguresPerBin;
+            suggested = await binService.SuggestBinForWaitingMinifigAsync(maxWaiting);
+        }
+        // UX X.33 v0.1.19-beta.7 Block K: bei null vom Service NICHT mehr
+        // auf AvailableBins.FirstOrDefault fallback - User soll bewusst
+        // ein Fach aus der Combobox waehlen oder erst ein neues anlegen.
+        // Dialog-Button "Figur anlegen" ist via CanCreate disabled solange
+        // SelectedBin null bleibt.
+        //
+        // UX X.33 v0.1.19-beta.7 Block O.5 (Pre-Tag): zusaetzlich Volle-
+        // Faecher-Banner setzen damit der User SIEHT warum kein Vorschlag
+        // kommt. Vorher leeres Dropdown ohne Erklaerung.
+        if (suggested != null)
+        {
+            SelectedBin = AvailableBins.FirstOrDefault(b => b.Id == suggested.Id);
+            NoFreeBinWarning = null;
+        }
+        else
+        {
+            SelectedBin = null;
+            NoFreeBinWarning = AvailableBins.Count == 0
+                ? "Es gibt noch keine Lagerfaecher. Lege zuerst eines an."
+                : "Alle Lagerfaecher sind belegt. Bitte ein neues Fach anlegen oder ein bestehendes leeren.";
+        }
 
         // 7) Bild im Hintergrund laden falls noch nicht da
         if (string.IsNullOrEmpty(ImageUrl))

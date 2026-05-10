@@ -201,7 +201,9 @@ public class PartLookupService : IPartLookupService
 
     public async Task<FloatingPart> AddPartToFloatingAsync(
         string blPartNo, int blColorId, string partName, string colorName,
-        int quantity, int storageBinId, CancellationToken ct = default)
+        int quantity, int storageBinId,
+        string? brickognizeCategory = null,
+        CancellationToken ct = default)
     {
         if (quantity <= 0) throw new ArgumentException("Quantity muss > 0 sein", nameof(quantity));
 
@@ -229,6 +231,12 @@ public class PartLookupService : IPartLookupService
         if (existing != null)
         {
             existing.Quantity += quantity;
+            // UX X.33 Block N: BrickognizeCategory nur befuellen wenn vorher
+            // leer war - Stapel-Match darf eine bestehende Kategorie nicht
+            // ueberschreiben (Brickognize kann pro Scan abweichende Werte
+            // liefern, der Bestand gilt).
+            if (string.IsNullOrEmpty(existing.BrickognizeCategory) && !string.IsNullOrWhiteSpace(brickognizeCategory))
+                existing.BrickognizeCategory = brickognizeCategory;
             result = existing;
         }
         else
@@ -241,7 +249,8 @@ public class PartLookupService : IPartLookupService
                 PartName = partName,
                 Quantity = quantity,
                 StorageBinId = storageBinId,
-                AddedAt = DateTime.UtcNow
+                AddedAt = DateTime.UtcNow,
+                BrickognizeCategory = string.IsNullOrWhiteSpace(brickognizeCategory) ? null : brickognizeCategory
             };
             ctx.FloatingParts.Add(result);
         }

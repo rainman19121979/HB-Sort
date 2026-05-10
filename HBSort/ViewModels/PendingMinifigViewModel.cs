@@ -135,6 +135,17 @@ public partial class PendingMinifigViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CanPersist))]
     private StorageBin? _selectedBin;
 
+    /// <summary>
+    /// UX X.33 v0.1.19-beta.7 Block K: Warnung wenn alle Lagerfaecher belegt
+    /// sind und der Service-Suggest keinen passenden Vorschlag mehr liefert.
+    /// Null = kein Warnhinweis, sonst der anzuzeigende Text.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNoFreeBinWarning))]
+    private string? _noFreeBinWarning;
+
+    public bool HasNoFreeBinWarning => !string.IsNullOrEmpty(NoFreeBinWarning);
+
     /// <summary>Optionale User-Notiz (z.B. "Helm fehlt original").</summary>
     [ObservableProperty]
     private string _userNotes = string.Empty;

@@ -33,7 +33,16 @@ public partial class SettingsWindow : Window
         }
 
         // Phase 6: Statistik-Daten initial laden (best-effort, blockt nicht).
-        Loaded += async (_, _) => await _viewModel.LoadStatsAsync();
+        // UX X.33 v0.1.19-beta.7 Block M: Category-Mappings ebenfalls einmalig
+        // beim Oeffnen laden (best-effort, fail-silent).
+        Loaded += async (_, _) =>
+        {
+            try { await _viewModel.LoadStatsAsync(); }
+            catch (System.Exception ex) { Log.Debug(ex, "LoadStatsAsync fehlgeschlagen"); }
+
+            try { await _viewModel.ReloadCategoryMappingsAsync(); }
+            catch (System.Exception ex) { Log.Debug(ex, "ReloadCategoryMappingsAsync fehlgeschlagen"); }
+        };
     }
 
     /// <summary>Speichern-Button: Settings uebernehmen und Fenster schliessen</summary>

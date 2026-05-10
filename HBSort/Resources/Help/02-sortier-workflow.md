@@ -71,11 +71,15 @@ Der Vorschlag wechselt **live waehrend du Teile markierst**: alle Teile
 da -> Complete-Fach, fehlt mindestens eins -> Wartend-Fach. Du musst
 nichts manuell umschalten.
 
-> **Tipp (ab v0.1.19-beta.4):** Du kannst auch konfigurieren wie viele
-> wartende Figuren sich ein Fach teilen duerfen (Default 3) und ob
-> verschiedene Teile-Kategorien (Kopf, Torso, Beine, ...) zusammen
-> gelagert werden duerfen (Default 1 = strikte Trennung). Siehe
+> **Tipp (ab v0.1.19-beta.4):** Du kannst konfigurieren wie viele
+> wartende Figuren sich ein Fach teilen duerfen (Default 3) und wie viele
+> komplette Figuren pro Fach gestapelt werden (Default 5). Siehe
 > **Einstellungen > Erkennung > Sortier-Workflow**.
+>
+> **Einzelteile** sortiert HBSort nach **Brickognize-Kategorie** (z.B.
+> "Minifigure, Head"): pro Kategorie nur eine Teile-Nummer pro Fach.
+> Du kannst Kategorien auch fest auf bestimmte Faecher mappen unter
+> **Einstellungen > Kategorien**.
 
 ### Auswahl-Dialog "Figur anlegen" (ab v0.1.19-beta.4)
 

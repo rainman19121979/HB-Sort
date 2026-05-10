@@ -64,20 +64,34 @@ public class AppSettings
     /// </summary>
     public int MaxWaitingFiguresPerBin { get; set; } = 3;
 
+    // UX X.33 v0.1.19-beta.7 Block M: MaxFloatingPartTypesPerBin entfernt -
+    // wurde durch das CategoryToBinMapping (siehe unten) abgeloest. Mapping
+    // ist deterministisch, deshalb braucht es keine Mix-Limit-Heuristik mehr.
+    // Alte settings.json mit "maxFloatingPartTypesPerBin"-Eintrag wird von
+    // System.Text.Json ignoriert.
+
     /// <summary>
-    /// UX X.32 v0.1.19-beta.4: Maximale Anzahl verschiedener BL-Kategorien
-    /// (Head, Torso, Legs, Headgear etc.) pro Lagerfach.
+    /// UX X.33 v0.1.19-beta.7 Block M: User-pflegbares Mapping einer
+    /// Brickognize-Kategorie (z.B. "Minifigure, Head") auf ein bestimmtes
+    /// Lagerfach (BinId). Beim Einzelteil-Scan wird die von Brickognize
+    /// gelieferte Kategorie hier nachgeschlagen - bei Treffer ist das Bin
+    /// das Default. Bei keinem Treffer faellt der Pfad auf den Suggest-
+    /// Service zurueck.
     ///
-    /// Default 999 = praktisch unbegrenztes Mischen. ABER: pro Kategorie
-    /// landet immer nur EIN unique Item im Fach - bei einem zweiten
-    /// Helm (gleiche Kategorie, andere PartNo) wird ein anderes Fach
-    /// vorgeschlagen. Gleiche Teile (PartNo+ColorId) stapeln IMMER
-    /// unabhaengig vom Limit.
-    ///
-    /// Bei 1 = strikte Trennung pro Kategorie pro Fach (Koepfe in einem,
-    /// Torsos in einem anderen, kein Mix).
+    /// Der Key ist der unveraenderte Brickognize-String (z.B.
+    /// "Minifigure, Head" oder "Minifigure, Torso Assembly, Decor.").
+    /// Settings-UI sammelt bisher gesehene Strings via
+    /// <see cref="SeenBrickognizeCategories"/> und bietet sie als Liste an.
     /// </summary>
-    public int MaxFloatingPartTypesPerBin { get; set; } = 999;
+    public Dictionary<string, int> CategoryToBinMapping { get; set; } = new();
+
+    /// <summary>
+    /// UX X.33 v0.1.19-beta.7 Block M: Liste der Brickognize-Kategorien,
+    /// die im Lauf der Zeit beim Scannen gesehen wurden. Wird beim Settings-
+    /// Dialog als Vorlage angeboten (User mappt jeden Eintrag auf ein Bin).
+    /// Wird beim Scannen automatisch gepflegt - kein manuelles Eintragen.
+    /// </summary>
+    public List<string> SeenBrickognizeCategories { get; set; } = new();
 
     /// <summary>
     /// UX-Iteration X.9: Tooltips global an/ausschalten. Der TooltipsService
@@ -103,17 +117,12 @@ public class AppSettings
     /// <summary>Wie oft Minifigur-Bilder aus dem Cache refreshed werden (in Tagen)</summary>
     public int ImageCacheRefreshDays { get; set; } = 30;
 
-    /// <summary>
-    /// UI-Darstellungsdichte (DEPRECATED ab UX-Iteration X.11, 2026-05-04).
-    /// Frueher: "Compact" / "Normal" / "Comfortable". Jetzt sind die
-    /// Compact-Werte fest in den Views verdrahtet. Feld bleibt aus
-    /// Backwards-Compat in der settings.json - wird nirgends mehr
-    /// gelesen. Kann in einer spaeteren Iteration entfernt werden.
-    /// </summary>
-    public string UiDensity { get; set; } = "Compact";
-
-    /// <summary>URL zum BrickLink-Preis-Tool (Phase 8+, leer = nicht konfiguriert)</summary>
-    public string PriceToolUrl { get; set; } = string.Empty;
+    // UX X.33 v0.1.19-beta.7: UiDensity (DEPRECATED seit UX X.11) entfernt -
+    // alte settings.json mit "uiDensity"-Eintrag wird von System.Text.Json
+    // ignoriert.
+    // UX X.33 v0.1.19-beta.7: PriceToolUrl (Phase-8-Stub, nie produktiv
+    // genutzt) entfernt - das Feld wurde nirgends im UI gebunden und nicht
+    // zurueckgeschrieben. Alte settings.json wird beim Laden ignoriert.
 
     /// <summary>Zeitpunkt des letzten Update-Checks (max. 1x pro Tag)</summary>
     public DateTime? LastUpdateCheck { get; set; }
@@ -258,15 +267,10 @@ public class WindowState
     /// </summary>
     public double SplitterColumnRatio2 { get; set; } = 1.0 / 3.0;
 
-    /// <summary>Anteil der oberen Zeile am 2x2-Layout (0..1). Default 0.6.</summary>
-    /// <remarks>
-    /// DEPRECATED ab UX X.19 Teil 3b: das alte 2x2-Layout hatte EIN
-    /// gemeinsames oben/unten-Verhaeltnis. Jetzt hat jede der drei Spalten
-    /// ihr eigenes (siehe Column1HorizontalSplitterRatio etc.). Wird beim
-    /// Laden ignoriert; alte settings.json laedt trotzdem sauber, weil
-    /// System.Text.Json unbekannte oder ueberzaehlige Properties uebergeht.
-    /// </remarks>
-    public double SplitterRowRatio { get; set; } = 0.6;
+    // UX X.33 v0.1.19-beta.7: SplitterRowRatio (DEPRECATED seit UX X.19
+    // Teil 3b - altes 2x2-Layout) entfernt. Pro-Spalten-Verhaeltnisse
+    // leben in Column[1-3]HorizontalSplitterRatio. Alte settings.json
+    // mit "splitterRowRatio"-Eintrag wird von System.Text.Json ignoriert.
 
     /// <summary>
     /// UX X.19 Teil 3b: Anteil der oberen Box (Webcam) in Spalte 1.

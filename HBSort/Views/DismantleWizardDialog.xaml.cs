@@ -61,16 +61,30 @@ public partial class DismantleWizardDialog : Window
 
     private async void Confirm_Click(object sender, RoutedEventArgs e)
     {
-        // Validierung pro Teil:
-        //  - PutInBin-Mode + IsKept=true -> TargetBin muss gesetzt sein
-        //  - AssignToWaiting-Mode + IsKept=true -> SelectedMatch muss gesetzt sein
-        var missingBin = _viewModel.Parts.FirstOrDefault(p =>
-            p.IsKept && p.IsPutInBinMode && p.TargetBin == null);
-        if (missingBin != null)
+        // UX X.33 Block N (v0.1.19-beta.7): Pre-flight-Check fuer fehlende
+        // Bins (Volle-Faecher-Konvention). Wenn ein oder mehrere Teile mit
+        // PutInBin-Mode kein Ziel-Fach haben - blocking Dialog statt
+        // einzelner ShowWarning. Listet alle betroffenen Teile auf.
+        var partsWithoutBin = _viewModel.GetPartsWithoutTargetBin();
+        if (partsWithoutBin.Count > 0)
         {
-            _notifications.ShowWarning($"Teil '{missingBin.PartName}': bitte ein Ziel-Fach waehlen.");
+            var dialogs = App.Services.GetRequiredService<IDialogService>();
+            var nameList = string.Join("\n  - ",
+                partsWithoutBin.Take(5)
+                    .Concat(partsWithoutBin.Count > 5
+                        ? new[] { $"... und {partsWithoutBin.Count - 5} weitere" }
+                        : Array.Empty<string>()));
+            await dialogs.ShowInfoAsync(
+                "Lagerfaecher fehlen",
+                $"Fuer folgende Teile ist kein passendes Lagerfach frei:\n  - {nameList}\n\n" +
+                "Bitte ein neues Fach anlegen, ein bestehendes leeren oder im Settings-Tab " +
+                "'Kategorien' ein Mapping setzen. Anschliessend den Wizard erneut oeffnen.");
             return;
         }
+
+        // Pro-Teil-Validierung fuer den AssignToWaiting-Pfad bleibt - dort
+        // ist es eine andere User-Aktion (bewusste Match-Auswahl), nicht
+        // ein Default-Fach-Vorschlag.
         var missingMatch = _viewModel.Parts.FirstOrDefault(p =>
             p.IsKept && p.IsAssignToWaitingMode && p.SelectedMatch == null);
         if (missingMatch != null)

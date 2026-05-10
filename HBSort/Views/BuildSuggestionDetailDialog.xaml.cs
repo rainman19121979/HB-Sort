@@ -145,6 +145,28 @@ public partial class BuildSuggestionDetailDialog : Window
     }
 
     /// <summary>
+    /// UX X.33 v0.1.19-beta.7 Block O.5 (Pre-Tag): schliesst diesen modalen
+    /// Dialog (DialogResult=false, kein Datenverlust - User hat noch nichts
+    /// angelegt) und oeffnet die Settings ueber das MainWindow. Konsistent
+    /// zum OpenBinManagement-Pattern in MinifigDetailView/PartLookupView,
+    /// aber mit vorherigem Close weil hier ein modaler Dialog ueber dem
+    /// MainWindow liegt - Settings-Dialog kann sonst nicht ohne Konflikt
+    /// erscheinen. User waehlt den Bauvorschlag nach dem Settings-Schliessen
+    /// einfach erneut aus dem "Was kann ich bauen?"-Tab.
+    /// </summary>
+    private void OpenBinManagement_Click(object sender, RoutedEventArgs e)
+    {
+        var owner = Owner;
+        DialogResult = false;
+        Close();
+
+        if (owner?.DataContext is HBSort.ViewModels.MainViewModel main)
+        {
+            main.OpenSettings();
+        }
+    }
+
+    /// <summary>
     /// UX X.32 v0.1.19-beta.6: pro konsumiertem FloatingPart das Teil-Bild
     /// via IPartImageProvider laden + auf das BinInstructionItem.ImageUrl
     /// setzen. Items sind ObservableObjects - das Overlay refreshed seine

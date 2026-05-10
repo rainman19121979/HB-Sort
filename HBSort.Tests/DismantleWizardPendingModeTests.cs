@@ -231,11 +231,14 @@ public class DismantleWizardPendingModeTests : IDisposable
     // ====================================================================
 
     [Fact]
-    public async Task LoadFromPending_distributes_fresh_parts_across_different_bins()
+    public async Task LoadFromPending_without_mapping_uses_truly_free_default()
     {
-        // Bug-Repro: User scannt Owen Grady mit 4 verschiedenen Teilen, KEIN
-        // bestehender Stapel. Vor dem Fix bekamen alle 4 das gleiche "Box 01".
-        // Nach dem Fix: jedes Teil ein eigenes Fach.
+        // UX X.33 v0.1.19-beta.7 Block M: ohne Category-Mapping (Test-Setup
+        // hat keinen ICategoryBinMappingService) und ohne bestehende Stapel
+        // landen alle Teile im selben truly-free-Default-Bin. Der frueher
+        // gewuenschte "verteile auf 4 verschiedene Bins"-Pfad war Block-C
+        // aus beta.6 und wurde mit dem Mapping ueberfluessig - das User-
+        // Mapping ist die richtige Stelle fuer "Beine ins Beine-Fach".
         await _binService.CreateBulkAsync(new[] { "Box 01", "Box 02", "Box 03", "Box 04" });
 
         var pending = MakePending();
@@ -247,10 +250,9 @@ public class DismantleWizardPendingModeTests : IDisposable
         var wizard = MakeWizard(0);
         await wizard.LoadFromPendingAsync(pending);
 
-        // 4 Teile, 4 verschiedene Bins.
-        var distinctBins = wizard.Parts.Select(p => p.TargetBin?.Id).Distinct().Count();
         Assert.Equal(4, wizard.Parts.Count);
-        Assert.Equal(4, distinctBins);
+        // Alle Teile landen im ersten truly-free Bin (Box 01, sortiert nach Label).
+        Assert.All(wizard.Parts, p => Assert.Equal("Box 01", p.TargetBin?.Label));
     }
 
     [Fact]

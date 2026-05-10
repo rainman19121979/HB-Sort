@@ -33,6 +33,19 @@ public class FloatingPart
     public DateTime AddedAt { get; set; }
 
     /// <summary>
+    /// UX X.33 Block N (v0.1.19-beta.7): Brickognize-Kategorie des Teils
+    /// (z.B. "Minifigure, Head"). Wird beim Scan vom Brickognize-Endpoint
+    /// geliefert; beim Zerlegen aus PartName-Heuristik abgeleitet
+    /// (BlPartCategoryHeuristic.DeriveBrickognizeCategoryFromPartName).
+    ///
+    /// Treibt die Default-Regel "max 1 PartId pro Kategorie pro Bin" in
+    /// IStorageBinService.SuggestBinForFloatingPartAsync. Null/leer =
+    /// "Unbekannt"-Kategorie - Default-Regel behandelt alle ungemappten
+    /// Bestands-Teile (Migration A) als eigene Pseudo-Kategorie.
+    /// </summary>
+    public string? BrickognizeCategory { get; set; }
+
+    /// <summary>
     /// Optional: aus welcher Figur stammt dieses Teil? Wird vom DismantleWizard
     /// gesetzt wenn der User eine Figur "aufgibt" und Teile in den Floating-Pool
     /// uebernimmt. Erlaubt es, Teile in der Lagerliste als "aus zerlegter Figur X"
