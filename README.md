@@ -323,10 +323,20 @@ Daten zentral.
 HB-Sort steht unter der **GNU General Public License v3.0** - siehe
 [LICENSE](LICENSE).
 
+## Roadmap
+
+Die geplanten Features fuer die naechsten Iterationen, der Stand der
+aktuellen Version und das langfristige Backlog stehen in
+[BACKLOG.md](BACKLOG.md). Items sind nach Iteration gruppiert und mit
+Status-Markern (geplant / in-arbeit / erledigt) versehen.
+
 ## Mitwirken
 
 Issues und Pull Requests willkommen. Vor groesseren Aenderungen bitte
 ein Issue eroeffnen, damit wir Richtung und Scope abstimmen koennen.
+Vor neuen Features lohnt ein Blick ins [BACKLOG.md](BACKLOG.md) - dort
+steht meist schon ob das Thema geplant ist oder warum es ggf. bewusst
+zurueckgestellt wurde.
 
 ## Entwicklungs-Hinweis
 
