@@ -11,8 +11,9 @@
 | `Esc` | Modal-Dialog / Bild-Vergroesserung schliessen |
 | `Strg + S` | Sortieren-Tab aktivieren |
 | `Strg + L` | Lagerliste-Tab aktivieren |
-| `Strg + H` | Hilfe-Tab aktivieren |
+| `Strg + H` | Verlauf-Tab aktivieren (Hilfe ist auf F1) |
 | `Strg + ,` | Einstellungen oeffnen |
+| `Strg + B` | Backup jetzt erstellen |
 | `Strg + Q` | App beenden (gleicher Pfad wie der Beenden-Button im Header) |
 | `Alt + F4` | Windows-Standard: beendet die App. Identisch zu Strg+Q und dem Header-Beenden-Button. |
 
@@ -21,10 +22,14 @@
 > Eingabefeldern (Suchfeld, Mengen-Feld, Notizen) bleibt die Leertaste
 > ein normales Leerzeichen.
 
-> **Bewusst weggelassen** (siehe CLAUDE.md UX X.20 Teil 6):
-> Zifferntasten 1/2/3 fuer Top-Treffer, +/- fuer Anzahl-Felder,
-> Pfeiltasten/Pos1/Ende, Entf-Taste fuer Loeschen. Die kollidieren
-> alle mit Standard-WPF-Verhalten in Eingabefeldern und DataGrids.
+> **Brickognize-Vorschlaege uebernehmen** (ab v0.1.17): Die Tasten
+> 1, 2 oder 3 uebernehmen den entsprechenden Treffer aus den Top-3-
+> Karten unter dem Webcam-Bild. In Eingabe-Feldern bleibt die Taste
+> ein normales Zeichen.
+>
+> Bewusst NICHT belegt (Konflikt mit Standard-WPF in TextBoxen/Lists):
+> +/- fuer Anzahl-Felder, Pfeiltasten/Pos1/Ende, Entf-Taste in
+> Lagerlisten.
 
 ## Lagerliste effizient nutzen
 

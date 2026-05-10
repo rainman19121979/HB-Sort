@@ -1,9 +1,25 @@
 # Einstellungen
 
 Du erreichst die Einstellungen ueber das **Zahnrad-Icon** oben rechts
-in der Header-Leiste. Sie sind in Tabs gegliedert.
+in der Header-Leiste (oder via **Strg + ,**). Sie sind seit v0.1.19
+in folgende Tabs gegliedert:
 
-## Allgemein
+1. Erkennung
+2. Darstellung
+3. BrickLink (mit Sektionen *API-Zugang*, *API-Nutzung*, *Preise*, *Catalog-Daten*)
+4. Lagerfaecher
+5. Kategorien
+6. Cache
+7. Export
+8. Statistik
+9. Backups
+10. Updates
+11. Hotkeys
+12. Info
+
+## Erkennung
+
+Alles was mit dem Brickognize-Scan zu tun hat.
 
 - **Kamera-Index** - waehlt die richtige USB-Webcam, falls mehrere
   am PC haengen.
@@ -17,8 +33,6 @@ in der Header-Leiste. Sie sind in Tabs gegliedert.
 - **Scan-Cooldown** - Pause zwischen zwei Scans, verhindert
   Doppelscans (Default 1000 ms).
 - **Sound-Effekte** - akustisches Feedback (Default aus).
-- **Tooltips anzeigen** - blendet alle Tooltips aus, falls sie dich
-  stoeren. Default an.
 
 ### Sortier-Workflow (ab v0.1.16)
 
@@ -43,16 +57,7 @@ duerfen. Default: **5**.
 - **5** (Default) = praktischer Kompromiss.
 - **999** = praktisch unbegrenzt zusammenpacken.
 
-Wo: **Einstellungen > Erkennung > Sortier-Workflow > Maximale
-Complete-Figuren pro Lagerfach**.
-
-Der Wert wirkt nur auf den **Lagerfach-Vorschlag**: HB-Sort sucht ein
-Fach mit unter dem Limit Complete-Figuren drin (und keinen wartenden /
-Einzelteilen). Erst wenn das aktuelle Sammelfach das Limit erreicht
-hat, schlaegt HB-Sort ein neues freies Fach vor.
-
-Manuell kannst du im Dropdown weiter beliebige Faecher waehlen - das
-Limit gilt nur fuer den Default-Vorschlag.
+Wirkt nur auf den Default-Vorschlag. Manuell bleibst du frei.
 
 ### Maximale wartende Figuren pro Lagerfach (ab v0.1.19-beta.4)
 
@@ -63,51 +68,24 @@ teilen duerfen. Default: **3**.
 - **3** (Default) = praktischer Kompromiss - bis zu 3 wartende parallel.
 - **999** = praktisch unbegrenzt mischen.
 
-Wo: **Einstellungen > Erkennung > Sortier-Workflow > Maximale
-wartende Figuren pro Lagerfach**.
+## Darstellung
 
-Wirkt nur auf den Default-Vorschlag - manuell bleibst du frei.
+- **Tooltips anzeigen** - blendet alle Tooltips aus, falls sie dich
+  stoeren. Wirkt sofort, ohne Neustart. Default an.
 
-### Kategorien-Mapping (Tab "Kategorien", ab v0.1.19-beta.7)
+## BrickLink
 
-Hier ordnest du **Brickognize-Kategorien** (z.B. "Minifigure, Head",
-"Minifigure, Headgear") manuell festen Lagerfaechern zu. Wenn du z.B.
-"Minifigure, Headgear" auf "Box21-3" setzt, landen ALLE Helme in diesem
-Fach - egal welche Teile-Nummer, egal welche Farbe.
+Alles rund um die offizielle BL-Catalog- und Preis-API. Tab ist
+scrollbar - vier Sektionen.
 
-**Wenn du keine Zuordnung machst** ("(kein Mapping)" im Dropdown):
-greift die Standard-Regel - **maximal eine Teile-Nummer pro Brickognize-
-Kategorie pro Lagerfach**. Verschiedene Kategorien (Helm + Kopf + Hose)
-duerfen sich ein Fach teilen, zwei verschiedene Helme nicht.
-
-> **Stapel-Match wins immer:** identische Teile (gleiche Teile-Nummer
-> und Farbe) sammeln sich automatisch im gleichen Fach, unabhaengig vom
-> Mapping. Mehrfaches Scannen vom gleichen Brick landet als Stapel im
-> selben Bin.
-
-Die Liste zeigt alle Kategorien die HBSort bisher gesehen hat - sie
-fuellt sich organisch beim Scannen. Neue Kategorien tauchen auf, sobald
-du das erste Teil dieser Kategorie scannst.
-
-Wo: **Einstellungen > Kategorien**.
-
-### Hotkeys
-
-Im Tab **Hotkeys** (ab v0.1.16) findest du eine Tabelle aller
-Tastatur-Shortcuts (Leertaste, Strg+Z, Strg+B, F1 etc.). Die
-gleiche Liste steht in der Hilfe (F1) → Kapitel "Tastatur-
-Shortcuts".
-
-User-konfigurierbare Hotkeys sind aktuell nicht vorgesehen.
-
-## BrickLink-API
+### Sektion: API-Zugang (Tokens)
 
 Hier hinterlegst du deine BL-Tokens, damit HB-Sort Live-Daten und
 Preise von der BrickLink-API ziehen kann. Optional - HB-Sort
 funktioniert auch ohne, wenn du den BrickStore-Bulk-Import nutzt
-(siehe Tab *BL-Catalog-Daten*).
+(siehe Sektion *Catalog-Daten* weiter unten).
 
-### Tokens erzeugen
+#### Tokens erzeugen
 
 1. Auf [bricklink.com](https://www.bricklink.com/v2/api/register_consumer.page)
    einloggen und dort "Register Consumer" anklicken.
@@ -126,7 +104,7 @@ funktioniert auch ohne, wenn du den BrickStore-Bulk-Import nutzt
 > Windows-User-Wechsel oder PC-Wechsel musst du die Tokens neu
 > eingeben.
 
-### Rate-Limit-Schwellen
+### Sektion: API-Nutzung (Rate-Limit)
 
 BL erlaubt 5000 Calls / 24h (rolling). HB-Sort haelt sich konservativ
 an eigene Schwellen:
@@ -138,18 +116,26 @@ In der Status-Leiste siehst du den aktuellen Stand
 ("BL: 47 / 4500 (24h)"). Mit Hover bekommst du einen Tooltip mit
 Detail-Counter.
 
-## BL-Catalog-Daten
+### Sektion: Preise
+
+Konfiguration des BL-Preis-Lookups (Phase 8). Provider-Auswahl
+(BrickLink-API / None), Filter (Sold/Stock, Used/New, Region,
+Country, Currency), Korrekturfaktoren (z.B. -10% Minifig / -15%
+Parts), Auto-vs-Manuell-Modus pro Bereich (Komplett-Preis /
+Einzelteile). Cache-TTL pro Item-Typ. Mehr Details im Kapitel
+*Export & Verkauf*.
+
+### Sektion: Catalog-Daten
 
 Die schnellste Variante, um an Stammdaten zu kommen, ohne BL-API:
 
-- **Von GitHub importieren** - laed `downloads.zip` von der
+- **Von GitHub importieren** - laed `downloads.zip` (~12 MB) von der
   oeffentlichen
   [BrickStore-Datenbank](https://github.com/rgriebl/brickstore-database)
-  (~12 MB) und importiert direkt nach `bl_cache.db`. Internet-
+  und importiert direkt nach `bl_cache.db`. Internet-
   Verbindung noetig, BL-Account nicht.
-- **Cache leeren / pruning** - bereinigt alte Eintraege > 90 Tage.
 
-### Automatischer Import (ab v0.1.15)
+#### Automatischer Import (ab v0.1.15)
 
 Wenn aktiviert, prueft HB-Sort beim App-Start ob die BrickLink-Daten
 aelter als das gewaehlte Intervall sind und laed sie dann im
@@ -168,13 +154,81 @@ Beim erfolgreichen Auto-Import siehst du Toasts:
 
 Manueller Import oben funktioniert immer unabhaengig vom Toggle.
 
-## Bild-Cache
+## Lagerfaecher
+
+Liste aller Faecher mit Belegt/Frei-Status. Buttons:
+
+- **Anlegen** / **Bulk anlegen**
+- **Umbenennen**
+- **Fach leeren** - gibt das Fach frei und loest alle Zuweisungen.
+  Ab v0.1.16 mit differenzierter Confirmation:
+  - Bei wartenden Figuren + Einzelteilen: normale Bestaetigung,
+    Strg+Z (Verlauf-Tab) macht jede Entkopplung einzeln rueckgaengig.
+  - **Bei kompletten Figuren im Fach**: gesonderte ACHTUNG-Warnung
+    mit dem Hinweis dass sie ihr Lagerfach verlieren. Strg+Z stellt
+    die Zuordnung pro Figur wieder her.
+- **Loeschen** - nur moeglich, wenn frei.
+
+## Kategorien
+
+Tab seit v0.1.19-beta.7. Hier ordnest du **Brickognize-Kategorien**
+(z.B. "Minifigure, Head", "Minifigure, Headgear") manuell festen
+Lagerfaechern zu. Wenn du z.B. "Minifigure, Headgear" auf "Box21-3"
+setzt, landen ALLE Helme in diesem Fach - egal welche Teile-Nummer,
+egal welche Farbe.
+
+**Wenn du keine Zuordnung machst** ("(kein Mapping)" im Dropdown):
+greift die Standard-Regel - **maximal eine Teile-Nummer pro Brickognize-
+Kategorie pro Lagerfach**. Verschiedene Kategorien (Helm + Kopf + Hose)
+duerfen sich ein Fach teilen, zwei verschiedene Helme nicht.
+
+> **Stapel-Match wins immer:** identische Teile (gleiche Teile-Nummer
+> und Farbe) sammeln sich automatisch im gleichen Fach, unabhaengig vom
+> Mapping. Mehrfaches Scannen vom gleichen Brick landet als Stapel im
+> selben Bin.
+
+Die Liste zeigt alle Kategorien die HB-Sort bisher gesehen hat - sie
+fuellt sich organisch beim Scannen. Neue Kategorien tauchen auf, sobald
+du das erste Teil dieser Kategorie scannst.
+
+## Cache
+
+Drei Sektionen in einem scrollbaren Tab.
+
+### Sektion: Bild-Cache
 
 - **Limit** in MB (Default 1024).
 - **BL-Bilder bevorzugen** - echte BL-Teile-Fotos statt Brickognize-
   Renderings.
 - **Vorab-Cache** beim Minifig-Scan - laed nach erkannter Figur
   schon mal alle Teile-Bilder im Hintergrund.
+
+### Sektion: BL-Daten-Cache
+
+Statistik (Items, Subsets, Farben in `bl_cache.db`) plus Pruning- und
+Cache-Leeren-Buttons. **Cache leeren / pruning** bereinigt alte
+Eintraege > 90 Tage.
+
+### Sektion: Preis-Cache
+
+TTL-Tage pro Item-Typ (Default 90 fuer Minifigs und Einzelteile),
+Anzahl gecachter Preise plus **Preis-Cache leeren**-Button.
+
+## Export
+
+Default-Ordner fuer BSX und Wanted-List setzen.
+Default ist `Documents\HBSort-Export\`.
+
+## Statistik
+
+Zeigt dir Heute / 7T / 30T / Insgesamt:
+
+- Anzahl Scans
+- Komplettierte Figuren
+- Zerlegte Figuren
+
+Plus aktueller Bestand: wartende Figuren, komplette Figuren,
+Floating-Parts, belegte Faecher.
 
 ## Backups
 
@@ -193,7 +247,8 @@ wird.
 ### Manuell
 
 Klick auf **Backup jetzt erstellen** loest einen sofortigen Backup-Lauf
-aus. Status-Text zeigt Erfolg + Datei-Groesse.
+aus. Status-Text zeigt Erfolg + Datei-Groesse. Auch via **Strg + B**
+ausloesbar.
 
 ### Wiederherstellen
 
@@ -210,42 +265,6 @@ Bestaetigung. Bei *Ja* legt HB-Sort:
    gerade geoeffnet sind.
 
 Loeschen-Button entfernt ein Backup dauerhaft (mit Bestaetigung).
-
-## Lagerfaecher
-
-Liste aller Faecher mit Belegt/Frei-Status. Buttons:
-
-- **Anlegen** / **Bulk anlegen**
-- **Umbenennen**
-- **Fach leeren** - gibt das Fach frei und loest alle Zuweisungen.
-  Ab v0.1.16 mit differenzierter Confirmation:
-  - Bei wartenden Figuren + Einzelteilen: normale Bestaetigung,
-    Strg+Z (Verlauf-Tab) macht jede Entkopplung einzeln rueckgaengig.
-  - **Bei kompletten Figuren im Fach**: gesonderte ACHTUNG-Warnung
-    mit dem Hinweis dass sie ihr Lagerfach verlieren. Strg+Z stellt
-    die Zuordnung pro Figur wieder her.
-- **Loeschen** - nur moeglich, wenn frei.
-
-## Preise
-
-Konfiguration des Preis-Lookups (Phase 8). Siehe Kapitel
-*Export & Verkauf*.
-
-## Statistik
-
-Zeigt dir Heute / 7T / 30T / Insgesamt:
-
-- Anzahl Scans
-- Komplettierte Figuren
-- Zerlegte Figuren
-
-Plus aktueller Bestand: wartende Figuren, komplette Figuren,
-Floating-Parts, belegte Faecher.
-
-## Export
-
-Default-Ordner fuer BSX und Wanted-List setzen.
-Default ist `Documents\HBSort-Export\`.
 
 ## Updates
 
@@ -269,6 +288,14 @@ herunterladen.
 Deine Daten unter `%APPDATA%\HBSort\` (settings.json, Datenbanken,
 Logs) bleiben beim Update unveraendert - nur die App selbst wird
 ausgetauscht.
+
+## Hotkeys
+
+Tabelle aller Tastatur-Shortcuts (Leertaste, Strg+Z, Strg+B, F1,
+Strg+S/L/H/Q etc.). Die gleiche Liste steht auch in der Hilfe (F1)
+unter Kapitel *Tastatur-Shortcuts*.
+
+User-konfigurierbare Hotkeys sind aktuell nicht vorgesehen.
 
 ## Info
 

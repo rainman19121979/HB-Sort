@@ -54,7 +54,7 @@ physische Teil neu ein - HB-Sort legt es als neuen Floating-Part an.
 
 ## Tooltips nerven - kann ich sie ausschalten?
 
-Ja: Einstellungen -> *Allgemein* -> Schalter **Tooltips anzeigen**
+Ja: Einstellungen -> *Darstellung* -> Schalter **Tooltips anzeigen**
 ausstellen. Wirkt sofort, ohne Neustart.
 
 ## Kann ich HB-Sort ohne BL-Tokens benutzen?

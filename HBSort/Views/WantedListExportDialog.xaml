@@ -45,7 +45,7 @@
                          ToolTip="Mengen werden ueber alle wartenden Figuren aggregiert (PartNo + Farbe)."/>
             <RadioButton x:Name="ModePerMinifig" Content="Pro wartender Figur eine eigene Datei (separate Wanted-Lists)"
                          GroupName="ExportMode"
-                         ToolTip="Pro wartender Figur eine eigene BSX mit ihren fehlenden Teilen."/>
+                         ToolTip="Pro wartender Figur eine eigene XML-Datei mit ihren fehlenden Teilen (BrickLink-Wanted-Format)."/>
         </StackPanel>
 
         <!-- Speicherort -->

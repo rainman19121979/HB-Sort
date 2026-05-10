@@ -101,7 +101,7 @@ komplette Figur zu verkaufen oder die Einzelteile.
 
 ### Aktivierung
 
-Einstellungen -> Tab *Preise*:
+Einstellungen -> Tab *BrickLink* -> Sektion *Preise*:
 
 1. **Provider** waehlen - aktuell *BrickLink-API* (oder *None*, wenn
    du keine Preise willst).

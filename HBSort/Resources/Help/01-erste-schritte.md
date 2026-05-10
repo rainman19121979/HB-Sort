@@ -21,20 +21,20 @@ zuzuordnen und in Lagerfaechern zu sammeln, bis die Figur komplett ist.
 ## Erstmaliges Einrichten
 
 1. **Webcam anschliessen** und gegebenenfalls in den Einstellungen
-   (Zahnrad-Icon oben rechts -> Tab *Allgemein*) den richtigen Index
+   (Zahnrad-Icon oben rechts -> Tab *Erkennung*) den richtigen Index
    waehlen, falls mehrere Kameras am PC haengen.
 
 2. **BL-Catalog-Daten importieren** (Einstellungen -> Tab
-   *BL-Catalog-Daten* -> *Von GitHub importieren*). Das laed einmalig
-   ~12 MB von der oeffentlichen BrickStore-Datenbank und legt damit
-   alle Catalog-Items, Subsets und Farben in deiner lokalen
-   `bl_cache.db` ab. Anschliessend kann HB-Sort Stammdaten ohne
+   *BrickLink* -> Sektion *Catalog-Daten* -> *Von GitHub importieren*).
+   Das laed einmalig ~12 MB von der oeffentlichen BrickStore-Datenbank
+   und legt damit alle Catalog-Items, Subsets und Farben in deiner
+   lokalen `bl_cache.db` ab. Anschliessend kann HB-Sort Stammdaten ohne
    BL-API-Calls anzeigen.
 
 3. **Optional: BrickLink-Tokens hinterlegen** (Einstellungen -> Tab
-   *BrickLink-API*). Nur noetig wenn du Live-Daten oder Preise direkt
-   von der BL-API ziehen willst. Wie du Tokens bekommst, steht im
-   Kapitel *Einstellungen*.
+   *BrickLink* -> Sektion *API-Zugang*). Nur noetig wenn du Live-Daten
+   oder Preise direkt von der BL-API ziehen willst. Wie du Tokens
+   bekommst, steht im Kapitel *Einstellungen*.
 
 4. **Lagerfaecher anlegen** (Einstellungen -> Tab *Lagerfaecher*).
    Lege so viele Faecher an, wie du physisch hast. Du kannst sie auch

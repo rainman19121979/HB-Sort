@@ -305,7 +305,7 @@
                                   ItemsSource="{Binding AvailableBins}"
                                   SelectedItem="{Binding SelectedBin}"
                                   DisplayMemberPath="Label"
-                                  ToolTip="Fach in das die Figur gelegt wird (Default: erstes freies Fach)"/>
+                                  ToolTip="Fach in das die Figur gelegt wird. Default vom Vorschlags-Service - bei vollen Faechern erscheint ein Hinweis-Banner."/>
 
                         <!-- Buttons rechtsbuendig in 1 Zeile -->
                         <StackPanel Grid.Column="2" Orientation="Horizontal"

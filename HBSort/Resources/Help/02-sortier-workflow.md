@@ -30,7 +30,9 @@ HB-Sort erkennt automatisch, was du vor die Kamera haelst.
 5. Nach Auswahl siehst du:
    - Das BL-Bild der Figur
    - Die komplette Teileliste mit BL-Part-Nummer, Farbe und Anzahl
-   - Ein **Lagerfach-Dropdown** (Default: erstes freies Fach)
+   - Ein **Lagerfach-Dropdown** (Default vom Vorschlags-Service - bei
+     vollen Faechern erscheint ein orangener Volle-Faecher-Banner mit
+     Direkt-Link in die Lagerfach-Verwaltung)
    - Ein optionales **Beschreibung**-Feld (landet beim BSX-Export im
      oeffentlichen `<Comments>`-Feld - perfekt fuer Hinweise wie
      *"kleiner Riss am Helm"* oder *"Helm fehlt original"*, die der

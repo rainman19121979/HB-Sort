@@ -166,7 +166,7 @@
                         Click="OpenSettings_Click"
                         Padding="10,6"
                         Margin="0,0,8,0"
-                        ToolTip="Oeffnet die Einstellungen (Kamera, BL-Tokens, Cache, Preise, Lagerfaecher).">
+                        ToolTip="Oeffnet die Einstellungen (Kamera, BL-Tokens, Lagerfaecher, Kategorien, Cache, Preise, Backups, Updates, Hotkeys).">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets"
                                    FontSize="16" VerticalAlignment="Center"
