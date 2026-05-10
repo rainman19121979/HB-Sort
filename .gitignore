@@ -164,6 +164,14 @@ coverage/
 *_DIAGNOSE_*.md
 *_PRAXIS_TEST.md
 *_TESTANLEITUNG.md
+.release-notes-*.md
+
+# ============================================
+# Lokale Diagnose-Tools (UX X.33 v0.1.19 Audit):
+# Eigene Hilfs-Projekte die nur lokal zum Inspizieren der DB / Logs
+# benutzt werden (z.B. .dbinspect aus Block O.1.1). Nicht produktiv.
+# ============================================
+.dbinspect/
 
 # ============================================
 # OS
