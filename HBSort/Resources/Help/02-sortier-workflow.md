@@ -71,6 +71,31 @@ Der Vorschlag wechselt **live waehrend du Teile markierst**: alle Teile
 da -> Complete-Fach, fehlt mindestens eins -> Wartend-Fach. Du musst
 nichts manuell umschalten.
 
+> **Tipp (ab v0.1.19-beta.4):** Du kannst auch konfigurieren wie viele
+> wartende Figuren sich ein Fach teilen duerfen (Default 3) und ob
+> verschiedene Teile-Kategorien (Kopf, Torso, Beine, ...) zusammen
+> gelagert werden duerfen (Default 1 = strikte Trennung). Siehe
+> **Einstellungen > Erkennung > Sortier-Workflow**.
+
+### Auswahl-Dialog "Figur anlegen" (ab v0.1.19-beta.4)
+
+Wenn du beim Scannen eines Einzelteils auf eine BL-Figur stoesst die
+du noch nicht hast, kannst du auf **"Diese Figur anlegen"** klicken.
+HB-Sort zeigt dir dann einen Auswahl-Dialog mit allen Required-Parts:
+
+- **Trigger-Teil** (das gerade gescannte Teil): immer markiert in
+  gelb, kann nicht abgewaehlt werden.
+- **Reverse-Match-Treffer** (Teil liegt schon in einem Lagerfach):
+  vor-markiert in gruen, "im Lager: Box X". Beim Klick auf "Figur
+  anlegen" wird das Teil aus dem Bin genommen und der Figur zugeordnet.
+- **Fehlende Teile**: nicht markiert in grau, "fehlt - bleibt wartend".
+  Die Figur wird als wartend angelegt und braucht diese Teile noch.
+
+Du kannst Reverse-Match-Treffer abwaehlen wenn du das Teil im Bin
+liegen lassen willst (z.B. weil du noch nicht alle Sortieren willst).
+Beim Klick auf "Figur anlegen" erscheint danach ein Sammel-Popup mit
+Anweisungen welches Teil aus welchem Bin wohin kommt.
+
 > Du kannst direkt im Pending-Block einzelne Teile als "vorhanden"
 > markieren oder per **Aus Fach**-Button (siehe unten) einen
 > Floating-Part aus einem anderen Fach uebernehmen.

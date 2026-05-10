@@ -54,6 +54,48 @@ hat, schlaegt HB-Sort ein neues freies Fach vor.
 Manuell kannst du im Dropdown weiter beliebige Faecher waehlen - das
 Limit gilt nur fuer den Default-Vorschlag.
 
+### Maximale wartende Figuren pro Lagerfach (ab v0.1.19-beta.4)
+
+Bestimmt wie viele wartende (noch unfertige) Figuren sich ein Fach
+teilen duerfen. Default: **3**.
+
+- **1** = jede wartende Figur bekommt ihr eigenes Fach (strikt).
+- **3** (Default) = praktischer Kompromiss - bis zu 3 wartende parallel.
+- **999** = praktisch unbegrenzt mischen.
+
+Wo: **Einstellungen > Erkennung > Sortier-Workflow > Maximale
+wartende Figuren pro Lagerfach**.
+
+Wirkt nur auf den Default-Vorschlag - manuell bleibst du frei.
+
+### Maximale Teile-Kategorien pro Lagerfach (ab v0.1.19-beta.4)
+
+Bestimmt wie viele verschiedene **Teile-Kategorien** (Kopf, Torso,
+Beine, Kopfbedeckung, ...) sich ein Lagerfach teilen duerfen.
+Default: **999** (praktisch unbegrenztes Mischen).
+
+Egal welcher Wert hier steht, gilt IMMER: **pro Kategorie nur EIN
+unique Item pro Fach**. Beispiel:
+
+- Box 16 hat einen Helm und einen Kopf: weitere Helme oder Koepfe
+  gehen automatisch in andere Faecher (gleiche Kategorie schon belegt).
+- Box 16 darf zusaetzlich Beine bekommen (andere Kategorie, ist
+  noch nicht drin).
+
+Spezialfall:
+
+- **1** = strikte Trennung. Koepfe in einem Fach, Torsos in einem
+  anderen, kein Mix erlaubt.
+- **999** (Default) = unbegrenztes Mischen verschiedener Kategorien
+  in einem Fach, aber nicht doppelt.
+
+Wo: **Einstellungen > Erkennung > Sortier-Workflow > Maximale
+Teile-Kategorien pro Lagerfach**.
+
+> Wichtig: **gleiche Teile** (gleiche Teile-Nummer UND Farbe) stapeln
+> IMMER im selben Fach - unabhaengig von diesem Limit. Mehrfaches
+> Scannen vom gleichen Brick landet als Stapel im selben Bin.
+
 ### Hotkeys
 
 Im Tab **Hotkeys** (ab v0.1.16) findest du eine Tabelle aller

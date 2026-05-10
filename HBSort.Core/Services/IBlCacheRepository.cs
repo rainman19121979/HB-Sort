@@ -27,6 +27,18 @@ public interface IBlCacheRepository
     /// </summary>
     Task<bool> IsItemStaleAsync(string itemType, string itemNo, int staleDays, CancellationToken ct = default);
 
+    /// <summary>
+    /// UX X.32 v0.1.19-beta.4: liefert pro PartNo die BL-Kategorie-Id aus
+    /// bl_items (item_type='P'). PartNos ohne Cache-Eintrag oder mit
+    /// NULL category_id tauchen NICHT im Result auf - der Aufrufer
+    /// entscheidet selbst wie "unbekannte Kategorie" behandelt wird.
+    /// Bei leerem Input leeres Dict, kein DB-Hit.
+    /// SQLite-Parameter-Limit (999) wird intern via Chunking umgangen.
+    /// </summary>
+    Task<Dictionary<string, int>> GetCategoryIdsForPartsAsync(
+        IEnumerable<string> partNumbers,
+        CancellationToken ct = default);
+
     // --- Subsets ---
 
     Task<List<BlSubset>> GetSubsetsAsync(string parentType, string parentNo, CancellationToken ct = default);

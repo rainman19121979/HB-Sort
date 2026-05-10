@@ -213,8 +213,12 @@ public partial class ScanViewModel : ObservableObject
             }
             else
             {
-                newBest = await _binService.SuggestBinForWaitingMinifigAsync();
-                Log.Information("Re-Suggest (Waiting-Pfad): {Bin}", newBest?.Label ?? "(keiner)");
+                // UX X.32 v0.1.19-beta.4: Limit aus Settings reicht den
+                // "Stapel-mit-bestehenden-Wartenden"-Pfad an den Service.
+                var maxWaiting = _settingsService.Current.MaxWaitingFiguresPerBin;
+                newBest = await _binService.SuggestBinForWaitingMinifigAsync(maxWaiting);
+                Log.Information("Re-Suggest (Waiting-Pfad, MaxWaiting={Max}): {Bin}",
+                    maxWaiting, newBest?.Label ?? "(keiner)");
             }
 
             if (newBest == null) return;
@@ -282,10 +286,17 @@ public partial class ScanViewModel : ObservableObject
     public BinInstructionGroupViewModel BinInstructionGroup { get; } = new();
     public bool IsBinInstructionGroupVisible => BinInstructionGroup.IsVisible;
 
-    /// <summary>Zeigt das Sammel-Popup mit mehreren "Lege X in Y"-Anweisungen.</summary>
-    public void ShowBinInstructionGroup(IEnumerable<BinInstructionItem> items)
+    /// <summary>
+    /// Zeigt das Sammel-Popup mit mehreren "Lege X in Y"-Anweisungen.
+    /// UX X.32 v0.1.19-beta.5: <paramref name="headerText"/> kann gesetzt
+    /// werden um den Default ("Lege folgende Teile...") zu ueberschreiben -
+    /// z.B. fuer den BuildSuggestion-Pfad ("Nimm folgende Teile...").
+    /// </summary>
+    public void ShowBinInstructionGroup(
+        IEnumerable<BinInstructionItem> items,
+        string? headerText = null)
     {
-        BinInstructionGroup.Show(items);
+        BinInstructionGroup.Show(items, headerText);
         OnPropertyChanged(nameof(IsBinInstructionGroupVisible));
     }
 
@@ -1138,11 +1149,14 @@ public partial class ScanViewModel : ObservableObject
         try
         {
             var allBins = await _binService.GetAllAsync();
-            // UX X.31 (v0.1.18): konsistente Bin-Vorschlaege - Default-Fallback
-            // ist jetzt SuggestBinForFloatingPart (kein Bin mit Complete-Figuren)
-            // statt GetNextFreeAsync (das ignorierte Complete-Figuren).
+            // UX X.31 (v0.1.18) + UX X.32 v0.1.19-beta.4: konsistente Bin-
+            // Vorschlaege. MaxFloatingPartTypesPerBin steuert ob mehrere
+            // BL-Kategorien zusammen gelagert werden duerfen.
+            var maxCats = _settingsService.Current.MaxFloatingPartTypesPerBin;
             var firstFree = await _binService.SuggestBinForFloatingPartAsync(
-                pending.BlPartNo, pending.BlColorId);
+                pending.BlPartNo, pending.BlColorId,
+                maxCategoriesPerBin: maxCats,
+                partName: pending.PartName);
 
             // UX-Iteration X.7: Smart-Storage-Suggestion. Vor der Default-Auswahl
             // pruefen ob das Teil bereits in einem Fach liegt - dann dieses Fach
@@ -1285,7 +1299,9 @@ public partial class ScanViewModel : ObservableObject
             }
             else
             {
-                firstFree = await _binService.SuggestBinForWaitingMinifigAsync();
+                // UX X.32 v0.1.19-beta.4: Limit fuer wartende Figuren aus Settings.
+                var maxWaiting = _settingsService.Current.MaxWaitingFiguresPerBin;
+                firstFree = await _binService.SuggestBinForWaitingMinifigAsync(maxWaiting);
             }
 
             // ComboBox auf UI-Thread befuellen
@@ -1328,24 +1344,11 @@ public partial class ScanViewModel : ObservableObject
             return;
         }
 
-        // Bin-Belegung pruefen + Bestaetigung wenn nicht frei
-        try
-        {
-            var occ = await _binService.GetOccupancyAsync(pending.SelectedBin.Id);
-            if (occ.MinifigCount > 0 || occ.FloatingPartCount > 0)
-            {
-                var msg = $"Fach '{pending.SelectedBin.Label}' ist bereits belegt: " +
-                          $"{occ.MinifigCount} Figur(en), {occ.FloatingPartCount} Teil(e).\n\n" +
-                          "Mehrere Figuren in einem Fach sind erlaubt - willst du fortfahren?";
-                // Bestaetigung vor dem Mischen - "Ja" / "Nein", weil das Fach
-                // dann eine zusaetzliche Figur bekommt und das schwer rueckgaengig ist.
-                if (!await _dialogs.ShowQuestionAsync("Lagerfach belegt", msg)) return;
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Bin-Occupancy-Check fehlgeschlagen, fahre trotzdem fort");
-        }
+        // UX X.32 v0.1.19-beta.4 (User-Befund): Bestaetigungs-Dialog
+        // "Lagerfach belegt - mehrere Figuren erlaubt?" entfernt. Mehrere
+        // wartende/komplette Figuren pro Fach sind ueber Settings
+        // (MaxWaitingFiguresPerBin / MaxCompleteFiguresPerBin) explizit
+        // erlaubt - das ist bewusst eingestellt, nicht warnungswuerdig.
 
         pending.IsPersisting = true;
         try

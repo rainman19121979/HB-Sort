@@ -4,6 +4,7 @@ using HBSort.Core.Database;
 using HBSort.Core.Models;
 using HBSort.Core.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HBSort.ViewModels;
 
@@ -175,11 +176,15 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
         foreach (var b in free) AvailableBins.Add(b);
         foreach (var b in occupied) AvailableBins.Add(b);
 
-        // UX X.31 (v0.1.18): Default-Auswahl aus Suggest-Service holen, damit
-        // Faecher mit Complete-Figuren NICHT als "frei" vorgeschlagen werden
-        // (UX-X.6-Konvention). Aus AvailableBins per Reference-Equality holen,
-        // damit die ComboBox den Eintrag findet.
-        var suggested = await binService.SuggestBinForWaitingMinifigAsync();
+        // UX X.31 (v0.1.18) + UX X.32 v0.1.19-beta.4: Default-Auswahl aus
+        // Suggest-Service holen, damit Faecher mit Complete-Figuren NICHT
+        // als "frei" vorgeschlagen werden (UX-X.6-Konvention). Limit
+        // MaxWaitingFiguresPerBin via App.Services - der ViewModel-
+        // Konstruktor hat keinen ISettingsService, ist aber innerhalb der
+        // App-DI sicher erreichbar.
+        var settings = App.Services.GetRequiredService<HBSort.Core.Services.ISettingsService>();
+        var maxWaiting = settings.Current.MaxWaitingFiguresPerBin;
+        var suggested = await binService.SuggestBinForWaitingMinifigAsync(maxWaiting);
         SelectedBin = suggested != null
             ? AvailableBins.FirstOrDefault(b => b.Id == suggested.Id) ?? AvailableBins.FirstOrDefault()
             : AvailableBins.FirstOrDefault();

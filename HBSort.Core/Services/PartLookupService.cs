@@ -462,4 +462,162 @@ public class PartLookupService : IPartLookupService
 
         return minifig;
     }
+
+    /// <summary>
+    /// UX X.32 v0.1.19-beta.4 Block D: erweiterte CollectMinifig-Methode mit
+    /// User-Filter welche FloatingParts via Reverse-Match konsumiert werden.
+    /// Logik analog zu <see cref="CollectMinifigFromSupersetAsync"/>, aber:
+    ///   - Reverse-Match-Schleife laeuft nur fuer (PartNo, ColorId)-Paare die
+    ///     in <paramref name="consumePartsFromFloating"/> stehen.
+    ///   - Liefert ein <see cref="CollectMinifigResult"/> mit konsumierten
+    ///     FloatingParts (Quell-Bin-Label) - der UI-Layer baut daraus das
+    ///     Sammel-Popup.
+    /// </summary>
+    public async Task<CollectMinifigResult> CollectMinifigFromSupersetWithSelectionAsync(
+        string blMinifigId, int storageBinId,
+        string triggerPartNo, int triggerColorId, int triggerQuantity,
+        IReadOnlyCollection<(string PartNo, int ColorId)> consumePartsFromFloating,
+        CancellationToken ct = default)
+    {
+        // Filter-Set fuer schnellen Lookup pro Required-Part. Stringvergleich
+        // case-insensitive damit Edge-Cases mit Gross-Klein-Schreibung
+        // (z.B. "3001" vs "3001a") nicht zu Misses fuehren.
+        var filter = new HashSet<(string, int)>(
+            consumePartsFromFloating?.Select(x => (x.PartNo.ToLowerInvariant(), x.ColorId))
+            ?? Enumerable.Empty<(string, int)>());
+
+        // 1) Sicherstellen dass die volle Subsets-Liste der Minifig im Cache ist.
+        await _catalog.EnsureFullSubsetsAsync(blMinifigId, ct);
+
+        var item = await _catalog.GetMinifigDetailsAsync(blMinifigId, ct)
+            ?? throw new InvalidOperationException($"Minifig '{blMinifigId}' nicht in BL gefunden.");
+
+        string? localImagePath = null;
+        try { localImagePath = await _imageProvider.GetImageFileByBlAsync("M", blMinifigId, null); }
+        catch (Exception imgEx) { Log.Debug(imgEx, "CollectMinifig (Selection): Bild nicht ladbar"); }
+
+        var subsets = await _catalog.GetMinifigPartsAsync(blMinifigId, ct);
+        var allColors = await _catalog.GetAllColorsAsync(ct);
+        var colorMap = allColors.ToDictionary(c => c.ColorId);
+
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+        var bin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == storageBinId, ct)
+            ?? throw new InvalidOperationException($"Lagerfach {storageBinId} existiert nicht.");
+
+        if (bin.FreedAt != null)
+        {
+            Log.Information("Fach '{Label}' war als frei markiert (seit {FreedAt}) - wird durch neue Figur wieder belegt",
+                bin.Label, bin.FreedAt);
+            bin.FreedAt = null;
+        }
+
+        var minifig = new TrackedMinifig
+        {
+            FigNum = blMinifigId,
+            BricklinkId = blMinifigId,
+            Name = item.Name,
+            ImageUrl = item.ImageUrl,
+            LocalImagePath = localImagePath,
+            CreatedAt = DateTime.UtcNow,
+            Status = TrackedMinifigStatus.Waiting,
+            StorageBinId = storageBinId,
+            RequiredParts = subsets.Select(s =>
+            {
+                colorMap.TryGetValue(s.ColorId, out var color);
+                return new TrackedMinifigPart
+                {
+                    PartNumber = s.ItemNo,
+                    ColorId = s.ColorId,
+                    PartName = string.Empty,
+                    ColorName = color?.Name ?? $"Color {s.ColorId}",
+                    QuantityNeeded = s.Quantity,
+                    QuantityCollected = 0
+                };
+            }).ToList()
+        };
+
+        // Trigger-Teil sofort auf collected setzen.
+        var trigger = minifig.RequiredParts.FirstOrDefault(p =>
+            p.PartNumber == triggerPartNo && p.ColorId == triggerColorId);
+        if (trigger != null)
+            trigger.QuantityCollected = Math.Min(triggerQuantity, trigger.QuantityNeeded);
+
+        ctx.TrackedMinifigs.Add(minifig);
+        await ctx.SaveChangesAsync(ct);
+
+        // Reverse-Match NUR fuer Filter-Eintraege.
+        var consumed = new List<ConsumedFloatingPartInfo>();
+        var reverseMatched = 0;
+        foreach (var required in minifig.RequiredParts)
+        {
+            var stillNeeded = required.QuantityNeeded - required.QuantityCollected;
+            if (stillNeeded <= 0) continue;
+
+            // User-Filter pruefen - wenn nicht in der Liste, NICHT konsumieren.
+            var key = (required.PartNumber.ToLowerInvariant(), required.ColorId);
+            if (!filter.Contains(key)) continue;
+
+            var candidates = await ctx.FloatingParts
+                .Include(fp => fp.StorageBin)
+                .Where(fp => fp.PartNumber == required.PartNumber
+                          && fp.ColorId == required.ColorId)
+                .OrderBy(fp => fp.AddedAt)
+                .ToListAsync(ct);
+
+            foreach (var fp in candidates)
+            {
+                if (stillNeeded <= 0) break;
+                var take = Math.Min(stillNeeded, fp.Quantity);
+                required.QuantityCollected += take;
+                fp.Quantity -= take;
+                stillNeeded -= take;
+                reverseMatched += take;
+
+                consumed.Add(new ConsumedFloatingPartInfo
+                {
+                    BlPartNo = required.PartNumber,
+                    BlColorId = required.ColorId,
+                    PartName = required.PartName,
+                    ColorName = required.ColorName,
+                    Quantity = take,
+                    SourceBinLabel = fp.StorageBin?.Label ?? string.Empty
+                });
+
+                if (fp.Quantity <= 0) ctx.FloatingParts.Remove(fp);
+            }
+        }
+
+        var isComplete = minifig.RequiredParts.All(p => p.QuantityCollected >= p.QuantityNeeded)
+                         && minifig.RequiredParts.Count > 0;
+        if (isComplete)
+        {
+            minifig.Status = TrackedMinifigStatus.Complete;
+            minifig.CompletedAt = DateTime.UtcNow;
+        }
+
+        ctx.ScanEvents.Add(new ScanEvent
+        {
+            Timestamp = DateTime.UtcNow,
+            Type = ScanType.PartScan,
+            RecognizedId = triggerPartNo,
+            ResultDescription = isComplete
+                ? $"Neue Figur '{minifig.Name}' direkt komplett (User-Auswahl)"
+                : $"Neue Figur '{minifig.Name}' angelegt in '{bin.Label}' (User-Auswahl, {reverseMatched} Teile uebernommen)",
+            WasUndone = false
+        });
+
+        await ctx.SaveChangesAsync(ct);
+        _persistence.RaiseDataChanged();
+
+        Log.Information("CollectMinifig (Selection): '{Name}' angelegt in '{Bin}', Trigger {Tp}/{Tc}, Filter={FilterCount}, Consumed={Cons}{Done}",
+            minifig.Name, bin.Label, triggerPartNo, triggerColorId,
+            filter.Count, consumed.Count, isComplete ? " => COMPLETE" : "");
+
+        return new CollectMinifigResult
+        {
+            SavedMinifig = minifig,
+            IsFullyComplete = isComplete,
+            ConsumedFloatingParts = consumed
+        };
+    }
 }

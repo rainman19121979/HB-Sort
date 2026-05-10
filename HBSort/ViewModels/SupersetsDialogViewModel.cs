@@ -8,6 +8,7 @@ using HBSort.Core.Models.Bricklink;
 using HBSort.Core.Services;
 using HBSort.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 
 namespace HBSort.ViewModels;
@@ -239,11 +240,17 @@ public partial class SupersetsDialogViewModel : ObservableObject
     public Task<List<StorageBin>> GetAllBinsAsync() => _binService.GetAllAsync();
 
     /// <summary>
-    /// UX X.31 (v0.1.18): Default-Vorschlag fuer "Diese Figur sammeln" -
-    /// die Figur wird wartend angelegt, also wirklich freies Fach
-    /// (kein Bin mit Complete drin).
+    /// UX X.31 (v0.1.18) / UX X.32 v0.1.19-beta.4: Default-Vorschlag fuer
+    /// "Diese Figur sammeln" - die Figur wird wartend angelegt. Limit aus
+    /// Settings.MaxWaitingFiguresPerBin damit der Vorschlag mit dem
+    /// User-Preset uebereinstimmt.
     /// </summary>
-    public Task<StorageBin?> GetNextFreeBinAsync() => _binService.SuggestBinForWaitingMinifigAsync();
+    public Task<StorageBin?> GetNextFreeBinAsync()
+    {
+        var settings = App.Services.GetRequiredService<HBSort.Core.Services.ISettingsService>();
+        var maxWaiting = settings.Current.MaxWaitingFiguresPerBin;
+        return _binService.SuggestBinForWaitingMinifigAsync(maxWaiting);
+    }
 }
 
 /// <summary>Eine Zeile im SupersetsDialog (eine Minifigur).</summary>

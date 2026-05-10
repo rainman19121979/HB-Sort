@@ -169,6 +169,45 @@
                                  Width="80" HorizontalAlignment="Left"
                                  ToolTip="Wieviele komplette Figuren duerfen sich ein Fach teilen? Default 5."/>
 
+                        <!-- UX X.32 v0.1.19-beta.4: Maximum wartende Figuren pro Lagerfach -->
+                        <TextBlock Text="Maximale wartende Figuren pro Lagerfach:"
+                                   FontWeight="SemiBold" Margin="0,12,0,4"/>
+                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
+                                   Margin="0,0,0,4">
+                            Bestimmt wie viele wartende (noch unfertige) Figuren sich ein
+                            Fach teilen duerfen. Bei 1 bekommt jede wartende Figur ihr
+                            eigenes Fach (strikt). Bei groesseren Werten landen mehrere
+                            wartende Figuren parallel im gleichen Fach. Default: 3. Min 1, Max 999.
+                        </TextBlock>
+                        <TextBox Text="{Binding MaxWaitingFiguresPerBin, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 Width="80" HorizontalAlignment="Left"
+                                 ToolTip="Wieviele wartende Figuren duerfen sich ein Fach teilen? Default 3."/>
+
+                        <!-- UX X.32 v0.1.19-beta.4: Maximum Kategorien pro Lagerfach -->
+                        <TextBlock Text="Maximale Teile-Kategorien pro Lagerfach:"
+                                   FontWeight="SemiBold" Margin="0,12,0,4"/>
+                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
+                                   Margin="0,0,0,4">
+                            Bestimmt wie viele verschiedene BL-Kategorien (Kopf, Torso,
+                            Beine, Kopfbedeckung, ...) sich ein Lagerfach teilen duerfen.
+                            <LineBreak/>
+                            Default 999 = praktisch unbegrenztes Mischen, aber pro
+                            Kategorie immer nur EIN unique Item (z.B. Box 16 darf einen
+                            Kopf + eine Kopfbedeckung + Beine enthalten, aber kein
+                            zweiter Helm dazu).
+                            <LineBreak/>
+                            Bei 1 = strikte Trennung pro Kategorie (Koepfe in einem
+                            Fach, Torsos in einem anderen, kein Mix erlaubt).
+                            <LineBreak/>
+                            Gleiche Teile (gleiche Teilenummer UND Farbe) stapeln IMMER
+                            unabhaengig von diesem Limit.
+                            <LineBreak/>
+                            Min 1, Max 999.
+                        </TextBlock>
+                        <TextBox Text="{Binding MaxFloatingPartTypesPerBin, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 Width="80" HorizontalAlignment="Left"
+                                 ToolTip="Wieviele verschiedene Kategorien duerfen sich ein Fach teilen? Default 999."/>
+
                         <Separator/>
 
                         <TextBlock Text="Sonstiges" FontSize="16" FontWeight="SemiBold"/>

@@ -38,9 +38,13 @@ public partial class WantedListExportDialog : Window
                 "HBSort-Export");
         FolderBox.Text = defaultFolder;
 
-        SummaryText.Text = "Exportiert die fehlenden Teile aller wartenden Figuren " +
-                           "im BrickLink-Wanted-List-XML-Format.";
-        StatusText.Text = "Bereit. Bitte Modus und Ordner pruefen, dann auf 'Exportieren' klicken.";
+        SummaryText.Text = "Exportiert die fehlenden Teile deiner wartenden Figuren als " +
+                           "BrickLink-Wanted-List (.xml). Eine Zeile pro Teil-Sorte (PartNo + " +
+                           "Farbe). Direkt auf der BrickLink-Webseite hochladbar oder per " +
+                           "Zwischenablage einfuegbar.";
+        StatusText.Text = "Bereit. Du kannst die Wanted-List entweder als XML-Datei speichern " +
+                          "oder den XML-Code direkt in die Zwischenablage kopieren um ihn auf " +
+                          "der BrickLink-Webseite einzufuegen.";
     }
 
     /// <summary>Ordner-Picker, wie im BSX-Dialog auch.</summary>
@@ -93,10 +97,14 @@ public partial class WantedListExportDialog : Window
                     return;
                 }
 
+                // UX X.32 v0.1.19-beta.6: BL-Wanted-XML, Endung .xml,
+                // UTF-8 ohne BOM. WriteAllBytesAsync statt WriteAllTextAsync
+                // weil File.WriteAllTextAsync system-default Encoding nutzt.
+                var noBomEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
                 foreach (var f in files)
                 {
                     var path = Path.Combine(folder, f.FileName);
-                    await File.WriteAllTextAsync(path, f.Xml);
+                    await File.WriteAllBytesAsync(path, noBomEncoding.GetBytes(f.Xml));
                 }
                 writtenCount = files.Count;
                 firstPath = Path.Combine(folder, files[0].FileName);
@@ -104,10 +112,14 @@ public partial class WantedListExportDialog : Window
             else
             {
                 // Combined-Mode (Default).
+                // UX X.32 v0.1.19-beta.6: BrickLink-Wanted-XML, Endung .xml.
+                // BL-Web akzeptiert kein BSX. UTF-8 ohne BOM.
                 var xml = await _exportService.GenerateCombinedAsync();
-                var fileName = $"HBSort-Wanted-{DateTime.Now:yyyy-MM-dd-HHmm}.xml";
+                var fileName = $"HBSort-Wanted-Fehlteile-{DateTime.Now:yyyy-MM-dd-HHmm}.xml";
                 var path = Path.Combine(folder, fileName);
-                await File.WriteAllTextAsync(path, xml);
+                var bytes = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false)
+                    .GetBytes(xml);
+                await File.WriteAllBytesAsync(path, bytes);
                 writtenCount = 1;
                 firstPath = path;
             }
@@ -143,5 +155,47 @@ public partial class WantedListExportDialog : Window
     {
         DialogResult = false;
         Close();
+    }
+
+    /// <summary>
+    /// UX X.32 v0.1.19-beta.6: kopiert die Combined-Wanted-List als XML
+    /// in die Windows-Zwischenablage. User kann sie dann auf
+    /// https://www.bricklink.com/v2/wanted/upload.page im "Paste XML"-
+    /// Tab direkt einfuegen - kein File-Upload noetig.
+    ///
+    /// Funktioniert bewusst nur fuer den Combined-Modus, weil mehrere
+    /// XMLs in der Zwischenablage keinen Sinn ergeben.
+    /// </summary>
+    private async void CopyToClipboard_Click(object sender, RoutedEventArgs e)
+    {
+        ClipboardButton.IsEnabled = false;
+        try
+        {
+            StatusText.Text = "XML wird generiert...";
+            var xml = await _exportService.GenerateCombinedAsync();
+
+            // Clipboard.SetText muss auf dem UI-Thread laufen.
+            Clipboard.SetText(xml);
+
+            StatusText.Text = "XML wurde in die Zwischenablage kopiert. Du kannst es jetzt " +
+                              "im BrickLink-Web-Wanted-Upload (Paste XML-Tab) einfuegen.";
+            _notifications.ShowSuccess("Wanted-List-XML in Zwischenablage kopiert");
+            Log.Information("Wanted-List in Zwischenablage kopiert ({Length} Zeichen)", xml.Length);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Service wirft InvalidOperationException wenn keine fehlenden
+            // Teile - freundlich anzeigen, kein Stacktrace.
+            StatusText.Text = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Wanted-List Zwischenablage-Kopie fehlgeschlagen");
+            StatusText.Text = $"Fehler beim Kopieren: {ex.Message}";
+        }
+        finally
+        {
+            ClipboardButton.IsEnabled = true;
+        }
     }
 }

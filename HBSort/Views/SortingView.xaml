@@ -467,20 +467,8 @@
         </Grid>
         </Grid>
 
-        <!-- UX X.31 Block B (v0.1.18): Anweisungs-Overlay nach Persist.
-             ZIndex=100 - liegt ueber dem ganzen Sortier-Tab.
-             Sichtbarkeit gebunden an ScanViewModel.IsBinInstructionVisible. -->
-        <views:BinInstructionOverlay
-            Panel.ZIndex="100"
-            Visibility="{Binding ScanViewModel.IsBinInstructionVisible,
-                                 Converter={StaticResource BoolToVisibility}}"/>
-
-        <!-- UX X.32 Block C (v0.1.19): Sammel-Popup nach Direkt-Zerlegen
-             oder Reverse-Match >=2. ZIndex=101 - knapp ueber Einzel-Overlay
-             falls beide aktiv waeren. -->
-        <views:BinInstructionGroupOverlay
-            Panel.ZIndex="101"
-            Visibility="{Binding ScanViewModel.IsBinInstructionGroupVisible,
-                                 Converter={StaticResource BoolToVisibility}}"/>
+        <!-- UX X.32 v0.1.19-beta.4 Block E: Sammel-Popup-Overlays sind nach
+             MainWindow.xaml gewandert, damit sie tab-uebergreifend sichtbar
+             sind (auch wenn Bulk-Move aus der Lagerliste sie ausloest). -->
     </Grid>
 </UserControl>

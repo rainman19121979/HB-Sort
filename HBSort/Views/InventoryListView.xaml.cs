@@ -284,9 +284,61 @@ public partial class InventoryListView : UserControl
             try
             {
                 var persistence = Service<IMinifigPersistenceService>();
+
+                // UX X.32 v0.1.19-beta.4 Block E: Vorab Item-Labels einsammeln
+                // damit das Sammel-Popup nach dem Move ein "Lege X in Box Y"
+                // pro bewegtem Item zeigen kann. Wir lesen die DB BEVOR der
+                // Move passiert - die Labels sind sonst nach dem Update
+                // identisch zur Ziel-Bin-Spalte und wir koennen die User-
+                // Anweisung nicht mehr formulieren.
+                var ctxFactory = Service<Microsoft.EntityFrameworkCore.IDbContextFactory<Core.Database.UserDataContext>>();
+                var movedItems = new List<HBSort.ViewModels.BinInstructionItem>();
+                await using (var ctx = await ctxFactory.CreateDbContextAsync())
+                {
+                    if (minifigIds.Count > 0)
+                    {
+                        var minifigs = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+                            Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AsNoTracking(
+                                ctx.TrackedMinifigs.Where(m => minifigIds.Contains(m.Id))));
+                        foreach (var m in minifigs)
+                        {
+                            movedItems.Add(new HBSort.ViewModels.BinInstructionItem
+                            {
+                                ItemLabel = $"Figur '{m.Name ?? m.BricklinkId ?? "?"}'",
+                                QuantityText = "1 Stueck",
+                                BinLabel = targetBin.Label
+                            });
+                        }
+                    }
+                    if (floatingIds.Count > 0)
+                    {
+                        var floats = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+                            Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AsNoTracking(
+                                ctx.FloatingParts.Where(p => floatingIds.Contains(p.Id))));
+                        foreach (var fp in floats)
+                        {
+                            movedItems.Add(new HBSort.ViewModels.BinInstructionItem
+                            {
+                                ItemLabel = $"{fp.PartName} ({fp.PartNumber}) - {fp.ColorName}",
+                                QuantityText = $"{fp.Quantity} Stueck",
+                                BinLabel = targetBin.Label
+                            });
+                        }
+                    }
+                }
+
                 var (mMov, fMov) = await persistence.MoveSelectionAsync(minifigIds, floatingIds, targetBinId);
                 var notif = Service<INotificationService>();
                 notif.ShowSuccess($"{mMov} Figur(en) und {fMov} Einzelteil(e) nach '{targetBin.Label}' verschoben.");
+
+                // Sammel-Popup mit Item-Liste. Nur ab 1 bewegten Item zeigen
+                // (bei 0 macht ein Popup keinen Sinn).
+                if (movedItems.Count > 0
+                    && Window.GetWindow(this)?.DataContext is MainViewModel mainVm
+                    && mainVm.ScanViewModel != null)
+                {
+                    mainVm.ScanViewModel.ShowBinInstructionGroup(movedItems);
+                }
             }
             catch (System.Exception ex)
             {

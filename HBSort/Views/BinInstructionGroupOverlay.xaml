@@ -31,9 +31,11 @@
 
             <DockPanel LastChildFill="True">
                 <TextBlock DockPanel.Dock="Top"
-                           Text="Lege folgende Teile in die jeweiligen Faecher:"
+                           Text="{Binding ScanViewModel.BinInstructionGroup.HeaderText}"
+                           TextWrapping="Wrap"
                            FontSize="16" FontWeight="SemiBold"
                            HorizontalAlignment="Center"
+                           TextAlignment="Center"
                            Margin="0,0,0,16"/>
 
                 <Button DockPanel.Dock="Bottom"
@@ -50,41 +52,68 @@
                     <ItemsControl ItemsSource="{Binding ScanViewModel.BinInstructionGroup.Items}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Grid Margin="0,4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="60"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
+                                <!-- UX X.32 v0.1.19-beta.6: visuelle Trennung
+                                     Quell-Items (oben, "rausnehmen") <-> Ziel-
+                                     Items (unten, "reinlegen"). Vor jedem
+                                     IsTargetItem=true: Separator. Plus
+                                     leichter Akzent-Hintergrund am Item. -->
+                                <StackPanel>
+                                    <Separator Margin="0,8,0,4"
+                                               Background="{DynamicResource SystemAccentColorLight2Brush}"
+                                               Height="1"
+                                               Visibility="{Binding IsTargetItem,
+                                                                    Converter={StaticResource BoolToVisibility}}"/>
 
-                                    <Image Grid.Column="0"
-                                           Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
-                                           Width="48" Height="48"
-                                           Stretch="Uniform"/>
+                                    <Border CornerRadius="4" Padding="8,4">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsTargetItem}" Value="True">
+                                                        <Setter Property="Background"
+                                                                Value="{DynamicResource InfoBoxBackground}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
 
-                                    <StackPanel Grid.Column="1"
-                                                VerticalAlignment="Center"
-                                                Margin="8,0">
-                                        <TextBlock Text="{Binding ItemLabel}"
-                                                   FontWeight="SemiBold"
-                                                   TextWrapping="Wrap"/>
-                                        <TextBlock Text="{Binding QuantityText}"
-                                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                                                   FontSize="11"/>
-                                    </StackPanel>
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="60"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
 
-                                    <Border Grid.Column="2"
-                                            Background="{DynamicResource SystemAccentColorLight2Brush}"
-                                            CornerRadius="4"
-                                            Padding="12,6"
-                                            VerticalAlignment="Center"
-                                            MinWidth="100">
-                                        <TextBlock Text="{Binding BinLabel}"
-                                                   Foreground="White"
-                                                   FontWeight="Bold"
-                                                   HorizontalAlignment="Center"/>
+                                            <Image Grid.Column="0"
+                                                   Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
+                                                   Width="48" Height="48"
+                                                   Stretch="Uniform"/>
+
+                                            <StackPanel Grid.Column="1"
+                                                        VerticalAlignment="Center"
+                                                        Margin="8,0">
+                                                <TextBlock Text="{Binding ItemLabel}"
+                                                           FontWeight="SemiBold"
+                                                           TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding QuantityText}"
+                                                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                                           FontSize="11"/>
+                                            </StackPanel>
+
+                                            <Border Grid.Column="2"
+                                                    Background="{DynamicResource SystemAccentColorLight2Brush}"
+                                                    CornerRadius="4"
+                                                    Padding="12,6"
+                                                    VerticalAlignment="Center"
+                                                    MinWidth="100">
+                                                <TextBlock Text="{Binding BinLabel}"
+                                                           Foreground="White"
+                                                           FontWeight="Bold"
+                                                           HorizontalAlignment="Center"/>
+                                            </Border>
+                                        </Grid>
                                     </Border>
-                                </Grid>
+                                </StackPanel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

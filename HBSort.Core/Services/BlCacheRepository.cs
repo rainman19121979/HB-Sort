@@ -280,6 +280,59 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         }
     }
 
+    /// <summary>
+    /// UX X.32 v0.1.19-beta.4: BL-Kategorie-Id pro PartNo aus dem Cache.
+    /// Chunking auf 500 Items pro IN-Klausel - SQLite-Default-Limit ist
+    /// 999 Parameter, wir bleiben mit Sicherheits-Puffer drunter.
+    /// </summary>
+    public Task<Dictionary<string, int>> GetCategoryIdsForPartsAsync(
+        IEnumerable<string> partNumbers,
+        CancellationToken ct = default)
+    {
+        var input = (partNumbers ?? Enumerable.Empty<string>())
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        if (input.Count == 0) return Task.FromResult(result);
+
+        const int chunkSize = 500;
+        lock (_lock)
+        {
+            for (int offset = 0; offset < input.Count; offset += chunkSize)
+            {
+                ct.ThrowIfCancellationRequested();
+                var chunk = input.Skip(offset).Take(chunkSize).ToList();
+
+                using var cmd = _connection.CreateCommand();
+                // Parameter-Liste $p0, $p1, ... pro Chunk dynamisch bauen.
+                var paramNames = new string[chunk.Count];
+                for (int i = 0; i < chunk.Count; i++)
+                {
+                    var name = $"$p{i}";
+                    paramNames[i] = name;
+                    cmd.Parameters.AddWithValue(name, chunk[i]);
+                }
+                cmd.CommandText =
+                    "SELECT item_no, category_id FROM bl_items " +
+                    "WHERE item_type = 'P' AND category_id IS NOT NULL " +
+                    "  AND item_no IN (" + string.Join(",", paramNames) + ");";
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    if (reader.IsDBNull(1)) continue; // defensiv (Filter ist DB-seitig schon raus)
+                    var no = reader.GetString(0);
+                    var cat = reader.GetInt32(1);
+                    result[no] = cat;
+                }
+            }
+        }
+
+        return Task.FromResult(result);
+    }
+
     private static BlItem ReadItem(SqliteDataReader r)
     {
         var compl = r.GetString(11);

@@ -56,6 +56,25 @@ public interface IPartLookupService
         CancellationToken ct = default);
 
     /// <summary>
+    /// UX X.32 v0.1.19-beta.4 Block D: erweiterte Variante von
+    /// <see cref="CollectMinifigFromSupersetAsync"/> mit User-Auswahl welche
+    /// Reverse-Match-Teile konsumiert werden sollen. Statt automatisch ALLE
+    /// matchenden FloatingParts zu nehmen, wird nur fuer die in
+    /// <paramref name="consumePartsFromFloating"/> genannten (PartNo, ColorId)
+    /// ein Reverse-Match versucht. Andere Required-Parts bleiben "fehlt /
+    /// wartend".
+    ///
+    /// Liefert ein <see cref="CollectMinifigResult"/> mit der angelegten
+    /// Figur, dem Complete-Status und den konsumierten FloatingParts (fuer
+    /// das Sammel-Popup im UI-Layer).
+    /// </summary>
+    Task<CollectMinifigResult> CollectMinifigFromSupersetWithSelectionAsync(
+        string blMinifigId, int storageBinId,
+        string triggerPartNo, int triggerColorId, int triggerQuantity,
+        IReadOnlyCollection<(string PartNo, int ColorId)> consumePartsFromFloating,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Loescht einen FloatingPart-Eintrag komplett aus der DB (User-Aktion in
     /// der Lagerliste). Liefert true wenn der Eintrag existierte.
     /// </summary>
@@ -75,6 +94,19 @@ public record FloatingPartLocation(
     int StorageBinId,
     string StorageBinLabel,
     int TotalQuantity);
+
+/// <summary>
+/// UX X.32 v0.1.19-beta.4 Block D: Ergebnis eines
+/// <see cref="IPartLookupService.CollectMinifigFromSupersetWithSelectionAsync"/>-
+/// Aufrufs. Liefert die angelegte Figur PLUS die Detail-Info ueber
+/// konsumierte FloatingParts (fuer das Sammel-Popup im UI).
+/// </summary>
+public class CollectMinifigResult
+{
+    public TrackedMinifig SavedMinifig { get; init; } = null!;
+    public bool IsFullyComplete { get; init; }
+    public List<ConsumedFloatingPartInfo> ConsumedFloatingParts { get; init; } = new();
+}
 
 /// <summary>Ergebnis eines LookupPartAsync-Aufrufs.</summary>
 public record PartLookupResult(

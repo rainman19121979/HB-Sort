@@ -268,6 +268,73 @@ public class StorageBinServiceTests : IDisposable
         Assert.Null(suggestion);
     }
 
+    // ===== UX X.32 v0.1.19-beta.4: maxWaitingLimit > 1 =====
+
+    [Fact]
+    public async Task SuggestBinForWaitingMinifig_limit3_with_existing_waiting_picks_stack_bin()
+    {
+        // Limit=3, Box 01 hat schon 1 wartende Figur, Box 02 ist frei.
+        // Stapel-Pfad: Box 01 wird vorgeschlagen (Stapel waechst).
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Waiting);
+
+        var suggestion = await _sut.SuggestBinForWaitingMinifigAsync(maxWaitingLimit: 3);
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 01", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForWaitingMinifig_limit3_at_limit_falls_back_to_free_bin()
+    {
+        // Limit=3, Box 01 hat schon 3 wartende -> nicht mehr stapelbar.
+        // Box 02 ist frei -> wird vorgeschlagen.
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        for (int i = 0; i < 3; i++)
+            await SeedMinifigInBinAsync(b1!.Id, $"fig{i}", TrackedMinifigStatus.Waiting);
+
+        var suggestion = await _sut.SuggestBinForWaitingMinifigAsync(maxWaitingLimit: 3);
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForWaitingMinifig_limit3_skips_stack_bin_with_complete()
+    {
+        // Limit=3, Box 01 hat 1 wartende UND 1 Complete -> nicht stapelbar
+        // (Mix-Fach mit Complete macht Verwaltung kompliziert). Box 02 frei.
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedMinifigInBinAsync(b1!.Id, "wait1", TrackedMinifigStatus.Waiting);
+        await SeedMinifigInBinAsync(b1!.Id, "done1", TrackedMinifigStatus.Complete);
+
+        var suggestion = await _sut.SuggestBinForWaitingMinifigAsync(maxWaitingLimit: 3);
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForWaitingMinifig_limit3_prefers_fuller_stack()
+    {
+        // Limit=3, Box 01 hat 1 wartende, Box 02 hat 2 wartende.
+        // Voller Bin zuerst -> Box 02.
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02", "Box 03" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        var b2 = await _sut.GetByLabelAsync("Box 02");
+        await SeedMinifigInBinAsync(b1!.Id, "f1", TrackedMinifigStatus.Waiting);
+        await SeedMinifigInBinAsync(b2!.Id, "f2", TrackedMinifigStatus.Waiting);
+        await SeedMinifigInBinAsync(b2!.Id, "f3", TrackedMinifigStatus.Waiting);
+
+        var suggestion = await _sut.SuggestBinForWaitingMinifigAsync(maxWaitingLimit: 3);
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
     [Fact]
     public async Task SuggestBinForCompleteMinifig_under_limit_picks_existing_complete_bin()
     {

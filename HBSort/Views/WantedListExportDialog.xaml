@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.modernwpf.com/2019"
         ui:WindowHelper.UseModernWindowStyle="True"
-        Title="Wanted-List exportieren"
+        Title="BrickLink Wanted-List exportieren - fehlende Teile"
         ToolTipService.IsEnabled="{DynamicResource TooltipsEnabled}"
         Icon="../Resources/app.ico"
         Width="560" Height="440"
@@ -25,7 +25,7 @@
 
         <!-- Kopf -->
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
-            <TextBlock Text="BrickLink Wanted-List exportieren"
+            <TextBlock Text="BrickLink Wanted-List exportieren - fehlende Teile"
                        FontSize="18" FontWeight="SemiBold"/>
             <TextBlock x:Name="SummaryText"
                        FontSize="12" Foreground="Gray"
@@ -38,12 +38,14 @@
         <StackPanel Grid.Row="1" Margin="0,0,0,12">
             <TextBlock Text="Modus" FontSize="14" FontWeight="SemiBold"
                        Margin="0,0,0,6"/>
-            <RadioButton x:Name="ModeCombined" Content="Alle wartenden Figuren in eine Datei"
+            <RadioButton x:Name="ModeCombined" Content="Alle Fehlteile in eine Datei (zusammengefasst)"
                          GroupName="ExportMode"
                          IsChecked="True"
-                         Margin="0,0,0,4"/>
-            <RadioButton x:Name="ModePerMinifig" Content="Pro wartender Figur eine eigene Datei"
-                         GroupName="ExportMode"/>
+                         Margin="0,0,0,4"
+                         ToolTip="Mengen werden ueber alle wartenden Figuren aggregiert (PartNo + Farbe)."/>
+            <RadioButton x:Name="ModePerMinifig" Content="Pro wartender Figur eine eigene Datei (separate Wanted-Lists)"
+                         GroupName="ExportMode"
+                         ToolTip="Pro wartender Figur eine eigene BSX mit ihren fehlenden Teilen."/>
         </StackPanel>
 
         <!-- Speicherort -->
@@ -88,11 +90,21 @@
             <Button Content="Abbrechen" IsCancel="True"
                     Width="100" Margin="0,0,8,0"
                     Click="Cancel_Click"/>
-            <Button x:Name="ExportButton" Content="Exportieren"
-                    Width="120"
+            <!-- UX X.32 v0.1.19-beta.6: Zwischenablage-Variante.
+                 BrickLink-Web hat ein "Paste XML"-Tab im Wanted-Upload-
+                 Dialog - der User kopiert hier den XML-Code rein statt
+                 die Datei hochzuladen. Funktioniert nur fuer den
+                 Combined-Modus (Pro-Figur-Modus erzeugt mehrere XMLs). -->
+            <Button x:Name="ClipboardButton" Content="In Zwischenablage"
+                    Width="160" Margin="0,0,8,0"
+                    Click="CopyToClipboard_Click"
+                    ToolTip="Kopiert den XML-Code aller Fehlteile in die Zwischenablage. Du kannst ihn dann direkt im BrickLink-Web-Wanted-Upload in das Textfeld einfuegen statt eine Datei hochzuladen."/>
+            <Button x:Name="ExportButton" Content="Als Datei exportieren"
+                    Width="160"
                     Style="{StaticResource AccentButtonStyle}"
                     Click="Export_Click"
-                    IsDefault="True"/>
+                    IsDefault="True"
+                    ToolTip="Speichert die Wanted-List als XML-Datei im gewaehlten Ordner. Auf BrickLink unter Wanted -> Upload kannst du sie dann hochladen."/>
         </StackPanel>
     </Grid>
 </Window>

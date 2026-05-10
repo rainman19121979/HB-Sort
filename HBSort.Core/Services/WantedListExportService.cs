@@ -1,6 +1,7 @@
 using System.Globalization;
+using System.IO;
+using System.Net;
 using System.Text;
-using System.Xml.Linq;
 using HBSort.Core.Database;
 using HBSort.Core.Models;
 using Microsoft.EntityFrameworkCore;
@@ -9,21 +10,33 @@ using Serilog;
 namespace HBSort.Core.Services;
 
 /// <summary>
-/// Default-Implementierung des Wanted-List-Exports. Liest die wartenden
-/// Figuren aus userdata.db, ermittelt pro Required-Part die fehlende Menge
-/// und schreibt das BrickLink-Wanted-List-XML-Format.
+/// Default-Implementierung des Wanted-List-Exports.
 ///
-/// XML-Struktur:
+/// UX X.32 v0.1.19-beta.6 (User-Befund): Format zurueck auf BrickLink-
+/// Wanted-XML (INVENTORY/ITEM mit Grossbuchstaben-Tags, MINQTY-Pflicht).
+/// Vorher (beta.4-beta.5) war BSX, aber die BrickLink-Webseite akzeptiert
+/// nur ihr eigenes XML-Format beim Upload. Inhalt unveraendert: pro
+/// fehlendem Teil ein Eintrag, Mengen ueber wartende Figuren aggregiert.
+///
+/// XML-Struktur (BL-Wanted-Spec):
 /// <code>
 /// &lt;INVENTORY&gt;
-///   &lt;ITEM&gt;
-///     &lt;ITEMTYPE&gt;P&lt;/ITEMTYPE&gt;
-///     &lt;ITEMID&gt;3622&lt;/ITEMID&gt;
-///     &lt;COLOR&gt;11&lt;/COLOR&gt;
-///     &lt;MINQTY&gt;3&lt;/MINQTY&gt;
-///   &lt;/ITEM&gt;
+/// &lt;ITEM&gt;
+/// &lt;ITEMTYPE&gt;P&lt;/ITEMTYPE&gt;
+/// &lt;ITEMID&gt;3622&lt;/ITEMID&gt;
+/// &lt;COLOR&gt;11&lt;/COLOR&gt;
+/// &lt;MINQTY&gt;5&lt;/MINQTY&gt;
+/// &lt;/ITEM&gt;
+/// ...
 /// &lt;/INVENTORY&gt;
 /// </code>
+///
+/// Konvention:
+/// - KEINE XML-Deklaration (BL-Web-Upload erkennt sie nicht).
+/// - UTF-8 ohne BOM.
+/// - MINQTY ZWINGEND - sonst ignoriert BL den Eintrag beim Upload.
+/// - Reihenfolge der Sub-Elemente: ITEMTYPE -> ITEMID -> COLOR (nur Parts)
+///   -> MINQTY.
 /// </summary>
 public class WantedListExportService : IWantedListExportService
 {
@@ -39,9 +52,7 @@ public class WantedListExportService : IWantedListExportService
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
         var waiting = await LoadWaitingMinifigsAsync(ctx, ct);
 
-        // Fehlende Mengen ueber alle wartenden Figuren aufsummieren, gruppiert
-        // nach (PartNo, ColorId). So bekommt der User eine einzige Liste, in
-        // der z.B. "5x Helm Black" steht statt 3 Eintraege "1x", "2x", "2x".
+        // Fehlende Mengen ueber alle wartenden Figuren aggregieren.
         var aggregated = waiting
             .SelectMany(m => m.RequiredParts)
             .Select(p => new
@@ -52,9 +63,10 @@ public class WantedListExportService : IWantedListExportService
             })
             .Where(x => x.Missing > 0)
             .GroupBy(x => new { x.PartNumber, x.ColorId })
-            .Select(g => (PartNo: g.Key.PartNumber,
-                          ColorId: g.Key.ColorId,
-                          Quantity: g.Sum(x => x.Missing)))
+            .Select(g => new WantedItem(
+                g.Key.PartNumber,
+                g.Key.ColorId,
+                g.Sum(x => x.Missing)))
             .OrderBy(x => x.PartNo).ThenBy(x => x.ColorId)
             .ToList();
 
@@ -62,8 +74,8 @@ public class WantedListExportService : IWantedListExportService
             throw new InvalidOperationException(
                 "Keine fehlenden Teile in den wartenden Figuren - nichts zu exportieren.");
 
-        var xml = BuildInventoryXml(aggregated);
-        Log.Information("Wanted-List (combined): {Count} Teile-Eintraege ueber {Mfg} Figuren",
+        var xml = BuildBlWantedXml(aggregated);
+        Log.Information("Wanted-List (BL-XML combined): {Count} Teile-Eintraege ueber {Mfg} Figuren",
             aggregated.Count, waiting.Count);
         return xml;
     }
@@ -80,26 +92,26 @@ public class WantedListExportService : IWantedListExportService
             ct.ThrowIfCancellationRequested();
 
             var entries = m.RequiredParts
-                .Select(p => (PartNo: p.PartNumber,
-                              p.ColorId,
-                              Quantity: Math.Max(0, p.QuantityNeeded - p.QuantityCollected)))
+                .Select(p => new WantedItem(
+                    p.PartNumber,
+                    p.ColorId,
+                    Math.Max(0, p.QuantityNeeded - p.QuantityCollected)))
                 .Where(x => x.Quantity > 0)
                 .OrderBy(x => x.PartNo).ThenBy(x => x.ColorId)
                 .ToList();
 
-            if (entries.Count == 0) continue; // Figur ist eigentlich schon komplett
+            if (entries.Count == 0) continue;
 
-            var xml = BuildInventoryXml(entries);
+            var xml = BuildBlWantedXml(entries);
             var blId = m.BricklinkId ?? m.FigNum;
             var fileName = $"Wanted-{SanitizeFileName(blId)}-{SanitizeFileName(m.Name)}.xml";
             result.Add(new WantedListExportFile(fileName, xml));
         }
 
-        Log.Information("Wanted-List (per Figur): {Count} Dateien generiert", result.Count);
+        Log.Information("Wanted-List (BL-XML per Figur): {Count} Dateien generiert", result.Count);
         return result;
     }
 
-    /// <summary>Laedt alle wartenden Figuren mit ihren Required-Parts.</summary>
     private static async Task<List<TrackedMinifig>> LoadWaitingMinifigsAsync(
         UserDataContext ctx, CancellationToken ct)
     {
@@ -110,35 +122,52 @@ public class WantedListExportService : IWantedListExportService
             .ToListAsync(ct);
     }
 
-    /// <summary>Baut das INVENTORY-XML aus einer Eintragsliste.</summary>
-    private static string BuildInventoryXml(
-        IEnumerable<(string PartNo, int ColorId, int Quantity)> entries)
+    /// <summary>
+    /// Baut das BL-Wanted-XML aus der Item-Liste. StringBuilder statt
+    /// XmlWriter weil:
+    ///   1) BL akzeptiert keine XML-Deklaration. XmlWriter mit
+    ///      OmitXmlDeclaration=true ist zwar moeglich, aber bei manchen
+    ///      .NET-Versionen schreibt er sie trotzdem.
+    ///   2) Wir wollen Pretty-Print mit jeweils einem Tag pro Zeile -
+    ///      direkter Stringbau ist hier transparenter.
+    /// Sonderzeichen werden via WebUtility.HtmlEncode escaped (deckt
+    /// &amp;lt;, &amp;gt;, &amp;amp; ab).
+    /// </summary>
+    private static string BuildBlWantedXml(IEnumerable<WantedItem> entries)
     {
-        var inventory = new XElement("INVENTORY");
+        var sb = new StringBuilder();
+        sb.AppendLine("<INVENTORY>");
         foreach (var e in entries)
         {
-            inventory.Add(new XElement("ITEM",
-                new XElement("ITEMTYPE", "P"),
-                new XElement("ITEMID", e.PartNo),
-                new XElement("COLOR", e.ColorId.ToString(CultureInfo.InvariantCulture)),
-                new XElement("MINQTY", e.Quantity.ToString(CultureInfo.InvariantCulture))));
+            sb.AppendLine("<ITEM>");
+            sb.AppendLine("<ITEMTYPE>P</ITEMTYPE>");
+            sb.AppendLine($"<ITEMID>{Escape(e.PartNo)}</ITEMID>");
+            // COLOR-Tag nur wenn sinnvoll. ColorId 0 wird oft fuer "no color
+            // applicable" genutzt - BL akzeptiert das auch ohne COLOR-Tag.
+            // Wir schreiben sie trotzdem mit, weil BL "0=Not Applicable"
+            // explizit so im Color-Mapping definiert.
+            sb.AppendLine($"<COLOR>{e.ColorId.ToString(CultureInfo.InvariantCulture)}</COLOR>");
+            sb.AppendLine($"<MINQTY>{e.Quantity.ToString(CultureInfo.InvariantCulture)}</MINQTY>");
+            sb.AppendLine("</ITEM>");
         }
-
-        var doc = new XDocument(
-            new XDeclaration("1.0", "UTF-8", null),
-            inventory);
-
-        // XDocument.ToString liefert ohne XML-Declaration. Wir brauchen sie aber,
-        // damit BrickStore/BL die Datei korrekt erkennt.
-        using var sw = new StringWriter();
-        doc.Save(sw);
-        return sw.ToString();
+        sb.Append("</INVENTORY>");
+        return sb.ToString();
     }
+
+    private static string Escape(string s)
+    {
+        // WebUtility.HtmlEncode escaped &, <, > sowie hohe Codepoints.
+        return WebUtility.HtmlEncode(s ?? string.Empty);
+    }
+
+    /// <summary>Eine Zeile in der Wanted-List - aggregiertes fehlendes Teil.</summary>
+    private record WantedItem(
+        string PartNo,
+        int ColorId,
+        int Quantity);
 
     /// <summary>
     /// Macht aus beliebigen Strings einen Dateinamens-tauglichen Token.
-    /// Sonderzeichen werden zu '_'; Path-Separator und reservierte
-    /// Windows-Zeichen sind raus.
     /// </summary>
     private static string SanitizeFileName(string s)
     {
@@ -149,7 +178,6 @@ public class WantedListExportService : IWantedListExportService
         {
             sb.Append(invalid.Contains(c) || char.IsControl(c) ? '_' : c);
         }
-        // Maximal-Laenge limitieren damit der Pfad insgesamt nicht zu lang wird.
         var clean = sb.ToString().Trim('_', ' ');
         return clean.Length > 60 ? clean.Substring(0, 60) : clean;
     }

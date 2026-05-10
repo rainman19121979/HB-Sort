@@ -551,6 +551,10 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         // wenn ein Required-Part aus 2 Faechern bedient wird, zwei Eintraege.
         var consumed = new List<ConsumedFloatingPartInfo>();
 
+        Log.Information(
+            "PersistAndStore Reverse-Match: Minifig='{Name}' (BL:{Bl}), {Cnt} RequiredParts",
+            minifig.Name, minifig.BricklinkId, minifig.RequiredParts.Count);
+
         foreach (var required in minifig.RequiredParts)
         {
             // Alle passenden FloatingParts (egal in welchem Fach), aelteste zuerst.
@@ -563,6 +567,17 @@ public class MinifigPersistenceService : IMinifigPersistenceService
                 .OrderBy(fp => fp.AddedAt)
                 .ToListAsync(ct);
 
+            Log.Information(
+                "  RequiredPart {Part}/{Color} (need={Need}, have={Have}): {Cands} FloatingPart-Kandidaten",
+                required.PartNumber, required.ColorId,
+                required.QuantityNeeded, required.QuantityCollected,
+                candidates.Count);
+            foreach (var c in candidates)
+            {
+                Log.Information("    -> FP Id={Id} '{Name}' Qty={Qty} Bin='{Bin}'",
+                    c.Id, c.PartName, c.Quantity, c.StorageBin?.Label ?? "?");
+            }
+
             foreach (var fp in candidates)
             {
                 var stillNeeded = required.QuantityNeeded - required.QuantityCollected;
@@ -572,6 +587,10 @@ public class MinifigPersistenceService : IMinifigPersistenceService
                 required.QuantityCollected += take;
                 fp.Quantity -= take;
                 reverseMatched += take;
+
+                Log.Information("    KONSUMIERT: nimm {Take} aus FP Id={Id} (Bin '{Bin}'); FP-Rest={Rest}, Required jetzt {Have}/{Need}",
+                    take, fp.Id, fp.StorageBin?.Label ?? "?", fp.Quantity,
+                    required.QuantityCollected, required.QuantityNeeded);
 
                 consumed.Add(new ConsumedFloatingPartInfo
                 {

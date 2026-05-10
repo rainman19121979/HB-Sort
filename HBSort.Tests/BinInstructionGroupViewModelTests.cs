@@ -118,4 +118,109 @@ public class BinInstructionGroupViewModelTests
 
         Assert.Contains(nameof(BinInstructionGroupViewModel.IsVisible), changed);
     }
+
+    // ====================================================================
+    // UX X.32 v0.1.19-beta.5 (User-Befund Baubar-Popup): HeaderText
+    // ====================================================================
+
+    [Fact]
+    public void HeaderText_defaults_to_default_constant()
+    {
+        var vm = new BinInstructionGroupViewModel();
+        Assert.Equal(BinInstructionGroupViewModel.DefaultHeaderText, vm.HeaderText);
+    }
+
+    [Fact]
+    public void Show_without_headerText_keeps_default()
+    {
+        var vm = new BinInstructionGroupViewModel();
+        vm.Show(new[] { MakeItem("X", "Box 1", 1) });
+        Assert.Equal(BinInstructionGroupViewModel.DefaultHeaderText, vm.HeaderText);
+    }
+
+    [Fact]
+    public void Show_with_custom_headerText_applies_it()
+    {
+        var vm = new BinInstructionGroupViewModel();
+        var custom = "Nimm folgende Teile aus den Faechern und lege die fertige Figur in das Ziel-Fach:";
+        vm.Show(new[] { MakeItem("X", "Box 1", 1) }, custom);
+        Assert.Equal(custom, vm.HeaderText);
+    }
+
+    [Fact]
+    public void Show_with_empty_headerText_falls_back_to_default()
+    {
+        var vm = new BinInstructionGroupViewModel();
+        vm.Show(new[] { MakeItem("X", "Box 1", 1) }, "   ");
+        Assert.Equal(BinInstructionGroupViewModel.DefaultHeaderText, vm.HeaderText);
+    }
+
+    [Fact]
+    public void Dismiss_resets_HeaderText_to_default()
+    {
+        var vm = new BinInstructionGroupViewModel();
+        vm.Show(new[] { MakeItem("X", "Box 1", 1) }, "Custom Header");
+        Assert.Equal("Custom Header", vm.HeaderText);
+
+        vm.Dismiss();
+
+        Assert.Equal(BinInstructionGroupViewModel.DefaultHeaderText, vm.HeaderText);
+    }
+
+    [Fact]
+    public void Show_after_dismiss_with_new_header_applies_new_header()
+    {
+        var vm = new BinInstructionGroupViewModel();
+        vm.Show(new[] { MakeItem("X", "Box 1", 1) }, "Erster Header");
+        vm.Dismiss();
+        vm.Show(new[] { MakeItem("Y", "Box 2", 1) }, "Zweiter Header");
+
+        Assert.Equal("Zweiter Header", vm.HeaderText);
+    }
+
+    // ====================================================================
+    // UX X.32 v0.1.19-beta.6 (User-Befund Item-Trennung): IsTargetItem
+    // ====================================================================
+
+    [Fact]
+    public void BinInstructionItem_IsTargetItem_defaults_to_false()
+    {
+        var item = MakeItem("X", "Box 1", 1);
+        Assert.False(item.IsTargetItem);
+    }
+
+    [Fact]
+    public void BinInstructionItem_IsTargetItem_can_be_set_via_init()
+    {
+        var item = new BinInstructionItem
+        {
+            ItemLabel = "Lege fertige Figur in Ziel-Fach",
+            BinLabel = "Box 5",
+            QuantityText = "1 Stueck",
+            IsTargetItem = true
+        };
+        Assert.True(item.IsTargetItem);
+    }
+
+    [Fact]
+    public void BinInstructionItem_ImageUrl_can_be_updated_after_creation()
+    {
+        // Item-Liste wird mit ImageUrl=null erzeugt. Im UI-Layer wird das
+        // Bild dann async ueber den IPartImageProvider nachgeladen und
+        // per Setter aktualisiert. ObservableProperty -> UI bekommt
+        // PropertyChanged + Bild erscheint im Overlay.
+        var item = new BinInstructionItem
+        {
+            ItemLabel = "Test", BinLabel = "Box 1", QuantityText = "1 Stueck"
+        };
+        Assert.Null(item.ImageUrl);
+
+        var changedProps = new List<string?>();
+        item.PropertyChanged += (_, e) => changedProps.Add(e.PropertyName);
+
+        item.ImageUrl = "C:/cache/3001.png";
+
+        Assert.Equal("C:/cache/3001.png", item.ImageUrl);
+        Assert.Contains(nameof(BinInstructionItem.ImageUrl), changedProps);
+    }
 }

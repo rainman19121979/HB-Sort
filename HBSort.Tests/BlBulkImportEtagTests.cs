@@ -208,6 +208,7 @@ public class BlBulkImportEtagTests
         public Task<BlItem?> GetItemAsync(string itemType, string itemNo, CancellationToken ct = default) => throw new NotImplementedException();
         public Task UpsertItemAsync(BlItem item, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<bool> IsItemStaleAsync(string itemType, string itemNo, int staleDays, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<Dictionary<string, int>> GetCategoryIdsForPartsAsync(IEnumerable<string> partNumbers, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<List<BlSubset>> GetSubsetsAsync(string parentType, string parentNo, CancellationToken ct = default) => throw new NotImplementedException();
         public Task ReplaceSubsetsAsync(string parentType, string parentNo, IEnumerable<BlSubset> subsets, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<List<string>> FindParentsByItemAsync(string itemType, string itemNo, int colorId, CancellationToken ct = default) => throw new NotImplementedException();

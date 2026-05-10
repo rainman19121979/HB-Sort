@@ -56,6 +56,30 @@ public class AppSettings
     public int MaxCompleteFiguresPerBin { get; set; } = 5;
 
     /// <summary>
+    /// UX X.32 v0.1.19-beta.4: Maximale Anzahl wartender Figuren pro Lagerfach.
+    /// Default 3. Bei 1 bekommt jede wartende Figur ein eigenes Fach
+    /// (UX-X.6-konform / strikte Trennung). Bei &gt;1 koennen mehrere wartende
+    /// Figuren ein Fach teilen - sinnvoll wenn man mehrere Figuren parallel
+    /// sammelt und Platz sparen will. Min 1, Max 999 (UI-seitig validiert).
+    /// </summary>
+    public int MaxWaitingFiguresPerBin { get; set; } = 3;
+
+    /// <summary>
+    /// UX X.32 v0.1.19-beta.4: Maximale Anzahl verschiedener BL-Kategorien
+    /// (Head, Torso, Legs, Headgear etc.) pro Lagerfach.
+    ///
+    /// Default 999 = praktisch unbegrenztes Mischen. ABER: pro Kategorie
+    /// landet immer nur EIN unique Item im Fach - bei einem zweiten
+    /// Helm (gleiche Kategorie, andere PartNo) wird ein anderes Fach
+    /// vorgeschlagen. Gleiche Teile (PartNo+ColorId) stapeln IMMER
+    /// unabhaengig vom Limit.
+    ///
+    /// Bei 1 = strikte Trennung pro Kategorie pro Fach (Koepfe in einem,
+    /// Torsos in einem anderen, kein Mix).
+    /// </summary>
+    public int MaxFloatingPartTypesPerBin { get; set; } = 999;
+
+    /// <summary>
     /// UX-Iteration X.9: Tooltips global an/ausschalten. Der TooltipsService
     /// schreibt diesen Wert in eine Application-Resource, die als
     /// DynamicResource an ToolTipService.IsEnabled der Wurzel-Windows gebunden

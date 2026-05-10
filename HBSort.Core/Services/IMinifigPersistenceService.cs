@@ -272,4 +272,12 @@ public class ConsumedFloatingPartInfo
 
     /// <summary>Label des Quell-Fachs (wo der FloatingPart konsumiert wurde).</summary>
     public string SourceBinLabel { get; init; } = string.Empty;
+
+    /// <summary>
+    /// UX X.32 v0.1.19-beta.6: Lokal gecachter Bild-Pfad zum Teil. Wird vom
+    /// Service NICHT befuellt (Service hat keinen IPartImageProvider) -
+    /// der UI-Layer reichert die Eintraege nach PersistAndStoreAsync via
+    /// IPartImageProvider an. Default null = noch kein Bild bekannt.
+    /// </summary>
+    public string? ImageUrl { get; set; }
 }

@@ -21,13 +21,22 @@ public interface IStorageBinService
     Task<StorageBin?> GetNextFreeAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// UX X.31 (v0.1.18): Schlaegt das naechste wirklich freie Fach fuer eine
-    /// wartende Figur vor. "Frei" hier bedeutet streng nach UX-X.6-Konvention:
-    /// keine wartende Figur, KEINE Complete-Figur (auch wenn UX-X.6 sagt
-    /// "Faecher bleiben belegt"), keine FloatingParts.
-    /// Sortierung nach Label aufsteigend; null wenn alle Faecher belegt sind.
+    /// UX X.31 (v0.1.18) / UX X.32 v0.1.19-beta.4: Schlaegt ein Fach fuer eine
+    /// wartende Figur vor.
+    ///
+    /// <paramref name="maxWaitingLimit"/> (Default 1, Backwards-Compat):
+    /// - = 1: nur wirklich freie Faecher (keine wartende, keine Complete,
+    ///        keine FloatingParts). UX-X.6-konform / strikte Trennung.
+    /// - &gt; 1: bevorzugt Bin der bereits wartende Figuren enthaelt
+    ///        (unter Limit) UND keine Complete-Figuren UND keine FloatingParts.
+    ///        Sortierung: meiste wartende zuerst (Stapel waechst), dann Label.
+    ///        Fallback: wirklich freies Fach.
+    ///
+    /// Liefert null wenn alle Faecher blockiert sind.
     /// </summary>
-    Task<StorageBin?> SuggestBinForWaitingMinifigAsync(CancellationToken ct = default);
+    Task<StorageBin?> SuggestBinForWaitingMinifigAsync(
+        int maxWaitingLimit = 1,
+        CancellationToken ct = default);
 
     /// <summary>
     /// UX X.31 (v0.1.18): Schlaegt ein Fach fuer eine Complete-Figur vor.
@@ -40,25 +49,34 @@ public interface IStorageBinService
     Task<StorageBin?> SuggestBinForCompleteMinifigAsync(int maxCompleteLimit, CancellationToken ct = default);
 
     /// <summary>
-    /// UX X.31 (v0.1.18) / Bug-Fix v0.1.19-beta.2: Schlaegt ein Fach fuer ein
-    /// Einzelteil vor. Vier-stufiger Fallback:
+    /// UX X.31 (v0.1.18) / Bug-Fix v0.1.19-beta.2 / UX X.32 v0.1.19-beta.4:
+    /// Schlaegt ein Fach fuer ein Einzelteil vor. Mehrstufiger Fallback:
     ///   1) Bin in dem das gleiche Teil (PartNo + ColorId) schon liegt
     ///      (FIFO nach AddedAt). Stapel wachsen lassen.
-    ///   2) Wirklich freies Fach (keine Minifigs, keine FloatingParts).
-    ///   3) Erweitert: Fach OHNE Complete-Figuren (FloatingParts erlaubt).
-    ///   4) Letzter Fallback: irgendein Fach, sortiert nach am wenigsten
-    ///      belegt. Damit liefert die Methode immer einen Vorschlag (sofern
-    ///      ueberhaupt Bins existieren) - Aufrufer muss nicht selbst auf null
-    ///      reagieren und auf Default-Bin zurueckfallen.
+    ///   2) Bei <paramref name="maxCategoriesPerBin"/> &gt; 1: Bin mit
+    ///      bestehenden FloatingParts deren Kategorie-Set die neue
+    ///      Kategorie noch nicht enthaelt UND unter Limit ist. Sortierung
+    ///      vollstes Fach zuerst.
+    ///   3) Wirklich freies Fach (keine Minifigs, keine FloatingParts).
+    ///   4) Fach OHNE Complete-/Waiting-Minifigs (FloatingParts erlaubt).
+    ///   5) Letzter Fallback: irgendein Fach, sortiert nach am wenigsten
+    ///      belegt. Liefert immer einen Vorschlag wenn Bins existieren.
     ///
-    /// Optionaler <paramref name="excludeMinifigId"/>: ignoriert das Fach
-    /// IGNORE einer Figur die durch den Aufrufer-Pfad selbst gleich
-    /// "verschwindet" (z.B. die zu zerlegende Figur im DismantleWizard - ihr
-    /// Fach wird dadurch frei). Wenn null gesetzt: keine Filterung.
+    /// <paramref name="excludeMinifigId"/>: Fach einer Figur die durch
+    /// den Aufrufer-Pfad gleich verschwindet (z.B. zu zerlegende Figur)
+    /// zaehlt als frei.
+    ///
+    /// <paramref name="maxCategoriesPerBin"/> (Default 1, Backwards-Compat):
+    /// strikte Trennung. Bei &gt; 1: bis zu N verschiedene BL-Kategorien
+    /// duerfen sich ein Fach teilen. Greift nur wenn <see cref="StorageBinService"/>
+    /// mit einem <see cref="IBlCacheRepository"/> konstruiert wurde - sonst
+    /// wird Stufe 2 uebersprungen.
     /// </summary>
     Task<StorageBin?> SuggestBinForFloatingPartAsync(
         string blPartNo, int blColorId,
         int? excludeMinifigId = null,
+        int maxCategoriesPerBin = 1,
+        string? partName = null,
         CancellationToken ct = default);
 
     Task<StorageBin> CreateSingleAsync(string label, string? notes = null, CancellationToken ct = default);

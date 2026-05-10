@@ -61,9 +61,15 @@ sichtbar sind:
 
 ## Wanted-List-Export fuer BrickLink
 
-Eine **Wanted-List** ist eine BrickLink-XML-Datei, die du in dein
-BrickLink-Konto importieren kannst, damit BL automatisch nach
-fehlenden Teilen sucht.
+Eine **Wanted-List** ist eine BrickLink-XML-Datei (`.xml`) die du auf
+der **BrickLink-Webseite** in deine Wanted-List importieren kannst,
+um die fehlenden Teile deiner wartenden Figuren zum Nachkauf zu
+sammeln.
+
+> Hinweis: Ab v0.1.19-beta.6 wieder BrickLink-Wanted-XML (Format der
+> BrickLink-Webseite). Die Zwischenversion mit BrickStoreXML wurde
+> verworfen weil die BrickLink-Webseite nur ihr eigenes XML-Format
+> beim Upload akzeptiert.
 
 ### So gehts
 
@@ -71,16 +77,22 @@ fehlenden Teilen sucht.
 2. Klick **Wanted-List exportieren** in der Header-Leiste.
 3. Im Dialog:
    - **Modus** waehlen:
-     - *Alle wartenden Figuren in eine Datei* - eine grosse Liste mit
-       allen fehlenden Teilen aller wartenden Figuren.
-     - *Pro Figur eine eigene Datei* - getrennte Listen, falls du sie
-       einzeln in BL anlegen willst.
+     - *Alle Fehlteile in eine Datei (zusammengefasst)* - eine grosse
+       Liste mit allen fehlenden Teilen aller wartenden Figuren,
+       Mengen aggregiert pro (PartNo + Farbe).
+     - *Pro wartender Figur eine eigene Datei* - getrennte Listen,
+       falls du sie einzeln auf BrickLink hochladen willst.
    - Default-Ordner pruefen / aendern.
-4. **Speichern**.
+4. Entweder **Als Datei exportieren** (XML-Datei speichern und auf
+   BrickLink unter *Wanted > Upload* hochladen)
+5. ODER **In Zwischenablage** klicken: HB-Sort kopiert den XML-Code
+   direkt in die Windows-Zwischenablage. Auf
+   <https://www.bricklink.com/v2/wanted/upload.page> dann den
+   *Paste XML*-Tab oeffnen und einfuegen.
 
-Die XML enthaelt pro fehlendem Teil eine `INVENTORY/ITEM`-Zeile mit
-`ITEMTYPE=P`, `ITEMID`, `COLOR` und `MINQTY` - genau wie BL es
-erwartet.
+Die `.xml`-Datei enthaelt pro fehlendem Teil ein
+`INVENTORY/ITEM`-Element mit `ITEMTYPE=P`, `ITEMID`, `COLOR` und
+`MINQTY` - genau das was BrickLink beim Wanted-Upload erwartet.
 
 ## Preise & Verkaufsempfehlung
 

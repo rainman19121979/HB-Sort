@@ -140,9 +140,13 @@ public partial class PartLookupView : UserControl
     //  SupersetsDialog + ViewModel bleiben fuer evtl. spaeteren Re-Use bestehen.)
 
     /// <summary>
-    /// "Diese Figur anlegen" auf einem BL-Catalog-Treffer: legt die Figur an,
-    /// markiert das gescannte Trigger-Teil sofort als gesammelt, macht
-    /// Reverse-Match gegen vorhandene Einzelteile.
+    /// "Diese Figur anlegen" auf einem BL-Catalog-Treffer.
+    ///
+    /// UX X.32 v0.1.19-beta.4 Block D: Vor-Auswahl-Dialog. User markiert
+    /// welche Required-Parts beim Anlegen aus dem Floating-Pool gezogen
+    /// werden sollen. Trigger-Teil ist immer markiert + nicht abwaehlbar,
+    /// Reverse-Match-Treffer sind vor-markiert (gruen), Rest ist demarkiert
+    /// (grau / "fehlt - bleibt wartend").
     /// </summary>
     private async void CollectFromBlCatalog_Click(object sender, RoutedEventArgs e)
     {
@@ -152,34 +156,121 @@ public partial class PartLookupView : UserControl
         var notif = Service<INotificationService>();
         var partLookup = Service<IPartLookupService>();
         var binService = Service<IStorageBinService>();
+        var catalog = Service<IBlCatalogService>();
+        var imageProvider = Service<IPartImageProvider>();
+        var settings = App.Services.GetRequiredService<HBSort.Core.Services.ISettingsService>();
+        var maxWaiting = settings.Current.MaxWaitingFiguresPerBin;
 
-        // Default-Bin: aktuell in der Floating-Combo selektiertes Fach,
-        // sonst Suggest-Service (wartende Figur -> wirklich freies Fach,
-        // UX X.31 v0.1.18 - kein Bin mit Complete drin).
-        var bin = vm.SelectedFloatingBin
-                  ?? await binService.SuggestBinForWaitingMinifigAsync()
-                  ?? vm.AvailableBins.FirstOrDefault();
-        if (bin == null)
+        // UX X.32 v0.1.19-beta.4 (User-Befund): kein Default-Bin mehr aus
+        // dem Floating-Pool des gerade gescannten Teils. Der Selection-
+        // Dialog hat jetzt seinen eigenen Bin-Picker - Default = wartende-
+        // Figur-Vorschlag aus dem StorageBinService. Vorher landete die
+        // neue wartende Figur faelschlicherweise im Fach des Einzelteils.
+        var selectionVm = new ViewModels.CollectMinifigSelectionViewModel(
+            catalog, partLookup, imageProvider, binService);
+
+        vm.IsBusy = true;
+        try
+        {
+            await selectionVm.LoadAsync(
+                match.BlMinifigId,
+                vm.BlPartNo, vm.BlColorId,
+                maxWaitingLimit: maxWaiting);
+        }
+        catch (System.Exception loadEx)
+        {
+            Log.Error(loadEx, "CollectMinifigSelection LoadAsync fehlgeschlagen");
+            await App.Services.GetRequiredService<IDialogService>()
+                .ShowErrorAsync("Fehler", loadEx.Message);
+            vm.IsBusy = false;
+            return;
+        }
+        vm.IsBusy = false;
+
+        if (selectionVm.AvailableBins.Count == 0)
         {
             notif.ShowWarning("Kein Lagerfach verfuegbar - bitte erst ein Fach anlegen.");
             return;
         }
 
+        var dialog = new CollectMinifigSelectionDialog(selectionVm)
+        {
+            Owner = Window.GetWindow(this)
+        };
+        var result = dialog.ShowDialog();
+        if (result != true) return; // User hat verworfen
+
+        // User-gewaehltes Bin aus dem Dialog (Default war SuggestBinForWaiting).
+        var bin = selectionVm.SelectedBin;
+        if (bin == null)
+        {
+            notif.ShowWarning("Kein Lagerfach gewaehlt.");
+            return;
+        }
+
+        // Service-Aufruf mit User-Auswahl.
         vm.IsBusy = true;
         try
         {
-            var minifig = await partLookup.CollectMinifigFromSupersetAsync(
+            var collectResult = await partLookup.CollectMinifigFromSupersetWithSelectionAsync(
                 match.BlMinifigId,
                 bin.Id,
                 vm.BlPartNo,
                 vm.BlColorId,
-                Math.Max(1, vm.Quantity));
+                Math.Max(1, vm.Quantity),
+                selectionVm.SelectedPartsForReverseMatch);
 
-            notif.ShowSuccess(
-                $"Figur '{minifig.Name}' angelegt in '{bin.Label}' - Trigger-Teil sofort gesammelt.");
+            // Toast + ggf. Sammel-Popup.
+            var scan = GetScanViewModel();
+            var consumed = collectResult.ConsumedFloatingParts;
+
+            if (collectResult.IsFullyComplete)
+            {
+                notif.ShowSuccess(
+                    $"Figur '{collectResult.SavedMinifig.Name}' komplett in '{bin.Label}'!");
+            }
+            else
+            {
+                notif.ShowSuccess(
+                    $"Figur '{collectResult.SavedMinifig.Name}' angelegt in '{bin.Label}'.");
+            }
+
+            // UX X.32 v0.1.19-beta.4 (User-Befund): Anweisungs-Popup analog
+            // zum PersistPendingAsync-Pfad - bei 2+ konsumierten Teilen
+            // Sammel-Popup, sonst Einzel-Popup ("Lege Figur in Box X").
+            // Vorher kam bei 0 konsumierten Teilen NUR ein Toast - der
+            // User wollte aber konsistent das gleiche Popup wie beim
+            // direkten Wartend-Anlegen.
+            if (scan != null)
+            {
+                if (consumed.Count >= 2)
+                {
+                    var items = new List<HBSort.ViewModels.BinInstructionItem>
+                    {
+                        new()
+                        {
+                            ItemLabel = $"Figur '{collectResult.SavedMinifig.Name}'",
+                            QuantityText = "1 Stueck",
+                            BinLabel = bin.Label,
+                            ImageUrl = selectionVm.ImageUrl
+                        }
+                    };
+                    items.AddRange(consumed.Select(c => new HBSort.ViewModels.BinInstructionItem
+                    {
+                        ItemLabel = $"{c.PartName} ({c.BlPartNo}) - {c.ColorName}",
+                        QuantityText = $"{c.Quantity} Stueck (aus {c.SourceBinLabel})",
+                        BinLabel = bin.Label
+                    }));
+                    scan.ShowBinInstructionGroup(items);
+                }
+                else
+                {
+                    // Einzel-Popup mit Bin-Label + Figur-Bild.
+                    scan.ShowBinInstruction(bin.Label, selectionVm.ImageUrl);
+                }
+            }
 
             // Pending ausblenden - Workflow ist abgeschlossen.
-            var scan = GetScanViewModel();
             if (scan != null) scan.PendingPart = null;
         }
         catch (System.Exception ex)

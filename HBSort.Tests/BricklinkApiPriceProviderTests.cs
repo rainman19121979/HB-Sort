@@ -189,6 +189,7 @@ public class BricklinkApiPriceProviderTests
         public Task UpsertItemAsync(BlItem item, CancellationToken ct = default) => throw new NotImplementedException();
         public Task UpsertItemsAsync(IEnumerable<BlItem> items, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<bool> IsItemStaleAsync(string itemType, string itemNo, int staleDays, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<Dictionary<string, int>> GetCategoryIdsForPartsAsync(IEnumerable<string> partNumbers, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<List<BlSubset>> GetSubsetsAsync(string parentType, string parentNo, CancellationToken ct = default) => throw new NotImplementedException();
         public Task ReplaceSubsetsAsync(string parentType, string parentNo, IEnumerable<BlSubset> subsets, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<int> BulkInsertSubsetsAsync(IEnumerable<BlSubset> subsets, CancellationToken ct = default) => throw new NotImplementedException();

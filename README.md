@@ -49,6 +49,44 @@ BrickStore- und BrickLink-Export.
   markieren und gemeinsam loeschen oder verschieben (mit Undo-Support).
   Doppelklick auf Zeile oeffnet Details, Entf-Taste loescht Selektion.
 
+## v0.1.19-beta.6: Beta-Release (aktuelle Beta-Iteration)
+
+Diese Version ist ein **Pre-Release**. Auto-Update aus stable-Versionen
+zieht NICHT automatisch - manueller Download via `HBSort-win-Setup.exe`
+aus den Release-Assets noetig falls du testen willst.
+
+### Was ist neu in v0.1.19-beta.6
+
+- **Wanted-List wieder im BrickLink-XML-Format**: das BSX-Zwischenformat
+  aus beta.4/beta.5 wurde von der BrickLink-Webseite nicht akzeptiert.
+  Daher zurueck zum BL-XML.
+- **Neuer "In Zwischenablage"-Button** im Wanted-Export-Dialog: kopiert
+  den XML-Code direkt in die Zwischenablage, du kannst ihn auf
+  <https://www.bricklink.com/v2/wanted/upload.page> im "Paste XML"-Tab
+  einfuegen ohne Datei-Upload.
+- **Sammel-Popup nach "Figur anlegen"** (aus Baubar-Tab): zeigt jetzt
+  Bilder der zu holenden Teile, klare visuelle Trennung zwischen
+  "Hole aus Box X" (oben) und "Lege fertige Figur in Box Y" (unten,
+  mit Separator + Hintergrund-Tint).
+- **Wanted-Dialog-Texte praezisiert**: "fehlende Teile exportieren"
+  statt "wartende Figuren exportieren" - der Export-Inhalt war schon
+  immer korrekt (Teile zum Nachkauf), nur die Beschriftung war
+  missverstaendlich.
+
+### Bereits in v0.1.19-beta.4/5 enthalten
+
+- **Konfigurierbare Lagerfach-Limits** (Complete / Wartend / Teile-
+  Kategorien pro Fach), abrufbar unter *Einstellungen > Erkennung >
+  Sortier-Workflow*.
+- **Auswahl-Dialog beim "Diese Figur anlegen"** (PartLookup-Pfad):
+  pro Required-Part waehlbar ob Reverse-Match-Treffer aus dem Lager
+  konsumiert wird.
+- **Sammel-Popup tab-uebergreifend** sichtbar (Bulk-Verschieben in
+  der Lagerliste, BuildSuggestion etc.).
+- **Body-Part-Kategorie-Heuristik** ("Minifigure, Headgear ..." etc.)
+  fuer den Bin-Vorschlag-Service - ein Helm-Bin wird nicht mit einem
+  zweiten Helm gemischt, andere Kategorien duerfen mit rein.
+
 ## v0.1.19-beta.1: Beta-Release
 
 Diese Version ist ein **Pre-Release** zum Testen vor v0.1.19 stable.

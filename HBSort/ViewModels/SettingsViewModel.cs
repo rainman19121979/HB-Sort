@@ -341,6 +341,14 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private int _maxCompleteFiguresPerBin;
 
+    // --- UX X.32 v0.1.19-beta.4: Maximum wartende Figuren pro Lagerfach ---
+    [ObservableProperty]
+    private int _maxWaitingFiguresPerBin;
+
+    // --- UX X.32 v0.1.19-beta.4: Maximum Kategorien pro Lagerfach ---
+    [ObservableProperty]
+    private int _maxFloatingPartTypesPerBin;
+
     // --- UX X.29 (v0.1.16): Backup-Tab ---
 
     [ObservableProperty]
@@ -504,6 +512,8 @@ public partial class SettingsViewModel : ObservableObject
         SoundEnabled = s.SoundEnabled;
         DefaultPartsCollected = s.DefaultPartsCollected;
         MaxCompleteFiguresPerBin = s.MaxCompleteFiguresPerBin;
+        MaxWaitingFiguresPerBin = s.MaxWaitingFiguresPerBin;
+        MaxFloatingPartTypesPerBin = s.MaxFloatingPartTypesPerBin;
         ShowTooltips = s.ShowTooltips;
         AutoCheckForUpdates = s.AutoCheckForUpdates;
         AutoBlImport = s.AutoBlImport;
@@ -560,6 +570,8 @@ public partial class SettingsViewModel : ObservableObject
         // Eingabefeld oder ein versehentlicher 0/Negativ-Wert die App nicht
         // ins Endlos-Fallback laufen laesst.
         s.MaxCompleteFiguresPerBin = Math.Clamp(MaxCompleteFiguresPerBin <= 0 ? 5 : MaxCompleteFiguresPerBin, 1, 999);
+        s.MaxWaitingFiguresPerBin  = Math.Clamp(MaxWaitingFiguresPerBin  <= 0 ? 3 : MaxWaitingFiguresPerBin, 1, 999);
+        s.MaxFloatingPartTypesPerBin = Math.Clamp(MaxFloatingPartTypesPerBin <= 0 ? 999 : MaxFloatingPartTypesPerBin, 1, 999);
         s.ShowTooltips = ShowTooltips;
         s.AutoCheckForUpdates = AutoCheckForUpdates;
         s.AutoBlImport = AutoBlImport;

@@ -12,10 +12,21 @@ namespace HBSort.Core.Services;
 public class StorageBinService : IStorageBinService
 {
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
+    private readonly IBlCacheRepository? _blCache;
 
-    public StorageBinService(IDbContextFactory<UserDataContext> ctxFactory)
+    /// <summary>
+    /// UX X.32 v0.1.19-beta.4: <paramref name="blCache"/> ist optional fuer
+    /// Backwards-Compat in Tests die das Repository nicht mocken muessen.
+    /// Wenn null: <see cref="SuggestBinForFloatingPartAsync"/> mit
+    /// maxCategoriesPerBin &gt; 1 verhaelt sich wie bei Limit=1 (kein
+    /// Kategorie-Mischen, weil ohne Cache keine Kategorie-Lookup-Daten).
+    /// </summary>
+    public StorageBinService(
+        IDbContextFactory<UserDataContext> ctxFactory,
+        IBlCacheRepository? blCache = null)
     {
         _ctxFactory = ctxFactory;
+        _blCache = blCache;
     }
 
     // ---- Reads ----
@@ -81,10 +92,40 @@ public class StorageBinService : IStorageBinService
     // korrekte Default-Vorschlag fuer den Sortier-Workflow.
     // ====================================================================
 
-    public async Task<StorageBin?> SuggestBinForWaitingMinifigAsync(CancellationToken ct = default)
+    public async Task<StorageBin?> SuggestBinForWaitingMinifigAsync(
+        int maxWaitingLimit = 1,
+        CancellationToken ct = default)
     {
+        // Defensive Clamping - UI sollte 1..999 garantieren, aber wir
+        // verlassen uns nicht drauf. Werte unter 1 verhalten sich wie 1.
+        if (maxWaitingLimit < 1) maxWaitingLimit = 1;
+
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
-        // Wirklich frei: keine wartende, KEINE Complete, keine FloatingParts.
+
+        // 1) Bei Limit > 1: Bin mit anderen wartenden (unter Limit) bevorzugen.
+        //    Bedingungen: keine Complete-Figuren, keine FloatingParts (sonst
+        //    Mix-Fach), bestehende wartende UND Anzahl &lt; Limit.
+        //    Sortierung: voller Bin zuerst (Stapel waechst).
+        if (maxWaitingLimit > 1)
+        {
+            var stackCandidate = await ctx.StorageBins
+                .AsNoTracking()
+                .Where(b => !b.TrackedMinifigs.Any(m => m.Status == TrackedMinifigStatus.Complete)
+                         && !b.FloatingParts.Any())
+                .Select(b => new
+                {
+                    Bin = b,
+                    WaitingCount = b.TrackedMinifigs.Count(m => m.Status == TrackedMinifigStatus.Waiting)
+                })
+                .Where(x => x.WaitingCount > 0 && x.WaitingCount < maxWaitingLimit)
+                .OrderByDescending(x => x.WaitingCount)
+                .ThenBy(x => x.Bin.Label)
+                .FirstOrDefaultAsync(ct);
+            if (stackCandidate != null) return stackCandidate.Bin;
+        }
+
+        // 2) Fallback: wirklich freies Fach (keine Minifig irgendeines Status,
+        //    keine FloatingParts). UX-X.6-konform.
         return await ctx.StorageBins
             .AsNoTracking()
             .Where(b => !b.TrackedMinifigs.Any()
@@ -132,10 +173,15 @@ public class StorageBinService : IStorageBinService
     public async Task<StorageBin?> SuggestBinForFloatingPartAsync(
         string blPartNo, int blColorId,
         int? excludeMinifigId = null,
+        int maxCategoriesPerBin = 1,
+        string? partName = null,
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(blPartNo))
             throw new ArgumentException("BL-Part-No darf nicht leer sein.", nameof(blPartNo));
+
+        // Defensive Clamping.
+        if (maxCategoriesPerBin < 1) maxCategoriesPerBin = 1;
 
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
 
@@ -155,14 +201,20 @@ public class StorageBinService : IStorageBinService
             if (bin != null) return bin;
         }
 
-        // Bug-Fix v0.1.19-beta.2: 4-stufiger Fallback statt nur "wirklich frei
-        // -> null". Damit kann ein Aufrufer (z.B. DismantleWizard) sicher sein
-        // dass IMMER ein Vorschlag kommt, sofern ueberhaupt Bins existieren.
-        // excludeMinifigId beruecksichtigen: Bins in denen NUR die zu
-        // entfernende Figur liegt zaehlen wie "frei" (sie wird gleich weg sein).
         var hasExclude = excludeMinifigId.HasValue;
 
-        // 2) Wirklich freies Fach: keine Minifigs (ausser excluded), keine FloatingParts.
+        // 2) UX X.32 v0.1.19-beta.4 (User-Befund): Kategorie-Stapel-Pfad
+        //    laeuft IMMER (auch bei Limit=1) - Phase A der Helper-Methode
+        //    sucht ein Bin wo die gleiche Kategorie schon drin ist
+        //    (z.B. zweites Bein-Teil zum bestehenden Bein-Bin). Phase B
+        //    (Mix-Fach mit verschiedenen Kategorien) greift nur bei
+        //    Limit > 1. Kategorie kommt aus PartName-Praefix (BL-Naming
+        //    "Minifig Head, ..."), Fallback PartNo-Praefix.
+        var categoryStackBin = await TryFindCategoryStackBinAsync(
+            ctx, blPartNo, blColorId, partName, excludeMinifigId, maxCategoriesPerBin, ct);
+        if (categoryStackBin != null) return categoryStackBin;
+
+        // 3) Wirklich freies Fach: keine Minifigs (ausser excluded), keine FloatingParts.
         var trulyFree = await ctx.StorageBins
             .AsNoTracking()
             .Where(b =>
@@ -172,7 +224,7 @@ public class StorageBinService : IStorageBinService
             .FirstOrDefaultAsync(ct);
         if (trulyFree != null) return trulyFree;
 
-        // 3) Erweitert: Fach OHNE Complete- und Waiting-Figuren (FloatingParts
+        // 4) Erweitert: Fach OHNE Complete- und Waiting-Figuren (FloatingParts
         //    erlaubt - Mix-Fach OK wenn keine wirklich freien mehr da sind).
         var noMinifigOnly = await ctx.StorageBins
             .AsNoTracking()
@@ -182,7 +234,7 @@ public class StorageBinService : IStorageBinService
             .FirstOrDefaultAsync(ct);
         if (noMinifigOnly != null) return noMinifigOnly;
 
-        // 4) Letzter Fallback: irgendein Fach, sortiert nach am wenigsten
+        // 5) Letzter Fallback: irgendein Fach, sortiert nach am wenigsten
         //    belegt (Complete-Count zuerst, dann FloatingParts-Count, dann Label).
         //    User sieht "kein perfektes Fach, hier die beste Wahl" statt eines
         //    kommentarlosen null. Excluded Minifig zaehlt nicht.
@@ -194,6 +246,98 @@ public class StorageBinService : IStorageBinService
             .ThenBy(b => b.FloatingParts.Count)
             .ThenBy(b => b.Label)
             .FirstOrDefaultAsync(ct);
+    }
+
+    /// <summary>
+    /// UX X.32 v0.1.19-beta.4 (User-Befund): zwei Phasen.
+    ///
+    /// Phase A (gilt IMMER, auch bei Limit=1): Bin wo die NEUE Kategorie
+    /// schon vorhanden ist - dort STAPELT die neue Kategorie-Instanz mit
+    /// (z.B. zweites Bein-Teil zum bestehenden Bein-Bin). Step 1
+    /// (gleicher PartNo+ColorId-Stapel) deckt das nur fuer identische
+    /// Teile ab; verschiedene Bein-Varianten haben aber unterschiedliche
+    /// PartNos.
+    ///
+    /// Phase B (nur bei Limit > 1): Bin wo die neue Kategorie noch NICHT
+    /// vorhanden ist UND Set-Count unter Limit - der User hat im Setting
+    /// erlaubt mehrere Kategorien zu mischen.
+    ///
+    /// Kategorie-Bestimmung:
+    /// 1. <see cref="IBlCacheRepository.GetCategoryIdsForPartsAsync"/>
+    ///    (bl_items.category_id - meist nur fuer 'full'-Eintraege gesetzt)
+    /// 2. Fallback: <see cref="BlPartCategoryHeuristic.GetPseudoCategory"/>
+    ///    (numerischer Praefix der PartNo + Aliase fuer Bein/Arm/Hand-
+    ///    Varianten).
+    /// </summary>
+    private async Task<StorageBin?> TryFindCategoryStackBinAsync(
+        UserDataContext ctx,
+        string blPartNo,
+        int blColorId,
+        string? partName,
+        int? excludeMinifigId,
+        int maxCategoriesPerBin,
+        CancellationToken ct)
+    {
+        var hasExclude = excludeMinifigId.HasValue;
+
+        // Kandidaten-Bins: haben FloatingParts UND keine Minifigs (ausser excluded).
+        var candidates = await ctx.StorageBins
+            .AsNoTracking()
+            .Include(b => b.FloatingParts)
+            .Where(b =>
+                b.FloatingParts.Any()
+                && !b.TrackedMinifigs.Any(m => !hasExclude || m.Id != excludeMinifigId!.Value))
+            .ToListAsync(ct);
+        if (candidates.Count == 0) return null;
+
+        // Kategorie der NEUEN PartNo bestimmen - PartName-Praefix bevorzugt
+        // (BL-Naming "Minifig Head, ..."), Fallback PartNo-Praefix. ColorId
+        // wird in den Schluessel einbezogen damit verschiedene Farben des
+        // gleichen Teils nicht zusammengewuerfelt werden.
+        var newCategory = BlPartCategoryHeuristic.Resolve(blPartNo, blColorId, partName);
+
+        // Pro Kandidat: Set seiner Kategorien (PartName + PartNo + ColorId
+        // aus dem FloatingPart-Object - kein Cache-Roundtrip noetig).
+        var ranked = candidates
+            .Select(b => new
+            {
+                Bin = b,
+                Categories = b.FloatingParts
+                    .Select(fp => BlPartCategoryHeuristic.Resolve(
+                        fp.PartNumber, fp.ColorId, fp.PartName))
+                    .ToHashSet()
+            })
+            .ToList();
+
+        Log.Information(
+            "BinSuggest CategoryStack: NewPart={Part}/{Color} Name='{Name}' -> Key='{Key}'. Kandidaten: {Cnt}",
+            blPartNo, blColorId, partName ?? "(null)", newCategory, ranked.Count);
+        foreach (var r in ranked)
+        {
+            Log.Information("  - Bin '{Label}': Cats=[{Cats}]",
+                r.Bin.Label, string.Join(",", r.Categories));
+        }
+
+        // UX X.32 v0.1.19-beta.4 (User-Befund 2x Helm): strikte Trennung
+        // pro Kategorie. Step 1 (gleicher PartNo+ColorId-Stapel) hat schon
+        // davor zugeschlagen - nur identische Teile stapeln dort.
+        // Hier: Bin wo newCategory NOCH NICHT drin ist + Set-Count unter
+        // Limit. Bei Limit=1 heisst das: Bin muss leer sein (count < 1).
+        // Bei Limit > 1 wird Mischen erlaubt.
+        var fitBin = ranked
+            .Where(x => !x.Categories.Contains(newCategory)
+                     && x.Categories.Count < maxCategoriesPerBin)
+            .OrderByDescending(x => x.Categories.Count)
+            .ThenBy(x => x.Bin.Label)
+            .FirstOrDefault();
+        if (fitBin != null)
+        {
+            Log.Information("BinSuggest: Kategorie-Filter trifft, Bin='{Label}'", fitBin.Bin.Label);
+            return fitBin.Bin;
+        }
+
+        Log.Information("BinSuggest: kein Kategorie-Bin passt - Fallback auf Stufe 3-5");
+        return null;
     }
 
     // ---- Create ----

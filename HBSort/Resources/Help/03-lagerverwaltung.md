@@ -107,7 +107,9 @@ In der Action-Bar ueber der Liste:
 - **Verschieben in...** - oeffnet einen Bin-Picker, alle markierten
   Items wandern ins gewaehlte Fach. Strg+Z macht den Verschub
   rueckgaengig (bei Figuren - Einzelteile muessten manuell zurueck-
-  geschoben werden).
+  geschoben werden). Ab v0.1.19-beta.4 erscheint nach erfolgreichem
+  Verschieben ein Sammel-Popup mit pro Item einer "Lege X in
+  {Ziel-Fach}"-Anweisung - auch im Lagerlist-Tab sichtbar.
 - **Loeschen** (rot) - loescht alle markierten Items dauerhaft. Strg+Z
   oder der Verlauf-Tab macht das Item-fuer-Item rueckgaengig.
 - **Exportieren** (gruen) - exportiert die markierten kompletten
