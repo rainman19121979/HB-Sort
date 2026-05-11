@@ -33,6 +33,20 @@ public class BrickognizeClient : IBrickognizeClient
         WriteIndented = true
     };
 
+    // v0.1.20-beta.5: Rate-Throttle fuer Brickognize-Predict-Calls.
+    // 5 RPS Limit gemaess Absprache mit Piotr Rerek (Brickognize-Entwickler,
+    // 2026-05-09). Bei Bulk-Scans wuerden ohne Throttle 429-Errors auftauchen.
+    // SemaphoreSlim(1,1) + Timestamp - der Semaphor serialisiert die Lese/
+    // Schreib-Logik aufs _lastRequestTime, das eigentliche Warten geschieht
+    // mit Task.Delay nachdem der Slot vergeben wurde. Statisch damit ALLE
+    // BrickognizeClient-Instanzen (egal welcher DI-Scope) auf dasselbe
+    // Token-Budget zugreifen.
+    // Nicht auf Health-Check angewandt - der hat seinen eigenen Timeout und
+    // ist kein Scan-Call.
+    private static readonly SemaphoreSlim _rateLimitSemaphore = new(1, 1);
+    private static DateTime _lastRequestTime = DateTime.MinValue;
+    private const int MinRequestIntervalMs = 200; // 5 RPS = max alle 200ms
+
     private readonly HttpClient _httpClient;
 
     public BrickognizeClient(HttpClient httpClient)
@@ -110,6 +124,10 @@ public class BrickognizeClient : IBrickognizeClient
         string endpointTag,
         CancellationToken cancellationToken)
     {
+        // 5-RPS-Throttle vor dem Stopwatch-Start, damit die geloggte Dauer
+        // nur die echte API-Latenz misst (nicht die Wartezeit auf den Slot).
+        await ThrottleAsync(cancellationToken);
+
         var stopwatch = Stopwatch.StartNew();
 
         // Multipart-Form aufbauen.
@@ -196,6 +214,31 @@ public class BrickognizeClient : IBrickognizeClient
         {
             // Debug-Log-Fehler darf den Hauptablauf NICHT killen
             Log.Warning(ex, "Konnte brickognize-debug.log nicht schreiben");
+        }
+    }
+
+    /// <summary>
+    /// 5-RPS-Throttle vor jedem Predict-Call. SemaphoreSlim serialisiert den
+    /// Check-und-Update-Block auf _lastRequestTime; das eigentliche Warten
+    /// (Task.Delay) laeuft innerhalb des Slots, danach Slot freigeben.
+    /// </summary>
+    private static async Task ThrottleAsync(CancellationToken ct)
+    {
+        await _rateLimitSemaphore.WaitAsync(ct);
+        try
+        {
+            var elapsed = (DateTime.UtcNow - _lastRequestTime).TotalMilliseconds;
+            if (elapsed < MinRequestIntervalMs)
+            {
+                // +1 ms Sicherheits-Puffer gegen Rundungs-Ungenauigkeiten.
+                var delay = (int)(MinRequestIntervalMs - elapsed) + 1;
+                await Task.Delay(delay, ct);
+            }
+            _lastRequestTime = DateTime.UtcNow;
+        }
+        finally
+        {
+            _rateLimitSemaphore.Release();
         }
     }
 }
