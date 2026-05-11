@@ -25,7 +25,7 @@ namespace HBSort.ViewModels;
 ///   - Top-3-Karten mit Score-Auswertung und Auto-Akzept-Hervorhebung
 ///   - Status-Anzeige (Online / Slow / Offline)
 /// </summary>
-public partial class ScanViewModel : ObservableObject
+public partial class ScanViewModel : ObservableObject, IDisposable
 {
     private readonly ICameraService _cameraService;
     private readonly ISettingsService _settingsService;
@@ -1808,6 +1808,51 @@ public partial class ScanViewModel : ObservableObject
         UpdateCanScan();
         CurrentFrame = null;
         ScanStatusText = "Kamera gestoppt";
+    }
+
+    // ========================================================================
+    // v0.1.20-beta.5: IDisposable
+    // ScanViewModel ist Singleton im DI. Beim App-Shutdown ruft
+    // (Services as IDisposable)?.Dispose() in App.OnExit den hier hinterlegten
+    // Dispose-Pfad auf, der die Event-Subscriptions wieder loest. Ohne das
+    // bleiben der CameraService-FrameReceived-Handler und der PendingMinifig-
+    // PropertyChanged-Handler als GC-Anker stehen.
+    // ========================================================================
+
+    private bool _disposed;
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        // CameraService.FrameReceived abbestellen - sonst haengt der
+        // OnFrameReceived-Handler am Camera-Singleton und haelt das ViewModel
+        // (und damit den ganzen UI-Graphen) am Leben.
+        try { _cameraService.FrameReceived -= OnFrameReceived; }
+        catch (Exception ex) { Log.Debug(ex, "FrameReceived-Unsubscribe geworfen"); }
+
+        // Dynamisch abonnierte PendingMinifig-PropertyChanged abbestellen
+        // (siehe OnPendingMinifigChanged - dort wird sub/unsub bei jedem Set
+        // gemanaged, hier defensiv fuer den allerletzten Zustand).
+        try
+        {
+            if (PendingMinifig != null)
+                PendingMinifig.PropertyChanged -= OnPendingMinifigPropertyChanged;
+        }
+        catch (Exception ex) { Log.Debug(ex, "PendingMinifig-Unsubscribe geworfen"); }
+
+        // BinInstruction-Auto-Dismiss-Timer stoppen falls noch aktiv.
+        try
+        {
+            _binInstructionTimer?.Stop();
+            _binInstructionTimer = null;
+        }
+        catch (Exception ex) { Log.Debug(ex, "BinInstruction-Timer-Stop geworfen"); }
+
+        // Laufenden BL-Lookup canceln und Token disposen.
+        try { _lookupCts?.Cancel(); } catch { /* ignore */ }
+        try { _lookupCts?.Dispose(); } catch { /* ignore */ }
     }
 }
 
