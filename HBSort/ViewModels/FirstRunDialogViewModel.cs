@@ -6,34 +6,31 @@ using Serilog;
 namespace HBSort.ViewModels;
 
 /// <summary>
-/// UX X.34 v0.1.20-beta.2: ViewModel fuer den First-Run-Onboarding-Dialog.
+/// UX X.34 v0.1.20-beta.2 / beta.4: ViewModel fuer den First-Run-Onboarding-
+/// Dialog.
 ///
-/// Zwei Pflicht-Schritte:
+/// Ein interaktiver Pflicht-Schritt:
 /// 1. BL-Catalog laden (per BulkImportService) - PFLICHT damit HBSort
 ///    ueberhaupt Stammdaten zu gescannten Items hat.
-/// 2. Lagerfaecher anlegen - User klickt "Lagerfach-Verwaltung" -> Settings
-///    oeffnet, User legt manuell Bins an, schliesst Settings, kommt zurueck
-///    in den Dialog. Nach erfolgreichem Anlegen schaltet das StatusIcon auf
-///    gruen.
 ///
-/// Der "Loslegen"-Button ist disabled solange kein Catalog existiert
-/// (Lagerfaecher sind nice-to-have aber nicht zwingend - User kann auch
-/// in einer laufenden Session ein erstes Bin anlegen).
+/// Plus reine Info-Hinweise (beta.4):
+/// 2. Lagerfaecher anlegen - nur Text-Hinweis im Dialog. User legt sie nach
+///    "Loslegen" in den Einstellungen an. Vorher (beta.2/.3) gab es einen
+///    "Lagerfach-Verwaltung oeffnen"-Button der einen Modal-on-Modal-Stack
+///    erzeugt hat - User-Feedback: weglassen, der Dialog wird klarer.
+/// 3. BL-Tokens - optional, reiner Hinweis.
+///
+/// Der "Loslegen"-Button ist disabled solange kein Catalog existiert.
 /// </summary>
 public partial class FirstRunDialogViewModel : ObservableObject
 {
     private readonly IBlBulkImportService _bulkImport;
-    private readonly IFirstRunService _firstRun;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CatalogStatusIcon))]
     [NotifyPropertyChangedFor(nameof(CatalogButtonEnabled))]
     [NotifyPropertyChangedFor(nameof(StartButtonEnabled))]
     private bool _hasCatalog;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(BinsStatusIcon))]
-    private bool _hasBins;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CatalogButtonEnabled))]
@@ -50,38 +47,25 @@ public partial class FirstRunDialogViewModel : ObservableObject
         FirstRunStatus initialStatus)
     {
         _bulkImport = bulkImport;
-        _firstRun = firstRun;
-        ApplyStatus(initialStatus);
+        // firstRun-Param bleibt im Ctor fuer API-Kompatibilitaet falls
+        // der Bin-Refresh-Pfad in einer spaeteren Iteration wiederkommt.
+        // Initial-Status reicht aktuell aus.
+        _ = firstRun;
+        HasCatalog = initialStatus is FirstRunStatus.Complete or FirstRunStatus.NeedsBins;
     }
 
-    /// <summary>Visueller Marker pro Schritt: gruener Haken oder Warn-Symbol.</summary>
+    /// <summary>Visueller Marker fuer Schritt 1: gruener Haken oder Warn-Symbol.</summary>
     public string CatalogStatusIcon => HasCatalog ? "✓" : "!";
-    public string BinsStatusIcon    => HasBins    ? "✓" : "!";
 
     /// <summary>Catalog-Button nur klickbar wenn noch kein Catalog UND kein laufender Import.</summary>
     public bool CatalogButtonEnabled => !HasCatalog && !CatalogLoading;
 
     /// <summary>
-    /// "Loslegen"-Button: nur aktiv wenn Catalog vorhanden. Bins sind bewusst
-    /// optional - User kann sie spaeter im Settings-Tab "Lagerfaecher" anlegen.
+    /// "Loslegen"-Button: nur aktiv wenn Catalog vorhanden. Lagerfaecher sind
+    /// bewusst nicht Voraussetzung - User legt sie spaeter in den Einstellungen
+    /// an (Welcome-Dialog kein blockierender Wizard).
     /// </summary>
     public bool StartButtonEnabled => HasCatalog;
-
-    /// <summary>
-    /// Wird vom Code-Behind nach Settings-Dialog-Schliessen aufgerufen,
-    /// damit das Bin-Status-Icon aktualisiert wird.
-    /// </summary>
-    public async Task RefreshStatusAsync()
-    {
-        var status = await _firstRun.CheckStatusAsync();
-        ApplyStatus(status);
-    }
-
-    private void ApplyStatus(FirstRunStatus status)
-    {
-        HasCatalog = status is FirstRunStatus.Complete or FirstRunStatus.NeedsBins;
-        HasBins    = status is FirstRunStatus.Complete or FirstRunStatus.NeedsCatalog;
-    }
 
     [RelayCommand]
     private async Task LoadCatalogAsync()

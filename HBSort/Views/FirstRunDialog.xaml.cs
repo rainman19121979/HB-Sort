@@ -7,10 +7,10 @@ namespace HBSort.Views;
 /// <summary>
 /// UX X.34 v0.1.20-beta.2: Code-Behind fuer den First-Run-Dialog.
 ///
-/// "Lagerfach-Verwaltung oeffnen" delegiert an MainViewModel.OpenSettings()
-/// (analog zu BuildSuggestionDetailDialog) - der User landet im Settings-
-/// Dialog, klickt auf den Lagerfaecher-Tab, legt Bins an, schliesst den
-/// Settings-Dialog. Beim Schliessen refresht das ViewModel den Bin-Status.
+/// UX X.34 v0.1.20-beta.4: Lagerfaecher-Schritt ist nur noch Info-Text -
+/// kein Action-Button mehr. User schliesst Welcome via "Loslegen" und
+/// legt Bins entspannt in den Einstellungen an. Spart Modal-on-Modal-
+/// Komplexitaet und macht den Welcome-Flow klarer.
 /// </summary>
 public partial class FirstRunDialog : Window
 {
@@ -23,21 +23,6 @@ public partial class FirstRunDialog : Window
         _vm = vm;
         _settings = settings;
         DataContext = _vm;
-    }
-
-    private void OpenBinSettings_Click(object sender, RoutedEventArgs e)
-    {
-        // MainViewModel.OpenSettings() loest den Settings-Dialog ueber das
-        // MainWindow aus. Wir uebergeben unsere Owner-Reference damit der
-        // Settings-Dialog ueber dem First-Run-Dialog erscheint (modal-on-modal).
-        if (Owner?.DataContext is MainViewModel main)
-        {
-            main.OpenSettings();
-        }
-        // Nach dem Settings-Schliessen: Bin-Status neu pruefen damit das
-        // gruene Haken-Icon erscheint. WPF blockiert hier bis Settings zu ist
-        // (modal-Hierarchie via Owner).
-        _ = _vm.RefreshStatusAsync();
     }
 
     private void Dismiss_Click(object sender, RoutedEventArgs e)

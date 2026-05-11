@@ -63,8 +63,9 @@ funktioniert nicht.
 
 Du brauchst physische Boxen die HBSort als "Lagerfaecher" verwaltet.
 Empfehlung: starte mit 10-30 Boxen je nach Sammlungsgroesse - du kannst
-spaeter weitere anlegen oder loeschen. Klick auf "Lagerfach-Verwaltung
-oeffnen" -> Settings-Dialog -> Tab "Lagerfaecher" -> "Bulk anlegen".
+spaeter weitere anlegen oder loeschen. Nach "Loslegen" findest du das
+unter *Einstellungen > Lagerfaecher > Bulk anlegen* (z.B. Box01-Box30
+in einem Rutsch).
 
 ### 3. BrickLink-Tokens (optional)
 

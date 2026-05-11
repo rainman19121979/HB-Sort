@@ -78,27 +78,20 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Schritt 2: Lagerfaecher -->
+                <!-- Schritt 2: Lagerfaecher (nur Hinweis, kein Action-Button -
+                     User legt Bins in Ruhe nach "Loslegen" an, in den Settings). -->
                 <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
                         BorderThickness="1" CornerRadius="6"
                         Padding="14" Margin="0,0,0,8">
                     <StackPanel>
-                        <DockPanel>
-                            <TextBlock DockPanel.Dock="Right"
-                                       Text="{Binding BinsStatusIcon}"
-                                       FontSize="20" FontWeight="Bold"
-                                       VerticalAlignment="Top"/>
-                            <TextBlock Text="2. Lagerfaecher anlegen (empfohlen)"
-                                       FontWeight="SemiBold" FontSize="15"/>
-                        </DockPanel>
+                        <TextBlock Text="2. Lagerfaecher anlegen (empfohlen)"
+                                   FontWeight="SemiBold" FontSize="15"/>
                         <TextBlock TextWrapping="Wrap" FontSize="12"
-                                   Foreground="Gray" Margin="0,6,0,8"
-                                   Text="Du brauchst physische Boxen die HBSort als 'Lagerfaecher' verwaltet. Empfehlung: starte mit 10-30 Boxen je nach Sammlungsgroesse - du kannst spaeter weitere anlegen oder loeschen."/>
-
-                        <Button Content="Lagerfach-Verwaltung oeffnen"
-                                Click="OpenBinSettings_Click"
-                                HorizontalAlignment="Left"
-                                Padding="14,6"/>
+                                   Foreground="Gray" Margin="0,6,0,0"
+                                   Text="Du brauchst physische Boxen die HBSort als 'Lagerfaecher' verwaltet. Empfehlung: starte mit 10-30 Boxen je nach Sammlungsgroesse."/>
+                        <TextBlock TextWrapping="Wrap" FontSize="12"
+                                   Foreground="Gray" Margin="0,6,0,0"
+                                   Text="Nach 'Loslegen' kannst du sie unter Einstellungen > Lagerfaecher > 'Bulk anlegen' in einem Rutsch erzeugen (z.B. Box01-Box30)."/>
                     </StackPanel>
                 </Border>
 
