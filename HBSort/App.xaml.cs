@@ -293,6 +293,9 @@ public partial class App : Application
         // UX X.28: Daten-Heal beim App-Start (Bug-B-Folgen automatisch korrigieren).
         services.AddSingleton<IDataHealService, DataHealService>();
 
+        // UX X.34 v0.1.20-beta.2: First-Run-Onboarding-Erkennung.
+        services.AddSingleton<IFirstRunService, FirstRunService>();
+
         // UX X.29 (v0.1.16): Backup-System. Konstruktor braucht den AppData-
         // Pfad damit die Backups in %APPDATA%\HBSort\backups\ landen.
         services.AddSingleton<IBackupService>(_ => new BackupService(AppDataFolder));

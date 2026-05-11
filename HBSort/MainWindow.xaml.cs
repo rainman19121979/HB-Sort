@@ -55,6 +55,45 @@ public partial class MainWindow : Window
         _ = _viewModel.RunBrickognizeHealthCheckAsync();
 
         _viewModel.StatusText = "Bereit";
+
+        // UX X.34 v0.1.20-beta.2: First-Run-Onboarding-Dialog wenn Setup
+        // unvollstaendig UND User hat den Dialog nicht weggeklickt.
+        await ShowFirstRunDialogIfNeededAsync();
+    }
+
+    /// <summary>
+    /// UX X.34 v0.1.20-beta.2: prueft den First-Run-Status und zeigt den
+    /// Onboarding-Dialog wenn das Setup unvollstaendig ist UND der User
+    /// nicht aktiv "Loslegen" geklickt hat (ShowFirstRunDialog=true).
+    /// Best-effort - bei Fehler still loggen, App bleibt nutzbar.
+    /// </summary>
+    private async Task ShowFirstRunDialogIfNeededAsync()
+    {
+        try
+        {
+            var settings = App.Services.GetRequiredService<HBSort.Core.Services.ISettingsService>();
+            if (!settings.Current.ShowFirstRunDialog) return;
+
+            var firstRun = App.Services.GetRequiredService<HBSort.Core.Services.IFirstRunService>();
+            var status = await firstRun.CheckStatusAsync();
+            if (status == HBSort.Core.Services.FirstRunStatus.Complete)
+            {
+                // Setup ist sowieso komplett - Setting auch auf false damit
+                // wir den Check nicht jeden Start machen muessen.
+                settings.Current.ShowFirstRunDialog = false;
+                await settings.SaveAsync();
+                return;
+            }
+
+            var bulkImport = App.Services.GetRequiredService<HBSort.Core.Services.IBlBulkImportService>();
+            var vm = new ViewModels.FirstRunDialogViewModel(bulkImport, firstRun, status);
+            var dlg = new Views.FirstRunDialog(vm, settings) { Owner = this };
+            dlg.ShowDialog();
+        }
+        catch (System.Exception ex)
+        {
+            Serilog.Log.Warning(ex, "First-Run-Dialog konnte nicht gezeigt werden");
+        }
     }
 
     /// <summary>

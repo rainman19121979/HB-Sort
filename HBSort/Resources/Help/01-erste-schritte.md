@@ -45,3 +45,37 @@ zuzuordnen und in Lagerfaechern zu sammeln, bis die Figur komplett ist.
    eine Figur vor die Webcam halten, **Leertaste** druecken.
 
 Mehr Details zum Workflow findest du im Kapitel *Sortier-Workflow*.
+
+## First-Run-Setup (ab v0.1.20-beta.2)
+
+Beim allerersten Start auf einem leeren Rechner zeigt HBSort einen
+Willkommens-Dialog mit drei Schritten:
+
+### 1. BrickLink-Catalog laden (Pflicht)
+
+HBSort holt einmalig ca. 12 MB Stammdaten (ca. 110.000 Items, Farben und
+Subsets) aus der oeffentlichen BrickStore-Datenbank auf GitHub. Dauert
+je nach Verbindung 30-90 Sekunden. **Ohne diesen Catalog** kann HBSort
+keine Stammdaten zu gescannten Teilen anzeigen und der Sortier-Workflow
+funktioniert nicht.
+
+### 2. Lagerfaecher anlegen (empfohlen)
+
+Du brauchst physische Boxen die HBSort als "Lagerfaecher" verwaltet.
+Empfehlung: starte mit 10-30 Boxen je nach Sammlungsgroesse - du kannst
+spaeter weitere anlegen oder loeschen. Klick auf "Lagerfach-Verwaltung
+oeffnen" -> Settings-Dialog -> Tab "Lagerfaecher" -> "Bulk anlegen".
+
+### 3. BrickLink-Tokens (optional)
+
+Fuer Live-Preise und Verkaufsempfehlungen. Brauchst du nicht zum
+Sortieren - kannst du jederzeit unter *Einstellungen > BrickLink >
+API-Zugang* einrichten.
+
+### Setup unterbrochen?
+
+Wenn du den Dialog mit "Spaeter erinnern" schliesst aber Setup nicht
+komplett ist, erscheint er beim naechsten App-Start wieder. Wenn du
+"Loslegen" klickst nach erfolgreichem Catalog-Import, taucht der Dialog
+auch dann nicht mehr auf wenn du noch keine Lagerfaecher hast - du
+kannst sie jederzeit in den Einstellungen anlegen.

@@ -103,6 +103,16 @@ public class AppSettings
     public bool ShowTooltips { get; set; } = true;
 
     /// <summary>
+    /// UX X.34 v0.1.20-beta.2: First-Run-Onboarding-Dialog beim App-Start
+    /// zeigen wenn das Setup nicht komplett ist (BL-Catalog fehlt und/oder
+    /// keine Lagerfaecher angelegt). Default true. Wird durch User-Interaktion
+    /// im Dialog ("Loslegen"-Button nach erfolgreichem Setup) auf false
+    /// gesetzt - sobald Setup komplett ist, wird der Check beim Start ohnehin
+    /// 'Complete' liefern und der Dialog erscheint nicht mehr.
+    /// </summary>
+    public bool ShowFirstRunDialog { get; set; } = true;
+
+    /// <summary>
     /// Bild-Cache-Einstellungen (Limit, BL-Bevorzugung, Vorab-Cache).
     /// Subobjekt damit cache-relevante Felder gruppiert in der settings.json stehen.
     /// </summary>
