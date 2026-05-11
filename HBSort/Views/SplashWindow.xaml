@@ -9,7 +9,7 @@
         ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen"
         ShowInTaskbar="False"
-        Topmost="True"
+        Topmost="False"
         Background="Transparent">
 
     <!--
@@ -17,8 +17,13 @@
         - Randlos, zentriert, nicht in der Taskleiste.
         - Wird in App.xaml.cs vor dem MainWindow gezeigt und nach mind.
           800ms wieder geschlossen sobald MainWindow ready ist.
-        - Topmost=True damit der Splash nicht hinter andere App-Fenster
-          verschwindet wenn das System langsam aufbaut.
+        - UX X.34 v0.1.20-beta.3 Bug-Fix: Topmost=False. Vorher True war
+          die Ursache dass der FirstRunDialog (modaler Welcome-Dialog beim
+          ersten Start) ueber dem Splash erschien aber dahinter verdeckt
+          war - WPF haelt Topmost-Z-Order auch kurz nach Close() noch im
+          Compositor, besonders mit AllowsTransparency=True. Splash ist
+          eh das einzige Window in der Startup-Phase, Topmost ist also
+          ueberfluessig.
     -->
 
     <!-- Border mit weichem Schatten + abgerundeten Ecken. AllowsTransparency

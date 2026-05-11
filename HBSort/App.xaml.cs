@@ -166,8 +166,18 @@ public partial class App : Application
                 await Task.Delay((int)(800 - elapsed));
             }
 
-            mainWindow.Show();
+            // UX X.34 v0.1.20-beta.3 Bug-Fix: Reihenfolge geaendert von
+            // (mainWindow.Show, splash.Close) auf (splash.Close, mainWindow.Show)
+            // mit dazwischenliegendem Dispatcher-Flush. Vorher konnte der
+            // Splash-Z-Order kurz nach Close() noch ueber dem FirstRunDialog
+            // bleiben - mit AllowsTransparency+Topmost (jetzt False) war das
+            // besonders haeufig. Mit Dispatcher.BeginInvoke + Background-
+            // Priority wartet der Code bis WPF den Splash wirklich aus dem
+            // Compositor entfernt hat.
             splash.Close();
+            await System.Windows.Threading.Dispatcher.CurrentDispatcher
+                .InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+            mainWindow.Show();
 
             // 9. Phase R1: BL-API-Verbindung im Hintergrund pruefen wenn Tokens vorhanden.
             // Fire-and-forget: blockiert NICHT den Startup. Wenn keine Tokens da sind,

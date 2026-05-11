@@ -131,6 +131,16 @@ Items archiviert werden.
 
 ## Erledigt ✅
 
+### v0.1.20-beta.3 (UX X.34, 2026-05-11) - Bug-Fix Splash/Welcome
+- ✅ **Splash verdeckt Welcome-Dialog**: SplashWindow hatte `Topmost="True"`
+  in Kombination mit `AllowsTransparency="True"` - WPF haelt den Z-Order
+  auch kurz nach `Close()` noch im Compositor. Fix: `Topmost="False"`
+  + Dispatcher-Flush zwischen `splash.Close()` und `mainWindow.Show()`.
+- ✅ Reihenfolge umgedreht: Splash schliesst zuerst, dann MainWindow.
+  Dazwischen `await Dispatcher.InvokeAsync(() => {}, ContextIdle)` damit
+  WPF den Splash wirklich aus dem Compositor entfernt bevor der
+  FirstRunDialog erscheint.
+
 ### v0.1.20-beta.2 (UX X.34, 2026-05-11) - First-Run-Onboarding
 - ✅ **First-Run-Dialog**: erscheint beim ersten App-Start auf einer
   leeren Installation. Zwei Pflicht-Schritte (BL-Catalog laden + Lager-
@@ -210,7 +220,8 @@ Aenderungen am Cache-Schema + Provider-Logik.
 |---|---|---|
 | **v0.1.19** | ✅ stable (2026-05-10) | UX X.33 - Cleanup + Sortier-Logik-Refactor + Doku-Sweep |
 | **v0.1.20-beta.1** | ✅ released (2026-05-11) | UX X.34 - BL-Preis-Lookup-Sammelpaket (VAT, Either-Or, Cache-Anti-Vergiftung) |
-| **v0.1.20-beta.2** | 🟡 in-arbeit (2026-05-11) | UX X.34 - First-Run-Onboarding-Dialog |
+| **v0.1.20-beta.2** | ✅ released (2026-05-11) | UX X.34 - First-Run-Onboarding-Dialog |
+| **v0.1.20-beta.3** | 🟡 in-arbeit (2026-05-11) | UX X.34 - Splash-Welcome-Lifecycle-Fix |
 | **v0.1.20** | 📋 geplant (Stable) | UX X.34 stable nach Beta-Praxis-Test - plus optional Performance / Undo / Bulk-Bin / Wiki / Brickognize-Throttle (siehe oben) |
 | **v0.2.0** | 💭 Brainstorming | BL-Inventar-Integration (eigene große Iteration) |
 | v0.2.1+ | offen | weitere Features aus Backlog |
