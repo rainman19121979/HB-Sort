@@ -132,14 +132,22 @@ Items archiviert werden.
 ## Erledigt ✅
 
 ### v0.1.20-beta.3 (UX X.34, 2026-05-11) - Bug-Fix Splash/Welcome
-- ✅ **Splash verdeckt Welcome-Dialog**: SplashWindow hatte `Topmost="True"`
-  in Kombination mit `AllowsTransparency="True"` - WPF haelt den Z-Order
-  auch kurz nach `Close()` noch im Compositor. Fix: `Topmost="False"`
-  + Dispatcher-Flush zwischen `splash.Close()` und `mainWindow.Show()`.
-- ✅ Reihenfolge umgedreht: Splash schliesst zuerst, dann MainWindow.
-  Dazwischen `await Dispatcher.InvokeAsync(() => {}, ContextIdle)` damit
-  WPF den Splash wirklich aus dem Compositor entfernt bevor der
-  FirstRunDialog erscheint.
+Iteration mit zwei Runden weil der erste Fix einen Folge-Befund hatte.
+
+**Runde 1 (erste beta.3, zurueckgezogen):**
+- Splash hatte `Topmost="True"` + `AllowsTransparency="True"` - WPF
+  haelt den Z-Order auch kurz nach `Close()` noch im Compositor.
+  Welcome-Dialog wurde dahinter verdeckt.
+- Fix: `Topmost="False"` + Dispatcher-Flush vor `mainWindow.Show()`.
+
+**Runde 2 (aktuelle beta.3, User-Befund nach Runde 1):**
+- Splash verschwand zu frueh - dann 5-10s "leere Pause" bevor Welcome
+  erschien. Ursache: `Window_Loaded` rief `InitializeCameraAsync` (5-10s
+  blocking) VOR dem Welcome-Dialog auf.
+- Fix: Reihenfolge in `Window_Loaded` umgedreht. **First-Run-Dialog
+  ZUERST**, Camera-Init danach. Welcome erscheint jetzt sofort nach
+  Splash; Camera-Init laeuft im Hintergrund waehrend User Welcome
+  bedient (Camera ist erst nach "Loslegen" relevant).
 
 ### v0.1.20-beta.2 (UX X.34, 2026-05-11) - First-Run-Onboarding
 - ✅ **First-Run-Dialog**: erscheint beim ersten App-Start auf einer

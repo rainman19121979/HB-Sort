@@ -49,16 +49,25 @@ public partial class MainWindow : Window
         // wieder aktiviert werden.
         FocusTrap.Focus();
 
+        // UX X.34 v0.1.20-beta.3 (User-Befund nach erster beta.3): Reihenfolge
+        // umgedreht. Vorher: InitializeCameraAsync (5-10s blocking) -> dann
+        // First-Run-Dialog. Folge: Splash war schon weg, User sah 5-10s einen
+        // leeren MainWindow-Frame ohne Erklaerung, dann ploetzlich Welcome.
+        //
+        // Jetzt: First-Run-Dialog ZUERST (Welcome erscheint sofort nach
+        // Splash). Camera-Init laeuft im Hintergrund waehrend der User den
+        // Welcome-Dialog bedient - die Camera ist sowieso erst nach dem
+        // "Loslegen"-Klick relevant.
+        await ShowFirstRunDialogIfNeededAsync();
+
+        // Camera-Init + BG-Health-Check NACH dem Welcome-Dialog. Wenn kein
+        // Welcome noetig war (Setup komplett), ist das direkt nach Show().
         await _viewModel.ScanViewModel.InitializeCameraAsync();
 
         // Brickognize-Health-Check im Hintergrund (Fire-and-forget).
         _ = _viewModel.RunBrickognizeHealthCheckAsync();
 
         _viewModel.StatusText = "Bereit";
-
-        // UX X.34 v0.1.20-beta.2: First-Run-Onboarding-Dialog wenn Setup
-        // unvollstaendig UND User hat den Dialog nicht weggeklickt.
-        await ShowFirstRunDialogIfNeededAsync();
     }
 
     /// <summary>
