@@ -24,8 +24,10 @@ Items archiviert werden.
   Betrifft: CollectMinifigSelectionViewModel (50-200ms), DismantleWizardViewModel
   (200-500ms), BuildSuggestionDetailViewModel (30-100ms).
   Aufwand: ~3h
-- 📋 **ScanViewModel : IDisposable** - aus Cleanup-Bericht Memory-Lifecycle.
-  Aufwand: ~30min
+- ✅ **ScanViewModel : IDisposable** - erledigt in v0.1.20-beta.5 (2026-05-12).
+  FrameReceived + PendingMinifig.PropertyChanged + BinInstructionTimer + LookupCts
+  werden im Dispose freigegeben; (Services as IDisposable)?.Dispose() in
+  App.OnExit ruft den Pfad automatisch beim Shutdown.
 
 ### Features
 - 📋 **Vollständiges Undo-System für alle DB-Mutationen**
@@ -50,9 +52,10 @@ Items archiviert werden.
   Aufwand: ~1h
 
 ### Brickognize-Integration (aus Mail von Piotr 2026-05-09)
-- 📋 **Rate-Limit-Throttle (5 RPS)** in BrickognizeService
-  Sicherheit gegen 429-Errors bei Bulk-Scans.
-  Aufwand: ~30min
+- ✅ **Rate-Limit-Throttle (5 RPS)** in BrickognizeClient - erledigt in
+  v0.1.20-beta.5 (2026-05-12). SemaphoreSlim + Timestamp-Throttle vor jedem
+  Predict-Call; statisch damit alle Client-Instanzen denselben Token-Bucket
+  teilen.
 - 📋 **/feedback-Endpoint nutzen** - User-Feedback "korrekt/falsch" an Brickognize senden
   Optional, hilft Brickognize-Modell-Genauigkeit.
   Aufwand: ~1h
@@ -130,6 +133,29 @@ Items archiviert werden.
 ---
 
 ## Erledigt ✅
+
+### v0.1.20-beta.5 (UX X.34, 2026-05-12) - bl_prices Cache-Fix + Brickognize-Throttle + ScanViewModel-Dispose
+
+Drei Cleanup-Fixes in einem Beta-Release.
+
+- ✅ **bl_prices Cache-Fix**: country_code war keine Cache-Dimension - Country=DE
+  und Global teilten sich denselben Cache-Eintrag (region="" in beiden Faellen)
+  und ueberschrieben sich gegenseitig. Stille Vergiftung ohne API-Fehler,
+  praktisch sichtbar in app-20260511.log. Schema-Migration drop+create der
+  bl_prices-Tabelle (reiner Cache, kein User-Datenverlust). vat_mode wandert
+  in den Primary Key, Either-Or-Logik (Country wins ueber Region) wird auch
+  im BlPriceCacheService angewandt damit Service-Reads die Provider-Writes
+  finden.
+- ✅ **Brickognize 5-RPS-Throttle**: SemaphoreSlim + Timestamp-Throttle vor
+  jedem Predict-Call (Health-Check ausgenommen). 5 RPS Limit gemaess Piotr-
+  Absprache 2026-05-09. Statisch damit alle Client-Instanzen denselben
+  Bucket teilen.
+- ✅ **ScanViewModel : IDisposable**: FrameReceived + PendingMinifig.
+  PropertyChanged + BinInstructionTimer + LookupCts werden beim Dispose
+  freigegeben. App.OnExit ruft (Services as IDisposable)?.Dispose() schon -
+  greift damit automatisch beim Shutdown.
+
+538/538 Tests gruen (vorher 536 + 2 neu in BlCacheRepositoryTests).
 
 ### v0.1.20-beta.4 (UX X.34, 2026-05-11) - Welcome-Dialog vereinfacht
 - ✅ **Lagerfaecher-Schritt nur als Hinweis**: Button "Lagerfach-Verwaltung
@@ -239,8 +265,9 @@ Aenderungen am Cache-Schema + Provider-Logik.
 | **v0.1.20-beta.1** | ✅ released (2026-05-11) | UX X.34 - BL-Preis-Lookup-Sammelpaket (VAT, Either-Or, Cache-Anti-Vergiftung) |
 | **v0.1.20-beta.2** | ✅ released (2026-05-11) | UX X.34 - First-Run-Onboarding-Dialog |
 | **v0.1.20-beta.3** | ✅ released (2026-05-11) | UX X.34 - Splash-Welcome-Lifecycle-Fix |
-| **v0.1.20-beta.4** | 🟡 in-arbeit (2026-05-11) | UX X.34 - Welcome-Dialog Lagerfaecher-Schritt nur als Hinweis |
-| **v0.1.20** | 📋 geplant (Stable) | UX X.34 stable nach Beta-Praxis-Test - plus optional Performance / Undo / Bulk-Bin / Wiki / Brickognize-Throttle (siehe oben) |
+| **v0.1.20-beta.4** | ✅ released (2026-05-11) | UX X.34 - Welcome-Dialog Lagerfaecher-Schritt nur als Hinweis |
+| **v0.1.20-beta.5** | 🟡 in-arbeit (2026-05-12) | UX X.34 - bl_prices Cache-Fix + Brickognize-Throttle + ScanViewModel-Dispose |
+| **v0.1.20** | 📋 geplant (Stable) | UX X.34 stable nach Beta-Praxis-Test - plus optional Performance / Undo / Bulk-Bin / Wiki |
 | **v0.2.0** | 💭 Brainstorming | BL-Inventar-Integration (eigene große Iteration) |
 | v0.2.1+ | offen | weitere Features aus Backlog |
 
@@ -250,4 +277,4 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-11 nach v0.1.20-beta.1-Vorbereitung.*
+*Zuletzt aktualisiert: 2026-05-12 nach v0.1.20-beta.5-Commits (vor Praxis-Test).*
