@@ -144,7 +144,8 @@ public interface IBlCacheRepository
         string region, string currency,
         int staleDays,
         CancellationToken ct = default,
-        string vatMode = "N");
+        string vatMode = "N",
+        string countryCode = "");
 
     /// <summary>
     /// Speichert oder aktualisiert einen Preis-Eintrag (INSERT OR REPLACE auf
@@ -160,7 +161,8 @@ public interface IBlCacheRepository
         string region, string currency,
         Models.Pricing.PriceResult price,
         CancellationToken ct = default,
-        string vatMode = "N");
+        string vatMode = "N",
+        string countryCode = "");
 
     // ====================================================================
     // Phase 8 / UX#12 Stale-While-Revalidate - vier neue Operationen
@@ -179,7 +181,8 @@ public interface IBlCacheRepository
         string region, string currency,
         int ttlDays,
         CancellationToken ct = default,
-        string vatMode = "N");
+        string vatMode = "N",
+        string countryCode = "");
 
     /// <summary>
     /// Loescht GENAU diesen Cache-Eintrag (PRIMARY-KEY-Match). Liefert true
@@ -194,7 +197,8 @@ public interface IBlCacheRepository
         string guideType, string newOrUsed,
         string region, string currency,
         CancellationToken ct = default,
-        string vatMode = "N");
+        string vatMode = "N",
+        string countryCode = "");
 
     /// <summary>Loescht ALLE Eintraege in bl_prices. Fuer "Cache leeren"-Button.</summary>
     Task<int> ClearAllPricesAsync(CancellationToken ct = default);

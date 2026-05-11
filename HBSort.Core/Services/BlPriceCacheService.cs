@@ -97,17 +97,16 @@ public class BlPriceCacheService : IBlPriceCacheService
     {
         var cfg = _settings.Current.Prices;
         var newOrUsed = "U"; // wir tracken nur Used wie im PriceCalculationService
-        var region = cfg.Region ?? string.Empty;
+        // v0.1.20-beta.5: Either-Or-Logik konsistent zum Provider. Vorher hat
+        // dieser Service nur cfg.Region in den Cache-Key gepackt und cfg.CountryCode
+        // komplett ignoriert. Damit haben Service-Cache-Reads die Provider-Cache-
+        // Writes (die countryCode mitschreiben) NIE getroffen - jeder Lookup
+        // landete als Live-Call beim Provider.
+        var (effectiveRegion, effectiveCountry) = ComputeEffectiveFilter(cfg);
         var currency = string.IsNullOrWhiteSpace(cfg.Currency) ? "EUR" : cfg.Currency;
         var effectiveTtl = Math.Max(1, ttlDays);
         // UX X.34 v0.1.20: Cache-Lookups mit aktuellem VAT-Mode filtern.
-        var vatCode = cfg.VatMode switch
-        {
-            VatMode.Y => "Y",
-            VatMode.N => "N",
-            VatMode.O => "O",
-            _         => "Y"
-        };
+        var vatCode = MapVat(cfg.VatMode);
 
         // 1) Cache-Lookup mit Stale-Flag.
         CachedPriceLookup? cached = null;
@@ -115,8 +114,8 @@ public class BlPriceCacheService : IBlPriceCacheService
         {
             cached = await _repo.GetCachedPriceWithStaleFlagAsync(
                 itemType, itemNo, colorId,
-                cfg.GuideType, newOrUsed, region, currency,
-                effectiveTtl, ct, vatCode);
+                cfg.GuideType, newOrUsed, effectiveRegion, currency,
+                effectiveTtl, ct, vatCode, effectiveCountry);
         }
         catch (Exception ex)
         {
@@ -140,7 +139,7 @@ public class BlPriceCacheService : IBlPriceCacheService
         if (cached != null && cached.IsStale)
         {
             Task.Run(() => RevalidateInBackgroundAsync(
-                itemType, itemNo, colorId, cfg.GuideType, newOrUsed, region, currency))
+                itemType, itemNo, colorId, cfg.GuideType, newOrUsed, effectiveRegion, effectiveCountry, currency))
                 .FireAndForget($"BlPrice-Revalidate {itemType}/{itemNo}/{colorId}");
 
             return new PriceLookupOutcome(
@@ -247,8 +246,11 @@ public class BlPriceCacheService : IBlPriceCacheService
     /// </summary>
     private async Task RevalidateInBackgroundAsync(
         string itemType, string itemNo, int colorId,
-        string guideType, string newOrUsed, string region, string currency)
+        string guideType, string newOrUsed, string region, string countryCode, string currency)
     {
+        // Hinweis: region+countryCode werden hier nur zur Telemetrie/Logging
+        // durchgereicht. Der eigentliche Live-Call laeuft ueber den Provider, der
+        // die Filter aus den Settings selbst zieht (Either-Or-Logik gleich).
         try
         {
             var outcome = await GetLiveWithInFlightGuardAsync(itemType, itemNo, colorId,
@@ -280,13 +282,14 @@ public class BlPriceCacheService : IBlPriceCacheService
     public async Task DeleteMinifigPriceAsync(string blMinifigId, CancellationToken ct = default)
     {
         var cfg = _settings.Current.Prices;
-        var region = cfg.Region ?? string.Empty;
+        // v0.1.20-beta.5: Either-Or wie im Lookup-Pfad.
+        var (region, countryCode) = ComputeEffectiveFilter(cfg);
         var currency = string.IsNullOrWhiteSpace(cfg.Currency) ? "EUR" : cfg.Currency;
         // UX X.34 v0.1.20: Refresh loescht den aktuellen VAT-Mode-Eintrag.
         var vatCode = MapVat(cfg.VatMode);
 
         await _repo.DeletePriceAsync("M", blMinifigId, 0,
-            cfg.GuideType, "U", region, currency, ct, vatCode);
+            cfg.GuideType, "U", region, currency, ct, vatCode, countryCode);
 
         Log.Information("Komplett-Figur-Cache geloescht: {Mfg} ({Guide}, vat={Vat})",
             blMinifigId, cfg.GuideType, vatCode);
@@ -297,7 +300,7 @@ public class BlPriceCacheService : IBlPriceCacheService
         CancellationToken ct = default)
     {
         var cfg = _settings.Current.Prices;
-        var region = cfg.Region ?? string.Empty;
+        var (region, countryCode) = ComputeEffectiveFilter(cfg);
         var currency = string.IsNullOrWhiteSpace(cfg.Currency) ? "EUR" : cfg.Currency;
         var vatCode = MapVat(cfg.VatMode);
 
@@ -306,7 +309,7 @@ public class BlPriceCacheService : IBlPriceCacheService
         {
             ct.ThrowIfCancellationRequested();
             await _repo.DeletePriceAsync("P", partNo, colorId,
-                cfg.GuideType, "U", region, currency, ct, vatCode);
+                cfg.GuideType, "U", region, currency, ct, vatCode, countryCode);
         }
 
         Log.Information("Einzelteil-Cache geloescht: {Count} Eintraege ({Guide}, vat={Vat})",
@@ -327,6 +330,20 @@ public class BlPriceCacheService : IBlPriceCacheService
         VatMode.O => "O",
         _         => "Y"
     };
+
+    /// <summary>
+    /// v0.1.20-beta.5: Either-Or-Filter wie im BricklinkApiPriceProvider.
+    /// BL-API erwartet entweder Land ODER Region, nicht beide. CountryCode wins.
+    /// Cache-Key muss konsistent zur Provider-Schreibseite sein, sonst werden
+    /// Cache-Hits nie als solche erkannt.
+    /// </summary>
+    private static (string Region, string CountryCode) ComputeEffectiveFilter(PriceSettings cfg)
+    {
+        var hasCountry = !string.IsNullOrWhiteSpace(cfg.CountryCode);
+        var country = hasCountry ? cfg.CountryCode!.Trim() : string.Empty;
+        var region  = hasCountry ? string.Empty : (cfg.Region ?? string.Empty).Trim();
+        return (region, country);
+    }
 
     /// <summary>
     /// Cache-Key fuer das In-Flight-Dictionary. Currency/Region/Guide etc.

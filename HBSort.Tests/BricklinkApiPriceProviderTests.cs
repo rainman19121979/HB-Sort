@@ -268,17 +268,20 @@ public class BricklinkApiPriceProviderTests
 
         public string? LastVatMode { get; private set; }
         public string? LastRegion { get; private set; }
+        public string? LastCountryCode { get; private set; }
 
         public Task<PriceResult?> GetCachedPriceAsync(
             string itemType, string itemNo, int colorId,
             string guideType, string newOrUsed,
             string region, string currency,
             int staleDays, CancellationToken ct = default,
-            string vatMode = "N")
+            string vatMode = "N",
+            string countryCode = "")
         {
             LastStaleDays = staleDays;
             LastVatMode = vatMode;
             LastRegion = region;
+            LastCountryCode = countryCode;
             // staleDays > 0 ist "frische Pruefung", staleDays == 0 ist Stale-Fallback.
             return Task.FromResult(staleDays > 0 ? NextCached : NextStale);
         }
@@ -309,14 +312,18 @@ public class BricklinkApiPriceProviderTests
         public Task<DateTime?> GetOldestCallInWindowAsync(TimeSpan window, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<int> PruneApiCallLogAsync(int olderThanDays = 7, CancellationToken ct = default) => throw new NotImplementedException();
         public string? LastUpsertVatMode { get; private set; }
+        public string? LastUpsertCountryCode { get; private set; }
+        public string? LastUpsertRegion { get; private set; }
 
-        public Task UpsertPriceAsync(string itemType, string itemNo, int colorId, string guideType, string newOrUsed, string region, string currency, PriceResult price, CancellationToken ct = default, string vatMode = "N")
+        public Task UpsertPriceAsync(string itemType, string itemNo, int colorId, string guideType, string newOrUsed, string region, string currency, PriceResult price, CancellationToken ct = default, string vatMode = "N", string countryCode = "")
         {
             LastUpsertVatMode = vatMode;
+            LastUpsertRegion = region;
+            LastUpsertCountryCode = countryCode;
             return Task.CompletedTask;
         }
-        public Task<CachedPriceLookup?> GetCachedPriceWithStaleFlagAsync(string itemType, string itemNo, int colorId, string guideType, string newOrUsed, string region, string currency, int ttlDays, CancellationToken ct = default, string vatMode = "N") => throw new NotImplementedException();
-        public Task<bool> DeletePriceAsync(string itemType, string itemNo, int colorId, string guideType, string newOrUsed, string region, string currency, CancellationToken ct = default, string vatMode = "N") => throw new NotImplementedException();
+        public Task<CachedPriceLookup?> GetCachedPriceWithStaleFlagAsync(string itemType, string itemNo, int colorId, string guideType, string newOrUsed, string region, string currency, int ttlDays, CancellationToken ct = default, string vatMode = "N", string countryCode = "") => throw new NotImplementedException();
+        public Task<bool> DeletePriceAsync(string itemType, string itemNo, int colorId, string guideType, string newOrUsed, string region, string currency, CancellationToken ct = default, string vatMode = "N", string countryCode = "") => throw new NotImplementedException();
         public Task<int> ClearAllPricesAsync(CancellationToken ct = default) => throw new NotImplementedException();
         public Task<int> ClearEmptyPricesAsync(CancellationToken ct = default) => throw new NotImplementedException();
         public Task<int> GetPriceCacheCountAsync(CancellationToken ct = default) => throw new NotImplementedException();

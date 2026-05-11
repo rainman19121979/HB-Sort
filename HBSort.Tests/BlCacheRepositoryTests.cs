@@ -398,4 +398,83 @@ public class BlCacheRepositoryTests : IDisposable
         Assert.Equal(1, first);
         Assert.Equal(0, second);
     }
+
+    // ========================================================================
+    // v0.1.20-beta.5: country_code als Cache-Dimension + vat_mode im PK
+    // ========================================================================
+
+    [Fact]
+    public async Task Cache_keys_distinguish_country_DE_from_global()
+    {
+        // Vorher Bug: Country=DE und Global teilten sich denselben Cache-Eintrag
+        // (region="" in beiden Faellen) und ueberschrieben sich gegenseitig.
+        // Jetzt: country_code ist eigene Cache-Dimension - zwei separate Eintraege.
+        var nowGlobal = DateTime.UtcNow.AddMinutes(-1);
+        var nowDe     = DateTime.UtcNow;
+
+        // Erst Global schreiben (countryCode="")
+        await _sut.UpsertPriceAsync("M", "cty0703", 0, "stock", "U",
+            region: "", currency: "EUR",
+            price: new HBSort.Core.Models.Pricing.PriceResult
+            {
+                AvgPrice = 1.43m, Currency = "EUR", FetchedAt = nowGlobal
+            },
+            vatMode: "Y",
+            countryCode: "");
+
+        // Dann DE schreiben (countryCode="DE")
+        await _sut.UpsertPriceAsync("M", "cty0703", 0, "stock", "U",
+            region: "", currency: "EUR",
+            price: new HBSort.Core.Models.Pricing.PriceResult
+            {
+                AvgPrice = 1.18m, Currency = "EUR", FetchedAt = nowDe
+            },
+            vatMode: "Y",
+            countryCode: "DE");
+
+        // Beide muessen separat zurueckkommen.
+        var global = await _sut.GetCachedPriceAsync("M", "cty0703", 0, "stock", "U",
+            region: "", currency: "EUR", staleDays: 30, vatMode: "Y", countryCode: "");
+        var de = await _sut.GetCachedPriceAsync("M", "cty0703", 0, "stock", "U",
+            region: "", currency: "EUR", staleDays: 30, vatMode: "Y", countryCode: "DE");
+
+        Assert.NotNull(global);
+        Assert.NotNull(de);
+        Assert.Equal(1.43m, global!.AvgPrice);
+        Assert.Equal(1.18m, de!.AvgPrice);
+    }
+
+    [Fact]
+    public async Task Cache_keys_include_vat_mode()
+    {
+        // vat_mode ist seit beta.5 Teil des Primary Key. Ein Y-Eintrag und ein
+        // N-Eintrag fuer dasselbe Item duerfen sich nicht gegenseitig ueberschreiben.
+        var t = DateTime.UtcNow;
+
+        await _sut.UpsertPriceAsync("M", "cty0703", 0, "stock", "U",
+            region: "", currency: "EUR",
+            price: new HBSort.Core.Models.Pricing.PriceResult
+            {
+                AvgPrice = 1.50m, Currency = "EUR", FetchedAt = t
+            },
+            vatMode: "Y", countryCode: "");
+
+        await _sut.UpsertPriceAsync("M", "cty0703", 0, "stock", "U",
+            region: "", currency: "EUR",
+            price: new HBSort.Core.Models.Pricing.PriceResult
+            {
+                AvgPrice = 1.20m, Currency = "EUR", FetchedAt = t
+            },
+            vatMode: "N", countryCode: "");
+
+        var brutto = await _sut.GetCachedPriceAsync("M", "cty0703", 0, "stock", "U",
+            region: "", currency: "EUR", staleDays: 30, vatMode: "Y", countryCode: "");
+        var netto  = await _sut.GetCachedPriceAsync("M", "cty0703", 0, "stock", "U",
+            region: "", currency: "EUR", staleDays: 30, vatMode: "N", countryCode: "");
+
+        Assert.NotNull(brutto);
+        Assert.NotNull(netto);
+        Assert.Equal(1.50m, brutto!.AvgPrice);
+        Assert.Equal(1.20m, netto!.AvgPrice);
+    }
 }

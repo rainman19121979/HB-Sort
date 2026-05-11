@@ -96,11 +96,14 @@ public class BricklinkApiPriceProvider : IPriceProvider
             : cfg.BlPriceCacheTtlPartDays);
 
         // 1) Cache-Hit?
+        // v0.1.20-beta.5: effectiveCountry ist eigene Cache-Dimension. Vorher
+        // teilten sich Country=DE und Global denselben Cache-Eintrag (beide
+        // hatten effectiveRegion="") und ueberschrieben sich gegenseitig.
         try
         {
             var cached = await _cache.GetCachedPriceAsync(
                 itemType, itemNo, colorId, cfg.GuideType, newOrUsed,
-                effectiveRegion, currency, staleDays, ct, vatCode);
+                effectiveRegion, currency, staleDays, ct, vatCode, effectiveCountry);
             if (cached != null)
             {
                 return cached with { ProviderLabel = BuildProviderLabel(cfg) };
@@ -115,7 +118,7 @@ public class BricklinkApiPriceProvider : IPriceProvider
         if (!await _rateLimiter.CanMakeCallAsync(ct))
         {
             Log.Debug("Preis-Lookup geblockt durch Rate-Limit ({Type}/{No}/{Color})", itemType, itemNo, colorId);
-            return await TryStaleFallbackAsync(itemType, itemNo, colorId, cfg, newOrUsed, effectiveRegion, currency, vatCode, ct);
+            return await TryStaleFallbackAsync(itemType, itemNo, colorId, cfg, newOrUsed, effectiveRegion, effectiveCountry, currency, vatCode, ct);
         }
 
         // 3) BL-API-Call.
@@ -203,7 +206,7 @@ public class BricklinkApiPriceProvider : IPriceProvider
                 {
                     await _cache.UpsertPriceAsync(
                         itemType, itemNo, colorId, cfg.GuideType, newOrUsed,
-                        effectiveRegion, currency, result, ct, vatCode);
+                        effectiveRegion, currency, result, ct, vatCode, effectiveCountry);
                 }
                 catch (Exception ex)
                 {
@@ -220,7 +223,7 @@ public class BricklinkApiPriceProvider : IPriceProvider
             sw.Stop();
             statusCode = 401;
             Log.Warning(ex, "Preis-Lookup: Auth-Fehler");
-            return await TryStaleFallbackAsync(itemType, itemNo, colorId, cfg, newOrUsed, effectiveRegion, currency, vatCode, ct);
+            return await TryStaleFallbackAsync(itemType, itemNo, colorId, cfg, newOrUsed, effectiveRegion, effectiveCountry, currency, vatCode, ct);
         }
         catch (Exception ex)
         {
@@ -229,7 +232,7 @@ public class BricklinkApiPriceProvider : IPriceProvider
                        : (ex.Message ?? "").Contains("429") ? 429
                        : 500;
             Log.Warning(ex, "Preis-Lookup fehlgeschlagen ({Type}/{No}/{Color})", itemType, itemNo, colorId);
-            return await TryStaleFallbackAsync(itemType, itemNo, colorId, cfg, newOrUsed, effectiveRegion, currency, vatCode, ct);
+            return await TryStaleFallbackAsync(itemType, itemNo, colorId, cfg, newOrUsed, effectiveRegion, effectiveCountry, currency, vatCode, ct);
         }
         finally
         {
@@ -253,15 +256,18 @@ public class BricklinkApiPriceProvider : IPriceProvider
     /// </summary>
     private async Task<PriceResult?> TryStaleFallbackAsync(
         string itemType, string itemNo, int colorId,
-        PriceSettings cfg, string newOrUsed, string region, string currency,
+        PriceSettings cfg, string newOrUsed, string region, string countryCode, string currency,
         string vatCode,
         CancellationToken ct)
     {
         try
         {
+            // v0.1.20-beta.5: countryCode mitgeben, sonst wuerde der Fallback
+            // den falschen (oder gar keinen) Cache-Eintrag finden wenn der
+            // User einen Country-Filter aktiv hat.
             var stale = await _cache.GetCachedPriceAsync(
                 itemType, itemNo, colorId, cfg.GuideType, newOrUsed,
-                region, currency, staleDays: 0, ct, vatCode);
+                region, currency, staleDays: 0, ct, vatCode, countryCode);
             if (stale != null)
             {
                 Log.Information("Preis-Lookup: stale Cache-Wert geliefert ({Type}/{No}/{Color}, fetched {Days}d ago)",

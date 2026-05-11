@@ -79,14 +79,99 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         EnsureColumn("bl_subsets", "is_from_supersets", "INTEGER NOT NULL DEFAULT 0");
         // UX X.34 v0.1.20: vat_mode-Spalte fuer bl_prices. Default 'N' fuer
         // Bestand (= alter Netto-Default), neue Eintraege schreiben den aktuellen
-        // PriceSettings.VatMode-Wert.
+        // PriceSettings.VatMode-Wert. Hinweis: bei v0.1.20-beta.5-Migration
+        // unten wird die Tabelle ggf. komplett ersetzt, dann ist diese Spalte
+        // schon im neuen Schema enthalten und EnsureColumn ist no-op.
         EnsureColumn("bl_prices", "vat_mode", "TEXT NOT NULL DEFAULT 'N'");
+
+        // v0.1.20-beta.5: country_code als Cache-Dimension + vat_mode in den PK.
+        // Wenn die alte Tabelle ohne country_code-Spalte existiert: drop+create
+        // mit neuem Schema (bl_prices ist reiner Cache, kein User-Datenverlust).
+        MigrateBlPricesSchemaIfNeeded();
 
         // Bereinigung: alte Single-Row-Pseudo-Eintraege markieren die noch von vor
         // der is_from_supersets-Migration in der DB stehen. Sonst wuerde der
         // EnsureFullSubsets-Cache-Hit fuer eine 1-Eintrag-Minifig faelschlich
         // greifen und "Diese Figur anlegen" eine 1/1-Pseudo-Figur produzieren.
         MarkOrphanSingleRowSubsetsAsFromSupersets();
+    }
+
+    /// <summary>
+    /// v0.1.20-beta.5: Schema-Migration fuer bl_prices. Prueft ob die
+    /// country_code-Spalte existiert. Wenn nicht: alte Tabelle droppen und
+    /// mit neuem PK (inkl. country_code + vat_mode) neu anlegen.
+    ///
+    /// bl_prices ist reiner Cache - der naechste Lookup pro Item holt die
+    /// Werte frisch vom Provider. Kein User-Datenverlust (User-DB ist
+    /// userdata.db, davon getrennt).
+    ///
+    /// Idempotent: nach dem ersten Lauf ist die Spalte da und die Methode
+    /// macht nichts.
+    /// </summary>
+    private void MigrateBlPricesSchemaIfNeeded()
+    {
+        bool hasCountryCode = false;
+        using (var checkCmd = _connection.CreateCommand())
+        {
+            // PRAGMA table_info liefert (cid, name, type, notnull, default, pk).
+            checkCmd.CommandText = "PRAGMA table_info(bl_prices);";
+            using var reader = checkCmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), "country_code",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    hasCountryCode = true;
+                    break;
+                }
+            }
+        }
+        if (hasCountryCode) return;
+
+        Log.Information(
+            "bl_prices-Schema veraltet (fehlende country_code-Spalte) " +
+            "- Tabelle wird neu angelegt. Preis-Cache-Eintraege gehen verloren " +
+            "(werden beim naechsten Lookup neu geholt).");
+
+        // CREATE-Statement inline statt EnsureSchema rekursiv aufzurufen -
+        // sauberer und ohne Risiko in den anderen Tabellen-Anlagen mitzuwirken.
+        const string createSql = @"
+            CREATE TABLE bl_prices (
+                item_type    TEXT NOT NULL,
+                item_no      TEXT NOT NULL,
+                color_id     INTEGER NOT NULL DEFAULT 0,
+                guide_type   TEXT NOT NULL,
+                new_or_used  TEXT NOT NULL,
+                region       TEXT NOT NULL DEFAULT '',
+                country_code TEXT NOT NULL DEFAULT '',
+                currency     TEXT NOT NULL DEFAULT 'EUR',
+                vat_mode     TEXT NOT NULL DEFAULT 'Y',
+                min_price    REAL,
+                avg_price    REAL,
+                qty_avg_price REAL,
+                max_price    REAL,
+                unit_quantity INTEGER DEFAULT 0,
+                total_quantity INTEGER DEFAULT 0,
+                fetched_at   TEXT NOT NULL,
+                PRIMARY KEY (item_type, item_no, color_id, guide_type,
+                             new_or_used, region, country_code, currency, vat_mode)
+            );
+            CREATE INDEX IF NOT EXISTS idx_bl_prices_fetched ON bl_prices(fetched_at);";
+
+        using var transaction = _connection.BeginTransaction();
+        using (var drop = _connection.CreateCommand())
+        {
+            drop.Transaction = transaction;
+            drop.CommandText = "DROP TABLE IF EXISTS bl_prices;";
+            drop.ExecuteNonQuery();
+        }
+        using (var create = _connection.CreateCommand())
+        {
+            create.Transaction = transaction;
+            create.CommandText = createSql;
+            create.ExecuteNonQuery();
+        }
+        transaction.Commit();
     }
 
     /// <summary>
@@ -956,7 +1041,8 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         string region, string currency,
         int staleDays,
         CancellationToken ct = default,
-        string vatMode = "N")
+        string vatMode = "N",
+        string countryCode = "")
     {
         Models.Pricing.PriceResult? result = null;
         lock (_lock)
@@ -968,7 +1054,7 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
                 FROM bl_prices
                 WHERE item_type = $it AND item_no = $in AND color_id = $cid
                   AND guide_type = $gt AND new_or_used = $nu
-                  AND region = $rg AND currency = $cu
+                  AND region = $rg AND country_code = $cc AND currency = $cu
                   AND vat_mode = $vat;";
             cmd.Parameters.AddWithValue("$it", itemType);
             cmd.Parameters.AddWithValue("$in", itemNo);
@@ -976,6 +1062,7 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
             cmd.Parameters.AddWithValue("$gt", guideType);
             cmd.Parameters.AddWithValue("$nu", newOrUsed);
             cmd.Parameters.AddWithValue("$rg", region ?? string.Empty);
+            cmd.Parameters.AddWithValue("$cc", countryCode ?? string.Empty);
             cmd.Parameters.AddWithValue("$cu", currency);
             cmd.Parameters.AddWithValue("$vat", string.IsNullOrEmpty(vatMode) ? "N" : vatMode);
 
@@ -1012,7 +1099,8 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         string region, string currency,
         Models.Pricing.PriceResult price,
         CancellationToken ct = default,
-        string vatMode = "N")
+        string vatMode = "N",
+        string countryCode = "")
     {
         lock (_lock)
         {
@@ -1020,11 +1108,11 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
             cmd.CommandText = @"
                 INSERT OR REPLACE INTO bl_prices
                     (item_type, item_no, color_id, guide_type, new_or_used,
-                     region, currency, vat_mode,
+                     region, country_code, currency, vat_mode,
                      min_price, avg_price, qty_avg_price, max_price,
                      unit_quantity, total_quantity, fetched_at)
                 VALUES
-                    ($it, $in, $cid, $gt, $nu, $rg, $cu, $vat,
+                    ($it, $in, $cid, $gt, $nu, $rg, $cc, $cu, $vat,
                      $min, $avg, $qty, $max, $uq, $tq, $fet);";
             cmd.Parameters.AddWithValue("$it", itemType);
             cmd.Parameters.AddWithValue("$in", itemNo);
@@ -1032,6 +1120,7 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
             cmd.Parameters.AddWithValue("$gt", guideType);
             cmd.Parameters.AddWithValue("$nu", newOrUsed);
             cmd.Parameters.AddWithValue("$rg", region ?? string.Empty);
+            cmd.Parameters.AddWithValue("$cc", countryCode ?? string.Empty);
             cmd.Parameters.AddWithValue("$cu", currency);
             cmd.Parameters.AddWithValue("$vat", string.IsNullOrEmpty(vatMode) ? "N" : vatMode);
             cmd.Parameters.AddWithValue("$min", (object?)(double?)price.MinPrice ?? DBNull.Value);
@@ -1064,7 +1153,8 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         string region, string currency,
         int ttlDays,
         CancellationToken ct = default,
-        string vatMode = "N")
+        string vatMode = "N",
+        string countryCode = "")
     {
         Models.Pricing.CachedPriceLookup? result = null;
         lock (_lock)
@@ -1076,7 +1166,7 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
                 FROM bl_prices
                 WHERE item_type = $it AND item_no = $in AND color_id = $cid
                   AND guide_type = $gt AND new_or_used = $nu
-                  AND region = $rg AND currency = $cu
+                  AND region = $rg AND country_code = $cc AND currency = $cu
                   AND vat_mode = $vat;";
             cmd.Parameters.AddWithValue("$it", itemType);
             cmd.Parameters.AddWithValue("$in", itemNo);
@@ -1084,6 +1174,7 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
             cmd.Parameters.AddWithValue("$gt", guideType);
             cmd.Parameters.AddWithValue("$nu", newOrUsed);
             cmd.Parameters.AddWithValue("$rg", region ?? string.Empty);
+            cmd.Parameters.AddWithValue("$cc", countryCode ?? string.Empty);
             cmd.Parameters.AddWithValue("$cu", currency);
             cmd.Parameters.AddWithValue("$vat", string.IsNullOrEmpty(vatMode) ? "N" : vatMode);
 
@@ -1118,7 +1209,8 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         string guideType, string newOrUsed,
         string region, string currency,
         CancellationToken ct = default,
-        string vatMode = "N")
+        string vatMode = "N",
+        string countryCode = "")
     {
         lock (_lock)
         {
@@ -1127,7 +1219,7 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
                 DELETE FROM bl_prices
                 WHERE item_type = $it AND item_no = $in AND color_id = $cid
                   AND guide_type = $gt AND new_or_used = $nu
-                  AND region = $rg AND currency = $cu
+                  AND region = $rg AND country_code = $cc AND currency = $cu
                   AND vat_mode = $vat;";
             cmd.Parameters.AddWithValue("$it", itemType);
             cmd.Parameters.AddWithValue("$in", itemNo);
@@ -1135,6 +1227,7 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
             cmd.Parameters.AddWithValue("$gt", guideType);
             cmd.Parameters.AddWithValue("$nu", newOrUsed);
             cmd.Parameters.AddWithValue("$rg", region ?? string.Empty);
+            cmd.Parameters.AddWithValue("$cc", countryCode ?? string.Empty);
             cmd.Parameters.AddWithValue("$cu", currency);
             cmd.Parameters.AddWithValue("$vat", string.IsNullOrEmpty(vatMode) ? "N" : vatMode);
             var deleted = cmd.ExecuteNonQuery();
