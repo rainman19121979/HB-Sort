@@ -41,6 +41,7 @@ public class SettingsService : ISettingsService
                 if (loaded != null)
                 {
                     Current = loaded;
+                    NormalizePriceFilterEitherOr();
                     Log.Information("Einstellungen geladen aus {Path}", SettingsFilePath);
                     return;
                 }
@@ -55,6 +56,30 @@ public class SettingsService : ISettingsService
             // Bei Fehler: Defaults verwenden und weitermachen (App soll nicht abstuerzen)
             Log.Warning(ex, "Fehler beim Laden der Einstellungen, verwende Standardwerte");
             Current = new AppSettings();
+        }
+    }
+
+    /// <summary>
+    /// UX X.34 v0.1.20: Either-Or-Migration fuer Region/CountryCode in den
+    /// Preis-Settings. Bestand-User aus v0.1.19 oder frueher haben oft beide
+    /// gleichzeitig gesetzt (Defaults waren "europe" + "DE"). Der neue Provider
+    /// behandelt das als Either-Or - CountryCode wins, Region wird beim
+    /// API-Call ignoriert. Hier normalisieren wir die Settings persistent
+    /// auf den effektiven Filter, damit das Settings-UI nicht weiter beide
+    /// Werte zeigt. Save passiert beim naechsten regulaeren Settings-Save -
+    /// wir loesen ihn nicht selbst aus, das ist Sache des Aufrufers.
+    /// </summary>
+    private void NormalizePriceFilterEitherOr()
+    {
+        var p = Current.Prices;
+        var hasCountry = !string.IsNullOrWhiteSpace(p.CountryCode);
+        var hasRegion  = !string.IsNullOrWhiteSpace(p.Region);
+        if (hasCountry && hasRegion)
+        {
+            Log.Information(
+                "Preis-Filter-Migration: Region '{OldRegion}' geloescht weil CountryCode '{Country}' gesetzt ist (Either-Or, CountryCode wins)",
+                p.Region, p.CountryCode);
+            p.Region = string.Empty;
         }
     }
 

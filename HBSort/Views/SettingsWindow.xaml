@@ -442,14 +442,12 @@
 
                             <TextBlock Text="BL-API-Filter" FontSize="13" FontWeight="SemiBold"
                                        Margin="0,4,0,6"/>
-                            <Grid Margin="0,0,0,12">
+                            <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="180"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
@@ -475,32 +473,98 @@
                                     <ComboBoxItem Content="Max" Tag="max"/>
                                 </ComboBox>
 
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Region:"
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Waehrung:"
                                            VerticalAlignment="Center" Margin="0,0,0,4"/>
-                                <ComboBox Grid.Row="2" Grid.Column="1" Margin="0,0,0,4"
-                                          SelectedValue="{Binding PriceRegion, Mode=TwoWay}"
-                                          SelectedValuePath="Tag">
-                                    <ComboBoxItem Content="(global, keine Filterung)" Tag=""/>
-                                    <ComboBoxItem Content="europe" Tag="europe"/>
-                                    <ComboBoxItem Content="north_america" Tag="north_america"/>
-                                    <ComboBoxItem Content="asia" Tag="asia"/>
-                                    <ComboBoxItem Content="south_america" Tag="south_america"/>
-                                    <ComboBoxItem Content="africa" Tag="africa"/>
-                                </ComboBox>
-
-                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Country-Code (z.B. DE):"
-                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
-                                <TextBox Grid.Row="3" Grid.Column="1" Margin="0,0,0,4"
-                                         MaxLength="2"
-                                         Text="{Binding PriceCountryCode, UpdateSourceTrigger=PropertyChanged}"
-                                         ToolTip="Lass das Feld leer, wenn du keinen Country-Filter willst."/>
-
-                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Waehrung:"
-                                           VerticalAlignment="Center" Margin="0,0,0,4"/>
-                                <TextBox Grid.Row="4" Grid.Column="1" Margin="0,0,0,4"
+                                <TextBox Grid.Row="2" Grid.Column="1" Margin="0,0,0,4"
                                          MaxLength="3"
                                          Text="{Binding PriceCurrency, UpdateSourceTrigger=PropertyChanged}"/>
                             </Grid>
+
+                            <!-- UX X.34 v0.1.20: Region/Land Either-Or-Filter.
+                                 RadioButton-Gruppe statt zwei separater Felder -
+                                 BL-API erwartet nur eines von beiden, vorher haben
+                                 wir beide gleichzeitig geschickt was zu wenig/keinen
+                                 Daten gefuehrt hat (insb. bei Sold + DE). -->
+                            <TextBlock Text="Region/Land-Filter" FontSize="13" FontWeight="SemiBold"
+                                       Margin="0,8,0,6"/>
+                            <StackPanel Margin="0,0,0,8">
+                                <RadioButton GroupName="PriceFilter"
+                                             IsChecked="{Binding IsFilterModeGlobal, Mode=OneWay}"
+                                             Click="PriceFilterGlobal_Click"
+                                             Content="Global (keine Filterung) - groesste Datenbasis"
+                                             Margin="0,0,0,6"
+                                             ToolTip="Alle Verkaufstransaktionen weltweit. Empfohlen bei seltenen Items oder generell."/>
+
+                                <RadioButton GroupName="PriceFilter"
+                                             IsChecked="{Binding IsFilterModeRegion, Mode=OneWay}"
+                                             Click="PriceFilterRegion_Click"
+                                             Margin="0,0,0,4"
+                                             ToolTip="Filter auf eine Region (mehrere Laender). Mittelweg zwischen lokal und global.">
+                                    <RadioButton.Content>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Region:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <ComboBox Width="180"
+                                                      IsEnabled="{Binding IsFilterModeRegion}"
+                                                      SelectedValue="{Binding PriceRegion, Mode=TwoWay}"
+                                                      SelectedValuePath="Tag"
+                                                      ToolTip="Region-Werte gemaess offizieller BL-API. 'eu' = nur EU-Mitgliedsstaaten (VAT-pflichtig), 'europe' = ganz Europa inkl. UK/CH.">
+                                                <ComboBoxItem Content="europe" Tag="europe"/>
+                                                <ComboBoxItem Content="eu (nur EU-Mitglieder)" Tag="eu"/>
+                                                <ComboBoxItem Content="north_america" Tag="north_america"/>
+                                                <ComboBoxItem Content="south_america" Tag="south_america"/>
+                                                <ComboBoxItem Content="asia" Tag="asia"/>
+                                                <ComboBoxItem Content="middle_east" Tag="middle_east"/>
+                                                <ComboBoxItem Content="africa" Tag="africa"/>
+                                                <ComboBoxItem Content="oceania" Tag="oceania"/>
+                                            </ComboBox>
+                                        </StackPanel>
+                                    </RadioButton.Content>
+                                </RadioButton>
+
+                                <RadioButton GroupName="PriceFilter"
+                                             IsChecked="{Binding IsFilterModeCountry, Mode=OneWay}"
+                                             Click="PriceFilterCountry_Click"
+                                             ToolTip="Filter auf ein spezifisches Land (z.B. DE, US, GB). Engste Filterung - bei seltenen Items oft 0 Treffer.">
+                                    <RadioButton.Content>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Land:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <TextBox Width="60"
+                                                     MaxLength="2"
+                                                     IsEnabled="{Binding IsFilterModeCountry}"
+                                                     Text="{Binding PriceCountryCode, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="ISO-Country-Code (DE, US, GB, ...)."/>
+                                        </StackPanel>
+                                    </RadioButton.Content>
+                                </RadioButton>
+                            </StackPanel>
+                            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
+                                       Margin="0,0,0,12"
+                                       Text="Hinweis: bei Sold + Land bedeutet Filter 'Verkaeufe DURCH Verkaeufer aus diesem Land' - das sind oft wenige. Bei wenig Daten weniger eng filtern (Region statt Land oder Global)."/>
+
+                            <!-- UX X.34 v0.1.20: VAT-Modus. Default Brutto matcht
+                                 die BL-Webseite-Preise; Vorgaengerverhalten war
+                                 implizit Netto und hat gemischte Aggregate
+                                 erzeugt (Privat brutto, gewerblich netto). -->
+                            <TextBlock Text="VAT-Modus" FontSize="13" FontWeight="SemiBold"
+                                       Margin="0,4,0,6"/>
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="VAT-Behandlung:"
+                                           VerticalAlignment="Center"/>
+                                <ComboBox Grid.Column="1"
+                                          ItemsSource="{Binding VatModeOptions}"
+                                          SelectedValuePath="Mode"
+                                          DisplayMemberPath="Label"
+                                          SelectedValue="{Binding PriceVatMode, Mode=TwoWay}"
+                                          ToolTip="Brutto (Y, Default): Preise inkl. VAT, matcht die BrickLink-Webseite. Netto (N): VAT abgezogen - gemischte Aggregate, nur fuer eigene VAT-Verkaeufer-Erloesabschaetzung. Norwegen (O): 25% VAT - Spezial-Fall."/>
+                            </Grid>
+                            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
+                                       Margin="0,0,0,12"
+                                       Text="Brutto matcht die Preise auf der BL-Webseite. Aenderung wird beim naechsten Preis-Lookup wirksam (Cache-Refresh fuer den jeweiligen Eintrag)."/>
 
                             <TextBlock Text="Korrekturfaktoren" FontSize="13" FontWeight="SemiBold"
                                        Margin="0,4,0,6"/>
@@ -564,7 +628,7 @@
                                           SelectedValuePath="Value"
                                           DisplayMemberPath="Label"
                                           SelectedValue="{Binding PriceAutoLoadCompletePrice, Mode=TwoWay}"
-                                          ToolTip="Auto = sofort beim Scannen einer Figur. Manuell = erst auf Klick (spart API-Calls)."/>
+                                          ToolTip="Auto: jede Anzeige einer Figur loest 1 API-Aufruf an BrickLink aus.&#x0a;Manual: User klickt 'Preis laden' wenn gewollt (spart API-Calls)."/>
 
                                 <TextBlock Grid.Row="1" Grid.Column="0"
                                            Text="Einzelteile-Preise:"
@@ -574,7 +638,7 @@
                                           SelectedValuePath="Value"
                                           DisplayMemberPath="Label"
                                           SelectedValue="{Binding PriceAutoLoadPartsPrice, Mode=TwoWay}"
-                                          ToolTip="Auto = sofort beim Scannen. Manuell = erst auf Klick. Unabhaengig vom Komplett-Preis-Setting."/>
+                                          ToolTip="Auto: jede Anzeige einer Figur loest pro Teil-Typ einen API-Aufruf aus (z.B. 8 Teile = 8 Aufrufe).&#x0a;Manual: User klickt 'Teile-Preise laden' wenn gewollt (deutlich sparsamer)."/>
                             </Grid>
 
                             <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
@@ -585,6 +649,37 @@
                                 <Run Text="Manuell:"/>
                                 Preise werden erst auf Klick geladen (spart API-Calls).
                             </TextBlock>
+
+                            <!-- UX X.34 v0.1.20: Warnung bei Auto-Mode + API-Limit.
+                                 Sichtbar wenn mindestens einer der beiden AutoLoad-
+                                 Werte auf Auto steht. Hintergrund: Komplett = 1
+                                 Call/Figur, Einzelteile = 1 Call PRO TEIL-TYP. Bei
+                                 vielen Figuren oder schwacher Internet-Verbindung
+                                 ist Manual sparsamer. -->
+                            <Border Background="#FFF4E5" BorderBrush="#E65100"
+                                    BorderThickness="1" CornerRadius="4"
+                                    Padding="10" Margin="0,8,0,0"
+                                    Visibility="{Binding ShowAutoLoadApiWarning, Converter={StaticResource BoolToVisibility}}">
+                                <StackPanel>
+                                    <TextBlock FontWeight="SemiBold" Foreground="#E65100"
+                                               Text="⚠ Hinweis zu Auto-Modus"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#5D2E00" Margin="0,4,0,0">
+                                        Jedes Anzeigen einer Figur loest API-Aufrufe an BrickLink aus
+                                        (Limit: 5000 / 24h).
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#5D2E00" Margin="0,6,0,0">
+                                        <Run FontWeight="SemiBold" Text="Komplett-Preis Auto:"/>
+                                        <Run Text="1 API-Aufruf pro Figur."/>
+                                        <LineBreak/>
+                                        <Run FontWeight="SemiBold" Text="Einzelteile-Preis Auto:"/>
+                                        <Run Text="1 API-Aufruf"/>
+                                        <Run FontWeight="SemiBold" Text="pro Teil-Typ"/>
+                                        <Run Text="(z.B. 8 Teile = 8 Aufrufe)."/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#5D2E00" Margin="0,6,0,0"
+                                               Text="Bei vielen Figuren oder schwacher Internet-Verbindung empfiehlt sich der Manual-Modus mit gezieltem 'Preis laden'-Klick."/>
+                                </StackPanel>
+                            </Border>
 
                             <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
                                        FontStyle="Italic" Margin="0,8,0,0"

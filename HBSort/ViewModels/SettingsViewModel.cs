@@ -570,8 +570,16 @@ public partial class SettingsViewModel : ObservableObject
         PriceProvider                  = string.IsNullOrWhiteSpace(s.Prices.Provider) ? "None" : s.Prices.Provider;
         PriceGuideType                 = s.Prices.GuideType;
         PricePriceColumn               = s.Prices.PriceColumn;
-        PriceRegion                    = s.Prices.Region;
-        PriceCountryCode               = s.Prices.CountryCode;
+        PriceRegion                    = s.Prices.Region ?? string.Empty;
+        PriceCountryCode               = s.Prices.CountryCode ?? string.Empty;
+        // UX X.34 v0.1.20: Filter-Mode aus Settings-Stand ableiten. SettingsService
+        // hat schon normalisiert (CountryCode wins wenn beide gesetzt waren), also
+        // ist max. ein Wert gefuellt.
+        PriceFilterMode                = !string.IsNullOrWhiteSpace(s.Prices.CountryCode)
+            ? PriceFilterMode.Country
+            : !string.IsNullOrWhiteSpace(s.Prices.Region)
+                ? PriceFilterMode.Region
+                : PriceFilterMode.Global;
         PriceCurrency                  = s.Prices.Currency;
         PriceCorrectionMinifigPercent  = s.Prices.CorrectionMinifigPercent;
         PriceCorrectionPartsPercent    = s.Prices.CorrectionPartsPercent;
@@ -581,6 +589,8 @@ public partial class SettingsViewModel : ObservableObject
         PriceCacheTtlPartDays          = s.Prices.BlPriceCacheTtlPartDays;
         PriceAutoLoadCompletePrice     = s.Prices.AutoLoadCompletePrice;
         PriceAutoLoadPartsPrice        = s.Prices.AutoLoadPartsPrice;
+        // UX X.34 v0.1.20: VAT-Modus laden.
+        PriceVatMode                   = s.Prices.VatMode;
 
         // Kameras auflisten
         AvailableCameras = _cameraService.GetAvailableCameras();
@@ -622,8 +632,24 @@ public partial class SettingsViewModel : ObservableObject
         s.Prices.Provider                  = PriceProvider;
         s.Prices.GuideType                 = PriceGuideType;
         s.Prices.PriceColumn               = PricePriceColumn;
-        s.Prices.Region                    = PriceRegion ?? string.Empty;
-        s.Prices.CountryCode               = PriceCountryCode ?? string.Empty;
+        // UX X.34 v0.1.20: Filter-Mode-Either-Or beim Save erzwingen.
+        // Egal was im UI getippt wurde - nur das Feld des aktiven Modus
+        // wandert ins POCO, der andere wird auf "" gesetzt.
+        switch (PriceFilterMode)
+        {
+            case PriceFilterMode.Country:
+                s.Prices.CountryCode = (PriceCountryCode ?? string.Empty).Trim();
+                s.Prices.Region      = string.Empty;
+                break;
+            case PriceFilterMode.Region:
+                s.Prices.Region      = (PriceRegion ?? string.Empty).Trim();
+                s.Prices.CountryCode = string.Empty;
+                break;
+            default: // Global
+                s.Prices.Region      = string.Empty;
+                s.Prices.CountryCode = string.Empty;
+                break;
+        }
         s.Prices.Currency                  = string.IsNullOrWhiteSpace(PriceCurrency) ? "EUR" : PriceCurrency;
         s.Prices.CorrectionMinifigPercent  = PriceCorrectionMinifigPercent;
         s.Prices.CorrectionPartsPercent    = PriceCorrectionPartsPercent;
@@ -632,6 +658,8 @@ public partial class SettingsViewModel : ObservableObject
         s.Prices.BlPriceCacheTtlPartDays    = Math.Max(1, PriceCacheTtlPartDays);
         s.Prices.AutoLoadCompletePrice     = PriceAutoLoadCompletePrice;
         s.Prices.AutoLoadPartsPrice        = PriceAutoLoadPartsPrice;
+        // UX X.34 v0.1.20: VAT-Modus speichern.
+        s.Prices.VatMode                   = PriceVatMode;
 
         // UX X.33 v0.1.19-beta.7 Block N Mini-Fix: Mapping-Rows zurueck ins
         // Dict. Sentinel-Eintrag "(kein Mapping)" hat Id=0 - Save-Pfad
@@ -1197,9 +1225,38 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty] private string _priceGuideType = "sold";       // "sold" | "stock"
     [ObservableProperty] private string _pricePriceColumn = "qty_avg";  // "min"|"avg"|"qty_avg"|"max"
-    [ObservableProperty] private string _priceRegion = "europe";
-    [ObservableProperty] private string _priceCountryCode = "DE";
+
+    // UX X.34 v0.1.20: Region/CountryCode haben jetzt Default leer (nicht
+    // mehr "europe"/"DE") - der neue Filter-Mode steuert ueber Either-Or
+    // welcher der beiden Werte ueberhaupt gefuellt sein darf.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFilterModeRegion))]
+    [NotifyPropertyChangedFor(nameof(IsFilterModeCountry))]
+    [NotifyPropertyChangedFor(nameof(IsFilterModeGlobal))]
+    private string _priceRegion = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFilterModeRegion))]
+    [NotifyPropertyChangedFor(nameof(IsFilterModeCountry))]
+    [NotifyPropertyChangedFor(nameof(IsFilterModeGlobal))]
+    private string _priceCountryCode = string.Empty;
+
     [ObservableProperty] private string _priceCurrency = "EUR";
+
+    /// <summary>
+    /// UX X.34 v0.1.20: Filter-Mode Either-Or. Wert wird beim LoadFromSettings
+    /// aus dem (CountryCode/Region)-Stand abgeleitet, beim SaveSettings ins
+    /// PriceSettings-POCO durchgereicht (anderer Wert wird auf "" gezwungen).
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFilterModeRegion))]
+    [NotifyPropertyChangedFor(nameof(IsFilterModeCountry))]
+    [NotifyPropertyChangedFor(nameof(IsFilterModeGlobal))]
+    private PriceFilterMode _priceFilterMode = PriceFilterMode.Global;
+
+    public bool IsFilterModeGlobal  => PriceFilterMode == PriceFilterMode.Global;
+    public bool IsFilterModeRegion  => PriceFilterMode == PriceFilterMode.Region;
+    public bool IsFilterModeCountry => PriceFilterMode == PriceFilterMode.Country;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(MinifigPreviewLabel))]
@@ -1220,8 +1277,42 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private int _priceCacheTtlPartDays = 90;
 
     // UX-Iteration X.10: pro Bereich Auto vs Manuell.
-    [ObservableProperty] private PriceLoadMode _priceAutoLoadCompletePrice = PriceLoadMode.Manual;
-    [ObservableProperty] private PriceLoadMode _priceAutoLoadPartsPrice    = PriceLoadMode.Manual;
+    // UX X.34 v0.1.20: bei Wechsel von einem der beiden Werte wird der
+    // ShowAutoLoadApiWarning-Banner sichtbar/unsichtbar - PropertyChanged
+    // muss den Computed-Helper benachrichtigen.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowAutoLoadApiWarning))]
+    private PriceLoadMode _priceAutoLoadCompletePrice = PriceLoadMode.Manual;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowAutoLoadApiWarning))]
+    private PriceLoadMode _priceAutoLoadPartsPrice    = PriceLoadMode.Manual;
+
+    /// <summary>
+    /// UX X.34 v0.1.20: zeigt einen orangenen API-Limit-Warnhinweis im
+    /// Settings-Tab "BrickLink" → Sektion "Preise" wenn mindestens einer der
+    /// beiden AutoLoad-Werte auf Auto steht. Hintergrund: Auto-Mode loest pro
+    /// angezeigter Figur API-Aufrufe aus - Komplett-Preis = 1 Call/Figur,
+    /// Einzelteile-Preis = 1 Call PRO TEIL-TYP. Bei vielen Figuren oder
+    /// niedriger BL-Limit-Reserve ist Manual sparsamer.
+    /// </summary>
+    public bool ShowAutoLoadApiWarning =>
+        PriceAutoLoadCompletePrice == PriceLoadMode.Auto ||
+        PriceAutoLoadPartsPrice == PriceLoadMode.Auto;
+
+    // UX X.34 v0.1.20: VAT-Modus fuer BL-Preis-Lookups. Default Y (Brutto)
+    // matcht die BL-Webseite-Preise. Vorher kein Parameter -> Library-Default
+    // Netto -> gemischte Aggregate. Cache-Wechsel passiert lazy beim ersten
+    // Lookup nach Mode-Aenderung (Cache-Miss -> frischer API-Call).
+    [ObservableProperty] private VatMode _priceVatMode = VatMode.Y;
+
+    /// <summary>UI-Bindings fuer das VAT-Mode-Dropdown.</summary>
+    public IReadOnlyList<VatModeOption> VatModeOptions { get; } = new[]
+    {
+        new VatModeOption(VatMode.Y, "Brutto (Y) - matcht Website (Default)"),
+        new VatModeOption(VatMode.N, "Netto (N) - VAT abgezogen"),
+        new VatModeOption(VatMode.O, "Norwegen (O) - 25% VAT")
+    };
 
     /// <summary>
     /// UX-Iteration X.10: Optionen fuer die zwei "Preise laden"-Dropdowns.
@@ -1467,4 +1558,14 @@ public class BackupRowViewModel
             ? (info.SizeBytes / 1024.0).ToString("F1") + " KB"
             : (info.SizeBytes / (1024.0 * 1024.0)).ToString("F2") + " MB";
     }
+}
+
+/// <summary>
+/// UX X.34 v0.1.20: UI-Wrapper fuer das VAT-Mode-Dropdown im
+/// "BrickLink"-Tab → Sektion "Preise". Enum + Display-Label in einem
+/// kleinen Record damit das ComboBox-Binding sauber bleibt.
+/// </summary>
+public record VatModeOption(VatMode Mode, string Label)
+{
+    public override string ToString() => Label;
 }

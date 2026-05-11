@@ -132,6 +132,99 @@ public class BricklinkApiPriceProviderTests
     }
 
     // ====================================================================
+    // UX X.34 v0.1.20: VAT-Mode wird korrekt aus Settings durchgereicht
+    // ====================================================================
+
+    [Fact]
+    public async Task GetPrice_passes_vat_Y_to_cache_lookup_by_default()
+    {
+        // Default-Settings: VatMode.Y -> Cache-Lookup mit "Y" filtern.
+        _cache.NextCached = MakePrice(10m);
+
+        await _sut.GetMinifigPriceAsync("arc007");
+
+        Assert.Equal("Y", _cache.LastVatMode);
+    }
+
+    [Fact]
+    public async Task GetPrice_passes_vat_N_to_cache_lookup_when_setting_changed()
+    {
+        _settings.Current.Prices.VatMode = VatMode.N;
+        _cache.NextCached = MakePrice(10m);
+
+        await _sut.GetMinifigPriceAsync("arc007");
+
+        Assert.Equal("N", _cache.LastVatMode);
+    }
+
+    [Fact]
+    public async Task GetPrice_provider_label_contains_vat_mode_text()
+    {
+        _settings.Current.Prices.VatMode = VatMode.Y;
+        _cache.NextCached = MakePrice(10m);
+
+        var result = await _sut.GetMinifigPriceAsync("arc007");
+
+        Assert.NotNull(result);
+        Assert.Contains("Brutto", result!.ProviderLabel ?? "");
+    }
+
+    [Fact]
+    public async Task GetPrice_provider_label_with_netto_when_vat_N()
+    {
+        _settings.Current.Prices.VatMode = VatMode.N;
+        _cache.NextCached = MakePrice(10m);
+
+        var result = await _sut.GetMinifigPriceAsync("arc007");
+
+        Assert.NotNull(result);
+        Assert.Contains("Netto", result!.ProviderLabel ?? "");
+    }
+
+    // ====================================================================
+    // UX X.34 v0.1.20: Either-Or Region/CountryCode wird beim Cache-Lookup
+    // korrekt aufgeloest (CountryCode wins -> Region leer im Cache-Key).
+    // ====================================================================
+
+    [Fact]
+    public async Task GetPrice_either_or_country_wins_over_region_in_cache_key()
+    {
+        // Wenn beide gesetzt sind (alter Bestand): CountryCode gewinnt,
+        // Region wird beim Cache-Lookup auf "" gezwungen.
+        _settings.Current.Prices.CountryCode = "DE";
+        _settings.Current.Prices.Region      = "europe";
+        _cache.NextCached = MakePrice(10m);
+
+        await _sut.GetMinifigPriceAsync("arc007");
+
+        Assert.Equal(string.Empty, _cache.LastRegion);
+    }
+
+    [Fact]
+    public async Task GetPrice_either_or_region_only_passes_region_in_cache_key()
+    {
+        _settings.Current.Prices.CountryCode = string.Empty;
+        _settings.Current.Prices.Region      = "europe";
+        _cache.NextCached = MakePrice(10m);
+
+        await _sut.GetMinifigPriceAsync("arc007");
+
+        Assert.Equal("europe", _cache.LastRegion);
+    }
+
+    [Fact]
+    public async Task GetPrice_either_or_global_passes_empty_region_in_cache_key()
+    {
+        _settings.Current.Prices.CountryCode = string.Empty;
+        _settings.Current.Prices.Region      = string.Empty;
+        _cache.NextCached = MakePrice(10m);
+
+        await _sut.GetMinifigPriceAsync("arc007");
+
+        Assert.Equal(string.Empty, _cache.LastRegion);
+    }
+
+    // ====================================================================
     // Helpers
     // ====================================================================
 
@@ -173,13 +266,19 @@ public class BricklinkApiPriceProviderTests
         public PriceResult? NextStale { get; set; }
         public int LastStaleDays { get; private set; } = -1;
 
+        public string? LastVatMode { get; private set; }
+        public string? LastRegion { get; private set; }
+
         public Task<PriceResult?> GetCachedPriceAsync(
             string itemType, string itemNo, int colorId,
             string guideType, string newOrUsed,
             string region, string currency,
-            int staleDays, CancellationToken ct = default)
+            int staleDays, CancellationToken ct = default,
+            string vatMode = "N")
         {
             LastStaleDays = staleDays;
+            LastVatMode = vatMode;
+            LastRegion = region;
             // staleDays > 0 ist "frische Pruefung", staleDays == 0 ist Stale-Fallback.
             return Task.FromResult(staleDays > 0 ? NextCached : NextStale);
         }
@@ -209,10 +308,17 @@ public class BricklinkApiPriceProviderTests
         public Task<int> GetCallCountSinceAsync(DateTime since, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<DateTime?> GetOldestCallInWindowAsync(TimeSpan window, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<int> PruneApiCallLogAsync(int olderThanDays = 7, CancellationToken ct = default) => throw new NotImplementedException();
-        public Task UpsertPriceAsync(string itemType, string itemNo, int colorId, string guideType, string newOrUsed, string region, string currency, PriceResult price, CancellationToken ct = default) => throw new NotImplementedException();
-        public Task<CachedPriceLookup?> GetCachedPriceWithStaleFlagAsync(string itemType, string itemNo, int colorId, string guideType, string newOrUsed, string region, string currency, int ttlDays, CancellationToken ct = default) => throw new NotImplementedException();
-        public Task<bool> DeletePriceAsync(string itemType, string itemNo, int colorId, string guideType, string newOrUsed, string region, string currency, CancellationToken ct = default) => throw new NotImplementedException();
+        public string? LastUpsertVatMode { get; private set; }
+
+        public Task UpsertPriceAsync(string itemType, string itemNo, int colorId, string guideType, string newOrUsed, string region, string currency, PriceResult price, CancellationToken ct = default, string vatMode = "N")
+        {
+            LastUpsertVatMode = vatMode;
+            return Task.CompletedTask;
+        }
+        public Task<CachedPriceLookup?> GetCachedPriceWithStaleFlagAsync(string itemType, string itemNo, int colorId, string guideType, string newOrUsed, string region, string currency, int ttlDays, CancellationToken ct = default, string vatMode = "N") => throw new NotImplementedException();
+        public Task<bool> DeletePriceAsync(string itemType, string itemNo, int colorId, string guideType, string newOrUsed, string region, string currency, CancellationToken ct = default, string vatMode = "N") => throw new NotImplementedException();
         public Task<int> ClearAllPricesAsync(CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<int> ClearEmptyPricesAsync(CancellationToken ct = default) => throw new NotImplementedException();
         public Task<int> GetPriceCacheCountAsync(CancellationToken ct = default) => throw new NotImplementedException();
     }
 

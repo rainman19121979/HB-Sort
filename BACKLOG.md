@@ -131,6 +131,39 @@ Items archiviert werden.
 
 ## Erledigt ✅
 
+### v0.1.20-beta.1 (UX X.34, 2026-05-11) - Beta-Iteration
+BL-Preis-Lookup-Sammelpaket. Urspruenglich als v0.1.19.1-Hotfix geplant,
+in Beta-Iteration konsolidiert weil mehrere voneinander abhaengige
+Aenderungen am Cache-Schema + Provider-Logik.
+
+- ✅ **VAT=Y (Brutto) als Default** fuer BL-Preis-Lookups - matcht jetzt die
+  BrickLink-Webseite-Preise. Vorher kein vat-Parameter -> Library-Default
+  Netto -> gemischte Aggregate (Privat brutto, gewerblich netto). Verkaufs-
+  empfehlungen sind damit konsistent.
+- ✅ Neuer Settings-Eintrag *BrickLink → Preise → VAT-Modus* mit Dropdown
+  Brutto/Netto/Norwegen.
+- ✅ Cache-Schema erweitert: `bl_prices.vat_mode`-Spalte (lazy migration -
+  Bestand-Eintraege als Netto markiert, Refresh beim naechsten Lookup).
+- ✅ ProviderLabel im UI zeigt "Brutto"/"Netto"/"NO".
+- ✅ **AutoLoad-API-Warnung**: Banner unter den Settings-Dropdowns (Komplett-
+  Preis / Einzelteile-Preise) wenn Auto aktiviert ist - erklaert API-Aufrufe-
+  Verbrauch (Komplett=1/Figur, Einzelteile=1 PRO TEIL-TYP).
+- ✅ **Region/Land Either-Or-Fix**: BL-API erwartet nur einen Filter; vorher
+  haben wir beide geschickt -> Sold + DE lieferte oft 0 Treffer auch ohne
+  expliziten Wunsch. Neue RadioButton-Gruppe (Global / Region / Land) im
+  Settings-Tab. Default jetzt Global. Migration normalisiert alte
+  Beide-gesetzt-Konfigurationen beim Settings-Load (CountryCode wins).
+- ✅ **Region-Liste vollstaendig** gemaess offizieller BL-API-Doku:
+  `eu` (nur EU-Mitglieder), `middle_east`, `oceania` ergaenzt.
+- ✅ **Leer-Filter null-Fix**: BricklinkSharp.GetPriceGuideAsync mit Empty-
+  Strings sendet `&country_code=&region=` an die BL-API - das wird nicht
+  als "weglassen" behandelt und liefert leere Resultate. Provider wandelt
+  jetzt Empty -> null vor dem Aufruf.
+- ✅ **Cache-Anti-Vergiftung**: Provider schreibt **nichts** in den Cache
+  wenn das API-Resultat komplett leer ist (alle Preise null + Quantity=0).
+  Plus One-Shot-Cleanup beim App-Start: `ClearEmptyPricesAsync` raeumt
+  Bestand-Vergiftung aus dem Pre-Fix-Stand auf.
+
 ### v0.1.19 (UX X.33, 2026-05-10)
 - ✅ Cleanup-Iteration (Drifts 1-3, Sold-Status raus, Settings-Bereinigung)
 - ✅ Sortier-Logik-Refactor: max 1 PartId pro Brickognize-Kategorie pro Bin
@@ -167,7 +200,8 @@ Items archiviert werden.
 | Version | Stand | Inhalt |
 |---|---|---|
 | **v0.1.19** | ✅ stable (2026-05-10) | UX X.33 - Cleanup + Sortier-Logik-Refactor + Doku-Sweep |
-| **v0.1.20** | 📋 geplant | Performance + Undo + Bulk-Bin + Wiki + Brickognize-Throttle |
+| **v0.1.20-beta.1** | 🟡 in-arbeit (2026-05-11) | UX X.34 - BL-Preis-Lookup-Sammelpaket (VAT, Either-Or, Cache-Anti-Vergiftung) |
+| **v0.1.20** | 📋 geplant (Stable) | UX X.34 stable nach Beta-Praxis-Test - plus optional Performance / Undo / Bulk-Bin / Wiki / Brickognize-Throttle (siehe oben) |
 | **v0.2.0** | 💭 Brainstorming | BL-Inventar-Integration (eigene große Iteration) |
 | v0.2.1+ | offen | weitere Features aus Backlog |
 
@@ -177,4 +211,4 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-10 nach v0.1.19-Stable.*
+*Zuletzt aktualisiert: 2026-05-11 nach v0.1.20-beta.1-Vorbereitung.*

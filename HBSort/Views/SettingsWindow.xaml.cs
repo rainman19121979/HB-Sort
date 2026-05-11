@@ -323,6 +323,30 @@ public partial class SettingsWindow : Window
     private void PriceProviderBricklink_Click(object sender, RoutedEventArgs e)
         => _viewModel.PriceProvider = "BricklinkApi";
 
+    /// <summary>UX X.34 v0.1.20: Filter-Mode Either-Or - Global.</summary>
+    private void PriceFilterGlobal_Click(object sender, RoutedEventArgs e)
+        => _viewModel.PriceFilterMode = HBSort.Core.Models.PriceFilterMode.Global;
+
+    /// <summary>UX X.34 v0.1.20: Filter-Mode Either-Or - Region.</summary>
+    private void PriceFilterRegion_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.PriceFilterMode = HBSort.Core.Models.PriceFilterMode.Region;
+        // Sinnvollen Default setzen wenn das Feld leer ist (User hat gerade
+        // Region gewaehlt, will also einen Wert haben - sonst macht der Modus
+        // keinen Sinn). "europe" matcht das alte Default-Verhalten.
+        if (string.IsNullOrWhiteSpace(_viewModel.PriceRegion))
+            _viewModel.PriceRegion = "europe";
+    }
+
+    /// <summary>UX X.34 v0.1.20: Filter-Mode Either-Or - Country.</summary>
+    private void PriceFilterCountry_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.PriceFilterMode = HBSort.Core.Models.PriceFilterMode.Country;
+        // Analog: "DE" als Default setzen wenn leer (alte Default-Erwartung).
+        if (string.IsNullOrWhiteSpace(_viewModel.PriceCountryCode))
+            _viewModel.PriceCountryCode = "DE";
+    }
+
     /// <summary>
     /// Phase 7: Ordner-Picker fuer den BSX-Export-Default-Folder.
     ///

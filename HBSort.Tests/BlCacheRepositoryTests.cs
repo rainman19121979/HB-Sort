@@ -344,4 +344,58 @@ public class BlCacheRepositoryTests : IDisposable
             new HBSort.Core.Models.Pricing.PriceResult { AvgPrice = 1m, Currency = "EUR" });
         Assert.Equal(1, await _sut.GetPriceCacheCountAsync());
     }
+
+    // ====================================================================
+    // UX X.34 v0.1.20: ClearEmptyPricesAsync - Anti-Vergiftung
+    // ====================================================================
+
+    [Fact]
+    public async Task ClearEmptyPrices_removes_only_completely_empty_entries()
+    {
+        // Voll-leerer Eintrag (Bug-Resultat aus dem Empty-Filter-Pfad).
+        await _sut.UpsertPriceAsync("M", "leer1", 0, "sold", "U", "", "EUR",
+            new HBSort.Core.Models.Pricing.PriceResult { Currency = "EUR" });
+        // Eintrag mit nur AvgPrice gesetzt - bleibt drin.
+        await _sut.UpsertPriceAsync("M", "halb", 0, "sold", "U", "", "EUR",
+            new HBSort.Core.Models.Pricing.PriceResult { AvgPrice = 1.23m, Currency = "EUR" });
+        // Eintrag mit nur TotalQuantity > 0 (z.B. 0-Preis aber Quantity?) -
+        // unwahrscheinlich, aber wird konservativ behalten weil Quantity-
+        // Information existiert.
+        await _sut.UpsertPriceAsync("M", "qty-only", 0, "sold", "U", "", "EUR",
+            new HBSort.Core.Models.Pricing.PriceResult { TotalQuantity = 5, Currency = "EUR" });
+        // Zweiter voll-leerer Eintrag.
+        await _sut.UpsertPriceAsync("P", "3001", 11, "sold", "U", "europe", "EUR",
+            new HBSort.Core.Models.Pricing.PriceResult { Currency = "EUR" });
+
+        var removed = await _sut.ClearEmptyPricesAsync();
+
+        Assert.Equal(2, removed);
+        // Die beiden mit Daten muessen erhalten bleiben.
+        Assert.Equal(2, await _sut.GetPriceCacheCountAsync());
+    }
+
+    [Fact]
+    public async Task ClearEmptyPrices_returns_zero_when_no_empty_entries()
+    {
+        await _sut.UpsertPriceAsync("M", "voll", 0, "sold", "U", "", "EUR",
+            new HBSort.Core.Models.Pricing.PriceResult { AvgPrice = 1m, Currency = "EUR" });
+
+        var removed = await _sut.ClearEmptyPricesAsync();
+
+        Assert.Equal(0, removed);
+        Assert.Equal(1, await _sut.GetPriceCacheCountAsync());
+    }
+
+    [Fact]
+    public async Task ClearEmptyPrices_idempotent_second_call_returns_zero()
+    {
+        await _sut.UpsertPriceAsync("M", "leer", 0, "sold", "U", "", "EUR",
+            new HBSort.Core.Models.Pricing.PriceResult { Currency = "EUR" });
+
+        var first  = await _sut.ClearEmptyPricesAsync();
+        var second = await _sut.ClearEmptyPricesAsync();
+
+        Assert.Equal(1, first);
+        Assert.Equal(0, second);
+    }
 }

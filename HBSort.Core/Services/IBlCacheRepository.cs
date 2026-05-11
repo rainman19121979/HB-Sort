@@ -133,24 +133,34 @@ public interface IBlCacheRepository
     /// wenn der Eintrag aelter als <paramref name="staleDays"/> ist (Aufrufer holt
     /// dann neu vom Provider). Bei staleDays=0 wird auch ein stale Eintrag
     /// zurueckgegeben (Fallback-Pfad bei API-Fehler).
+    ///
+    /// <paramref name="vatMode"/> (UX X.34 v0.1.20): "Y"/"N"/"O" - matched auf
+    /// die vat_mode-Spalte. Default "N" weil Bestand-Eintraege mit DEFAULT 'N'
+    /// angelegt wurden. Mismatch -> null (Cache-Miss) -> Provider holt frisch.
     /// </summary>
     Task<Models.Pricing.PriceResult?> GetCachedPriceAsync(
         string itemType, string itemNo, int colorId,
         string guideType, string newOrUsed,
         string region, string currency,
         int staleDays,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        string vatMode = "N");
 
     /// <summary>
     /// Speichert oder aktualisiert einen Preis-Eintrag (INSERT OR REPLACE auf
     /// dem PRIMARY KEY). FetchedAt wird auf jetzt gesetzt.
+    ///
+    /// <paramref name="vatMode"/> (UX X.34): schreibt den aktuellen VAT-Modus
+    /// in die Spalte. INSERT OR REPLACE matched die alte PK (ohne vat_mode),
+    /// d.h. ein bestehender Eintrag mit anderem vat_mode wird ueberschrieben.
     /// </summary>
     Task UpsertPriceAsync(
         string itemType, string itemNo, int colorId,
         string guideType, string newOrUsed,
         string region, string currency,
         Models.Pricing.PriceResult price,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        string vatMode = "N");
 
     // ====================================================================
     // Phase 8 / UX#12 Stale-While-Revalidate - vier neue Operationen
@@ -160,27 +170,46 @@ public interface IBlCacheRepository
     /// Wie GetCachedPriceAsync, aber liefert IMMER den vorhandenen Eintrag
     /// mit einem IsStale-Flag (FetchedAt + ttlDays &lt; now). Liefert null
     /// nur wenn kein Eintrag in der DB ist. Fuer Stale-While-Revalidate.
+    ///
+    /// <paramref name="vatMode"/> (UX X.34): siehe GetCachedPriceAsync.
     /// </summary>
     Task<Models.Pricing.CachedPriceLookup?> GetCachedPriceWithStaleFlagAsync(
         string itemType, string itemNo, int colorId,
         string guideType, string newOrUsed,
         string region, string currency,
         int ttlDays,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        string vatMode = "N");
 
     /// <summary>
     /// Loescht GENAU diesen Cache-Eintrag (PRIMARY-KEY-Match). Liefert true
     /// wenn ein Eintrag entfernt wurde. Fuer Pro-Eintrag-Refresh ueber das
     /// ↻-Icon in der UI.
+    ///
+    /// <paramref name="vatMode"/> (UX X.34): zusaetzlicher Filter, damit nicht
+    /// unbeabsichtigt der falsche VAT-Eintrag geloescht wird.
     /// </summary>
     Task<bool> DeletePriceAsync(
         string itemType, string itemNo, int colorId,
         string guideType, string newOrUsed,
         string region, string currency,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        string vatMode = "N");
 
     /// <summary>Loescht ALLE Eintraege in bl_prices. Fuer "Cache leeren"-Button.</summary>
     Task<int> ClearAllPricesAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// UX X.34 v0.1.20: One-Shot-Cleanup beim App-Start. Loescht alle
+    /// Cache-Eintraege wo BL kein Resultat geliefert hat (alle Preis-Felder
+    /// NULL und total_quantity=0). Solche Eintraege entstanden vor dem
+    /// null-Filter-Fix wenn beide Filter (region+country) als Empty-String
+    /// an die BL-API geschickt wurden. Ergebnis: NULL gecached -> Lookup
+    /// liefert NULL ohne neuen API-Call -> Preise nie sichtbar bis Cache
+    /// leer.
+    /// Liefert die Anzahl geloeschter Eintraege.
+    /// </summary>
+    Task<int> ClearEmptyPricesAsync(CancellationToken ct = default);
 
     /// <summary>Anzahl Eintraege in bl_prices. Fuer Settings-Anzeige.</summary>
     Task<int> GetPriceCacheCountAsync(CancellationToken ct = default);

@@ -125,6 +125,79 @@ Parts), Auto-vs-Manuell-Modus pro Bereich (Komplett-Preis /
 Einzelteile). Cache-TTL pro Item-Typ. Mehr Details im Kapitel
 *Export & Verkauf*.
 
+#### Auto-Modus und API-Aufrufe (ab v0.1.20)
+
+BrickLink hat ein Tageslimit von **5000 API-Aufrufen** (rolling 24h). HBSort
+zaehlt eigenstaendig mit und blockt sich konservativ ab 4500 Aufrufen.
+
+| Modus | API-Aufrufe |
+|---|---|
+| Komplett-Preis Auto | 1 pro Figur die du oeffnest |
+| Komplett-Preis Manual | 0 - bis du auf "Preis laden" klickst |
+| Einzelteile Auto | 1 **pro Teil-Typ** (kann viele sein!) |
+| Einzelteile Manual | 0 - bis du auf "Teile-Preise laden" klickst |
+
+**Empfehlung:** Manual-Modus fuer Einzelteile. Du laedst die Preise nur fuer
+Figuren wo du sie wirklich brauchst (z.B. vor Verkauf). Eine Figur mit 8
+Teilen braucht im Auto-Modus 8 separate API-Aufrufe.
+
+Sobald du gegen das Limit laeufst, blockiert die App neue Aufrufe und zeigt
+stale Cache-Werte - kein Datenverlust, aber Preise sind dann ein paar
+Stunden alt. Status siehst du in der Status-Leiste unten rechts
+("BL: X / 4500").
+
+#### Region/Land-Filter (ab v0.1.20)
+
+Du kannst auswaehlen aus welchem geografischen Bereich die Preise kommen
+sollen:
+
+- **Global (Default):** alle Verkaufstransaktionen weltweit. Groesste
+  Datenbasis, aber Preise koennen weit auseinander gehen (USA, Asien etc.).
+- **Region:** Filter auf eine Region. BL-API kennt 8 Werte:
+  `europe` (ganz Europa inkl. UK/CH), `eu` (nur EU-Mitgliedsstaaten -
+  VAT-pflichtige Verkaeufer), `north_america`, `south_america`, `asia`,
+  `middle_east`, `africa`, `oceania`. Mittelweg zwischen lokal und global.
+- **Land:** Filter auf ein spezifisches Land (z.B. DE, US, GB). Engste
+  Filterung.
+
+**Wichtig:** Region und Land sind **Either-Or**. BL-API erwartet nur einen
+der beiden Filter. Setze entweder das eine oder das andere - HBSort leitet
+das aus deiner RadioButton-Wahl ab. Wenn du in v0.1.19 oder frueher beide
+gleichzeitig gesetzt hattest (Default war "europe" + "DE"), normalisiert
+HBSort beim Update automatisch auf "Land=DE" und blendet "Region" aus.
+
+**Bei wenig/keinen Daten:**
+- Bei `Sold` (Verkaufte) bedeutet Land-Filter: nur Verkaeufe **DURCH**
+  Verkaeufer aus diesem Land. Sind oft wenige -> wenig/keine Daten.
+- Bei `Stock` (Aktuelle Angebote) bedeutet Land-Filter: nur Listings
+  **VON** Verkaeufern aus diesem Land.
+
+Bei wenig Daten: weniger eng filtern (Region statt Land, oder Global).
+
+#### VAT-Modus (ab v0.1.20)
+
+Bestimmt wie BrickLink VAT (Mehrwertsteuer) bei den abgerufenen Preisen
+behandelt:
+
+- **Brutto (Default):** Preise inkl. VAT - matcht was du auf der
+  BrickLink-Webseite siehst. Empfohlen fuer fast alle User.
+- **Netto:** Preise ohne VAT. Nur sinnvoll wenn du selbst VAT-
+  Verkaeufer bist und deine Erloesabschaetzung netto haben willst.
+- **Norwegen:** Spezial-Fall mit 25% VAT.
+
+> **Hintergrund:** Die BL-API liefert ohne expliziten `vat`-Parameter
+> standardmaessig **Netto** (Hinweis aus der offiziellen BL-API-Doku:
+> *"returned price does not include VAT"*). HBSort schickt seit v0.1.20
+> explizit `vat=Y` mit, sonst bekommst du gemischte Aggregate (Privat-
+> Verkaeufer brutto, gewerbliche netto).
+
+> **Wichtig:** wenn du den Modus aenderst, werden die zwischengespeicherten
+> Preise nicht mitumgerechnet. Frische Werte holst du beim naechsten
+> Preis-Lookup automatisch (Cache-Miss -> frischer API-Call). Bestand-
+> Eintraege aus v0.1.19 oder frueher sind als "Netto" markiert (alter
+> impliziter Default) - bei Wechsel auf Brutto greift der Refresh-Pfad
+> automatisch.
+
 ### Sektion: Catalog-Daten
 
 Die schnellste Variante, um an Stammdaten zu kommen, ohne BL-API:

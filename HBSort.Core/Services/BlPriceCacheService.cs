@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using HBSort.Core.Helpers;
+using HBSort.Core.Models;
 using HBSort.Core.Models.Pricing;
 using Serilog;
 
@@ -99,6 +100,14 @@ public class BlPriceCacheService : IBlPriceCacheService
         var region = cfg.Region ?? string.Empty;
         var currency = string.IsNullOrWhiteSpace(cfg.Currency) ? "EUR" : cfg.Currency;
         var effectiveTtl = Math.Max(1, ttlDays);
+        // UX X.34 v0.1.20: Cache-Lookups mit aktuellem VAT-Mode filtern.
+        var vatCode = cfg.VatMode switch
+        {
+            VatMode.Y => "Y",
+            VatMode.N => "N",
+            VatMode.O => "O",
+            _         => "Y"
+        };
 
         // 1) Cache-Lookup mit Stale-Flag.
         CachedPriceLookup? cached = null;
@@ -107,7 +116,7 @@ public class BlPriceCacheService : IBlPriceCacheService
             cached = await _repo.GetCachedPriceWithStaleFlagAsync(
                 itemType, itemNo, colorId,
                 cfg.GuideType, newOrUsed, region, currency,
-                effectiveTtl, ct);
+                effectiveTtl, ct, vatCode);
         }
         catch (Exception ex)
         {
@@ -273,12 +282,14 @@ public class BlPriceCacheService : IBlPriceCacheService
         var cfg = _settings.Current.Prices;
         var region = cfg.Region ?? string.Empty;
         var currency = string.IsNullOrWhiteSpace(cfg.Currency) ? "EUR" : cfg.Currency;
+        // UX X.34 v0.1.20: Refresh loescht den aktuellen VAT-Mode-Eintrag.
+        var vatCode = MapVat(cfg.VatMode);
 
         await _repo.DeletePriceAsync("M", blMinifigId, 0,
-            cfg.GuideType, "U", region, currency, ct);
+            cfg.GuideType, "U", region, currency, ct, vatCode);
 
-        Log.Information("Komplett-Figur-Cache geloescht: {Mfg} ({Guide})",
-            blMinifigId, cfg.GuideType);
+        Log.Information("Komplett-Figur-Cache geloescht: {Mfg} ({Guide}, vat={Vat})",
+            blMinifigId, cfg.GuideType, vatCode);
     }
 
     public async Task DeletePartPricesAsync(
@@ -288,17 +299,18 @@ public class BlPriceCacheService : IBlPriceCacheService
         var cfg = _settings.Current.Prices;
         var region = cfg.Region ?? string.Empty;
         var currency = string.IsNullOrWhiteSpace(cfg.Currency) ? "EUR" : cfg.Currency;
+        var vatCode = MapVat(cfg.VatMode);
 
         var distinct = subsetParts.Distinct().ToList();
         foreach (var (partNo, colorId) in distinct)
         {
             ct.ThrowIfCancellationRequested();
             await _repo.DeletePriceAsync("P", partNo, colorId,
-                cfg.GuideType, "U", region, currency, ct);
+                cfg.GuideType, "U", region, currency, ct, vatCode);
         }
 
-        Log.Information("Einzelteil-Cache geloescht: {Count} Eintraege ({Guide})",
-            distinct.Count, cfg.GuideType);
+        Log.Information("Einzelteil-Cache geloescht: {Count} Eintraege ({Guide}, vat={Vat})",
+            distinct.Count, cfg.GuideType, vatCode);
     }
 
     public Task<int> GetEntryCountAsync(CancellationToken ct = default)
@@ -306,6 +318,15 @@ public class BlPriceCacheService : IBlPriceCacheService
 
     public Task<int> ClearAllAsync(CancellationToken ct = default)
         => _repo.ClearAllPricesAsync(ct);
+
+    /// <summary>UX X.34 v0.1.20: HBSort-VatMode -> BL-API-String-Code (Y/N/O).</summary>
+    private static string MapVat(VatMode mode) => mode switch
+    {
+        VatMode.Y => "Y",
+        VatMode.N => "N",
+        VatMode.O => "O",
+        _         => "Y"
+    };
 
     /// <summary>
     /// Cache-Key fuer das In-Flight-Dictionary. Currency/Region/Guide etc.

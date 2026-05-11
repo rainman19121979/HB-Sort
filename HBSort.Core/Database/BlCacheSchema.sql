@@ -71,6 +71,14 @@ CREATE INDEX IF NOT EXISTS idx_api_call_log_timestamp ON api_call_log(timestamp)
 
 -- Phase 8: Preis-Cache. PRIMARY KEY ueber alle Filter-Felder, damit
 -- verschiedene Region/Currency/Condition-Kombis nebeneinander gecached werden.
+--
+-- UX X.34 v0.1.20: vat_mode-Spalte angehaengt (NICHT in PK aus Hotfix-
+-- Pragmatismus - kein riskanter SQLite-Tabellen-Umbau). Bestand-Eintraege
+-- bekommen via ALTER TABLE Default 'N' (= alter Netto-Default). Neue
+-- Lookups mit vat='Y' filtern im WHERE und bekommen Cache-Miss bei
+-- Mismatch -> frischer API-Call ersetzt den alten Eintrag (INSERT OR
+-- REPLACE auf alter PK). User kann nicht Y und N parallel cachen,
+-- aber Wechsel funktioniert (Refresh per Lookup).
 CREATE TABLE IF NOT EXISTS bl_prices (
     item_type TEXT NOT NULL,
     item_no TEXT NOT NULL,
@@ -79,6 +87,7 @@ CREATE TABLE IF NOT EXISTS bl_prices (
     new_or_used TEXT NOT NULL,       -- 'N' | 'U'
     region TEXT NOT NULL DEFAULT '',
     currency TEXT NOT NULL DEFAULT 'EUR',
+    vat_mode TEXT NOT NULL DEFAULT 'N',  -- UX X.34: 'Y' (brutto, neuer Default), 'N' (netto, alt), 'O' (NO)
     min_price REAL,
     avg_price REAL,
     qty_avg_price REAL,

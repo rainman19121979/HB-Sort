@@ -335,13 +335,17 @@ public class BlPriceCacheServiceTests : IDisposable
         decimal avg, DateTime fetchedAt)
     {
         var cfg = _settings.Current.Prices;
+        // UX X.34 v0.1.20: vatMode aus aktuellen Settings durchreichen damit
+        // der Cache-Eintrag mit dem Mode geschrieben wird, mit dem der Service
+        // im Test gelesen wird.
         return _repo.UpsertPriceAsync(
             itemType, itemNo, colorId,
             cfg.GuideType, "U", cfg.Region, cfg.Currency,
             new PriceResult
             {
                 AvgPrice = avg, Currency = cfg.Currency, FetchedAt = fetchedAt
-            });
+            },
+            vatMode: MapVat(cfg.VatMode));
     }
 
     /// <summary>
@@ -360,8 +364,17 @@ public class BlPriceCacheServiceTests : IDisposable
             new PriceResult
             {
                 AvgPrice = avg, Currency = cfg.Currency, FetchedAt = fetchedAt
-            });
+            },
+            vatMode: MapVat(cfg.VatMode));
     }
+
+    private static string MapVat(VatMode mode) => mode switch
+    {
+        VatMode.Y => "Y",
+        VatMode.N => "N",
+        VatMode.O => "O",
+        _         => "Y"
+    };
 
     /// <summary>
     /// Stub-Provider mit einstellbaren Antworten. Erweitert um GuideType-

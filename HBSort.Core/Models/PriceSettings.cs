@@ -20,11 +20,20 @@ public class PriceSettings
     /// <summary>"min" | "avg" | "qty_avg" | "max" - welche Spalte angezeigt/zugrunde gelegt wird.</summary>
     public string PriceColumn { get; set; } = "qty_avg";
 
-    /// <summary>Region-Filter (BL: "europe", "north_america", "asia"). Leer = global.</summary>
-    public string Region { get; set; } = "europe";
+    /// <summary>
+    /// Region-Filter (BL: "europe", "north_america", "asia"). Leer = global.
+    /// UX X.34 v0.1.20: Default jetzt leer (vorher "europe"). Either-Or
+    /// mit <see cref="CountryCode"/> - wenn beide gesetzt sind, gewinnt
+    /// CountryCode im Provider und Region wird ignoriert. Settings-Migration
+    /// im SettingsService normalisiert alte "beide gesetzt"-Konfiguration.
+    /// </summary>
+    public string Region { get; set; } = string.Empty;
 
-    /// <summary>ISO-Country-Code (z.B. "DE"). Leer = kein Filter.</summary>
-    public string CountryCode { get; set; } = "DE";
+    /// <summary>
+    /// ISO-Country-Code (z.B. "DE"). Leer = kein Land-Filter.
+    /// UX X.34 v0.1.20: Default jetzt leer (vorher "DE"). Siehe Region.
+    /// </summary>
+    public string CountryCode { get; set; } = string.Empty;
 
     /// <summary>Waehrung (z.B. "EUR", "USD").</summary>
     public string Currency { get; set; } = "EUR";
@@ -81,6 +90,60 @@ public class PriceSettings
     /// z.B. den Komplett-Preis auto laden lassen und die Teile nur auf Klick.
     /// </summary>
     public PriceLoadMode AutoLoadPartsPrice { get; set; } = PriceLoadMode.Manual;
+
+    /// <summary>
+    /// UX X.34 v0.1.20: VAT-Behandlung beim BL-Preis-Lookup.
+    ///
+    /// <list type="bullet">
+    /// <item><b>Y</b> (Default) = Brutto - matcht die Preise auf der BrickLink-
+    /// Webseite. BL gibt VAT-Verkaeufer-Preise inkl. VAT aus, Privat-
+    /// Verkaeufer-Preise unveraendert. Konsistente Aggregate fuer
+    /// Markt-Vergleich.</item>
+    /// <item><b>N</b> = Netto - VAT-Verkaeufer-Preise ohne VAT, Privat-Preise
+    /// unveraendert. Gemischte Aggregate (Vorsicht). Nur sinnvoll fuer
+    /// eigene VAT-Verkaeufer-Erloesabschaetzung.</item>
+    /// <item><b>O</b> = Norwegen-Spezial (25% VAT, sehr enges Anwendungsfeld).</item>
+    /// </list>
+    ///
+    /// Default Y weil 95% der User Brutto/Website-Preise wollen. Vorher
+    /// (vor v0.1.20) war kein vat-Parameter gesetzt - BL-Default ist
+    /// Netto, was gemischte Aggregate erzeugt hat (Privat brutto, gewerblich
+    /// netto). Verkaufsempfehlungen waren irrefuehrend.
+    /// </summary>
+    public VatMode VatMode { get; set; } = VatMode.Y;
+}
+
+/// <summary>
+/// UX X.34 v0.1.20: VAT-Behandlung bei BL-Preis-Lookups.
+/// Mappt 1:1 auf BricklinkSharp.Client.VatOption (Include/Exclude/IncludeAsNorway),
+/// aber bewusst eigenes Enum damit PriceSettings unabhaengig vom Library-
+/// Detail bleibt. Mapping liegt im BricklinkApiPriceProvider.
+/// </summary>
+public enum VatMode
+{
+    /// <summary>Brutto - VAT eingerechnet, matcht Website-Preise (Default).</summary>
+    Y,
+    /// <summary>Netto - VAT abgezogen, gemischte Aggregate. Nur fuer VAT-Verkaeufer-Erloese.</summary>
+    N,
+    /// <summary>Norwegen 25% VAT - Spezial-Fall.</summary>
+    O
+}
+
+/// <summary>
+/// UX X.34 v0.1.20: Either-Or-Filter fuer BL-Preis-Lookups. Reine UI-
+/// Konvention - das POCO speichert nur Region und CountryCode (jeweils
+/// String, leer = nicht gesetzt). Der Filter-Modus wird beim Settings-Load
+/// aus dem Stand der zwei Felder abgeleitet, beim Save wird je nach Modus
+/// einer der beiden Werte auf "" gezwungen.
+/// </summary>
+public enum PriceFilterMode
+{
+    /// <summary>Kein geografischer Filter - groesste Datenbasis (Default).</summary>
+    Global,
+    /// <summary>Filter auf eine Region (europe / north_america / asia).</summary>
+    Region,
+    /// <summary>Filter auf ein spezifisches Land (DE / US / GB / ...).</summary>
+    Country
 }
 
 /// <summary>

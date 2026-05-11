@@ -77,6 +77,10 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         // Inkrementelle Migrationen fuer existierende DBs (CREATE TABLE IF NOT EXISTS
         // legt die Spalte nicht nachtraeglich an).
         EnsureColumn("bl_subsets", "is_from_supersets", "INTEGER NOT NULL DEFAULT 0");
+        // UX X.34 v0.1.20: vat_mode-Spalte fuer bl_prices. Default 'N' fuer
+        // Bestand (= alter Netto-Default), neue Eintraege schreiben den aktuellen
+        // PriceSettings.VatMode-Wert.
+        EnsureColumn("bl_prices", "vat_mode", "TEXT NOT NULL DEFAULT 'N'");
 
         // Bereinigung: alte Single-Row-Pseudo-Eintraege markieren die noch von vor
         // der is_from_supersets-Migration in der DB stehen. Sonst wuerde der
@@ -951,7 +955,8 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         string guideType, string newOrUsed,
         string region, string currency,
         int staleDays,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string vatMode = "N")
     {
         Models.Pricing.PriceResult? result = null;
         lock (_lock)
@@ -963,7 +968,8 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
                 FROM bl_prices
                 WHERE item_type = $it AND item_no = $in AND color_id = $cid
                   AND guide_type = $gt AND new_or_used = $nu
-                  AND region = $rg AND currency = $cu;";
+                  AND region = $rg AND currency = $cu
+                  AND vat_mode = $vat;";
             cmd.Parameters.AddWithValue("$it", itemType);
             cmd.Parameters.AddWithValue("$in", itemNo);
             cmd.Parameters.AddWithValue("$cid", colorId);
@@ -971,6 +977,7 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
             cmd.Parameters.AddWithValue("$nu", newOrUsed);
             cmd.Parameters.AddWithValue("$rg", region ?? string.Empty);
             cmd.Parameters.AddWithValue("$cu", currency);
+            cmd.Parameters.AddWithValue("$vat", string.IsNullOrEmpty(vatMode) ? "N" : vatMode);
 
             using var reader = cmd.ExecuteReader();
             if (!reader.Read()) return Task.FromResult<Models.Pricing.PriceResult?>(null);
@@ -1004,7 +1011,8 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         string guideType, string newOrUsed,
         string region, string currency,
         Models.Pricing.PriceResult price,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string vatMode = "N")
     {
         lock (_lock)
         {
@@ -1012,11 +1020,11 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
             cmd.CommandText = @"
                 INSERT OR REPLACE INTO bl_prices
                     (item_type, item_no, color_id, guide_type, new_or_used,
-                     region, currency,
+                     region, currency, vat_mode,
                      min_price, avg_price, qty_avg_price, max_price,
                      unit_quantity, total_quantity, fetched_at)
                 VALUES
-                    ($it, $in, $cid, $gt, $nu, $rg, $cu,
+                    ($it, $in, $cid, $gt, $nu, $rg, $cu, $vat,
                      $min, $avg, $qty, $max, $uq, $tq, $fet);";
             cmd.Parameters.AddWithValue("$it", itemType);
             cmd.Parameters.AddWithValue("$in", itemNo);
@@ -1025,6 +1033,7 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
             cmd.Parameters.AddWithValue("$nu", newOrUsed);
             cmd.Parameters.AddWithValue("$rg", region ?? string.Empty);
             cmd.Parameters.AddWithValue("$cu", currency);
+            cmd.Parameters.AddWithValue("$vat", string.IsNullOrEmpty(vatMode) ? "N" : vatMode);
             cmd.Parameters.AddWithValue("$min", (object?)(double?)price.MinPrice ?? DBNull.Value);
             cmd.Parameters.AddWithValue("$avg", (object?)(double?)price.AvgPrice ?? DBNull.Value);
             cmd.Parameters.AddWithValue("$qty", (object?)(double?)price.QtyAvgPrice ?? DBNull.Value);
@@ -1054,7 +1063,8 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         string guideType, string newOrUsed,
         string region, string currency,
         int ttlDays,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string vatMode = "N")
     {
         Models.Pricing.CachedPriceLookup? result = null;
         lock (_lock)
@@ -1066,7 +1076,8 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
                 FROM bl_prices
                 WHERE item_type = $it AND item_no = $in AND color_id = $cid
                   AND guide_type = $gt AND new_or_used = $nu
-                  AND region = $rg AND currency = $cu;";
+                  AND region = $rg AND currency = $cu
+                  AND vat_mode = $vat;";
             cmd.Parameters.AddWithValue("$it", itemType);
             cmd.Parameters.AddWithValue("$in", itemNo);
             cmd.Parameters.AddWithValue("$cid", colorId);
@@ -1074,6 +1085,7 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
             cmd.Parameters.AddWithValue("$nu", newOrUsed);
             cmd.Parameters.AddWithValue("$rg", region ?? string.Empty);
             cmd.Parameters.AddWithValue("$cu", currency);
+            cmd.Parameters.AddWithValue("$vat", string.IsNullOrEmpty(vatMode) ? "N" : vatMode);
 
             using var reader = cmd.ExecuteReader();
             if (!reader.Read())
@@ -1105,7 +1117,8 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         string itemType, string itemNo, int colorId,
         string guideType, string newOrUsed,
         string region, string currency,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string vatMode = "N")
     {
         lock (_lock)
         {
@@ -1114,7 +1127,8 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
                 DELETE FROM bl_prices
                 WHERE item_type = $it AND item_no = $in AND color_id = $cid
                   AND guide_type = $gt AND new_or_used = $nu
-                  AND region = $rg AND currency = $cu;";
+                  AND region = $rg AND currency = $cu
+                  AND vat_mode = $vat;";
             cmd.Parameters.AddWithValue("$it", itemType);
             cmd.Parameters.AddWithValue("$in", itemNo);
             cmd.Parameters.AddWithValue("$cid", colorId);
@@ -1122,6 +1136,7 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
             cmd.Parameters.AddWithValue("$nu", newOrUsed);
             cmd.Parameters.AddWithValue("$rg", region ?? string.Empty);
             cmd.Parameters.AddWithValue("$cu", currency);
+            cmd.Parameters.AddWithValue("$vat", string.IsNullOrEmpty(vatMode) ? "N" : vatMode);
             var deleted = cmd.ExecuteNonQuery();
             return Task.FromResult(deleted > 0);
         }
@@ -1135,6 +1150,32 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
             cmd.CommandText = "DELETE FROM bl_prices;";
             var deleted = cmd.ExecuteNonQuery();
             Log.Information("bl_prices komplett geleert: {Count} Eintraege geloescht", deleted);
+            return Task.FromResult(deleted);
+        }
+    }
+
+    public Task<int> ClearEmptyPricesAsync(CancellationToken ct = default)
+    {
+        lock (_lock)
+        {
+            using var cmd = _connection.CreateCommand();
+            // Anti-Vergiftung: Eintraege ohne jeden Preis + ohne Quantity sind
+            // BL-API-Antworten ohne Treffer (z.B. wegen leere Filter, vor dem
+            // null-Fix). Sie blockieren spaetere Lookups, weil der Cache-Hit
+            // verhindert dass die API erneut gefragt wird.
+            // COALESCE(...,0) damit auch NULL-zaehlt-als-leer fuer total_quantity.
+            cmd.CommandText = @"
+                DELETE FROM bl_prices
+                WHERE min_price IS NULL
+                  AND avg_price IS NULL
+                  AND qty_avg_price IS NULL
+                  AND max_price IS NULL
+                  AND COALESCE(total_quantity, 0) = 0;";
+            var deleted = cmd.ExecuteNonQuery();
+            if (deleted > 0)
+            {
+                Log.Information("bl_prices Anti-Vergiftung: {Count} leere Eintraege geloescht", deleted);
+            }
             return Task.FromResult(deleted);
         }
     }

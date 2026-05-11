@@ -126,6 +126,14 @@ public partial class App : Application
             // Idempotent - macht nur Eintraege mit null/empty an.
             await BackfillBrickognizeCategoriesAsync();
 
+            // 6.52 BL-Preis-Cache-Anti-Vergiftung (UX X.34 v0.1.20):
+            // Eintraege mit allen Preis-Feldern NULL und total_quantity=0
+            // sind das Resultat eines API-Calls mit leeren Filter-Strings
+            // (Bug vor dem null-Fix). Solche Eintraege blockieren spaetere
+            // Lookups, weil sie als gueltiger Cache-Hit zurueckkommen.
+            // Idempotent - mehrfaches Aufrufen ist safe.
+            await ClearEmptyPriceCacheEntriesAsync();
+
             // 6.55 Auto-Backup (UX X.29): wenn aktiviert + Intervall faellig,
             // im Hintergrund ein Backup erzeugen + alte aufraeumen. Fire-and-
             // forget - blockiert NICHT den Startup. Task.Run-Wrapping wegen
@@ -527,6 +535,33 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log.Warning(ex, "BrickognizeCategory-Backfill geworfen");
+        }
+    }
+
+    /// <summary>
+    /// UX X.34 v0.1.20: One-Shot-Cleanup beim App-Start. Loescht
+    /// "vergiftete" Cache-Eintraege in bl_prices die durch den Empty-Filter-
+    /// Bug entstanden sind (alle Preis-Felder null, total_quantity=0). Ohne
+    /// Cleanup wuerde der Lookup diese null-Eintraege als gueltigen Cache-
+    /// Hit zurueckgeben und die UI zeigt nie Preise.
+    /// Idempotent - mehrfaches Aufrufen ist safe.
+    /// </summary>
+    private static async Task ClearEmptyPriceCacheEntriesAsync()
+    {
+        try
+        {
+            var repo = Services.GetRequiredService<IBlCacheRepository>();
+            var cleared = await repo.ClearEmptyPricesAsync();
+            if (cleared > 0)
+            {
+                Log.Information(
+                    "BL-Preis-Cache Anti-Vergiftung: {Count} leere Eintraege beim Start aufgeraeumt",
+                    cleared);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "BL-Preis-Cache Anti-Vergiftung-Cleanup geworfen");
         }
     }
 
