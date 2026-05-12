@@ -272,6 +272,55 @@ public class PartLookupService : IPartLookupService
         return result;
     }
 
+    public async Task<Dictionary<(string PartNo, int ColorId), List<FloatingPartLocation>>>
+        FindFloatingLocationsForManyAsync(
+            IReadOnlyCollection<(string PartNo, int ColorId)> keys,
+            CancellationToken ct = default)
+    {
+        var result = new Dictionary<(string, int), List<FloatingPartLocation>>();
+        if (keys == null || keys.Count == 0) return result;
+
+        // Vor-Filter: nur Teile aus den angefragten PartNo + ColorId-Sets aus
+        // der DB ziehen. Das kann false-positives ergeben (z.B. (A,1) + (B,2)
+        // angefragt -> auch (A,2) und (B,1) durchgelassen), die per HashSet
+        // unten gefiltert werden. Lohnt sich trotzdem, weil EF-Where mit zwei
+        // Contains() ueber Sets eine einzige SQL-IN-Klausel je Spalte erzeugt.
+        var partNos = keys.Select(k => k.PartNo).Distinct().ToList();
+        var colorIds = keys.Select(k => k.ColorId).Distinct().ToList();
+        var keySet = keys.ToHashSet();
+
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+        var raw = await ctx.FloatingParts
+            .AsNoTracking()
+            .Where(fp => partNos.Contains(fp.PartNumber) && colorIds.Contains(fp.ColorId))
+            .Include(fp => fp.StorageBin)
+            .ToListAsync(ct);
+
+        // Exact-Filter + pro-Key gruppieren + pro-Bin aggregieren.
+        foreach (var grp in raw
+                     .Where(fp => fp.StorageBin != null
+                                  && keySet.Contains((fp.PartNumber, fp.ColorId)))
+                     .GroupBy(fp => (fp.PartNumber, fp.ColorId)))
+        {
+            var locations = grp
+                .GroupBy(fp => new { fp.StorageBinId, BinLabel = fp.StorageBin!.Label })
+                .Select(g => new FloatingPartLocation(
+                    g.Key.StorageBinId,
+                    g.Key.BinLabel,
+                    g.Sum(fp => fp.Quantity)))
+                .OrderByDescending(l => l.TotalQuantity)
+                .ToList();
+            result[grp.Key] = locations;
+        }
+
+        Log.Debug(
+            "FindFloatingLocationsForManyAsync: {Keys} Anfragen -> {Raw} rohe Eintraege, " +
+            "{Hits} Keys mit Treffern",
+            keys.Count, raw.Count, result.Count);
+
+        return result;
+    }
+
     public async Task<List<FloatingPartLocation>> FindFloatingLocationsAsync(
         string blPartNo, int blColorId, CancellationToken ct = default)
     {

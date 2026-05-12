@@ -95,6 +95,20 @@ public interface IPartLookupService
     /// </summary>
     Task<List<FloatingPartLocation>> FindFloatingLocationsAsync(
         string blPartNo, int blColorId, CancellationToken ct = default);
+
+    /// <summary>
+    /// v0.1.22-beta.1 Block C: Bulk-Variante von <see cref="FindFloatingLocationsAsync"/>.
+    /// Liefert pro angefragtem (PartNo, ColorId)-Paar die Floating-Locations.
+    /// Nicht in der Eingabe vorhandene Paare tauchen NICHT im Ergebnis auf -
+    /// der Aufrufer kann ueber das Dict iterieren und fehlende Keys als
+    /// "kein Floating vorhanden" interpretieren.
+    /// Eine einzige DB-Query statt N+1 - relevant fuer LoadAsync-Pfade in
+    /// CollectMinifigSelection und DismantleWizard.
+    /// </summary>
+    Task<Dictionary<(string PartNo, int ColorId), List<FloatingPartLocation>>>
+        FindFloatingLocationsForManyAsync(
+            IReadOnlyCollection<(string PartNo, int ColorId)> keys,
+            CancellationToken ct = default);
 }
 
 /// <summary>Ein Fach das ein bestimmtes Teil bereits als Einzelteil enthaelt.</summary>

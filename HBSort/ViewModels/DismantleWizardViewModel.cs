@@ -115,6 +115,34 @@ public partial class DismantleWizardViewModel : ObservableObject
 
             Parts.Clear();
 
+            // v0.1.22-beta.1 Block C: SmartHint-Bulk-Pre-Fetch statt N+1.
+            // Eine einzige Query gegen FloatingParts fuer alle Required-Parts
+            // statt eine pro Iteration. PickPerPartBin bleibt pro-Item, weil
+            // die Logik dort kategorie-/mapping-abhaengig ist und in einem
+            // Bulk-Pfad mehr Aufwand als Gewinn waere.
+            Dictionary<(string PartNo, int ColorId), List<FloatingPartLocation>> floatingByKey;
+            if (_partLookup != null)
+            {
+                try
+                {
+                    swSmartHint.Start();
+                    var keys = m.RequiredParts
+                        .Select(p => (p.PartNumber, p.ColorId)).ToList();
+                    floatingByKey = await _partLookup.FindFloatingLocationsForManyAsync(keys);
+                    smartHintCalls = 1; // 1 Bulk-Call statt N
+                    swSmartHint.Stop();
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug(ex, "SmartHint-Bulk-Lookup fehlgeschlagen - per-part-Path bleibt aus");
+                    floatingByKey = new();
+                }
+            }
+            else
+            {
+                floatingByKey = new();
+            }
+
             // UX X.33 v0.1.19-beta.7 Block M: Wizard-Session-State entfaellt -
             // PickPerPartBinAsync ist jetzt deterministisch (Mapping + Stapel
             // + truly-free), kein "naechstes freies Fach"-Wackelwert mehr.
@@ -155,54 +183,27 @@ public partial class DismantleWizardViewModel : ObservableObject
                 // Smart-Sammeln: ist das gleiche Teil schon irgendwo als Einzelteil
                 // gelagert? Dann das Fach mit der hoechsten Menge vor-auswaehlen
                 // damit Bestaende beim Speichern zusammengefuehrt werden.
-                if (_partLookup != null)
+                // v0.1.22-beta.1 Block C: Lookup aus dem Bulk-Dict statt
+                // per-part-Query.
+                if (floatingByKey.TryGetValue((p.PartNumber, p.ColorId), out var locations)
+                    && locations.Count > 0)
                 {
-                    try
+                    var best = locations[0]; // sortiert nach Menge absteigend
+                    var bin = AvailableBins.FirstOrDefault(b => b.Id == best.StorageBinId);
+                    if (bin != null)
                     {
-                        // v0.1.22-beta.1 Block B: das SmartHint-Information-
-                        // Log-Trio wurde auf Debug gestuft und Stopwatch
-                        // gepackt. Im PROFILE-Summary unten zusammengefasst.
-                        Log.Debug("SmartHint-Lookup: PartNo={PartNo}, ColorId={ColorId}",
-                            p.PartNumber, p.ColorId);
-
-                        swSmartHint.Start();
-                        smartHintCalls++;
-                        var locations = await _partLookup.FindFloatingLocationsAsync(
-                            p.PartNumber, p.ColorId);
-                        swSmartHint.Stop();
-
-                        Log.Debug("SmartHint-Lookup result: {Count} Locations gefunden", locations.Count);
-                        foreach (var loc in locations)
-                        {
-                            Log.Debug("  -> Bin {Id} '{Label}': {Qty} Stueck",
-                                loc.StorageBinId, loc.StorageBinLabel, loc.TotalQuantity);
-                        }
-
-                        if (locations.Count > 0)
-                        {
-                            var best = locations[0]; // sortiert nach Menge absteigend
-                            var bin = AvailableBins.FirstOrDefault(b => b.Id == best.StorageBinId);
-                            if (bin != null)
-                            {
-                                // SmartHint ueberschreibt vorigen TargetBin
-                                // (Stapel-Wachstum wins). UX X.33 Block N:
-                                // bei Treffer auch den Volle-Faecher-Warn-
-                                // Status zuruecksetzen - der Stapel ist ja da.
-                                partVm.TargetBin = bin;
-                                partVm.SmartHint = $"+{best.TotalQuantity} schon dort";
-                                partVm.NoFreeBinWarning = false;
-                            }
-                            else
-                            {
-                                Log.Warning("SmartHint: Bin Id={BinId} nicht in AvailableBins gefunden",
-                                    best.StorageBinId);
-                            }
-                        }
+                        // SmartHint ueberschreibt vorigen TargetBin
+                        // (Stapel-Wachstum wins). UX X.33 Block N:
+                        // bei Treffer auch den Volle-Faecher-Warn-
+                        // Status zuruecksetzen - der Stapel ist ja da.
+                        partVm.TargetBin = bin;
+                        partVm.SmartHint = $"+{best.TotalQuantity} schon dort";
+                        partVm.NoFreeBinWarning = false;
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        Log.Debug(ex, "SmartHint-Lookup fuer {Part}/{Color} fehlgeschlagen",
-                            p.PartNumber, p.ColorId);
+                        Log.Warning("SmartHint: Bin Id={BinId} nicht in AvailableBins gefunden",
+                            best.StorageBinId);
                     }
                 }
 

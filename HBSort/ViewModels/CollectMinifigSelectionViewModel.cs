@@ -128,6 +128,26 @@ public partial class CollectMinifigSelectionViewModel : ObservableObject
             var allColors = await _catalog.GetAllColorsAsync(ct);
             var colorMap = allColors.ToDictionary(c => c.ColorId);
 
+            // v0.1.22-beta.1 Block C: Bulk-Lookup statt pro-Part-N+1. Eine
+            // einzige DB-Query gegen FloatingParts statt eine pro Required-Part.
+            // Trigger-Teil wird trotzdem mit angefragt - der Reverse-Match-
+            // Check unten ignoriert IsTrigger und nutzt das Dict nur fuer
+            // nicht-Trigger Eintraege.
+            Dictionary<(string PartNo, int ColorId), List<FloatingPartLocation>> floatingByKey;
+            try
+            {
+                swReverseMatch.Start();
+                var keys = subsets.Select(s => (s.ItemNo, s.ColorId)).ToList();
+                floatingByKey = await _partLookup.FindFloatingLocationsForManyAsync(keys, ct);
+                reverseMatchCalls = 1; // 1 Bulk-Call statt N
+                swReverseMatch.Stop();
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "CollectMinifigSelection: Bulk-Reverse-Match fehlgeschlagen");
+                floatingByKey = new();
+            }
+
             Parts.Clear();
             foreach (var s in subsets)
             {
@@ -150,33 +170,16 @@ public partial class CollectMinifigSelectionViewModel : ObservableObject
                     // Trigger-Teil ist immer markiert + nicht abwaehlbar.
                     part.IsKept = true;
                 }
+                else if (floatingByKey.TryGetValue((s.ItemNo, s.ColorId), out var locations)
+                         && locations.Count > 0)
+                {
+                    part.IsCanBeReverseMatched = true;
+                    part.FoundInBinLabel = locations[0].StorageBinLabel;
+                    part.IsKept = true; // Vor-Markierung
+                }
                 else
                 {
-                    // Reverse-Match: existiert FloatingPart mit gleicher Kombi?
-                    try
-                    {
-                        swReverseMatch.Start();
-                        reverseMatchCalls++;
-                        var locations = await _partLookup.FindFloatingLocationsAsync(
-                            s.ItemNo, s.ColorId, ct);
-                        swReverseMatch.Stop();
-                        if (locations.Count > 0)
-                        {
-                            part.IsCanBeReverseMatched = true;
-                            part.FoundInBinLabel = locations[0].StorageBinLabel;
-                            part.IsKept = true; // Vor-Markierung
-                        }
-                        else
-                        {
-                            part.IsKept = false;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Debug(ex,
-                            "CollectMinifigSelection: FindFloatingLocations fuer {Part}/{Color} fehlgeschlagen",
-                            s.ItemNo, s.ColorId);
-                    }
+                    part.IsKept = false;
                 }
 
                 Parts.Add(part);

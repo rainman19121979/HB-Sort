@@ -228,6 +228,22 @@ public class CollectMinifigSelectionViewModelTests
             return Task.FromResult(new List<FloatingPartLocation>());
         }
 
+        public Task<Dictionary<(string PartNo, int ColorId), List<FloatingPartLocation>>>
+            FindFloatingLocationsForManyAsync(
+                IReadOnlyCollection<(string PartNo, int ColorId)> keys,
+                CancellationToken ct = default)
+        {
+            // v0.1.22-beta.1 Block C: Bulk-Variante. Im Stub einfach aus dem
+            // gleichen Dict bedienen.
+            var result = new Dictionary<(string, int), List<FloatingPartLocation>>();
+            foreach (var key in keys)
+            {
+                if (LocationsByKey.TryGetValue(key, out var list) && list.Count > 0)
+                    result[key] = list;
+            }
+            return Task.FromResult(result);
+        }
+
         // Restliche Methoden: nicht relevant.
         public Task<PartLookupResult> LookupPartAsync(string blPartNo, int blColorId, CancellationToken ct = default)
             => throw new NotImplementedException();
