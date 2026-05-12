@@ -49,6 +49,14 @@ public partial class CollectMinifigSelectionViewModel : ObservableObject
     [ObservableProperty]
     private StorageBin? _selectedBin;
 
+    /// <summary>
+    /// v0.1.22-beta.1 Block D: Konsistenz-Banner zu Block K aus v0.1.19.
+    /// Sichtbar wenn der Suggest-Service null liefert UND es keine freien
+    /// Bins gibt - der User sieht dann WHY die Combobox leer wirkt.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isAllBinsFullBannerVisible;
+
     /// <summary>Wird vom Aufrufer (View) ausgewertet nach OK-Click.</summary>
     public IReadOnlyList<(string PartNo, int ColorId)> SelectedPartsForReverseMatch =>
         Parts.Where(p => p.IsKept && (p.IsCanBeReverseMatched || p.IsTrigger))
@@ -108,6 +116,16 @@ public partial class CollectMinifigSelectionViewModel : ObservableObject
                 SelectedBin = suggested != null
                     ? AvailableBins.FirstOrDefault(b => b.Id == suggested.Id)
                     : null;
+
+                // v0.1.22-beta.1 Block D Konsistenz zu Block K: Banner sichtbar
+                // wenn der Service nichts liefern konnte UND alle Bins als
+                // belegt gelten (FreedAt == null). Bei mindestens einem
+                // wirklich freien Fach kein Banner - dann liegt es an einer
+                // anderen Regel (z.B. Wartend-Limit erreicht) und der User
+                // kann immerhin in der Combobox manuell waehlen.
+                IsAllBinsFullBannerVisible = suggested == null
+                    && AvailableBins.Count > 0
+                    && AvailableBins.All(b => b.FreedAt == null);
             }
 
             var item = await _catalog.GetMinifigDetailsAsync(blMinifigId, ct);

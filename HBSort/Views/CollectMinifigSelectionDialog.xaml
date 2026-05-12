@@ -27,6 +27,7 @@
             <RowDefinition Height="Auto"/>     <!-- Erklaerungs-Hint -->
             <RowDefinition Height="*"/>        <!-- Teile-Liste -->
             <RowDefinition Height="Auto"/>     <!-- Lagerfach-Picker -->
+            <RowDefinition Height="Auto"/>     <!-- Volle-Faecher-Banner (v0.1.22 Block D) -->
             <RowDefinition Height="Auto"/>     <!-- Buttons -->
         </Grid.RowDefinitions>
 
@@ -159,8 +160,26 @@
             </Grid>
         </Border>
 
+        <!--
+            v0.1.22-beta.1 Block D: Konsistenz-Banner zu Block K (Volle-Faecher-
+            Warnung in MinifigDetail / PartLookup / DismantleWizard / Build-
+            Suggestion). Sichtbar wenn der Suggest-Service nichts liefert und
+            alle Faecher belegt sind. Im Gegensatz zu BuildSuggestion KEIN
+            "Lagerfach-Verwaltung oeffnen"-Button - User schliesst den Dialog
+            via "Verwerfen" und macht es selbst (Spec-Entscheidung KISS).
+        -->
+        <Border Grid.Row="5"
+                Background="#FFF4E5" BorderBrush="#E65100"
+                BorderThickness="1" CornerRadius="4" Padding="10"
+                Margin="0,8,0,0"
+                Visibility="{Binding IsAllBinsFullBannerVisible, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="Alle Lagerfaecher sind belegt. Bitte ein neues Fach anlegen oder ein bestehendes leeren."
+                       TextWrapping="Wrap" VerticalAlignment="Center"
+                       FontWeight="SemiBold" Foreground="#E65100"/>
+        </Border>
+
         <!-- Footer-Buttons -->
-        <StackPanel Grid.Row="5" Orientation="Horizontal"
+        <StackPanel Grid.Row="6" Orientation="Horizontal"
                     HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button Content="Verwerfen" IsCancel="True"
                     MinWidth="100" Margin="0,0,8,0"
