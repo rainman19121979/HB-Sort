@@ -134,6 +134,37 @@ Items archiviert werden.
 
 ## Erledigt ✅
 
+### v0.1.21 (Hotfix, 2026-05-12) - bl_colors Cache-First + colors.xml im BulkImporter
+
+User-Befund: ohne BL-Tokens scheitert der erste Scan an einer
+BricklinkAuthException, obwohl das Onboarding "Tokens optional"
+verspricht.
+
+- ✅ **fix: BlCatalogService.GetAllColorsAsync Cache-First** (`6acc5aa5`):
+  prueft vor dem API-Fallback `IBricklinkTokenStorage.HasTokens()`. Bei
+  leerem Cache + keinen Tokens: leere Liste statt `BricklinkAuthException`.
+  Graceful degradation - Farb-Namen werden ohne Tokens nicht angezeigt,
+  aber das Matching laeuft (ID-basiert) durch.
+- ✅ **fix: BlBulkImportService importiert colors.xml**
+  (`da44f163`): vorher hat der Importer ausschliesslich `items/*.xml`
+  geparsed - `colors.xml` im Root des BrickStore-ZIP wurde ignoriert,
+  `bl_colors` blieb nach jedem Import leer. Neue Phase 1b parsed
+  `colors.xml` (~215 Eintraege) und schreibt via UpsertColorsAsync.
+- ✅ **fix: Auto-Reimport-Trigger fuer alte v0.1.20-Installs**
+  (`da44f163`): `TryReimportCatalogIfColorsMissingAsync` als
+  fire-and-forget-Startup-Hook. Bei `bl_items > 0 && bl_colors == 0`:
+  Reimport mit ETag-Check im Hintergrund + Toast.
+- ✅ **ci: AssemblyVersion-Padding fuer Patch-Tags** (`e9465fe1`):
+  setup-Step paddet jetzt assembly_version auf 4 Felder (.NET-Pflicht),
+  build-Steps lesen den Wert ohne weitere Manipulation. Erlaubt
+  zukuenftige 4-Field-Tags im build-zip-Pfad, ABER build-velopack bleibt
+  3-Field-only (siehe Versions-Schema-Konvention in CLAUDE.md).
+
+Versions-Sprung-Hinweis: urspruenglich als v0.1.20.1 geplant, wegen
+Velopack-3-Stelligkeit als Minor-Bump v0.1.21 released.
+
+542/542 Tests gruen (vorher 539 + 3 neu in BlCatalogServiceTests).
+
 ### v0.1.20-beta.5 (UX X.34, 2026-05-12) - bl_prices Cache-Fix + Brickognize-Throttle + ScanViewModel-Dispose
 
 Drei Cleanup-Fixes in einem Beta-Release.
@@ -273,6 +304,7 @@ Aenderungen am Cache-Schema + Provider-Logik.
 | **v0.1.20-beta.4** | ✅ released (2026-05-11) | UX X.34 - Welcome-Dialog Lagerfaecher-Schritt nur als Hinweis |
 | **v0.1.20-beta.5** | ✅ released (2026-05-12) | UX X.34 - bl_prices Cache-Fix + Brickognize-Throttle + ScanViewModel-Dispose + 4-Nachkommastellen-Preise |
 | **v0.1.20** | ✅ released (Stable, 2026-05-12) | UX X.34 stable - alle beta.1..beta.5-Aenderungen konsolidiert |
+| **v0.1.21** | ✅ released (Stable, 2026-05-12) | Hotfix - bl_colors Cache-First + colors.xml im BulkImporter + Auto-Reimport-Trigger + CI-Padding-Fix |
 | **v0.2.0** | 💭 Brainstorming | BL-Inventar-Integration (eigene große Iteration) |
 | v0.2.1+ | offen | weitere Features aus Backlog |
 
@@ -282,4 +314,4 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-12 nach v0.1.20-Stable-Release.*
+*Zuletzt aktualisiert: 2026-05-12 nach v0.1.21-Hotfix-Release + Versions-Schema-Konvention.*
