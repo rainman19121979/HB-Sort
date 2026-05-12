@@ -17,6 +17,11 @@ public class BlCatalogServiceTests : IDisposable
     private readonly FakeBricklinkClient _client = new();
     private readonly InMemorySettings _settings = new();
     private readonly BricklinkRateLimiter _limiter;
+    // v0.1.20.1: Default-Stub haelt Tokens fuer "vorhanden" damit die bestehenden
+    // Tests den API-Pfad weiter testen. Tests die explizit das "keine Tokens"-
+    // Verhalten beweisen wollen, instantiieren ihren eigenen sut mit
+    // HasTokens=false (siehe GetAllColors_*_without_tokens-Tests).
+    private readonly TokenStub _tokens = new() { HasAny = true };
     private readonly BlCatalogService _sut;
 
     public BlCatalogServiceTests()
@@ -24,7 +29,16 @@ public class BlCatalogServiceTests : IDisposable
         Directory.CreateDirectory(_testDir);
         _repo = new BlCacheRepository(Path.Combine(_testDir, "bl_cache.db"));
         _limiter = new BricklinkRateLimiter(_repo, _settings);
-        _sut = new BlCatalogService(_repo, _client, _settings, _limiter);
+        _sut = new BlCatalogService(_repo, _client, _settings, _limiter, _tokens);
+    }
+
+    private sealed class TokenStub : IBricklinkTokenStorage
+    {
+        public bool HasAny { get; set; }
+        public bool HasTokens() => HasAny;
+        public Task<BricklinkTokens?> LoadAsync() => Task.FromResult<BricklinkTokens?>(null);
+        public Task SaveAsync(BricklinkTokens tokens) => Task.CompletedTask;
+        public Task ClearAsync() => Task.CompletedTask;
     }
 
     public void Dispose()
@@ -146,6 +160,61 @@ public class BlCatalogServiceTests : IDisposable
         Assert.Equal(2, first.Count);
         Assert.Equal(2, second.Count);
         Assert.Equal(1, _client.ColorListCallCount); // beim 2. Mal aus Cache
+    }
+
+    // ========================================================================
+    // v0.1.20.1: Cache-First-Pattern fuer GetAllColors auch ohne Tokens
+    // ========================================================================
+
+    [Fact]
+    public async Task GetAllColorsAsync_returns_cache_data_without_tokens()
+    {
+        // Cache befuellt (z.B. via BrickStore-ZIP-Import) - kein Token noetig.
+        await _repo.UpsertColorsAsync(new[]
+        {
+            new BlColor { ColorId = 1,  Name = "White", Rgb = "FFFFFF", Type = "Solid", FetchedAt = DateTime.UtcNow },
+            new BlColor { ColorId = 11, Name = "Black", Rgb = "212121", Type = "Solid", FetchedAt = DateTime.UtcNow },
+            new BlColor { ColorId = 5,  Name = "Red",   Rgb = "B40000", Type = "Solid", FetchedAt = DateTime.UtcNow },
+        });
+
+        // SUT ohne Token-Storage
+        var tokenless = new TokenStub { HasAny = false };
+        var sutNoTokens = new BlCatalogService(_repo, _client, _settings, _limiter, tokenless);
+
+        var result = await sutNoTokens.GetAllColorsAsync();
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal(0, _client.ColorListCallCount); // KEIN API-Call
+    }
+
+    [Fact]
+    public async Task GetAllColorsAsync_returns_empty_list_when_cache_empty_and_no_tokens()
+    {
+        // bl_colors leer + keine Tokens: graceful degradation statt
+        // BricklinkAuthException.
+        var tokenless = new TokenStub { HasAny = false };
+        var sutNoTokens = new BlCatalogService(_repo, _client, _settings, _limiter, tokenless);
+
+        var result = await sutNoTokens.GetAllColorsAsync();
+
+        Assert.Empty(result);
+        Assert.Equal(0, _client.ColorListCallCount); // KEIN API-Call
+    }
+
+    [Fact]
+    public async Task GetAllColorsAsync_falls_back_to_api_when_cache_empty_and_tokens_set()
+    {
+        // Mit Tokens + leerem Cache: API-Call ist weiter erlaubt
+        // (Default-Setup _sut hat HasAny=true).
+        _client.ColorListResponse = new List<BricklinkColorDto>
+        {
+            new() { ColorId = 1, Name = "White", Rgb = "FFFFFF", Type = "Solid" }
+        };
+
+        var result = await _sut.GetAllColorsAsync();
+
+        Assert.Single(result);
+        Assert.Equal(1, _client.ColorListCallCount);
     }
 
     [Fact]

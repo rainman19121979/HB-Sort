@@ -30,17 +30,23 @@ public class BlCatalogService : IBlCatalogService
     private readonly IBricklinkClient _client;
     private readonly ISettingsService _settings;
     private readonly IBricklinkRateLimiter _rateLimiter;
+    private readonly IBricklinkTokenStorage? _tokenStorage;
 
     public BlCatalogService(
         IBlCacheRepository cache,
         IBricklinkClient client,
         ISettingsService settings,
-        IBricklinkRateLimiter rateLimiter)
+        IBricklinkRateLimiter rateLimiter,
+        IBricklinkTokenStorage? tokenStorage = null)
     {
         _cache = cache;
         _client = client;
         _settings = settings;
         _rateLimiter = rateLimiter;
+        // v0.1.20.1: optional damit alte Test-Konstruktoren ohne Token-Stub
+        // weiter laufen. Produktiv (App.xaml.cs) wird der Storage immer
+        // injected, fuer die Color-Logik unten ist null == "keine Tokens".
+        _tokenStorage = tokenStorage;
     }
 
     private int StaleDays => _settings.Current.Bricklink.CacheStaleDays;
@@ -306,10 +312,28 @@ public class BlCatalogService : IBlCatalogService
 
     public async Task<List<BlColor>> GetAllColorsAsync(CancellationToken ct = default)
     {
+        // 1) Cache-First: bl_colors lokal lesen. Wird seit v0.1.20.1 auch durch
+        //    BlBulkImportService (colors.xml im BrickStore-ZIP) befuellt - braucht
+        //    also keinen BL-API-Call mehr im Normalfall.
         var cached = await _cache.GetAllColorsAsync(ct);
         if (cached.Count > 0) return cached;
 
-        // Erstbefuellung (durch Rate-Limiter geleitet)
+        // 2) Cache leer + keine Tokens: graceful degradation statt Crash.
+        //    Vorher: API-Call -> BricklinkAuthException -> bricht den Scan ab,
+        //    obwohl das Onboarding "Tokens optional" verspricht.
+        //    Jetzt: leere Liste. Aufrufer-Pfade (Farb-Swatches, Color-Namen)
+        //    laufen ohne Color-Namen weiter; ID-basierte Logik (Matching) ist
+        //    nicht betroffen.
+        if (_tokenStorage == null || !_tokenStorage.HasTokens())
+        {
+            Log.Warning("GetAllColorsAsync: Cache leer und keine BL-Tokens. " +
+                        "Farb-Namen werden nicht angezeigt. Erwartung: BrickStore-" +
+                        "Catalog neu importieren - dann fuellt sich bl_colors auch " +
+                        "ohne Tokens.");
+            return cached;
+        }
+
+        // 3) Cache leer + Tokens da: regulaerer API-Lookup (durch Rate-Limiter).
         try
         {
             var dtoList = await CallApiTrackedAsync(
