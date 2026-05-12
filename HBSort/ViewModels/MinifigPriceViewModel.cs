@@ -564,7 +564,8 @@ public partial class MinifigPriceViewModel : ObservableObject
                 missing++;
             }
         }
-        PartsTotalSum = Math.Round(total, 2, MidpointRounding.AwayFromZero);
+        // v0.1.20-beta.5: 4 Nachkommastellen passend zur BL-Preis-Praezision.
+        PartsTotalSum = Math.Round(total, 4, MidpointRounding.AwayFromZero);
         PartsMissingCount = missing;
     }
 
@@ -605,7 +606,9 @@ public partial class MinifigPriceViewModel : ObservableObject
     private static string FormatMoney(decimal? value)
     {
         if (!value.HasValue || value.Value <= 0) return "-";
-        return value.Value.ToString("N2", CultureInfo.GetCultureInfo("de-DE")) + " €";
+        // v0.1.20-beta.5: N4 statt N2 - BL liefert 4 Nachkommastellen und
+        // kleine Standardteile (0.0234 EUR) sollen ihre Aussagekraft behalten.
+        return value.Value.ToString("N4", CultureInfo.GetCultureInfo("de-DE")) + " €";
     }
 
     private static string FormatFetchedAt(DateTime? utc)
@@ -679,6 +682,7 @@ public partial class PartPriceRowViewModel : ObservableObject
 
     public string DisplayName => $"{QuantityNeeded}× {PartName}";
 
+    // v0.1.20-beta.5: N4 statt N2 (siehe FormatMoney im VM).
     private static string Format(decimal value)
-        => value.ToString("N2", CultureInfo.GetCultureInfo("de-DE")) + " €";
+        => value.ToString("N4", CultureInfo.GetCultureInfo("de-DE")) + " €";
 }

@@ -39,13 +39,16 @@ public static class PriceMath
     /// <summary>
     /// Wendet einen Prozent-Korrekturfaktor auf einen Roh-Wert an.
     /// -10 = 10% Abschlag, +5 = 5% Aufschlag, 0 = unveraendert. Null bleibt null.
-    /// Rundet auf 2 Nachkommastellen kaufmaennisch (AwayFromZero).
+    /// Rundet auf 4 Nachkommastellen kaufmaennisch (AwayFromZero) passend zur
+    /// BL-Preis-Praezision - BL liefert Preise mit 4 Nachkommastellen, und
+    /// kleine Standardteile (z.B. 0.0234 EUR) wuerden bei 2-Stellen-Rundung
+    /// ihre Aussagekraft verlieren.
     /// </summary>
     public static decimal? ApplyCorrection(decimal? raw, decimal correctionPercent)
     {
         if (!raw.HasValue) return null;
         var factor = 1m + correctionPercent / 100m;
-        return Math.Round(raw.Value * factor, 2, MidpointRounding.AwayFromZero);
+        return Math.Round(raw.Value * factor, 4, MidpointRounding.AwayFromZero);
     }
 
     /// <summary>

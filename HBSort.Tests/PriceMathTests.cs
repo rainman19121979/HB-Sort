@@ -101,12 +101,21 @@ public class PriceMathTests
     }
 
     [Fact]
-    public void ApplyCorrection_rounds_kaufmaennisch_to_2_decimals()
+    public void ApplyCorrection_rounds_kaufmaennisch_to_4_decimals()
     {
-        // 3.333 * 0.90 = 2.9997 -> 3.00 (AwayFromZero)
-        Assert.Equal(3.00m, PriceMath.ApplyCorrection(3.333m, -10m));
-        // 1.005 * 1.00 = 1.005 -> 1.01 (AwayFromZero, nicht Banker's Rounding)
-        Assert.Equal(1.01m, PriceMath.ApplyCorrection(1.005m, 0m));
+        // 3.33335 * 0.90 = 3.000015 -> 3.0000 (AwayFromZero auf 4 Stellen)
+        Assert.Equal(3.0000m, PriceMath.ApplyCorrection(3.33335m, -10m));
+        // 1.00005 * 1.00 = 1.00005 -> 1.0001 (AwayFromZero, nicht Banker's Rounding)
+        Assert.Equal(1.0001m, PriceMath.ApplyCorrection(1.00005m, 0m));
+    }
+
+    [Fact]
+    public void ApplyCorrection_preserves_four_decimal_precision_for_small_values()
+    {
+        // BL liefert oft Preise wie 0.0234 EUR fuer Standard-Plates.
+        // Mit -10% Korrektur: 0.0234 * 0.90 = 0.02106 -> 0.0211 (4 Stellen).
+        // Vorher (2 Stellen): 0.0234 * 0.90 = 0.02106 -> 0.02 (Praezision weg).
+        Assert.Equal(0.0211m, PriceMath.ApplyCorrection(0.0234m, -10m));
     }
 
     [Fact]
