@@ -45,7 +45,7 @@
 
     <!-- ProtectedData: DPAPI-Encrypt/Decrypt fuer die BL-Tokens. Im
          net8.0-windows-Target nicht im base-class-library, daher als Paket. -->
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.7" />
   </ItemGroup>
 
   <ItemGroup>
