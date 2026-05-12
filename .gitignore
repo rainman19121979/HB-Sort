@@ -60,6 +60,10 @@ secrets.json
 # nachgereicht werden.
 CLAUDE.md
 
+# Interne Release-Prozess-Doku (Tag-Strategie, Velopack-Konstrenten,
+# Recovery-Schritte). Bleibt lokal - nicht oeffentlich.
+RELEASE_PROCESS.md
+
 # Andere AI-Tooling-Files (falls jemand mit Cursor/Aider/Copilot arbeitet).
 PROMPT_*.md
 .cursor/
