@@ -285,6 +285,33 @@ public class BlBulkImportService : IBlBulkImportService
             }
         }
 
+        // v0.1.20.1: PHASE 1b - Farben aus colors.xml im Root des ZIP.
+        // Vorher wurde die Datei ignoriert, bl_colors blieb leer und
+        // GetAllColorsAsync musste auf BL-API ausweichen - was ohne Tokens
+        // eine BricklinkAuthException warf. Konvention: alle Stammdaten
+        // (Items + Subsets + Farben) kommen aus dem BrickStore-Import.
+        var colorsXml = Path.Combine(folder, "colors.xml");
+        var colorsImported = 0;
+        if (File.Exists(colorsXml))
+        {
+            progress?.Report(new BlBulkImportProgress(
+                "Farben", 0, 0, "colors.xml"));
+            try
+            {
+                colorsImported = await ImportColorsXmlAsync(colorsXml, ct);
+                Log.Information("Farben: {Count} Eintraege importiert", colorsImported);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Fehler beim Import von colors.xml");
+                errors.Add($"colors.xml: {ex.Message}");
+            }
+        }
+        else
+        {
+            Log.Warning("colors.xml nicht gefunden unter {Folder} - bl_colors bleibt leer", folder);
+        }
+
         // PHASE 2: Inventories aus allen Type-Ordnern (M, P, S, G, B, C, I, O).
         // BrickStore legt pro Item-Type einen Ordner an mit *.xml pro Parent.
         var inventoryFolders = new[] { "M", "P", "S", "G", "B", "C", "I", "O" };
@@ -491,5 +518,66 @@ public class BlBulkImportService : IBlBulkImportService
 
         Log.Information("Stammdaten {Type}: {Count} Eintraege importiert", itemType, count);
         return count;
+    }
+
+    /// <summary>
+    /// v0.1.20.1: Parst die colors.xml im Root des BrickStore-ZIP. Format:
+    /// <code>&lt;CATALOG&gt;&lt;ITEM&gt;&lt;COLOR&gt;id&lt;/COLOR&gt;&lt;COLORNAME&gt;name&lt;/COLORNAME&gt;
+    /// &lt;COLORRGB&gt;hex&lt;/COLORRGB&gt;&lt;COLORTYPE&gt;type&lt;/COLORTYPE&gt;...&lt;/ITEM&gt;&lt;/CATALOG&gt;</code>
+    /// Schreibt via UpsertColorsAsync in bl_colors (Upsert auf color_id-PK,
+    /// damit Re-Importe sicher sind).
+    /// </summary>
+    private async Task<int> ImportColorsXmlAsync(string xmlPath, CancellationToken ct)
+    {
+        var colors = new List<BlColor>(256);
+        var now = DateTime.UtcNow;
+
+        var settings = new XmlReaderSettings
+        {
+            Async = true,
+            IgnoreWhitespace = true,
+            IgnoreComments = true
+        };
+
+        using var reader = XmlReader.Create(xmlPath, settings);
+        bool moveNext = true;
+        while (true)
+        {
+            if (moveNext)
+            {
+                if (!await reader.ReadAsync()) break;
+            }
+            moveNext = true;
+            ct.ThrowIfCancellationRequested();
+
+            if (reader.NodeType != XmlNodeType.Element || reader.Name != "ITEM") continue;
+
+            var elementXml = await reader.ReadOuterXmlAsync();
+            moveNext = false;
+
+            XElement root;
+            try { root = XElement.Parse(elementXml); }
+            catch { continue; }
+
+            var idText = root.Element("COLOR")?.Value;
+            if (!int.TryParse(idText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var colorId))
+                continue; // ohne Id keine PK -> skip
+
+            var rawRgb = root.Element("COLORRGB")?.Value;
+            colors.Add(new BlColor
+            {
+                ColorId = colorId,
+                // HTML-Decode konsistent mit Item-Importer.
+                Name = WebUtility.HtmlDecode(root.Element("COLORNAME")?.Value ?? string.Empty),
+                Rgb = string.IsNullOrWhiteSpace(rawRgb) ? null : rawRgb,
+                Type = root.Element("COLORTYPE")?.Value,
+                FetchedAt = now
+            });
+        }
+
+        if (colors.Count > 0)
+            await _cache.UpsertColorsAsync(colors, ct);
+
+        return colors.Count;
     }
 }

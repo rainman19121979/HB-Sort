@@ -134,6 +134,13 @@ public partial class App : Application
             // Idempotent - mehrfaches Aufrufen ist safe.
             await ClearEmptyPriceCacheEntriesAsync();
 
+            // 6.53 v0.1.20.1 Auto-Trigger Catalog-Reimport wenn bl_colors leer ist,
+            // bl_items aber voll. Das ist der Zustand alter v0.1.20-Installs vor dem
+            // colors.xml-Importer-Fix - der Reimport schreibt die Farben jetzt nach.
+            // Fire-and-forget; ETag-Check im BlBulkImportService verhindert Doppel-
+            // Download wenn ohnehin nichts neues da ist. Blockiert NICHT den Start.
+            _ = Task.Run(TryReimportCatalogIfColorsMissingAsync);
+
             // 6.55 Auto-Backup (UX X.29): wenn aktiviert + Intervall faellig,
             // im Hintergrund ein Backup erzeugen + alte aufraeumen. Fire-and-
             // forget - blockiert NICHT den Startup. Task.Run-Wrapping wegen
@@ -575,6 +582,62 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log.Warning(ex, "BL-Preis-Cache Anti-Vergiftung-Cleanup geworfen");
+        }
+    }
+
+    /// <summary>
+    /// v0.1.20.1: bl_colors-Migration fuer alte v0.1.20-Installs. Wenn der User
+    /// schon BrickStore-Daten importiert hat (bl_items > 0) aber bl_colors leer
+    /// ist, war das ein Import vor dem colors.xml-Parser-Fix. Wir stossen einen
+    /// Reimport an - der ETag-Check spart den Download wenn die ZIP gleich
+    /// geblieben ist, die colors.xml wird in jedem Fall neu importiert.
+    /// Fire-and-forget; Fehler werden nur geloggt, App-Start laeuft weiter.
+    /// </summary>
+    private static async Task TryReimportCatalogIfColorsMissingAsync()
+    {
+        try
+        {
+            var repo = Services.GetRequiredService<IBlCacheRepository>();
+            var stats = await repo.GetStatsAsync();
+            var colors = await repo.GetAllColorsAsync();
+
+            if (stats.ItemCount <= 0 || colors.Count > 0) return; // nichts zu tun
+
+            Log.Information(
+                "bl_colors leer aber bl_items voll ({ItemCount}) - Stammdaten-Reimport " +
+                "wird im Hintergrund ausgeloest (v0.1.20.1-Migration).",
+                stats.ItemCount);
+
+            var importer = Services.GetRequiredService<IBlBulkImportService>();
+            var settings = Services.GetRequiredService<ISettingsService>();
+            var previousEtag = settings.Current.LastBlImportEtag;
+            var previousHash = settings.Current.LastBlImportContentHash;
+
+            var result = await importer.ImportFromGitHubAsync(
+                previousEtag: previousEtag,
+                previousContentHash: previousHash);
+
+            // ETag/Hash zurueckschreiben falls der Server uns ein neues geliefert hat.
+            if (!string.IsNullOrEmpty(result.NewEtag))
+                settings.Current.LastBlImportEtag = result.NewEtag;
+            if (!string.IsNullOrEmpty(result.NewContentHash))
+                settings.Current.LastBlImportContentHash = result.NewContentHash;
+            settings.Current.LastBlImport = DateTime.UtcNow;
+            await settings.SaveAsync();
+
+            // Erfolg-Toast (best-effort - falls Notification noch nicht da, ignorieren).
+            try
+            {
+                var notify = Services.GetRequiredService<INotificationService>();
+                notify.ShowInfo("Stammdaten aktualisiert: BL-Farben wurden ergaenzt.");
+            }
+            catch { /* ignore */ }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex,
+                "bl_colors-Migration (Reimport-Trigger) geworfen - " +
+                "User kann den Catalog-Reimport manuell anstossen ueber Einstellungen.");
         }
     }
 
