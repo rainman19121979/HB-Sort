@@ -102,16 +102,21 @@ public class StorageBinService : IStorageBinService
 
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
 
+        // v0.1.22-beta.1 Block G: Bin-Typ-Trennung
+        //   Wartend darf in: Wartend-Bin (Reifungspfad inkl. komplette Mit-
+        //   bewohner), Komplett-Bin, leeres Bin. NICHT in Floating-Bin.
+        //   Block-G-Aufweichung gegenueber UX X.31: Complete-Figuren im selben
+        //   Bin sind erlaubt (Mix wartend+komplett ist OK).
+
         // 1) Bei Limit > 1: Bin mit anderen wartenden (unter Limit) bevorzugen.
-        //    Bedingungen: keine Complete-Figuren, keine FloatingParts (sonst
-        //    Mix-Fach), bestehende wartende UND Anzahl &lt; Limit.
+        //    Bedingungen: keine FloatingParts (sonst Mix), bestehende wartende
+        //    UND Anzahl < Limit. Complete-Figuren im selben Bin OK.
         //    Sortierung: voller Bin zuerst (Stapel waechst).
         if (maxWaitingLimit > 1)
         {
             var stackCandidate = await ctx.StorageBins
                 .AsNoTracking()
-                .Where(b => !b.TrackedMinifigs.Any(m => m.Status == TrackedMinifigStatus.Complete)
-                         && !b.FloatingParts.Any())
+                .Where(b => !b.FloatingParts.Any())
                 .Select(b => new
                 {
                     Bin = b,
@@ -124,8 +129,12 @@ public class StorageBinService : IStorageBinService
             if (stackCandidate != null) return stackCandidate.Bin;
         }
 
-        // 2) Fallback: wirklich freies Fach (keine Minifig irgendeines Status,
-        //    keine FloatingParts). UX-X.6-konform.
+        // 2) Fallback: wirklich freies Fach. UX-X.6-konform.
+        //    KEIN Vorschlag in Komplett-Bins via Default-Pfad - der waere zwar
+        //    konzeptionell erlaubt (Block-G-Spec), aber User-Erwartung im
+        //    Standard-Pfad ist "neues Fach". Mix mit Complete passiert nur via
+        //    Reifung (Complete-Werden einer bestehenden wartenden Figur), nicht
+        //    durch aktiven Vorschlag.
         return await ctx.StorageBins
             .AsNoTracking()
             .Where(b => !b.TrackedMinifigs.Any()
@@ -142,14 +151,17 @@ public class StorageBinService : IStorageBinService
 
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
 
+        // v0.1.22-beta.1 Block G: Complete darf in Wartend-Bin (Reifungspfad
+        // ist umgekehrt, aber konsistent erlaubt) und in Komplett-Bin, sowie
+        // in leeres Bin. NICHT in Floating-Bin. Block-G-Aufweichung gegenueber
+        // UX X.31: Waiting-Figuren im selben Bin sind erlaubt.
+
         // 1) Bevorzugt: Bin mit anderen Complete-Figuren (unter Limit) und
-        //    keinen Waiting-Figuren und keinen FloatingParts. Sortierung:
-        //    meiste Complete-Figuren zuerst (wir wollen den vorhandenen
-        //    Stapel wachsen lassen, nicht parallele anlegen).
+        //    keinen FloatingParts. Sortierung: meiste Complete-Figuren zuerst
+        //    (vorhandenen Stapel wachsen lassen, nicht parallele anlegen).
         var candidates = await ctx.StorageBins
             .AsNoTracking()
-            .Where(b => !b.TrackedMinifigs.Any(m => m.Status == TrackedMinifigStatus.Waiting)
-                     && !b.FloatingParts.Any())
+            .Where(b => !b.FloatingParts.Any())
             .Select(b => new
             {
                 Bin = b,
@@ -684,5 +696,129 @@ public class StorageBinService : IStorageBinService
             FloatingPartCount = partCount,
             Minifigs = minifigs
         };
+    }
+
+    // ========================================================================
+    // v0.1.22-beta.1 Block G: Bin-Typ-Trennung
+    // ========================================================================
+
+    public async Task<BinKind> GetBinKindAsync(int binId, CancellationToken ct = default)
+    {
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+
+        var waitingCount = await ctx.TrackedMinifigs.AsNoTracking()
+            .CountAsync(m => m.StorageBinId == binId
+                          && m.Status == TrackedMinifigStatus.Waiting, ct);
+        var completeCount = await ctx.TrackedMinifigs.AsNoTracking()
+            .CountAsync(m => m.StorageBinId == binId
+                          && m.Status == TrackedMinifigStatus.Complete, ct);
+        var floatingCount = await ctx.FloatingParts.AsNoTracking()
+            .CountAsync(p => p.StorageBinId == binId, ct);
+
+        if (waitingCount == 0 && completeCount == 0 && floatingCount == 0)
+            return BinKind.Empty;
+
+        // Wartend + (optional) Complete -> WaitingMinifig (Reifungspfad).
+        // Wartend + Floating ist Anomalie - liefert trotzdem WaitingMinifig
+        // (Wartend ist der "restriktivere" Typ aus User-Sicht), aber loggt WRN.
+        if (waitingCount > 0)
+        {
+            if (floatingCount > 0)
+            {
+                Log.Warning(
+                    "BinKind {BinId}: Anomalie - Wartend ({W}) + Floating ({F}) im selben Bin",
+                    binId, waitingCount, floatingCount);
+            }
+            return BinKind.WaitingMinifig;
+        }
+
+        // Kein Wartend mehr - reine Floating- oder Complete-Klassifikation.
+        if (floatingCount > 0)
+        {
+            if (completeCount > 0)
+            {
+                Log.Warning(
+                    "BinKind {BinId}: Anomalie - Complete ({C}) + Floating ({F}) im selben Bin",
+                    binId, completeCount, floatingCount);
+            }
+            return BinKind.FloatingOnly; // Floating wins (restriktivere Sortier-Regel)
+        }
+
+        // Nur Complete uebrig.
+        return BinKind.CompleteOnly;
+    }
+
+    public async Task<List<BinMixWarning>> FindBestandMixBinsAsync(CancellationToken ct = default)
+    {
+        // v0.1.22-beta.1 Block G: scannt einmalig die DB nach Mix-Bins die
+        // die neue Block-G-Sortier-Logik nicht mehr produziert:
+        //   1) Wartend-Bin mit fremden FloatingParts
+        //      (= FloatingParts die zu KEINER der enthaltenen wartenden
+        //      Figuren passen).
+        //   2) Floating-Bin mit wartender oder kompletter Figur
+        //      (Klassifikator wuerde Anomalie loggen).
+        // Kein Auto-Move - reine Detektion plus User-Hinweis.
+        var result = new List<BinMixWarning>();
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+
+        // Alle relevanten Bins einmal laden (typisch <100 Bins, akzeptabler
+        // In-Memory-Aggregate).
+        var bins = await ctx.StorageBins.AsNoTracking()
+            .Include(b => b.TrackedMinifigs)
+                .ThenInclude(m => m.RequiredParts)
+            .Include(b => b.FloatingParts)
+            .ToListAsync(ct);
+
+        foreach (var bin in bins)
+        {
+            ct.ThrowIfCancellationRequested();
+            var hasWaiting = bin.TrackedMinifigs.Any(m => m.Status == TrackedMinifigStatus.Waiting);
+            var hasComplete = bin.TrackedMinifigs.Any(m => m.Status == TrackedMinifigStatus.Complete);
+            var floats = bin.FloatingParts;
+
+            // Fall 2: Floating + Minifig (egal welcher Status)
+            if (floats.Count > 0 && (hasWaiting || hasComplete))
+            {
+                // Wartend-Bin mit fremden Floating-Parts: pruefen ob alle Floats
+                // zu mindestens einer wartenden Figur passen (Reverse-Match-
+                // Kandidaten). Sonst ist es Mix.
+                if (hasWaiting && !hasComplete)
+                {
+                    // Sammele alle (PartNo, ColorId)-Paare die in den wartenden
+                    // Figuren stehen.
+                    var waitingPartKeys = bin.TrackedMinifigs
+                        .Where(m => m.Status == TrackedMinifigStatus.Waiting)
+                        .SelectMany(m => m.RequiredParts)
+                        .Select(rp => (rp.PartNumber, rp.ColorId))
+                        .ToHashSet();
+
+                    var foreignFloats = floats
+                        .Where(fp => !waitingPartKeys.Contains((fp.PartNumber, fp.ColorId)))
+                        .ToList();
+                    if (foreignFloats.Count > 0)
+                    {
+                        result.Add(new BinMixWarning(
+                            bin.Id, bin.Label,
+                            $"Wartend-Bin mit {foreignFloats.Count} fremden Einzelteilen " +
+                            "(passen zu keiner der wartenden Figuren)."));
+                    }
+                }
+                else
+                {
+                    // Komplett+Floating oder gemischt Wartend+Komplett+Floating
+                    result.Add(new BinMixWarning(
+                        bin.Id, bin.Label,
+                        $"Floating + Minifig im selben Bin ({floats.Count} Einzelteile, " +
+                        $"{bin.TrackedMinifigs.Count} Figuren)."));
+                }
+            }
+        }
+
+        if (result.Count > 0)
+        {
+            Log.Warning("Bestand-Mix-Bins gefunden: {Count} ({Bins})",
+                result.Count, string.Join(", ", result.Select(r => r.Label)));
+        }
+        return result;
     }
 }

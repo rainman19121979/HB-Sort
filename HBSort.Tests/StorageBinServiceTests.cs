@@ -302,10 +302,12 @@ public class StorageBinServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SuggestBinForWaitingMinifig_limit3_skips_stack_bin_with_complete()
+    public async Task SuggestBinForWaitingMinifig_limit3_allows_stack_bin_with_complete()
     {
-        // Limit=3, Box 01 hat 1 wartende UND 1 Complete -> nicht stapelbar
-        // (Mix-Fach mit Complete macht Verwaltung kompliziert). Box 02 frei.
+        // v0.1.22-beta.1 Block G: Mix Wartend+Complete ist erlaubt
+        // (Reifungspfad). Vorher (UX X.31) hat Box 01 wegen der Complete-
+        // Figur als Mix-Verbot gegolten; jetzt nicht mehr - Box 01 wins
+        // weil sie schon eine wartende Figur enthaelt (Stapel waechst).
         await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
         var b1 = await _sut.GetByLabelAsync("Box 01");
         await SeedMinifigInBinAsync(b1!.Id, "wait1", TrackedMinifigStatus.Waiting);
@@ -314,7 +316,7 @@ public class StorageBinServiceTests : IDisposable
         var suggestion = await _sut.SuggestBinForWaitingMinifigAsync(maxWaitingLimit: 3);
 
         Assert.NotNull(suggestion);
-        Assert.Equal("Box 02", suggestion!.Label);
+        Assert.Equal("Box 01", suggestion!.Label);
     }
 
     [Fact]
@@ -367,10 +369,12 @@ public class StorageBinServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SuggestBinForCompleteMinifig_skips_bin_with_waiting()
+    public async Task SuggestBinForCompleteMinifig_allows_bin_with_waiting()
     {
-        // Bin mit 2 Complete + 1 Waiting -> nicht vorschlagen (Mischung
-        // wuerde "1 Waiting pro Fach"-Regel brechen).
+        // v0.1.22-beta.1 Block G: Mix Wartend+Complete ist erlaubt (Reifungs-
+        // pfad). Vorher (UX X.31) hat Box 01 wegen der wartenden Figur als
+        // Mix-Verbot gegolten; jetzt nicht mehr - Box 01 wins weil sie
+        // schon Complete-Figuren enthaelt (Complete-Stapel waechst).
         await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
         var b1 = await _sut.GetByLabelAsync("Box 01");
         await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Complete);
@@ -380,7 +384,7 @@ public class StorageBinServiceTests : IDisposable
         var suggestion = await _sut.SuggestBinForCompleteMinifigAsync(5);
 
         Assert.NotNull(suggestion);
-        Assert.Equal("Box 02", suggestion!.Label);
+        Assert.Equal("Box 01", suggestion!.Label);
     }
 
     [Fact]
@@ -887,5 +891,100 @@ public class StorageBinServiceTests : IDisposable
         private readonly DbContextOptions<UserDataContext> _options;
         public SimpleContextFactory(DbContextOptions<UserDataContext> options) => _options = options;
         public UserDataContext CreateDbContext() => new(_options);
+    }
+
+    // ========================================================================
+    // v0.1.22-beta.1 Block G: BinKind-Klassifikator + Mix-Bestand-Scan
+    // ========================================================================
+
+    [Fact]
+    public async Task GetBinKindAsync_classifies_empty_bin_correctly()
+    {
+        await _sut.CreateBulkAsync(new[] { "Box 01" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+
+        var kind = await _sut.GetBinKindAsync(b1!.Id);
+
+        Assert.Equal(BinKind.Empty, kind);
+    }
+
+    [Fact]
+    public async Task GetBinKindAsync_classifies_floating_only_bin_correctly()
+    {
+        await _sut.CreateBulkAsync(new[] { "Box 01" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedFloatingPartInBinAsync(b1!.Id, "3001", 2);
+
+        var kind = await _sut.GetBinKindAsync(b1!.Id);
+
+        Assert.Equal(BinKind.FloatingOnly, kind);
+    }
+
+    [Fact]
+    public async Task GetBinKindAsync_classifies_waiting_bin_correctly()
+    {
+        await _sut.CreateBulkAsync(new[] { "Box 01" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Waiting);
+
+        var kind = await _sut.GetBinKindAsync(b1!.Id);
+
+        Assert.Equal(BinKind.WaitingMinifig, kind);
+    }
+
+    [Fact]
+    public async Task GetBinKindAsync_classifies_complete_only_bin_correctly()
+    {
+        await _sut.CreateBulkAsync(new[] { "Box 01" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Complete);
+
+        var kind = await _sut.GetBinKindAsync(b1!.Id);
+
+        Assert.Equal(BinKind.CompleteOnly, kind);
+    }
+
+    [Fact]
+    public async Task GetBinKindAsync_treats_waiting_plus_complete_as_WaitingMinifig()
+    {
+        // Reifungspfad: wartende Figur ist komplett geworden und liegt
+        // jetzt zusammen mit einer noch wartenden im Bin.
+        await _sut.CreateBulkAsync(new[] { "Box 01" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedMinifigInBinAsync(b1!.Id, "wait1", TrackedMinifigStatus.Waiting);
+        await SeedMinifigInBinAsync(b1!.Id, "done1", TrackedMinifigStatus.Complete);
+
+        var kind = await _sut.GetBinKindAsync(b1!.Id);
+
+        Assert.Equal(BinKind.WaitingMinifig, kind);
+    }
+
+    [Fact]
+    public async Task FindBestandMixBins_returns_empty_when_no_mix()
+    {
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        var b2 = await _sut.GetByLabelAsync("Box 02");
+        await SeedMinifigInBinAsync(b1!.Id, "wait1", TrackedMinifigStatus.Waiting);
+        await SeedFloatingPartInBinAsync(b2!.Id, "3001", 5);
+
+        var mixBins = await _sut.FindBestandMixBinsAsync();
+
+        Assert.Empty(mixBins);
+    }
+
+    [Fact]
+    public async Task FindBestandMixBins_finds_complete_plus_floating_mix()
+    {
+        // Block G: Floating-Bin mit Complete-Figur ist Anomalie.
+        await _sut.CreateBulkAsync(new[] { "Box 01" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedMinifigInBinAsync(b1!.Id, "done", TrackedMinifigStatus.Complete);
+        await SeedFloatingPartInBinAsync(b1!.Id, "3001", 1);
+
+        var mixBins = await _sut.FindBestandMixBinsAsync();
+
+        Assert.Single(mixBins);
+        Assert.Equal(b1!.Id, mixBins[0].BinId);
     }
 }

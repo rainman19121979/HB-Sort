@@ -145,6 +145,11 @@ public partial class App : Application
             // Idempotent - mehrfaches Aufrufen ist safe.
             await ClearEmptyPriceCacheEntriesAsync();
 
+            // 6.525 v0.1.22-beta.1 Block G: Bestand-Mix-Bins detektieren
+            // (Wartend+Floating ohne Reverse-Match-Bezug, Floating+Complete).
+            // Fire-and-forget mit Toast, kein Auto-Move - User entscheidet.
+            _ = Task.Run(WarnAboutBestandMixBinsAsync);
+
             // 6.53 v0.1.20.1 Auto-Trigger Catalog-Reimport wenn bl_colors leer ist,
             // bl_items aber voll. Das ist der Zustand alter v0.1.20-Installs vor dem
             // colors.xml-Importer-Fix - der Reimport schreibt die Farben jetzt nach.
@@ -597,6 +602,36 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log.Warning(ex, "BL-Preis-Cache Anti-Vergiftung-Cleanup geworfen");
+        }
+    }
+
+    /// <summary>
+    /// v0.1.22-beta.1 Block G: Bestand-Mix-Bins beim App-Start detektieren.
+    /// Fire-and-forget; bei Treffer Toast + WRN-Log. Kein Auto-Move - die
+    /// User-Spec verlangt manuelle Aufloesung ueber die Lagerliste.
+    /// </summary>
+    private static async Task WarnAboutBestandMixBinsAsync()
+    {
+        try
+        {
+            var binService = Services.GetRequiredService<IStorageBinService>();
+            var mixBins = await binService.FindBestandMixBinsAsync();
+            if (mixBins.Count == 0) return;
+
+            try
+            {
+                var notify = Services.GetRequiredService<INotificationService>();
+                var labels = string.Join(", ", mixBins.Take(3).Select(m => m.Label));
+                var suffix = mixBins.Count > 3 ? $" (+{mixBins.Count - 3} weitere)" : "";
+                notify.ShowInfo(
+                    $"Es wurden {mixBins.Count} Mix-Lagerfaecher gefunden: {labels}{suffix}. " +
+                    "Pruefe die Lagerliste in den Einstellungen.");
+            }
+            catch { /* ignore - Hauptzweck ist das WRN-Log im Service */ }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Bestand-Mix-Bin-Scan geworfen - kein Impact auf Startup");
         }
     }
 

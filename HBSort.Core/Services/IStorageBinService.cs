@@ -146,7 +146,55 @@ public interface IStorageBinService
     /// Liefert die Anzahl freigegebener Faecher.
     /// </summary>
     Task<int> ReleaseBinsAsync(IEnumerable<int> binIds, CancellationToken ct = default);
+
+    /// <summary>
+    /// v0.1.22-beta.1 Block G: zentraler Klassifikator. Liefert den
+    /// aktuellen Typ eines Bins (Empty / FloatingOnly / WaitingMinifig /
+    /// CompleteOnly) - der Typ ergibt sich aus dem Inhalt, es gibt keine
+    /// "Bin.Type"-Spalte. Wartend+Complete-Mix wird als WaitingMinifig
+    /// klassifiziert (Reifungspfad). Mix mit FloatingParts ohne wartende
+    /// Figur ist ein Anomalie-Fall - die Klassifikation faellt auf
+    /// FloatingOnly mit WRN-Log zurueck.
+    /// </summary>
+    Task<BinKind> GetBinKindAsync(int binId, CancellationToken ct = default);
+
+    /// <summary>
+    /// v0.1.22-beta.1 Block G: scannt einmalig die DB nach Mix-Bins die
+    /// durch die neue Bin-Typ-Trennung nicht mehr entstehen sollten.
+    /// Wird beim App-Start gerufen und liefert eine Liste der betroffenen
+    /// Bin-Labels (fuer einen einmaligen User-Hinweis-Toast). Keine
+    /// Auto-Reparatur - User entscheidet manuell ob/wie er die Mix-Bins
+    /// aufloest.
+    /// </summary>
+    Task<List<BinMixWarning>> FindBestandMixBinsAsync(CancellationToken ct = default);
 }
+
+/// <summary>
+/// v0.1.22-beta.1 Block G: drei Bin-Typen, implizit durch Inhalt.
+/// Es gibt keine DB-Spalte fuer den Typ - der Klassifikator
+/// <see cref="IStorageBinService.GetBinKindAsync"/> leitet ihn ab.
+/// </summary>
+public enum BinKind
+{
+    /// <summary>Keine TrackedMinifigs (irgendeines Status), keine FloatingParts.</summary>
+    Empty,
+    /// <summary>Nur FloatingParts, keine TrackedMinifigs.</summary>
+    FloatingOnly,
+    /// <summary>
+    /// Mindestens eine wartende Figur. Komplette Figuren im selben Bin
+    /// sind erlaubt (Reifungspfad). FloatingParts sind hier eine Anomalie
+    /// - sollten durch Block-G-Sortier-Logik nicht mehr entstehen.
+    /// </summary>
+    WaitingMinifig,
+    /// <summary>Nur komplette Figuren, keine wartenden, keine FloatingParts.</summary>
+    CompleteOnly
+}
+
+/// <summary>v0.1.22-beta.1 Block G: ein Eintrag im Bestand-Mix-Scan.</summary>
+public record BinMixWarning(
+    int BinId,
+    string Label,
+    string Reason);
 
 /// <summary>
 /// UX X.29 Block C (v0.1.16): Vorab-Info fuer den "Fach leeren"-Workflow.
