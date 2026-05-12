@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using HBSort.Core.Models;
@@ -77,6 +78,13 @@ public partial class CollectMinifigSelectionViewModel : ObservableObject
         int maxWaitingLimit = 1,
         CancellationToken ct = default)
     {
+        // v0.1.22-beta.1 Block B: Profiling. Misst Gesamtzeit + die N+1-
+        // FindFloatingLocations-Schleife unten. Block C wandelt sie in einen
+        // Bulk-Lookup um, dann kann das Logging auf Debug heruntergesetzt
+        // oder entfernt werden.
+        var swTotal = Stopwatch.StartNew();
+        var swReverseMatch = new Stopwatch();
+        int reverseMatchCalls = 0;
         IsLoading = true;
         try
         {
@@ -147,8 +155,11 @@ public partial class CollectMinifigSelectionViewModel : ObservableObject
                     // Reverse-Match: existiert FloatingPart mit gleicher Kombi?
                     try
                     {
+                        swReverseMatch.Start();
+                        reverseMatchCalls++;
                         var locations = await _partLookup.FindFloatingLocationsAsync(
                             s.ItemNo, s.ColorId, ct);
+                        swReverseMatch.Stop();
                         if (locations.Count > 0)
                         {
                             part.IsCanBeReverseMatched = true;
@@ -177,6 +188,12 @@ public partial class CollectMinifigSelectionViewModel : ObservableObject
         finally
         {
             IsLoading = false;
+            swTotal.Stop();
+            Log.Information(
+                "[PROFILE] CollectMinifigSelection.LoadAsync {BlId}: total={Total}ms, " +
+                "reverseMatch={Rm}ms ueber {Calls} Calls, parts={Parts}",
+                BricklinkId, swTotal.ElapsedMilliseconds,
+                swReverseMatch.ElapsedMilliseconds, reverseMatchCalls, Parts.Count);
         }
     }
 

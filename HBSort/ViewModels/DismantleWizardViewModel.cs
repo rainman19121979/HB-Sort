@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
@@ -65,6 +66,14 @@ public partial class DismantleWizardViewModel : ObservableObject
 
     public async Task LoadAsync()
     {
+        // v0.1.22-beta.1 Block B: Profiling Gesamtzeit + PerPartBin- und
+        // FindFloatingLocations-Phasen. Beide Schleifen rufen pro Required-
+        // Part eigene DB-Lookups (N+1).
+        var swTotal = Stopwatch.StartNew();
+        var swPickBin = new Stopwatch();
+        var swSmartHint = new Stopwatch();
+        int pickBinCalls = 0;
+        int smartHintCalls = 0;
         IsLoading = true;
         try
         {
@@ -122,10 +131,13 @@ public partial class DismantleWizardViewModel : ObservableObject
                 StorageBin? perPartBin = null;
                 try
                 {
+                    swPickBin.Start();
+                    pickBinCalls++;
                     perPartBin = await PickPerPartBinAsync(
                         p.PartNumber, p.ColorId,
                         excludeMinifigId: TrackedMinifigId,
                         partName: p.PartName);
+                    swPickBin.Stop();
                 }
                 catch (Exception ex)
                 {
@@ -147,16 +159,22 @@ public partial class DismantleWizardViewModel : ObservableObject
                 {
                     try
                     {
-                        Log.Information("SmartHint-Lookup: PartNo={PartNo}, ColorId={ColorId}",
+                        // v0.1.22-beta.1 Block B: das SmartHint-Information-
+                        // Log-Trio wurde auf Debug gestuft und Stopwatch
+                        // gepackt. Im PROFILE-Summary unten zusammengefasst.
+                        Log.Debug("SmartHint-Lookup: PartNo={PartNo}, ColorId={ColorId}",
                             p.PartNumber, p.ColorId);
 
+                        swSmartHint.Start();
+                        smartHintCalls++;
                         var locations = await _partLookup.FindFloatingLocationsAsync(
                             p.PartNumber, p.ColorId);
+                        swSmartHint.Stop();
 
-                        Log.Information("SmartHint-Lookup result: {Count} Locations gefunden", locations.Count);
+                        Log.Debug("SmartHint-Lookup result: {Count} Locations gefunden", locations.Count);
                         foreach (var loc in locations)
                         {
-                            Log.Information("  -> Bin {Id} '{Label}': {Qty} Stueck",
+                            Log.Debug("  -> Bin {Id} '{Label}': {Qty} Stueck",
                                 loc.StorageBinId, loc.StorageBinLabel, loc.TotalQuantity);
                         }
 
@@ -213,6 +231,14 @@ public partial class DismantleWizardViewModel : ObservableObject
         finally
         {
             IsLoading = false;
+            swTotal.Stop();
+            Log.Information(
+                "[PROFILE] DismantleWizard.LoadAsync minifig={Id}: total={Total}ms, " +
+                "pickBin={Pb}ms ueber {PbCalls}, smartHint={Sh}ms ueber {ShCalls}, parts={Parts}",
+                TrackedMinifigId, swTotal.ElapsedMilliseconds,
+                swPickBin.ElapsedMilliseconds, pickBinCalls,
+                swSmartHint.ElapsedMilliseconds, smartHintCalls,
+                Parts.Count);
         }
     }
 
@@ -339,6 +365,10 @@ public partial class DismantleWizardViewModel : ObservableObject
     /// </summary>
     public async Task LoadFromPendingAsync(PendingMinifigViewModel pending)
     {
+        // v0.1.22-beta.1 Block B: Profiling.
+        var swTotal = Stopwatch.StartNew();
+        var swPickBin = new Stopwatch();
+        int pickBinCalls = 0;
         IsLoading = true;
         try
         {
@@ -373,11 +403,14 @@ public partial class DismantleWizardViewModel : ObservableObject
                 StorageBin? perPartBin = null;
                 try
                 {
+                    swPickBin.Start();
+                    pickBinCalls++;
                     // Pending-Mode: keine Figur in DB, kein excludeMinifigId.
                     perPartBin = await PickPerPartBinAsync(
                         p.BricklinkPartNo, p.BricklinkColorId,
                         excludeMinifigId: null,
                         partName: p.PartName);
+                    swPickBin.Stop();
                 }
                 catch (Exception ex)
                 {
@@ -406,6 +439,12 @@ public partial class DismantleWizardViewModel : ObservableObject
         finally
         {
             IsLoading = false;
+            swTotal.Stop();
+            Log.Information(
+                "[PROFILE] DismantleWizard.LoadFromPendingAsync {Bl}: total={Total}ms, " +
+                "pickBin={Pb}ms ueber {PbCalls}, parts={Parts}",
+                BricklinkId, swTotal.ElapsedMilliseconds,
+                swPickBin.ElapsedMilliseconds, pickBinCalls, Parts.Count);
         }
     }
 

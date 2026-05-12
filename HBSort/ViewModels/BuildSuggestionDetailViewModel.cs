@@ -1,10 +1,12 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using HBSort.Core.Database;
 using HBSort.Core.Models;
 using HBSort.Core.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 
 namespace HBSort.ViewModels;
 
@@ -111,6 +113,12 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
     /// </summary>
     public async Task LoadAsync(IStorageBinService binService)
     {
+        // v0.1.22-beta.1 Block B: Profiling. Misst die N+1 in der
+        // partNames-Schleife unten (pro Part ein _cache.GetItemAsync).
+        var swTotal = Stopwatch.StartNew();
+        var swPartNames = new Stopwatch();
+        int partNameCalls = 0;
+
         // 1) Subsets aus dem BL-Cache (sollten alle vorhanden sein - sonst gabs
         //    den Bauvorschlag gar nicht erst).
         var subsets = await _cache.GetSubsetsAsync("M", BricklinkId);
@@ -134,12 +142,15 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
         var colors = (await _cache.GetAllColorsAsync()).ToDictionary(c => c.ColorId);
 
         // 4) Item-Names der Teile (best-effort aus dem Cache).
+        swPartNames.Start();
         var partNames = new Dictionary<string, string>();
         foreach (var s in subsets.Select(x => x.ItemNo).Distinct())
         {
+            partNameCalls++;
             var item = await _cache.GetItemAsync("P", s);
             if (item != null) partNames[s] = item.Name;
         }
+        swPartNames.Stop();
 
         // 5) Liste aufbauen
         Parts.Clear();
@@ -248,6 +259,13 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
                 // Bild-Fehler ist nicht kritisch - Dialog funktioniert auch ohne.
             }
         }
+
+        swTotal.Stop();
+        Log.Information(
+            "[PROFILE] BuildSuggestionDetail.LoadAsync {Bl}: total={Total}ms, " +
+            "partNames={Pn}ms ueber {PnCalls}, parts={Parts}",
+            BricklinkId, swTotal.ElapsedMilliseconds,
+            swPartNames.ElapsedMilliseconds, partNameCalls, Parts.Count);
     }
 }
 

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http;
 using System.Windows;
@@ -475,6 +476,11 @@ public partial class SettingsViewModel : ObservableObject
         _binService = binService;
         BinManager = binManager;
 
+        // v0.1.22-beta.1 Block B: ctor-Profiling. Block C entscheidet ob die
+        // sieben fire-and-forget-Async-Tasks lazy auf Tab-Wechsel verschoben
+        // werden (z.B. Backups-Liste erst wenn der Backup-Tab geklickt wird).
+        var swCtor = Stopwatch.StartNew();
+
         // Vorhandene BL-Tokens beim Oeffnen der Settings laden, damit der User
         // sie sehen / aendern kann ohne neu eingeben zu muessen.
         _ = LoadBricklinkTokensAsync();
@@ -503,6 +509,12 @@ public partial class SettingsViewModel : ObservableObject
 
         // UX#12: Preis-Cache-Eintraege initial laden.
         _ = RefreshPriceCacheCountAsync();
+
+        swCtor.Stop();
+        Log.Information(
+            "[PROFILE] SettingsViewModel ctor (sync) {Ms}ms (7+ fire-and-forget " +
+            "Refresh-Tasks laufen weiter im Hintergrund)",
+            swCtor.ElapsedMilliseconds);
     }
 
     /// <summary>UX#12: Eintragsanzahl aus dem Preis-Cache holen und in der UI anzeigen.</summary>
