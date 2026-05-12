@@ -6,9 +6,10 @@ using HBSort.ViewModels;
 namespace HBSort.Views;
 
 /// <summary>
-/// UX X.31 Block B (v0.1.18): Anweisungs-Overlay nach erfolgreichem Persist.
-/// DataContext = MainViewModel (geerbt aus dem Parent SortingView).
-/// Sichtbar via DataTrigger auf MainViewModel.ScanViewModel.IsBinInstructionVisible.
+/// v0.1.22-beta.1 Block F: konsolidiertes Anweisungs-Overlay. Vorher zwei
+/// UserControls (Single + Group) mit identischer Klick-Handler-Logik.
+/// DataContext = MainViewModel; Sichtbarkeit + Mode-Switch ueber
+/// MainViewModel.ScanViewModel.BinInstruction.IsVisible / .Mode.
 /// </summary>
 public partial class BinInstructionOverlay : UserControl
 {
@@ -26,8 +27,8 @@ public partial class BinInstructionOverlay : UserControl
 
     /// <summary>
     /// Klick auf den inneren Panel-Border schliesst ebenfalls - Spec sagt
-    /// "Klick irgendwo schliesst", also auch innerhalb der Karte. Der Button
-    /// behaelt eigene Click-Handler-Prioritaet (e.Handled=true beim Button).
+    /// "Klick irgendwo schliesst", also auch innerhalb der Karte. Der OK-
+    /// Button behaelt eigene Click-Handler-Prioritaet (e.Handled=true).
     /// </summary>
     private void OverlayPanel_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {

@@ -269,55 +269,45 @@ public partial class ScanViewModel : ObservableObject, IDisposable
     // Timer-Verwaltung (DispatcherTimer braucht WPF-Dispatcher).
     // ====================================================================
 
+    // v0.1.22-beta.1 Block F: konsolidiert. Eine VM mit Mode-Switch
+    // (Single + Group) statt zwei separate Klassen + zwei separate
+    // ScanViewModel-Properties. Konsumenten nutzen ShowBinInstruction (Single,
+    // mit Auto-Dismiss-Timer) oder ShowBinInstructionGroup (Group, ohne
+    // Auto-Dismiss).
     public BinInstructionViewModel BinInstruction { get; } = new();
 
     /// <summary>
-    /// Convenience-Property fuer XAML-DataTrigger-Bindings die Single-Path-
-    /// Pfaden vorziehen (Visibility am Overlay).
+    /// Convenience-Property fuer XAML-DataTrigger-Bindings die Visibility
+    /// am Overlay steuern (Mode-Switch passiert intern in der VM).
     /// </summary>
     public bool IsBinInstructionVisible => BinInstruction.IsVisible;
 
-    // ====================================================================
-    // UX X.32 Block C (v0.1.19): Sammel-Popup fuer mehrere Items auf einmal
-    // (Direkt-Zerlegen + Reverse-Match >=2). Kein Auto-Dismiss-Timer -
-    // User muss aktiv schliessen.
-    // ====================================================================
-
-    public BinInstructionGroupViewModel BinInstructionGroup { get; } = new();
-    public bool IsBinInstructionGroupVisible => BinInstructionGroup.IsVisible;
-
     /// <summary>
-    /// Zeigt das Sammel-Popup mit mehreren "Lege X in Y"-Anweisungen.
-    /// UX X.32 v0.1.19-beta.5: <paramref name="headerText"/> kann gesetzt
-    /// werden um den Default ("Lege folgende Teile...") zu ueberschreiben -
-    /// z.B. fuer den BuildSuggestion-Pfad ("Nimm folgende Teile...").
+    /// Zeigt das Sammel-Popup mit mehreren "Lege X in Y"-Anweisungen
+    /// (Group-Mode). UX X.32 v0.1.19-beta.5: <paramref name="headerText"/>
+    /// kann gesetzt werden um den Default ("Lege folgende Teile...") zu
+    /// ueberschreiben - z.B. fuer den BuildSuggestion-Pfad ("Nimm folgende
+    /// Teile...").
     /// </summary>
     public void ShowBinInstructionGroup(
         IEnumerable<BinInstructionItem> items,
         string? headerText = null)
     {
-        BinInstructionGroup.Show(items, headerText);
-        OnPropertyChanged(nameof(IsBinInstructionGroupVisible));
-    }
-
-    [RelayCommand]
-    public void DismissBinInstructionGroup()
-    {
-        BinInstructionGroup.Dismiss();
-        OnPropertyChanged(nameof(IsBinInstructionGroupVisible));
+        BinInstruction.ShowGroup(items, headerText);
+        OnPropertyChanged(nameof(IsBinInstructionVisible));
     }
 
     private System.Windows.Threading.DispatcherTimer? _binInstructionTimer;
 
     /// <summary>
-    /// Zeigt das Anweisungs-Overlay mit Bin-Label + Item-Bild. Wird vom
-    /// PersistPendingAsync-Pfad sowie vom Einzelteil-Lager-Pfad
-    /// (PartLookupView.StoreFloating_Click) aufgerufen. Beendet sich nach
-    /// 8 Sekunden automatisch.
+    /// Zeigt das Anweisungs-Overlay im Single-Mode mit Bin-Label + Item-
+    /// Bild. Wird vom PersistPendingAsync-Pfad sowie vom Einzelteil-Lager-
+    /// Pfad (PartLookupView.StoreFloating_Click) aufgerufen. Beendet sich
+    /// nach 8 Sekunden automatisch.
     /// </summary>
     public void ShowBinInstruction(string binLabel, string? imageUrl)
     {
-        BinInstruction.Show(binLabel, imageUrl);
+        BinInstruction.ShowSingle(binLabel, imageUrl);
         OnPropertyChanged(nameof(IsBinInstructionVisible));
 
         // Bestehenden Timer aus einem vorherigen Aufruf abbrechen.

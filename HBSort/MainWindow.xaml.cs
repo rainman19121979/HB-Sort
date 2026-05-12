@@ -134,39 +134,28 @@ public partial class MainWindow : Window
     {
         var scanVm = _viewModel.ScanViewModel;
 
-        // UX X.32 Block C (v0.1.19): Sammel-Popup hat Vorrang vor allem
-        // anderen. Enter/Space/Esc schliesst es. Andere Sortier-Hotkeys
-        // (1/2/3) werden geblockt solange das Sammel-Popup sichtbar ist.
-        if (scanVm != null && scanVm.IsBinInstructionGroupVisible)
+        // v0.1.22-beta.1 Block F: konsolidiertes Overlay (Single + Group).
+        // Beide Modi schliessen via Enter/Space/Esc; im Group-Mode werden
+        // 1/2/3 zusaetzlich geblockt damit ein versehentlicher Hotkey-Klick
+        // unter dem Modal keinen Scan-Vorschlag aktiviert.
+        if (scanVm != null && scanVm.IsBinInstructionVisible)
         {
             if (IsTextInputFocused()) return;
             if (e.Key is Key.Enter or Key.Return or Key.Space or Key.Escape)
             {
-                scanVm.DismissBinInstructionGroup();
+                scanVm.DismissBinInstruction();
                 e.Handled = true;
                 return;
             }
-            // 1/2/3 unter dem Overlay versehentlich gedrueckt -> Block.
-            if (e.Key is Key.D1 or Key.D2 or Key.D3
-                       or Key.NumPad1 or Key.NumPad2 or Key.NumPad3)
+            // Im Group-Mode 1/2/3 blocken (Single-Mode hat Auto-Dismiss-
+            // Timer und ist transient).
+            if (scanVm.BinInstruction.Mode == BinInstructionMode.Group
+                && e.Key is Key.D1 or Key.D2 or Key.D3
+                          or Key.NumPad1 or Key.NumPad2 or Key.NumPad3)
             {
                 e.Handled = true;
                 return;
             }
-        }
-
-        // UX X.31 Block B (v0.1.18): wenn das Anweisungs-Overlay sichtbar ist,
-        // schliesst Enter / Leertaste / Esc das Overlay - und NUR das. Damit
-        // bricht ein versehentliches doppeltes Enter nicht den naechsten
-        // Scan oder Persist aus.
-        if (scanVm != null && scanVm.IsBinInstructionVisible
-            && (e.Key == Key.Enter || e.Key == Key.Return
-             || e.Key == Key.Space || e.Key == Key.Escape))
-        {
-            if (IsTextInputFocused()) return;
-            scanVm.DismissBinInstruction();
-            e.Handled = true;
-            return;
         }
 
         // Leertaste = Scan ausloesen.

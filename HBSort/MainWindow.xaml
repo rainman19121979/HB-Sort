@@ -317,19 +317,17 @@
              "App ist zu, neue Instanz starten"-Verwirrung gefuehrt hat -
              zwei Instanzen kaempften um die Webcam. -->
 
-        <!-- UX X.32 v0.1.19-beta.4 Block E: Bin-Anweisungs-Overlays
+        <!-- UX X.32 v0.1.19-beta.4 Block E: Bin-Anweisungs-Overlay
              tab-uebergreifend (vorher nur in SortingView eingebettet).
-             Spannen ueber alle 3 Rows damit sie egal in welchem Tab
-             sichtbar sind - z.B. nach Bulk-Move aus der Lagerliste. -->
+             Spannt ueber alle 3 Rows damit es egal in welchem Tab
+             sichtbar ist - z.B. nach Bulk-Move aus der Lagerliste.
+             v0.1.22-beta.1 Block F: konsolidiertes Overlay (Single + Group)
+             statt zwei separate UserControls. Mode-Switch ueber
+             BinInstruction.Mode (DataTrigger im Overlay). -->
         <views:BinInstructionOverlay
             Grid.Row="0" Grid.RowSpan="3"
             Panel.ZIndex="100"
             Visibility="{Binding ScanViewModel.IsBinInstructionVisible,
-                                 Converter={StaticResource BoolToVisibility}}"/>
-        <views:BinInstructionGroupOverlay
-            Grid.Row="0" Grid.RowSpan="3"
-            Panel.ZIndex="101"
-            Visibility="{Binding ScanViewModel.IsBinInstructionGroupVisible,
                                  Converter={StaticResource BoolToVisibility}}"/>
     </Grid>
 </Window>
