@@ -154,8 +154,13 @@ Drei Cleanup-Fixes in einem Beta-Release.
   PropertyChanged + BinInstructionTimer + LookupCts werden beim Dispose
   freigegeben. App.OnExit ruft (Services as IDisposable)?.Dispose() schon -
   greift damit automatisch beim Shutdown.
+- ✅ **Preise mit 4 Nachkommastellen**: PriceMath.ApplyCorrection rundet
+  auf 4 Stellen (statt 2), MinifigPriceViewModel formatiert mit "N4" und
+  RecalculatePartsTotal rundet ebenfalls auf 4. BL liefert Preise mit
+  4 Stellen Praezision - kleine Standardteile wie 0,0234 EUR EUR
+  behalten ihre Aussagekraft (vorher zu 0,02 EUR abgeschnitten).
 
-538/538 Tests gruen (vorher 536 + 2 neu in BlCacheRepositoryTests).
+539/539 Tests gruen (vorher 536, +3 neu: 2 BlCacheRepositoryTests + 1 PriceMathTests).
 
 ### v0.1.20-beta.4 (UX X.34, 2026-05-11) - Welcome-Dialog vereinfacht
 - ✅ **Lagerfaecher-Schritt nur als Hinweis**: Button "Lagerfach-Verwaltung
@@ -266,8 +271,8 @@ Aenderungen am Cache-Schema + Provider-Logik.
 | **v0.1.20-beta.2** | ✅ released (2026-05-11) | UX X.34 - First-Run-Onboarding-Dialog |
 | **v0.1.20-beta.3** | ✅ released (2026-05-11) | UX X.34 - Splash-Welcome-Lifecycle-Fix |
 | **v0.1.20-beta.4** | ✅ released (2026-05-11) | UX X.34 - Welcome-Dialog Lagerfaecher-Schritt nur als Hinweis |
-| **v0.1.20-beta.5** | 🟡 in-arbeit (2026-05-12) | UX X.34 - bl_prices Cache-Fix + Brickognize-Throttle + ScanViewModel-Dispose |
-| **v0.1.20** | 📋 geplant (Stable) | UX X.34 stable nach Beta-Praxis-Test - plus optional Performance / Undo / Bulk-Bin / Wiki |
+| **v0.1.20-beta.5** | ✅ released (2026-05-12) | UX X.34 - bl_prices Cache-Fix + Brickognize-Throttle + ScanViewModel-Dispose + 4-Nachkommastellen-Preise |
+| **v0.1.20** | ✅ released (Stable, 2026-05-12) | UX X.34 stable - alle beta.1..beta.5-Aenderungen konsolidiert |
 | **v0.2.0** | 💭 Brainstorming | BL-Inventar-Integration (eigene große Iteration) |
 | v0.2.1+ | offen | weitere Features aus Backlog |
 
@@ -277,4 +282,4 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-12 nach v0.1.20-beta.5-Commits (vor Praxis-Test).*
+*Zuletzt aktualisiert: 2026-05-12 nach v0.1.20-Stable-Release.*
