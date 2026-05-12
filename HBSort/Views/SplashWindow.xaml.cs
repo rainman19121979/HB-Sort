@@ -25,22 +25,21 @@ public partial class SplashWindow : Window
 
     /// <summary>
     /// v0.1.22-beta.1 Block A: Status-Text auf dem Splash aktualisieren.
-    /// Wird von Application_Startup ueber einen IProgress&lt;string&gt;-Adapter
-    /// an den Init-Schritt-Grenzen aufgerufen, damit der User sieht dass
-    /// "irgendwas laeuft". Defensives Dispatcher-Invoke fuer den Fall dass
-    /// Application_Startup nicht den UI-Thread haelt (sollte er, aber
-    /// schadet nicht).
+    /// Wird von Application_Startup an den Init-Schritt-Grenzen aufgerufen,
+    /// damit der User sieht dass "irgendwas laeuft".
+    ///
+    /// 2026-05-12 Fix: vorher nur Property-Set ohne Render-Flush - WPF
+    /// rendert erst beim naechsten Layout-Pass, aber die Init-Schritte
+    /// laufen schneller. Dispatcher.Invoke mit Render-Priority erzwingt
+    /// den Render-Pass synchron bevor der Aufrufer weiterlaeuft, sodass
+    /// die 6 Status-Wechsel sichtbar werden.
     /// </summary>
     public void SetStatus(string text)
     {
-        if (Dispatcher.CheckAccess())
+        Dispatcher.Invoke(() =>
         {
             StatusLabel.Text = text;
-        }
-        else
-        {
-            Dispatcher.Invoke(() => StatusLabel.Text = text);
-        }
+        }, System.Windows.Threading.DispatcherPriority.Render);
     }
 
     /// <summary>
