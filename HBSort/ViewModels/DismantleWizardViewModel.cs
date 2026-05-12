@@ -88,10 +88,9 @@ public partial class DismantleWizardViewModel : ObservableObject
             MinifigName = m.Name;
             BricklinkId = m.BricklinkId ?? m.FigNum;
 
-            // Lagerfaecher fuer Combobox laden
-            var bins = await _binService.GetAllAsync();
-            AvailableBins.Clear();
-            foreach (var b in bins) AvailableBins.Add(b);
+            // v0.1.22-beta.1 Block E: Helper-Refactor. Lagerfach-Liste
+            // einmalig laden - identische Logik in LoadFromPendingAsync.
+            await ReloadAvailableBinsAsync();
 
             // Default-Bin: aktuelles Fach der Figur, sonst erstes wirklich
             // freies Fach.
@@ -180,32 +179,10 @@ public partial class DismantleWizardViewModel : ObservableObject
                 partVm.TargetBin = perPartBin;
                 partVm.NoFreeBinWarning = perPartBin == null;
 
-                // Smart-Sammeln: ist das gleiche Teil schon irgendwo als Einzelteil
-                // gelagert? Dann das Fach mit der hoechsten Menge vor-auswaehlen
-                // damit Bestaende beim Speichern zusammengefuehrt werden.
-                // v0.1.22-beta.1 Block C: Lookup aus dem Bulk-Dict statt
-                // per-part-Query.
-                if (floatingByKey.TryGetValue((p.PartNumber, p.ColorId), out var locations)
-                    && locations.Count > 0)
-                {
-                    var best = locations[0]; // sortiert nach Menge absteigend
-                    var bin = AvailableBins.FirstOrDefault(b => b.Id == best.StorageBinId);
-                    if (bin != null)
-                    {
-                        // SmartHint ueberschreibt vorigen TargetBin
-                        // (Stapel-Wachstum wins). UX X.33 Block N:
-                        // bei Treffer auch den Volle-Faecher-Warn-
-                        // Status zuruecksetzen - der Stapel ist ja da.
-                        partVm.TargetBin = bin;
-                        partVm.SmartHint = $"+{best.TotalQuantity} schon dort";
-                        partVm.NoFreeBinWarning = false;
-                    }
-                    else
-                    {
-                        Log.Warning("SmartHint: Bin Id={BinId} nicht in AvailableBins gefunden",
-                            best.StorageBinId);
-                    }
-                }
+                // v0.1.22-beta.1 Block C/E: SmartHint via Helper. Liest aus
+                // dem Bulk-Dict, ueberschreibt TargetBin/SmartHint/NoFree-
+                // BinWarning bei Treffer (Stapel-Wachstum wins).
+                ApplySmartHintIfAny(partVm, p.PartNumber, p.ColorId, floatingByKey);
 
                 Parts.Add(partVm);
             }
@@ -277,6 +254,46 @@ public partial class DismantleWizardViewModel : ObservableObject
                     partVm.BlPartNo, partVm.BlColorId);
             }
         }
+    }
+
+    /// <summary>
+    /// v0.1.22-beta.1 Block E: extrahierter Helper. Laedt alle Bins
+    /// neu und ersetzt den AvailableBins-Inhalt. Wird von LoadAsync und
+    /// LoadFromPendingAsync identisch gebraucht.
+    /// </summary>
+    private async Task ReloadAvailableBinsAsync()
+    {
+        var bins = await _binService.GetAllAsync();
+        AvailableBins.Clear();
+        foreach (var b in bins) AvailableBins.Add(b);
+    }
+
+    /// <summary>
+    /// v0.1.22-beta.1 Block E: extrahierter Helper. Wertet das Bulk-
+    /// floatingByKey-Dict (siehe Block C) fuer ein Part-VM aus und setzt
+    /// TargetBin/SmartHint/NoFreeBinWarning bei Treffer. No-op wenn das
+    /// Teil im Dict nicht vorkommt oder das Bin nicht in AvailableBins ist.
+    /// </summary>
+    private void ApplySmartHintIfAny(
+        DismantlePartItemViewModel partVm,
+        string blPartNo, int blColorId,
+        IReadOnlyDictionary<(string PartNo, int ColorId), List<FloatingPartLocation>> floatingByKey)
+    {
+        if (!floatingByKey.TryGetValue((blPartNo, blColorId), out var locations)
+            || locations.Count == 0) return;
+
+        var best = locations[0]; // sortiert nach Menge absteigend
+        var bin = AvailableBins.FirstOrDefault(b => b.Id == best.StorageBinId);
+        if (bin == null)
+        {
+            Log.Warning("SmartHint: Bin Id={BinId} nicht in AvailableBins gefunden",
+                best.StorageBinId);
+            return;
+        }
+        // SmartHint ueberschreibt vorigen TargetBin (Stapel-Wachstum wins).
+        partVm.TargetBin = bin;
+        partVm.SmartHint = $"+{best.TotalQuantity} schon dort";
+        partVm.NoFreeBinWarning = false;
     }
 
     private async Task LoadPartImagesAndSwatchesAsync()
@@ -376,9 +393,8 @@ public partial class DismantleWizardViewModel : ObservableObject
             MinifigName = pending.Name;
             BricklinkId = pending.BricklinkId;
 
-            var bins = await _binService.GetAllAsync();
-            AvailableBins.Clear();
-            foreach (var b in bins) AvailableBins.Add(b);
+            // v0.1.22-beta.1 Block E: Helper-Refactor (identisch zu LoadAsync).
+            await ReloadAvailableBinsAsync();
 
             // Default-Bin: vom Suggest-Service mit MaxWaitingFiguresPerBin-
             // Limit (Drift-Fix UX X.33: vorher rief LoadFromPendingAsync den
