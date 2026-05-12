@@ -79,6 +79,11 @@ public partial class App : Application
         // angewendet.
         TryApplyPendingRestoreSafe();
 
+        // v0.1.22-beta.1 Block A: Splash-Status sichtbar machen. Pro Phase
+        // ein kurzer Hinweis was gerade laeuft - statt eines einzigen "Bereitet
+        // App vor"-Texts.
+        splash.SetStatus("Pruefe alte Datenbestaende...");
+
         // 0b. Auto-Migration: alter Datenbestand (LegoMinifigSorter) -> neuer Pfad (HBSort).
         // Muss VOR EnsureDirectories laufen, weil wir den neuen Ordner sonst leer anlegen.
         await MigrateLegacyAppDataIfNeededAsync();
@@ -100,6 +105,8 @@ public partial class App : Application
             ConfigureServices(serviceCollection);
             Services = serviceCollection.BuildServiceProvider();
 
+            splash.SetStatus("Lade Einstellungen...");
+
             // 4. Settings laden
             var settingsService = Services.GetRequiredService<ISettingsService>();
             await settingsService.LoadAsync();
@@ -109,11 +116,15 @@ public partial class App : Application
             // bevor das erste Fenster gezeigt wird.
             await Services.GetRequiredService<ITooltipsService>().ApplyAsync();
 
+            splash.SetStatus("Initialisiere Datenbank...");
+
             // 5. Datenbank erstellen/migrieren
             await InitializeDatabaseAsync();
 
             // 6. Backup der userdata.db beim Start anlegen
             BackupUserData();
+
+            splash.SetStatus("Pruefe Datenbestand...");
 
             // 6.5 DataHeal (UX X.28): Bug-B-Folgen aus alten Versionen heilen.
             // Bins die belegt sind aber FreedAt!=null haben werden korrigiert.
@@ -141,6 +152,8 @@ public partial class App : Application
             // Download wenn ohnehin nichts neues da ist. Blockiert NICHT den Start.
             _ = Task.Run(TryReimportCatalogIfColorsMissingAsync);
 
+            splash.SetStatus("Pruefe Stammdaten...");
+
             // 6.55 Auto-Backup (UX X.29): wenn aktiviert + Intervall faellig,
             // im Hintergrund ein Backup erzeugen + alte aufraeumen. Fire-and-
             // forget - blockiert NICHT den Startup. Task.Run-Wrapping wegen
@@ -157,6 +170,8 @@ public partial class App : Application
             // (Status=COMPLETE mit genau 1 RequiredPart, entstanden durch Single-Row-
             // Supersets-Cache vor Einfuehrung von IsFromSupersets).
             await CleanupOnePartCompletesAsync();
+
+            splash.SetStatus("Bereite Hauptfenster vor...");
 
             // 7. Hauptfenster anzeigen
             var mainWindow = Services.GetRequiredService<MainWindow>();

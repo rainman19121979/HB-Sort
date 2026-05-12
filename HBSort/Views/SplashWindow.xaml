@@ -76,11 +76,16 @@
                         Margin="0,12,0,12">
                 <ui:ProgressRing IsActive="True"
                                  Width="20" Height="20"/>
-                <TextBlock Text="Bereitet App vor..."
+                <!-- v0.1.22-beta.1 Block A: Status-Text als x:Name damit Application_Startup
+                     ihn waehrend der Init-Schritte aktualisieren kann (App-Start, Cache,
+                     DataHeal, Catalog-Update, MainWindow). -->
+                <TextBlock x:Name="StatusLabel"
+                           Text="Bereitet App vor..."
                            FontSize="12"
                            Foreground="Gray"
                            VerticalAlignment="Center"
-                           Margin="8,0,0,0"/>
+                           Margin="8,0,0,0"
+                           MinWidth="220"/>
             </StackPanel>
 
             <!-- Footer. v0.1.10 (2026-05-07): Reihenfolge der Drittanbieter

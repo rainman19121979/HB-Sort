@@ -24,6 +24,26 @@ public partial class SplashWindow : Window
     }
 
     /// <summary>
+    /// v0.1.22-beta.1 Block A: Status-Text auf dem Splash aktualisieren.
+    /// Wird von Application_Startup ueber einen IProgress&lt;string&gt;-Adapter
+    /// an den Init-Schritt-Grenzen aufgerufen, damit der User sieht dass
+    /// "irgendwas laeuft". Defensives Dispatcher-Invoke fuer den Fall dass
+    /// Application_Startup nicht den UI-Thread haelt (sollte er, aber
+    /// schadet nicht).
+    /// </summary>
+    public void SetStatus(string text)
+    {
+        if (Dispatcher.CheckAccess())
+        {
+            StatusLabel.Text = text;
+        }
+        else
+        {
+            Dispatcher.Invoke(() => StatusLabel.Text = text);
+        }
+    }
+
+    /// <summary>
     /// UX X.28 (v0.1.15): bevorzugt InformationalVersion damit ein "-dev"-
     /// Suffix fuer lokale Builds sichtbar wird. Im Tag-Release setzt die
     /// Pipeline -p:InformationalVersion=X.Y.Z (ohne Suffix), bei lokalem
