@@ -59,9 +59,18 @@ jobs:
           # Tag-Name "v0.1.19-beta.1" -> Version "0.1.19-beta.1", prerelease=true
           version="${GITHUB_REF_NAME#v}"
 
-          # AssemblyVersion (Windows-Version-Resource akzeptiert nur Numerik)
-          # = Version ohne Suffix. "0.1.19-beta.1" -> "0.1.19"
+          # AssemblyVersion (Windows-Version-Resource akzeptiert nur Numerik
+          # und genau major.minor.build.revision = 4 Felder).
+          # v0.1.20.1 (2026-05-12): Bash-Padding statt blindes ".0"-Anhaengen
+          # im build-Step. Vorher hat das ".0" bei 3-stelligen Patch-Tags
+          # wie 0.1.20.1 zu "0.1.20.1.0" (5 Felder) gefuehrt und der C#-
+          # Compiler hat CS7034 geworfen.
           assembly_version="${version%%-*}"
+          dots=$(echo "$assembly_version" | tr -cd '.' | wc -c)
+          while [ "$dots" -lt 3 ]; do
+              assembly_version="${assembly_version}.0"
+              dots=$((dots+1))
+          done
 
           # Prerelease wenn Tag einen Suffix nach der Version hat
           if [[ "$version" == *-* ]]; then
@@ -118,8 +127,8 @@ jobs:
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:PublishReadyToRun=true `
             -p:Version=${{ needs.setup.outputs.version }} `
-            -p:AssemblyVersion=${{ needs.setup.outputs.assembly_version }}.0 `
-            -p:FileVersion=${{ needs.setup.outputs.assembly_version }}.0 `
+            -p:AssemblyVersion=${{ needs.setup.outputs.assembly_version }} `
+            -p:FileVersion=${{ needs.setup.outputs.assembly_version }} `
             -p:InformationalVersion=${{ needs.setup.outputs.version }} `
             -o publish/win-x64
 
@@ -197,8 +206,8 @@ jobs:
             -p:PublishSingleFile=false `
             -p:PublishReadyToRun=true `
             -p:Version=${{ needs.setup.outputs.version }} `
-            -p:AssemblyVersion=${{ needs.setup.outputs.assembly_version }}.0 `
-            -p:FileVersion=${{ needs.setup.outputs.assembly_version }}.0 `
+            -p:AssemblyVersion=${{ needs.setup.outputs.assembly_version }} `
+            -p:FileVersion=${{ needs.setup.outputs.assembly_version }} `
             -p:InformationalVersion=${{ needs.setup.outputs.version }} `
             -o publish/velopack-input
 
