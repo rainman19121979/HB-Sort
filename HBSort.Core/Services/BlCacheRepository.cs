@@ -374,6 +374,57 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
     /// Chunking auf 500 Items pro IN-Klausel - SQLite-Default-Limit ist
     /// 999 Parameter, wir bleiben mit Sicherheits-Puffer drunter.
     /// </summary>
+    public Task<Dictionary<string, string>> GetItemNamesAsync(
+        IEnumerable<string> partNumbers,
+        CancellationToken ct = default)
+    {
+        // v0.1.22-beta.1 Fix 2026-05-12: Bulk-Lookup item_no -> name fuer
+        // item_type='P'. Chunking auf 500 wie GetCategoryIdsForPartsAsync.
+        var input = (partNumbers ?? Enumerable.Empty<string>())
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (input.Count == 0) return Task.FromResult(result);
+
+        const int chunkSize = 500;
+        lock (_lock)
+        {
+            for (int offset = 0; offset < input.Count; offset += chunkSize)
+            {
+                ct.ThrowIfCancellationRequested();
+                var chunk = input.Skip(offset).Take(chunkSize).ToList();
+
+                using var cmd = _connection.CreateCommand();
+                var paramNames = new string[chunk.Count];
+                for (int i = 0; i < chunk.Count; i++)
+                {
+                    var name = $"$p{i}";
+                    paramNames[i] = name;
+                    cmd.Parameters.AddWithValue(name, chunk[i]);
+                }
+                cmd.CommandText =
+                    "SELECT item_no, name FROM bl_items " +
+                    "WHERE item_type = 'P' AND name IS NOT NULL " +
+                    "  AND item_no IN (" + string.Join(",", paramNames) + ");";
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    if (reader.IsDBNull(1)) continue;
+                    var no = reader.GetString(0);
+                    var raw = reader.GetString(1);
+                    // Defensiv HTML-Decode konsistent zu ReadItem (alte
+                    // Bestandsdaten mit &#40; etc.).
+                    result[no] = System.Net.WebUtility.HtmlDecode(raw);
+                }
+            }
+        }
+
+        return Task.FromResult(result);
+    }
+
     public Task<Dictionary<string, int>> GetCategoryIdsForPartsAsync(
         IEnumerable<string> partNumbers,
         CancellationToken ct = default)

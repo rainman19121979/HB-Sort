@@ -477,4 +477,45 @@ public class BlCacheRepositoryTests : IDisposable
         Assert.Equal(1.50m, brutto!.AvgPrice);
         Assert.Equal(1.20m, netto!.AvgPrice);
     }
+
+    // ========================================================================
+    // v0.1.22-beta.1 Fix 2026-05-12: GetItemNamesAsync Bulk-Lookup
+    // ========================================================================
+
+    [Fact]
+    public async Task GetItemNamesAsync_returns_names_for_existing_part_numbers()
+    {
+        await _sut.UpsertItemsAsync(new[]
+        {
+            new BlItem { ItemType = "P", ItemNo = "2446", Name = "Minifigure, Headgear Helmet Motorcycle (Standard)",
+                         DataCompleteness = DataCompleteness.Full, FetchedAt = DateTime.UtcNow },
+            new BlItem { ItemType = "P", ItemNo = "93560", Name = "Minifigure, Headgear Helmet Sports / Flight",
+                         DataCompleteness = DataCompleteness.Full, FetchedAt = DateTime.UtcNow },
+            // Minifig - darf NICHT mit-gematcht werden (item_type='M').
+            new BlItem { ItemType = "M", ItemNo = "2446", Name = "Bogus Minifig",
+                         DataCompleteness = DataCompleteness.Full, FetchedAt = DateTime.UtcNow },
+        });
+
+        var result = await _sut.GetItemNamesAsync(new[] { "2446", "93560" });
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal("Minifigure, Headgear Helmet Motorcycle (Standard)", result["2446"]);
+        Assert.Equal("Minifigure, Headgear Helmet Sports / Flight", result["93560"]);
+    }
+
+    [Fact]
+    public async Task GetItemNamesAsync_returns_empty_dict_when_no_match()
+    {
+        // Cache leer - die abgefragten Parts existieren nicht.
+        var result = await _sut.GetItemNamesAsync(new[] { "9999", "ghost" });
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetItemNamesAsync_handles_empty_input_gracefully()
+    {
+        var result = await _sut.GetItemNamesAsync(Array.Empty<string>());
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
 }

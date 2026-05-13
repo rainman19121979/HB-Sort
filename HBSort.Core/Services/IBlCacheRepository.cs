@@ -13,6 +13,18 @@ public interface IBlCacheRepository
     Task<BlItem?> GetItemAsync(string itemType, string itemNo, CancellationToken ct = default);
 
     /// <summary>
+    /// v0.1.22-beta.1 Fix 2026-05-12: Liefert die Item-Namen fuer alle
+    /// uebergebenen PartNumbers (item_type='P') in einer einzigen SQL-Query
+    /// mit IN-Filter. Fuer Bulk-Anlege-Pfade die sonst N+1-Lookups machen
+    /// wuerden (z.B. CollectMinifigFromSupersetAsync, App-Start-Backfill).
+    /// Leere Eingabe -&gt; leeres Dict, kein DB-Hit. Bei vielen Eintraegen
+    /// wird intern auf 500er-Chunks aufgeteilt (SQLite-Parameter-Limit 999).
+    /// PartNumbers ohne bl_items-Eintrag tauchen NICHT im Result auf.
+    /// </summary>
+    Task<Dictionary<string, string>> GetItemNamesAsync(
+        IEnumerable<string> partNumbers, CancellationToken ct = default);
+
+    /// <summary>
     /// Speichert oder aktualisiert einen Item-Eintrag. Wichtige Schutz-Regel:
     /// ein bestehender 'Full'-Eintrag wird NIE durch einen 'Subset'-Eintrag
     /// ueberschrieben. Andersrum darf 'Subset' durch 'Full' aufgewertet werden.
