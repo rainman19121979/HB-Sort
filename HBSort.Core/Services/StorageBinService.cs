@@ -821,4 +821,101 @@ public class StorageBinService : IStorageBinService
         }
         return result;
     }
+
+    public async Task<List<StorageBin>> GetEligibleBinsAsync(
+        BinTargetKind targetKind,
+        string? partNo = null,
+        int? colorId = null,
+        int? excludeMinifigId = null,
+        CancellationToken ct = default)
+    {
+        // v0.1.22-beta.3 (2026-05-13): zentraler typ-gefilterter Bin-Vorschlag
+        // fuer die Combobox in MinifigDetail / CollectMinifigSelection / etc.
+        // Vorher zeigten die Comboboxen alle nicht-vollen Bins (auch typ-
+        // inkompatible), waehrend der Banner schon "kein passendes Fach"
+        // anzeigte - Inkonsistenz. Jetzt: gleiche Logik wie der Banner.
+        //
+        // Performance: alle Bins einmal mit Include(TrackedMinifigs +
+        // RequiredParts, FloatingParts) laden. Klassifikation lokal.
+        // Bei typischer DB-Groesse (~20-100 Bins) deutlich schneller als
+        // GetBinKindAsync N-mal aufrufen. Sortierung am Ende per Label.
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+
+        var binsQuery = ctx.StorageBins.AsNoTracking()
+            .Include(b => b.TrackedMinifigs)
+                .ThenInclude(m => m.RequiredParts)
+            .Include(b => b.FloatingParts);
+
+        var bins = await binsQuery.OrderBy(b => b.Label).ToListAsync(ct);
+        var eligible = new List<StorageBin>(bins.Count);
+
+        foreach (var bin in bins)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            // Counts unter Beruecksichtigung von excludeMinifigId.
+            var waitingCount = bin.TrackedMinifigs.Count(m =>
+                m.Status == TrackedMinifigStatus.Waiting
+                && (!excludeMinifigId.HasValue || m.Id != excludeMinifigId.Value));
+            var completeCount = bin.TrackedMinifigs.Count(m =>
+                m.Status == TrackedMinifigStatus.Complete
+                && (!excludeMinifigId.HasValue || m.Id != excludeMinifigId.Value));
+            var floatingCount = bin.FloatingParts.Count;
+
+            BinKind kind;
+            if (waitingCount == 0 && completeCount == 0 && floatingCount == 0)
+                kind = BinKind.Empty;
+            else if (waitingCount > 0)
+                kind = BinKind.WaitingMinifig;
+            else if (floatingCount > 0)
+                kind = BinKind.FloatingOnly;
+            else
+                kind = BinKind.CompleteOnly;
+
+            switch (targetKind)
+            {
+                case BinTargetKind.WaitingMinifigTarget:
+                case BinTargetKind.CompleteMinifigTarget:
+                    // Erlaubt: Empty, Wartend (mit oder ohne Complete), CompleteOnly.
+                    // Block-G: Mix wartend+komplett ist ok (Reifungspfad).
+                    // Verboten: FloatingOnly (wuerde Mix mit fremden Teilen erzeugen).
+                    if (kind == BinKind.Empty
+                        || kind == BinKind.WaitingMinifig
+                        || kind == BinKind.CompleteOnly)
+                    {
+                        eligible.Add(bin);
+                    }
+                    break;
+
+                case BinTargetKind.FloatingTarget:
+                    // Erlaubt: Empty, FloatingOnly. Plus Wartend-Bin wenn das
+                    // Teil zu einer der wartenden Figuren passt (Reverse-Match
+                    // -> Teil wird sowieso konsumiert statt als FloatingPart
+                    // angelegt; die Combobox bietet das Bin trotzdem an, weil
+                    // Aufrufer-Pfade ohne Reverse-Match-Check existieren).
+                    if (kind == BinKind.Empty || kind == BinKind.FloatingOnly)
+                    {
+                        eligible.Add(bin);
+                    }
+                    else if (kind == BinKind.WaitingMinifig
+                             && !string.IsNullOrEmpty(partNo)
+                             && colorId.HasValue)
+                    {
+                        // Reverse-Match-Check: irgendeine wartende Figur in
+                        // diesem Bin hat einen RequiredPart der (partNo, colorId)
+                        // matcht?
+                        var matchFound = bin.TrackedMinifigs.Any(m =>
+                            m.Status == TrackedMinifigStatus.Waiting
+                            && (!excludeMinifigId.HasValue || m.Id != excludeMinifigId.Value)
+                            && m.RequiredParts.Any(rp =>
+                                rp.PartNumber == partNo
+                                && rp.ColorId == colorId.Value));
+                        if (matchFound) eligible.Add(bin);
+                    }
+                    break;
+            }
+        }
+
+        return eligible;
+    }
 }

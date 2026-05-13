@@ -987,4 +987,103 @@ public class StorageBinServiceTests : IDisposable
         Assert.Single(mixBins);
         Assert.Equal(b1!.Id, mixBins[0].BinId);
     }
+
+    // ========================================================================
+    // v0.1.22-beta.3 (2026-05-13): GetEligibleBinsAsync (typ-gefilterte Liste)
+    // ========================================================================
+
+    [Fact]
+    public async Task GetEligibleBinsAsync_floating_target_includes_floating_and_empty()
+    {
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02", "Box 03" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        var b2 = await _sut.GetByLabelAsync("Box 02");
+        // Box 01: leer. Box 02: nur Floating. Box 03: bleibt leer.
+        await SeedFloatingPartInBinAsync(b2!.Id, "3001", 5);
+
+        var eligible = await _sut.GetEligibleBinsAsync(BinTargetKind.FloatingTarget);
+
+        var labels = eligible.Select(b => b.Label).ToHashSet();
+        Assert.Contains("Box 01", labels);
+        Assert.Contains("Box 02", labels);
+        Assert.Contains("Box 03", labels);
+    }
+
+    [Fact]
+    public async Task GetEligibleBinsAsync_floating_target_excludes_waiting_without_match()
+    {
+        // Wartend-Bin OHNE Reverse-Match-Kandidat: nicht eligible.
+        await _sut.CreateBulkAsync(new[] { "Box 01" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Waiting);
+
+        // Anfrage: Teil 9999/0 - das die wartende Figur NICHT braucht.
+        var eligible = await _sut.GetEligibleBinsAsync(
+            BinTargetKind.FloatingTarget, partNo: "9999", colorId: 0);
+
+        Assert.DoesNotContain(eligible, b => b.Id == b1!.Id);
+    }
+
+    [Fact]
+    public async Task GetEligibleBinsAsync_floating_target_includes_waiting_with_reverse_match()
+    {
+        // Wartend-Bin MIT Reverse-Match-Kandidat: eligible.
+        await _sut.CreateBulkAsync(new[] { "Box 01" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        var minifigId = await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Waiting);
+
+        // RequiredPart fuer 3001/11 anhaengen
+        await using (var ctx = await _factory.CreateDbContextAsync())
+        {
+            ctx.TrackedMinifigParts.Add(new TrackedMinifigPart
+            {
+                TrackedMinifigId = minifigId,
+                PartNumber = "3001",
+                ColorId = 11,
+                PartName = "Brick 2x4",
+                ColorName = "Black",
+                QuantityNeeded = 1,
+                QuantityCollected = 0
+            });
+            await ctx.SaveChangesAsync();
+        }
+
+        var eligible = await _sut.GetEligibleBinsAsync(
+            BinTargetKind.FloatingTarget, partNo: "3001", colorId: 11);
+
+        Assert.Contains(eligible, b => b.Id == b1!.Id);
+    }
+
+    [Fact]
+    public async Task GetEligibleBinsAsync_waiting_target_excludes_floating_bins()
+    {
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        var b2 = await _sut.GetByLabelAsync("Box 02");
+        await SeedFloatingPartInBinAsync(b1!.Id, "3001", 5); // FloatingOnly
+        // Box 02 leer.
+
+        var eligible = await _sut.GetEligibleBinsAsync(BinTargetKind.WaitingMinifigTarget);
+
+        Assert.DoesNotContain(eligible, b => b.Id == b1!.Id);
+        Assert.Contains(eligible, b => b.Id == b2!.Id);
+    }
+
+    [Fact]
+    public async Task GetEligibleBinsAsync_waiting_target_includes_empty_and_waiting_and_complete()
+    {
+        await _sut.CreateBulkAsync(new[] { "Empty", "WithWaiting", "WithComplete" });
+        var bE = await _sut.GetByLabelAsync("Empty");
+        var bW = await _sut.GetByLabelAsync("WithWaiting");
+        var bC = await _sut.GetByLabelAsync("WithComplete");
+        await SeedMinifigInBinAsync(bW!.Id, "wait", TrackedMinifigStatus.Waiting);
+        await SeedMinifigInBinAsync(bC!.Id, "done", TrackedMinifigStatus.Complete);
+
+        var eligible = await _sut.GetEligibleBinsAsync(BinTargetKind.WaitingMinifigTarget);
+
+        var ids = eligible.Select(b => b.Id).ToHashSet();
+        Assert.Contains(bE!.Id, ids);
+        Assert.Contains(bW!.Id, ids);
+        Assert.Contains(bC!.Id, ids);
+    }
 }

@@ -159,6 +159,35 @@ public interface IStorageBinService
     Task<BinKind> GetBinKindAsync(int binId, CancellationToken ct = default);
 
     /// <summary>
+    /// v0.1.22-beta.3 (2026-05-13): Liefert alle Bins die fuer den
+    /// uebergebenen Ziel-Typ zulaessig sind. Nutzt
+    /// <see cref="GetBinKindAsync"/> plus Reverse-Match-Pruefung fuer den
+    /// Floating-Pfad.
+    ///
+    /// Filter-Logik:
+    /// - <see cref="BinTargetKind.FloatingTarget"/>: Empty / FloatingOnly
+    ///   PLUS Wartend-Bins die <paramref name="partNo"/>+<paramref name="colorId"/>
+    ///   als Reverse-Match-Kandidat enthalten (Teil passt zu mindestens
+    ///   einer der wartenden Figuren). Wenn PartNo/ColorId null sind:
+    ///   keine Wartend-Bins.
+    /// - <see cref="BinTargetKind.WaitingMinifigTarget"/>: Empty / WaitingMinifig /
+    ///   CompleteOnly (Mix-Reifungspfad wartend+komplett ist OK). NICHT
+    ///   FloatingOnly.
+    /// - <see cref="BinTargetKind.CompleteMinifigTarget"/>: Empty / WaitingMinifig /
+    ///   CompleteOnly. NICHT FloatingOnly.
+    ///
+    /// <paramref name="excludeMinifigId"/>: TrackedMinifigs mit dieser Id
+    /// werden bei der Klassifikation ignoriert (z.B. wenn die zu zerlegende
+    /// Figur gerade verschwindet und das Bin damit "frei" wird).
+    /// </summary>
+    Task<List<StorageBin>> GetEligibleBinsAsync(
+        BinTargetKind targetKind,
+        string? partNo = null,
+        int? colorId = null,
+        int? excludeMinifigId = null,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// v0.1.22-beta.1 Block G: scannt einmalig die DB nach Mix-Bins die
     /// durch die neue Bin-Typ-Trennung nicht mehr entstehen sollten.
     /// Wird beim App-Start gerufen und liefert eine Liste der betroffenen
@@ -195,6 +224,20 @@ public record BinMixWarning(
     int BinId,
     string Label,
     string Reason);
+
+/// <summary>
+/// v0.1.22-beta.3 (2026-05-13): Zweck eines Bin-Vorschlags fuer
+/// GetEligibleBinsAsync. Steuert welche BinKinds als zulaessig gelten.
+/// </summary>
+public enum BinTargetKind
+{
+    /// <summary>FloatingPart wird in das Bin gelegt.</summary>
+    FloatingTarget,
+    /// <summary>Wartende Figur wird in das Bin gelegt.</summary>
+    WaitingMinifigTarget,
+    /// <summary>Komplette Figur wird in das Bin gelegt.</summary>
+    CompleteMinifigTarget
+}
 
 /// <summary>
 /// UX X.29 Block C (v0.1.16): Vorab-Info fuer den "Fach leeren"-Workflow.
