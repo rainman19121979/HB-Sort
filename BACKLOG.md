@@ -127,6 +127,19 @@ Items archiviert werden.
   geschrieben werden koennen (entdeckt in v0.1.22-beta.4).
 - 📋 **Tot-Code SwitchCameraAsync entfernen** - `ScanViewModel.cs:1759`,
   Command wird nirgends mehr aufgerufen (entdeckt in v0.1.22-beta.4).
+- 📋 **BinPickerDialog in eigene Datei extrahieren**
+  (`HBSort/Views/BinPickerDialog.cs`) und SupersetsDialog.xaml /
+  .xaml.cs / SupersetsDialogViewModel.cs entfernen. Aktuell ist die
+  Hilfsklasse BinPickerDialog als `internal static class` in
+  `SupersetsDialog.xaml.cs:71` eingebettet — wird von
+  `InventoryListView.xaml.cs:269` (Bulk-Move) genutzt. SupersetsDialog
+  selbst ist nicht mehr per UI erreichbar (Trigger-Button in
+  PartLookupView wurde mit "Spec UX-1 FIX 5" entfernt). Natuerlicher
+  Ort: v0.1.24 Anlegen-Dialog-Redesign.
+- 📋 **SupersetsDialogViewModel.GetAllBinsAsync latenter Filter-Bug**
+  (GetAllAsync statt typ-gefilterter Aufruf). Wird mit dem
+  BinPickerDialog-Refactor oben automatisch erledigt (Datei
+  verschwindet komplett).
 
 ---
 
@@ -376,4 +389,4 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-13 nach v0.1.22-Stable-Release.*
+*Zuletzt aktualisiert: 2026-05-14 nach v0.1.23-beta.1 Praxis-Test-Fix.*

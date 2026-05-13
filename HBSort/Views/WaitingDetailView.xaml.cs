@@ -51,7 +51,7 @@ public partial class WaitingDetailView : UserControl
 
         var vm = new MinifigSummaryViewModel(
             item.MinifigId, ctxFactory, binService,
-            imgProvider, catalog);
+            imgProvider, catalog, persistence);
         var dialog = new MinifigSummaryDialog(vm, notif, persistence)
         {
             Owner = Window.GetWindow(this)

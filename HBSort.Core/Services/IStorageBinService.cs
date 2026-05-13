@@ -11,15 +11,6 @@ public interface IStorageBinService
     Task<StorageBin?> GetByLabelAsync(string label, CancellationToken ct = default);
     Task<StorageBin?> GetByIdAsync(int id, CancellationToken ct = default);
 
-    /// <summary>Faecher die aktuell keine wartende Figur und keinen FloatingPart enthalten.</summary>
-    Task<List<StorageBin>> GetFreeAsync(CancellationToken ct = default);
-
-    /// <summary>Faecher die mindestens eine wartende Figur ODER FloatingParts enthalten.</summary>
-    Task<List<StorageBin>> GetOccupiedAsync(CancellationToken ct = default);
-
-    /// <summary>Erstes freies Fach (sortiert nach Label) oder null wenn keins frei.</summary>
-    Task<StorageBin?> GetNextFreeAsync(CancellationToken ct = default);
-
     /// <summary>
     /// UX X.31 (v0.1.18) / UX X.32 v0.1.19-beta.4: Schlaegt ein Fach fuer eine
     /// wartende Figur vor.
@@ -148,15 +139,12 @@ public interface IStorageBinService
     Task<int> ReleaseBinsAsync(IEnumerable<int> binIds, CancellationToken ct = default);
 
     /// <summary>
-    /// v0.1.22-beta.1 Block G: zentraler Klassifikator. Liefert den
-    /// aktuellen Typ eines Bins (Empty / FloatingOnly / WaitingMinifig /
-    /// CompleteOnly) - der Typ ergibt sich aus dem Inhalt, es gibt keine
-    /// "Bin.Type"-Spalte. Wartend+Complete-Mix wird als WaitingMinifig
-    /// klassifiziert (Reifungspfad). Mix mit FloatingParts ohne wartende
-    /// Figur ist ein Anomalie-Fall - die Klassifikation faellt auf
-    /// FloatingOnly mit WRN-Log zurueck.
+    /// v0.1.23: Aktualisiert die persistierte <see cref="StorageBin.Kind"/>-
+    /// Spalte anhand des aktuellen Inhalts (Wartende / Complete / Floating).
+    /// Wird von allen Schreib-Pfaden nach erfolgreichem SaveChangesAsync
+    /// gerufen. Idempotent. Reifungspfad: Wartend+Complete bleibt Waiting.
     /// </summary>
-    Task<BinKind> GetBinKindAsync(int binId, CancellationToken ct = default);
+    Task RecalculateKindAsync(int binId, CancellationToken ct = default);
 
     /// <summary>
     /// v0.1.22-beta.3 (2026-05-13): Liefert alle Bins die fuer den
@@ -196,27 +184,6 @@ public interface IStorageBinService
     /// aufloest.
     /// </summary>
     Task<List<BinMixWarning>> FindBestandMixBinsAsync(CancellationToken ct = default);
-}
-
-/// <summary>
-/// v0.1.22-beta.1 Block G: drei Bin-Typen, implizit durch Inhalt.
-/// Es gibt keine DB-Spalte fuer den Typ - der Klassifikator
-/// <see cref="IStorageBinService.GetBinKindAsync"/> leitet ihn ab.
-/// </summary>
-public enum BinKind
-{
-    /// <summary>Keine TrackedMinifigs (irgendeines Status), keine FloatingParts.</summary>
-    Empty,
-    /// <summary>Nur FloatingParts, keine TrackedMinifigs.</summary>
-    FloatingOnly,
-    /// <summary>
-    /// Mindestens eine wartende Figur. Komplette Figuren im selben Bin
-    /// sind erlaubt (Reifungspfad). FloatingParts sind hier eine Anomalie
-    /// - sollten durch Block-G-Sortier-Logik nicht mehr entstehen.
-    /// </summary>
-    WaitingMinifig,
-    /// <summary>Nur komplette Figuren, keine wartenden, keine FloatingParts.</summary>
-    CompleteOnly
 }
 
 /// <summary>v0.1.22-beta.1 Block G: ein Eintrag im Bestand-Mix-Scan.</summary>

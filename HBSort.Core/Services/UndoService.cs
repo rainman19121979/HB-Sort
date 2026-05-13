@@ -21,13 +21,16 @@ public class UndoService : IUndoService
 {
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
     private readonly IMinifigPersistenceService _persistence;
+    private readonly IStorageBinService? _binService;
 
     public UndoService(
         IDbContextFactory<UserDataContext> ctxFactory,
-        IMinifigPersistenceService persistence)
+        IMinifigPersistenceService persistence,
+        IStorageBinService? binService = null)
     {
         _ctxFactory = ctxFactory;
         _persistence = persistence;
+        _binService = binService;
     }
 
     public async Task<List<UndoableAction>> GetUndoableActionsAsync(int limit = 50, CancellationToken ct = default)
@@ -82,16 +85,18 @@ public class UndoService : IUndoService
 
         try
         {
-            var auditDescription = ev.Type switch
+            // v0.1.23: pro-Type-Methode liefert zusaetzlich die betroffenen
+            // Bin-Ids fuer RecalcKind nach SaveChangesAsync.
+            (string? Desc, IEnumerable<int> Bins) outcome = ev.Type switch
             {
                 ScanType.Delete => await UndoDeleteAsync(ctx, ev, ct),
                 ScanType.Move => await UndoMoveAsync(ctx, ev, ct),
                 ScanType.Complete => await UndoCompleteAsync(ctx, ev, ct),
                 ScanType.BinFreed => await UndoBinFreedAsync(ctx, ev, ct),
                 ScanType.BinCreated => await UndoBinCreatedAsync(ctx, ev, ct),
-                _ => null
+                _ => (null, Array.Empty<int>())
             };
-            if (auditDescription == null)
+            if (outcome.Desc == null)
                 return UndoResult.Fail("Undo fuer diesen Aktions-Typ ist nicht implementiert.");
 
             ev.WasUndone = true;
@@ -101,18 +106,28 @@ public class UndoService : IUndoService
             {
                 Timestamp = DateTime.UtcNow,
                 Type = ScanType.UndoApplied,
-                ResultDescription = "Rueckgaengig: " + auditDescription,
+                ResultDescription = "Rueckgaengig: " + outcome.Desc,
                 WasUndone = false
             });
 
             await ctx.SaveChangesAsync(ct);
+
+            // v0.1.23: Bin.Kind neu berechnen fuer alle betroffenen Bins.
+            if (_binService != null)
+            {
+                foreach (var binId in outcome.Bins.Distinct())
+                {
+                    try { await _binService.RecalculateKindAsync(binId, ct); }
+                    catch (Exception rex) { Log.Warning(rex, "RecalculateKindAsync({BinId}) im Undo geworfen", binId); }
+                }
+            }
 
             // DataChanged feuern damit Live-VMs (Lagerliste, BuildSuggestions, ...)
             // refreshen.
             _persistence.RaiseDataChanged();
 
             Log.Information("Undo erfolgreich: ScanEvent Id={Id} ({Type}) - {Desc}",
-                ev.Id, ev.Type, ev.ResultDescription);
+                ev.Id, ev.Type, outcome.Desc);
             return UndoResult.Ok();
         }
         catch (Exception ex)
@@ -136,7 +151,7 @@ public class UndoService : IUndoService
     // Per-Type Undo-Logik
     // ====================================================================
 
-    private static async Task<string?> UndoDeleteAsync(UserDataContext ctx, ScanEvent ev, CancellationToken ct)
+    private static async Task<(string? Desc, IEnumerable<int> Bins)> UndoDeleteAsync(UserDataContext ctx, ScanEvent ev, CancellationToken ct)
     {
         // UndoData kann ein Minifig-Snapshot oder ein FloatingPart-Snapshot sein.
         // Wir versuchen erst Minifig (haeufiger), dann FloatingPart.
@@ -184,7 +199,8 @@ public class UndoService : IUndoService
             };
             ctx.TrackedMinifigs.Add(newMinifig);
             await Task.CompletedTask;
-            return $"Figur '{minifigSnap.Name}' wiederhergestellt";
+            var bins = binId.HasValue ? new[] { binId.Value } : Array.Empty<int>();
+            return ($"Figur '{minifigSnap.Name}' wiederhergestellt", bins);
         }
 
         var fpSnap = TryDeserialize<UndoSnapshotFloatingDelete>(ev.UndoData);
@@ -203,6 +219,8 @@ public class UndoService : IUndoService
                     if (bin.FreedAt != null) bin.FreedAt = null;
                 }
             }
+            var resolvedBinId = binId ?? throw new InvalidOperationException(
+                "Lagerfach des Original-Einzelteils existiert nicht mehr - kein Undo moeglich.");
             ctx.FloatingParts.Add(new FloatingPart
             {
                 PartNumber = fpSnap.PartNumber,
@@ -210,19 +228,18 @@ public class UndoService : IUndoService
                 PartName = fpSnap.PartName,
                 ColorName = fpSnap.ColorName,
                 Quantity = fpSnap.Quantity,
-                StorageBinId = binId ?? throw new InvalidOperationException(
-                    "Lagerfach des Original-Einzelteils existiert nicht mehr - kein Undo moeglich."),
+                StorageBinId = resolvedBinId,
                 AddedAt = fpSnap.AddedAt,
                 OriginMinifigId = fpSnap.OriginMinifigId
             });
-            return $"Einzelteil '{fpSnap.PartName}' wiederhergestellt";
+            return ($"Einzelteil '{fpSnap.PartName}' wiederhergestellt", new[] { resolvedBinId });
         }
 
         throw new InvalidOperationException(
             "UndoData fuer Delete-Event ist weder Minifig- noch FloatingPart-Snapshot.");
     }
 
-    private static async Task<string?> UndoMoveAsync(UserDataContext ctx, ScanEvent ev, CancellationToken ct)
+    private static async Task<(string? Desc, IEnumerable<int> Bins)> UndoMoveAsync(UserDataContext ctx, ScanEvent ev, CancellationToken ct)
     {
         // UX X.30 (v0.1.17): unterscheidet Minifig-Move (UndoSnapshotMove) von
         // FloatingPart-Move (UndoSnapshotFloatingMove). Beide Records haben
@@ -237,6 +254,7 @@ public class UndoService : IUndoService
             if (minifig == null)
                 throw new InvalidOperationException("Figur existiert nicht mehr - kein Undo moeglich.");
 
+            var oldBinForMinifig = minifig.StorageBinId;
             if (minifigSnap.OldStorageBinId.HasValue)
             {
                 var oldBin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == minifigSnap.OldStorageBinId.Value, ct);
@@ -246,7 +264,10 @@ public class UndoService : IUndoService
                 if (oldBin.FreedAt != null) oldBin.FreedAt = null;
             }
             minifig.StorageBinId = minifigSnap.OldStorageBinId;
-            return $"Figur '{minifig.Name}' zurueck in altes Fach";
+            var minBins = new List<int>();
+            if (oldBinForMinifig.HasValue) minBins.Add(oldBinForMinifig.Value);
+            if (minifigSnap.OldStorageBinId.HasValue) minBins.Add(minifigSnap.OldStorageBinId.Value);
+            return ($"Figur '{minifig.Name}' zurueck in altes Fach", minBins);
         }
 
         // Versuch 2: FloatingPart-Move (UX X.30 neu).
@@ -257,6 +278,8 @@ public class UndoService : IUndoService
             if (fp == null)
                 throw new InvalidOperationException("Einzelteil existiert nicht mehr - kein Undo moeglich.");
 
+            var oldFpBin = fp.StorageBinId;
+            int newFpBin;
             if (fpSnap.OldStorageBinId.HasValue)
             {
                 var oldBin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == fpSnap.OldStorageBinId.Value, ct);
@@ -265,6 +288,7 @@ public class UndoService : IUndoService
                         "Das urspruengliche Lagerfach existiert nicht mehr - kein Undo moeglich.");
                 if (oldBin.FreedAt != null) oldBin.FreedAt = null;
                 fp.StorageBinId = oldBin.Id;
+                newFpBin = oldBin.Id;
             }
             else
             {
@@ -274,14 +298,14 @@ public class UndoService : IUndoService
                 throw new InvalidOperationException(
                     "Einzelteil hatte kein urspruengliches Lagerfach - inkonsistenter Snapshot.");
             }
-            return $"Einzelteil '{fp.PartName}' zurueck in altes Fach";
+            return ($"Einzelteil '{fp.PartName}' zurueck in altes Fach", new[] { oldFpBin, newFpBin });
         }
 
         throw new InvalidOperationException(
             "Move-Snapshot ist weder Minifig- noch FloatingPart-Variante.");
     }
 
-    private static async Task<string?> UndoCompleteAsync(UserDataContext ctx, ScanEvent ev, CancellationToken ct)
+    private static async Task<(string? Desc, IEnumerable<int> Bins)> UndoCompleteAsync(UserDataContext ctx, ScanEvent ev, CancellationToken ct)
     {
         var snap = TryDeserialize<UndoSnapshotComplete>(ev.UndoData)
             ?? throw new InvalidOperationException("Complete-Snapshot konnte nicht gelesen werden.");
@@ -293,15 +317,18 @@ public class UndoService : IUndoService
             throw new InvalidOperationException("Teil existiert nicht mehr - kein Undo moeglich.");
 
         part.QuantityCollected = snap.OldQuantityCollected;
+        var bins = new List<int>();
         if (part.TrackedMinifig != null)
         {
             part.TrackedMinifig.Status = ParseStatus(snap.OldStatus);
             part.TrackedMinifig.CompletedAt = snap.OldCompletedAt;
+            if (part.TrackedMinifig.StorageBinId.HasValue)
+                bins.Add(part.TrackedMinifig.StorageBinId.Value);
         }
-        return $"Teil-Markierung an '{part.PartName}' rueckgesetzt";
+        return ($"Teil-Markierung an '{part.PartName}' rueckgesetzt", bins);
     }
 
-    private static async Task<string?> UndoBinFreedAsync(UserDataContext ctx, ScanEvent ev, CancellationToken ct)
+    private static async Task<(string? Desc, IEnumerable<int> Bins)> UndoBinFreedAsync(UserDataContext ctx, ScanEvent ev, CancellationToken ct)
     {
         var snap = TryDeserialize<UndoSnapshotBinFreed>(ev.UndoData)
             ?? throw new InvalidOperationException("BinFreed-Snapshot konnte nicht gelesen werden.");
@@ -309,10 +336,10 @@ public class UndoService : IUndoService
         if (bin == null)
             throw new InvalidOperationException("Lagerfach existiert nicht mehr.");
         bin.FreedAt = null;
-        return $"Lagerfach '{bin.Label}' wieder als belegt markiert";
+        return ($"Lagerfach '{bin.Label}' wieder als belegt markiert", new[] { bin.Id });
     }
 
-    private static async Task<string?> UndoBinCreatedAsync(UserDataContext ctx, ScanEvent ev, CancellationToken ct)
+    private static async Task<(string? Desc, IEnumerable<int> Bins)> UndoBinCreatedAsync(UserDataContext ctx, ScanEvent ev, CancellationToken ct)
     {
         var snap = TryDeserialize<UndoSnapshotBinCreated>(ev.UndoData)
             ?? throw new InvalidOperationException("BinCreated-Snapshot konnte nicht gelesen werden.");
@@ -345,7 +372,8 @@ public class UndoService : IUndoService
         var msg = $"{deletedLabels.Count} Lagerfach/-faecher geloescht";
         if (skippedLabels.Count > 0)
             msg += $" ({skippedLabels.Count} uebersprungen, da Inhalt da ist)";
-        return msg;
+        // Geloeschte Bins gibt es nicht mehr - kein RecalcKind noetig.
+        return (msg, Array.Empty<int>());
     }
 
     // ====================================================================

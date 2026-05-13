@@ -129,7 +129,7 @@ public partial class InventoryListView : UserControl
 
             var vm = new MinifigSummaryViewModel(
                 row.UnderlyingMinifigId.Value, ctxFactory, binService,
-                imgProvider, catalog);
+                imgProvider, catalog, persistence);
             var dialog = new MinifigSummaryDialog(vm, notif, persistence) { Owner = window };
             dialog.ShowDialog();
         }
@@ -340,6 +340,12 @@ public partial class InventoryListView : UserControl
                     mainVm.ScanViewModel.ShowBinInstructionGroup(movedItems);
                 }
             }
+            catch (HBSort.Core.Services.InvalidBinKindException strict)
+            {
+                // v0.1.23 Strict-Mode: Ziel-Bin akzeptiert mind. ein Item nicht.
+                Log.Warning(strict, "Bulk-Move: Strict-Mode-Verletzung");
+                await dialogs.ShowErrorAsync("Verschieben nicht moeglich", strict.Message);
+            }
             catch (System.Exception ex)
             {
                 Log.Error(ex, "Bulk-Move fehlgeschlagen");
@@ -364,7 +370,7 @@ public partial class InventoryListView : UserControl
             var persistence = Service<IMinifigPersistenceService>();
             var imgProvider = Service<IPartImageProvider>();
             var catalog = Service<IBlCatalogService>();
-            var vm = new MinifigSummaryViewModel(row.UnderlyingMinifigId.Value, ctxFactory, binService, imgProvider, catalog);
+            var vm = new MinifigSummaryViewModel(row.UnderlyingMinifigId.Value, ctxFactory, binService, imgProvider, catalog, persistence);
             var dialog = new MinifigSummaryDialog(vm, notif, persistence) { Owner = window };
             dialog.ShowDialog();
         }

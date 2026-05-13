@@ -27,6 +27,7 @@ public partial class MinifigSummaryViewModel : ObservableObject
     private readonly IStorageBinService _binService;
     private readonly IPartImageProvider? _imageProvider;
     private readonly IBlCatalogService? _catalog;
+    private readonly IMinifigPersistenceService? _persistence;
 
     public int MinifigId { get; }
     public string Name { get; private set; } = string.Empty;
@@ -65,13 +66,15 @@ public partial class MinifigSummaryViewModel : ObservableObject
         IDbContextFactory<UserDataContext> ctxFactory,
         IStorageBinService binService,
         IPartImageProvider? imageProvider = null,
-        IBlCatalogService? catalog = null)
+        IBlCatalogService? catalog = null,
+        IMinifigPersistenceService? persistence = null)
     {
         MinifigId = minifigId;
         _ctxFactory = ctxFactory;
         _binService = binService;
         _imageProvider = imageProvider;
         _catalog = catalog;
+        _persistence = persistence;
     }
 
     /// <summary>Laed die Figur aus der DB inkl. Parts + alle anderen Faecher als Move-Targets.</summary>
@@ -239,15 +242,41 @@ public partial class MinifigSummaryViewModel : ObservableObject
         catch { return Brushes.Gray; }
     }
 
-    /// <summary>Verschiebt die Figur in ein anderes Fach.</summary>
+    /// <summary>
+    /// Verschiebt die Figur in ein anderes Fach.
+    /// v0.1.23 (A9, S20-Refactor): routet ueber
+    /// <see cref="IMinifigPersistenceService.MoveSelectionAsync"/> statt
+    /// inline-DB-Write. Strict-Mode, RecalcKind, Undo-Snapshot und
+    /// FreedAt-Reset sind zentral im Service. Test-Pfade ohne Persistence-
+    /// Service fallen auf das alte inline-Verhalten zurueck.
+    /// </summary>
     public async Task<bool> MoveToAsync(int newBinId)
     {
+        if (_persistence != null)
+        {
+            try
+            {
+                var (mCount, _) = await _persistence.MoveSelectionAsync(
+                    new[] { MinifigId }, Array.Empty<int>(), newBinId);
+                Log.Information(
+                    "Minifigur Id={Id} via MoveSelectionAsync in Fach {Bin} verschoben ({Count} Eintraege)",
+                    MinifigId, newBinId, mCount);
+                return mCount > 0;
+            }
+            catch (InvalidBinKindException strict)
+            {
+                Log.Warning(strict,
+                    "MoveToAsync: Strict-Mode-Verletzung beim Verschieben von Figur {Id} nach Bin {Bin}",
+                    MinifigId, newBinId);
+                throw;
+            }
+        }
+
+        // Legacy-Pfad fuer Tests ohne Persistence-Service.
         await using var ctx = await _ctxFactory.CreateDbContextAsync();
         var m = await ctx.TrackedMinifigs.FirstOrDefaultAsync(x => x.Id == MinifigId);
         if (m == null) return false;
 
-        // Bug B Fix (UX X.28): wenn das Ziel-Fach als "frei" markiert war,
-        // jetzt wieder als belegt markieren.
         var bin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == newBinId);
         if (bin == null)
             throw new InvalidOperationException($"Lagerfach {newBinId} existiert nicht.");
@@ -258,7 +287,6 @@ public partial class MinifigSummaryViewModel : ObservableObject
             bin.FreedAt = null;
         }
 
-        // UX X.29 (v0.1.16): Move-Snapshot fuer Undo erfassen + ScanEvent schreiben.
         var oldBinId = m.StorageBinId;
         var moveSnapshot = new HBSort.Core.Services.UndoSnapshotMove
         {
@@ -278,7 +306,7 @@ public partial class MinifigSummaryViewModel : ObservableObject
 
         m.StorageBinId = newBinId;
         await ctx.SaveChangesAsync();
-        Log.Information("Minifigur '{Name}' (Id={Id}) in Fach {Bin} verschoben",
+        Log.Information("Minifigur '{Name}' (Id={Id}) in Fach {Bin} verschoben (Legacy-Pfad)",
             m.Name, m.Id, newBinId);
         return true;
     }

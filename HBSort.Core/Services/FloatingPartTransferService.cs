@@ -18,13 +18,16 @@ public class FloatingPartTransferService : IFloatingPartTransferService
 {
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
     private readonly IMinifigPersistenceService _persistence;
+    private readonly IStorageBinService? _binService;
 
     public FloatingPartTransferService(
         IDbContextFactory<UserDataContext> ctxFactory,
-        IMinifigPersistenceService persistence)
+        IMinifigPersistenceService persistence,
+        IStorageBinService? binService = null)
     {
         _ctxFactory = ctxFactory;
         _persistence = persistence;
+        _binService = binService;
     }
 
     public async Task<FloatingPartMatch?> FindFirstMatchAsync(
@@ -153,6 +156,14 @@ public class FloatingPartTransferService : IFloatingPartTransferService
             Log.Information(
                 "FloatingPartTransfer: Fach '{Label}' freigegeben (war nach Transfer leer).",
                 bin.Label);
+        }
+
+        // v0.1.23: Bin.Kind neu berechnen (FloatingPart wurde reduziert/geloescht
+        // und ggf. Bin freigegeben).
+        if (_binService != null)
+        {
+            try { await _binService.RecalculateKindAsync(sourceBinId, ct); }
+            catch (Exception ex) { Log.Warning(ex, "RecalculateKindAsync({BinId}) geworfen", sourceBinId); }
         }
 
         Log.Information(

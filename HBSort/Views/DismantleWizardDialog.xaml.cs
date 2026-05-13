@@ -126,6 +126,13 @@ public partial class DismantleWizardDialog : Window
             DialogResult = true;
             Close();
         }
+        catch (HBSort.Core.Services.InvalidBinKindException strict)
+        {
+            // v0.1.23 Strict-Mode: Ziel-Bin akzeptiert das Teil nicht.
+            Log.Warning(strict, "Dismantle-Confirm: Strict-Mode-Verletzung");
+            await App.Services.GetRequiredService<IDialogService>()
+                .ShowErrorAsync("Zerlegen nicht moeglich", strict.Message);
+        }
         catch (System.Exception ex)
         {
             Log.Error(ex, "Dismantle-Confirm fehlgeschlagen");

@@ -257,6 +257,13 @@ public partial class PartLookupView : UserControl
             // Pending ausblenden - Workflow ist abgeschlossen.
             if (scan != null) scan.PendingPart = null;
         }
+        catch (HBSort.Core.Services.InvalidBinKindException strict)
+        {
+            // v0.1.23 Strict-Mode: Ziel-Bin akzeptiert die Figur nicht.
+            Log.Warning(strict, "CollectFromBlCatalog: Strict-Mode-Verletzung");
+            await App.Services.GetRequiredService<IDialogService>()
+                .ShowErrorAsync("Aktion nicht moeglich", strict.Message);
+        }
         catch (System.Exception ex)
         {
             Log.Error(ex, "CollectFromBlCatalog fehlgeschlagen");

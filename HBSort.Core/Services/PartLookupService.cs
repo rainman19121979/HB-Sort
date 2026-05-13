@@ -17,13 +17,15 @@ public class PartLookupService : IPartLookupService
     private readonly IMinifigPersistenceService _persistence;
     private readonly IPartImageProvider _imageProvider;
     private readonly IBlCacheRepository? _cache;
+    private readonly IStorageBinService? _binService;
 
     public PartLookupService(
         IDbContextFactory<UserDataContext> ctxFactory,
         IBlCatalogService catalog,
         IMinifigPersistenceService persistence,
         IPartImageProvider imageProvider,
-        IBlCacheRepository? cache = null)
+        IBlCacheRepository? cache = null,
+        IStorageBinService? binService = null)
     {
         _ctxFactory = ctxFactory;
         _catalog = catalog;
@@ -35,6 +37,16 @@ public class PartLookupService : IPartLookupService
         // Collect-Pfade unten brauchen GetItemNamesAsync fuer den PartName-
         // Bulk-Lookup. Null-Fall faellt auf das alte Verhalten zurueck.
         _cache = cache;
+        // v0.1.23: binService optional fuer Tests. Production reicht den Service
+        // durch, damit Bin.Kind nach jeder Schreib-Aktion neu berechnet wird.
+        _binService = binService;
+    }
+
+    private async Task RecalcBinKindAsync(int? binId, CancellationToken ct)
+    {
+        if (_binService == null || !binId.HasValue) return;
+        try { await _binService.RecalculateKindAsync(binId.Value, ct); }
+        catch (Exception ex) { Log.Warning(ex, "RecalculateKindAsync({BinId}) geworfen", binId); }
     }
 
     public async Task<PartLookupResult> LookupPartAsync(string blPartNo, int blColorId, CancellationToken ct = default)
@@ -135,6 +147,11 @@ public class PartLookupService : IPartLookupService
         });
 
         await ctx.SaveChangesAsync(ct);
+
+        // v0.1.23: bei Status-Wechsel Waiting->Complete kann Bin.Kind kippen.
+        if (minifigCompleted)
+            await RecalcBinKindAsync(part.TrackedMinifig.StorageBinId, ct);
+
         _persistence.RaiseDataChanged();
 
         Log.Information("Part {Part}/{Color} zu Minifig '{Name}' zugeordnet ({Q}/{N}){Done}",
@@ -200,6 +217,11 @@ public class PartLookupService : IPartLookupService
         });
 
         await ctx.SaveChangesAsync(ct);
+
+        // v0.1.23: bei Status-Wechsel Complete->Waiting kippt Bin auf Waiting.
+        if (wasComplete)
+            await RecalcBinKindAsync(part.TrackedMinifig.StorageBinId, ct);
+
         _persistence.RaiseDataChanged();
 
         Log.Information("Part-Zuordnung entfernt: {Part}/{Color} aus Figur '{Name}' (wasComplete={WC})",
@@ -217,9 +239,17 @@ public class PartLookupService : IPartLookupService
 
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
 
-        // Bin existiert?
-        var bin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == storageBinId, ct)
+        // Bin existiert? Inkl. Minifigs+RequiredParts fuer Strict-Mode-Bypass.
+        var bin = await ctx.StorageBins
+            .Include(b => b.TrackedMinifigs)
+                .ThenInclude(m => m.RequiredParts)
+            .FirstOrDefaultAsync(b => b.Id == storageBinId, ct)
             ?? throw new InvalidOperationException($"Lagerfach {storageBinId} existiert nicht.");
+
+        // v0.1.23 Strict-Mode (S8): Floating darf nur in Empty/Floating/Waiting-mit-Match.
+        BinKindGuard.EnsureBinAcceptsFloatingPart(
+            bin, blPartNo, blColorId,
+            $"Einzelteil {blPartNo}/{blColorId} in Fach '{bin.Label}' lagern");
 
         // Bug B Fix (UX X.28): wenn das Fach als "frei" markiert war, jetzt wieder als belegt markieren.
         if (bin.FreedAt != null)
@@ -273,6 +303,7 @@ public class PartLookupService : IPartLookupService
         });
 
         await ctx.SaveChangesAsync(ct);
+        await RecalcBinKindAsync(storageBinId, ct);
         _persistence.RaiseDataChanged();
 
         Log.Information("Floating-Part angelegt: {Part}/{Color} x{Qty} in Bin '{Bin}'",
@@ -389,8 +420,10 @@ public class PartLookupService : IPartLookupService
             UndoData = System.Text.Json.JsonSerializer.Serialize(snapshot)
         });
 
+        var affectedBin = fp.StorageBinId;
         ctx.FloatingParts.Remove(fp);
         await ctx.SaveChangesAsync(ct);
+        await RecalcBinKindAsync(affectedBin, ct);
         Log.Information("FloatingPart Id={Id} ({Part}/{Color} x{Qty}) geloescht",
             fp.Id, fp.PartNumber, fp.ColorId, fp.Quantity);
         _persistence.RaiseDataChanged();
@@ -436,8 +469,13 @@ public class PartLookupService : IPartLookupService
             : new Dictionary<string, string>();
 
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
-        var bin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == storageBinId, ct)
+        var bin = await ctx.StorageBins
+            .Include(b => b.TrackedMinifigs)
+            .FirstOrDefaultAsync(b => b.Id == storageBinId, ct)
             ?? throw new InvalidOperationException($"Lagerfach {storageBinId} existiert nicht.");
+
+        // v0.1.23 Strict-Mode (S10): Figur darf nicht in Floating-Bin.
+        BinKindGuard.EnsureBinAcceptsMinifig(bin, $"Figur '{item.Name}' in Fach '{bin.Label}' anlegen");
 
         // Bug B Fix (UX X.28): wenn das Fach als "frei" markiert war, jetzt wieder als belegt markieren.
         if (bin.FreedAt != null)
@@ -486,6 +524,8 @@ public class PartLookupService : IPartLookupService
 
         // 5) Reverse-Match Floating-Parts (wie in MinifigPersistenceService).
         var reverseMatched = 0;
+        // v0.1.23: betroffene Quell-Bins fuer RecalcKind sammeln.
+        var reverseMatchBinIds = new HashSet<int>();
         foreach (var required in minifig.RequiredParts)
         {
             var stillNeeded = required.QuantityNeeded - required.QuantityCollected;
@@ -505,6 +545,7 @@ public class PartLookupService : IPartLookupService
                 fp.Quantity -= take;
                 stillNeeded -= take;
                 reverseMatched += take;
+                reverseMatchBinIds.Add(fp.StorageBinId);
                 if (fp.Quantity <= 0) ctx.FloatingParts.Remove(fp);
             }
         }
@@ -530,6 +571,15 @@ public class PartLookupService : IPartLookupService
         });
 
         await ctx.SaveChangesAsync(ct);
+
+        // v0.1.23: Ziel-Bin + alle Reverse-Match-Quell-Bins recalculaten.
+        if (_binService != null)
+        {
+            await _binService.RecalculateKindAsync(storageBinId, ct);
+            foreach (var bid in reverseMatchBinIds)
+                await RecalcBinKindAsync(bid, ct);
+        }
+
         _persistence.RaiseDataChanged();
 
         Log.Information("CollectMinifig: '{Name}' (BL:{Bl}) angelegt in '{Bin}', Trigger {Tp}/{Tc} x{Tq}, ReverseMatch={Rm}{Done}",
@@ -586,8 +636,13 @@ public class PartLookupService : IPartLookupService
             : new Dictionary<string, string>();
 
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
-        var bin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == storageBinId, ct)
+        var bin = await ctx.StorageBins
+            .Include(b => b.TrackedMinifigs)
+            .FirstOrDefaultAsync(b => b.Id == storageBinId, ct)
             ?? throw new InvalidOperationException($"Lagerfach {storageBinId} existiert nicht.");
+
+        // v0.1.23 Strict-Mode (S10): Figur darf nicht in Floating-Bin.
+        BinKindGuard.EnsureBinAcceptsMinifig(bin, $"Figur '{item.Name}' in Fach '{bin.Label}' anlegen");
 
         if (bin.FreedAt != null)
         {
@@ -634,6 +689,8 @@ public class PartLookupService : IPartLookupService
         // Reverse-Match NUR fuer Filter-Eintraege.
         var consumed = new List<ConsumedFloatingPartInfo>();
         var reverseMatched = 0;
+        // v0.1.23: Quell-Bin-Ids fuer RecalcKind sammeln.
+        var reverseMatchBinIds = new HashSet<int>();
         foreach (var required in minifig.RequiredParts)
         {
             var stillNeeded = required.QuantityNeeded - required.QuantityCollected;
@@ -658,6 +715,7 @@ public class PartLookupService : IPartLookupService
                 fp.Quantity -= take;
                 stillNeeded -= take;
                 reverseMatched += take;
+                reverseMatchBinIds.Add(fp.StorageBinId);
 
                 consumed.Add(new ConsumedFloatingPartInfo
                 {
@@ -693,6 +751,15 @@ public class PartLookupService : IPartLookupService
         });
 
         await ctx.SaveChangesAsync(ct);
+
+        // v0.1.23: Ziel-Bin + alle Quell-Bins aus Reverse-Match recalculaten.
+        if (_binService != null)
+        {
+            await _binService.RecalculateKindAsync(storageBinId, ct);
+            foreach (var bid in reverseMatchBinIds)
+                await RecalcBinKindAsync(bid, ct);
+        }
+
         _persistence.RaiseDataChanged();
 
         Log.Information("CollectMinifig (Selection): '{Name}' angelegt in '{Bin}', Trigger {Tp}/{Tc}, Filter={FilterCount}, Consumed={Cons}{Done}",

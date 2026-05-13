@@ -1228,7 +1228,17 @@ public partial class ScanViewModel : ObservableObject, IDisposable
     {
         try
         {
-            var allBins = await _binService.GetAllAsync();
+            // v0.1.23-beta.1-Fix 2026-05-14 (Praxis-Test-Befund): typ-gefiltert
+            // + Reverse-Match-Bypass. Vorher GetAllAsync() - dann erschienen auch
+            // Complete-Bins in der "Als Einzelteil lagern"-Combobox; Strict-Mode
+            // warf zwar beim Klick, der User konnte aber das falsche Ziel
+            // ueberhaupt erst auswaehlen. partNo/colorId werden durchgereicht
+            // damit Wartend-Bins mit passendem Reverse-Match-Required-Part
+            // weiterhin zulaessig sind.
+            var allBins = await _binService.GetEligibleBinsAsync(
+                BinTargetKind.FloatingTarget,
+                partNo: pending.BlPartNo,
+                colorId: pending.BlColorId);
 
             // UX X.33 v0.1.19-beta.7 Block N: alle drei Stufen (Stapel ->
             // User-Mapping -> Default-Regel "max 1 PartId pro Kategorie pro
@@ -1384,7 +1394,17 @@ public partial class ScanViewModel : ObservableObject, IDisposable
     {
         try
         {
-            var allBins = await _binService.GetAllAsync();
+            // v0.1.23-beta.1-Fix 2026-05-14 (Praxis-Test-Befund): typ-gefiltert
+            // statt GetAllAsync(). Vorher landeten auch Floating-Bins in der
+            // Combobox - der Strict-Mode warf zwar beim Speichern, aber der
+            // User konnte das falsche Ziel ueberhaupt erst auswaehlen.
+            // Whitelist fuer Waiting/Complete-Target ist identisch
+            // ({Empty, Waiting, Complete}), darum braucht ReSuggestBinForPendingAsync
+            // die Liste nicht neu zu laden wenn WillBeComplete sich aendert.
+            var targetKind = pending.WillBeComplete
+                ? BinTargetKind.CompleteMinifigTarget
+                : BinTargetKind.WaitingMinifigTarget;
+            var allBins = await _binService.GetEligibleBinsAsync(targetKind);
             // UX X.31 Block B Bug-Fix v2 (v0.1.18): Initial-Suggest abhaengig
             // vom Pending-Status. "Alles vorab abgehakt" + Reverse-Match heisst:
             // Pending kann beim Erscheinen schon Complete sein - dann Complete-
@@ -1546,6 +1566,13 @@ public partial class ScanViewModel : ObservableObject, IDisposable
             // Pending ausblenden, Top-3 wiederherstellen
             PendingMinifig = null;
             MinifigStatusText = string.Empty;
+        }
+        catch (InvalidBinKindException strict)
+        {
+            // v0.1.23 Strict-Mode: Ziel-Bin akzeptiert die Figur nicht. User-
+            // freundliche Meldung statt unter Generic-Fehler vergraben.
+            Log.Warning(strict, "PersistPending: Strict-Mode-Verletzung");
+            _notifications.ShowError(strict.Message);
         }
         catch (Exception ex)
         {

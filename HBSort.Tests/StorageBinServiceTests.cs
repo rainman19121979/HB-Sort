@@ -170,32 +170,7 @@ public class StorageBinServiceTests : IDisposable
         Assert.Null(m.StorageBinId);
     }
 
-    // ---- Free / NextFree ----
-
-    [Fact]
-    public async Task GetNextFree_returns_first_alphabetical_bin_without_waiting_or_floats()
-    {
-        await _sut.CreateBulkAsync(new[] { "Box 02", "Box 03", "Box 01" });
-        // Box 01 mit wartender Figur belegen.
-        var box01 = await _sut.GetByLabelAsync("Box 01");
-        await SeedMinifigInBinAsync(box01!.Id, "arc007", TrackedMinifigStatus.Waiting);
-
-        var next = await _sut.GetNextFreeAsync();
-        Assert.NotNull(next);
-        Assert.Equal("Box 02", next!.Label);
-    }
-
-    [Fact]
-    public async Task GetFree_excludes_bins_with_floating_parts()
-    {
-        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
-        var b1 = await _sut.GetByLabelAsync("Box 01");
-        await SeedFloatingPartInBinAsync(b1!.Id, "3001", 2);
-
-        var free = await _sut.GetFreeAsync();
-        Assert.Single(free);
-        Assert.Equal("Box 02", free[0].Label);
-    }
+    // v0.1.23 A10: GetFreeAsync/GetNextFreeAsync entfernt -> Tests entfernt.
 
     // ====================================================================
     // UX X.31 (v0.1.18) - Bin-Vorschlag-Konsistenz
@@ -865,6 +840,9 @@ public class StorageBinServiceTests : IDisposable
         };
         ctx.TrackedMinifigs.Add(m);
         await ctx.SaveChangesAsync();
+        // v0.1.23: Bin.Kind nach jedem Seed neu berechnen, damit die Suggest-
+        // Methoden den Bin korrekt klassifizieren (sonst bleibt Kind=Empty).
+        await _sut.RecalculateKindAsync(binId);
         return m.Id;
     }
 
@@ -884,6 +862,8 @@ public class StorageBinServiceTests : IDisposable
             BrickognizeCategory = brickognizeCategory
         });
         await ctx.SaveChangesAsync();
+        // v0.1.23: siehe SeedMinifigInBinAsync-Kommentar.
+        await _sut.RecalculateKindAsync(binId);
     }
 
     private sealed class SimpleContextFactory : IDbContextFactory<UserDataContext>
@@ -894,70 +874,10 @@ public class StorageBinServiceTests : IDisposable
     }
 
     // ========================================================================
-    // v0.1.22-beta.1 Block G: BinKind-Klassifikator + Mix-Bestand-Scan
+    // v0.1.23: BinKind-Klassifikator durch persistierte StorageBin.Kind-Spalte
+    // ersetzt. RecalculateKindAsync-Tests + GetEligibleBinsAsync-Tests stehen
+    // in StorageBinKindTests.cs (separate Testdatei).
     // ========================================================================
-
-    [Fact]
-    public async Task GetBinKindAsync_classifies_empty_bin_correctly()
-    {
-        await _sut.CreateBulkAsync(new[] { "Box 01" });
-        var b1 = await _sut.GetByLabelAsync("Box 01");
-
-        var kind = await _sut.GetBinKindAsync(b1!.Id);
-
-        Assert.Equal(BinKind.Empty, kind);
-    }
-
-    [Fact]
-    public async Task GetBinKindAsync_classifies_floating_only_bin_correctly()
-    {
-        await _sut.CreateBulkAsync(new[] { "Box 01" });
-        var b1 = await _sut.GetByLabelAsync("Box 01");
-        await SeedFloatingPartInBinAsync(b1!.Id, "3001", 2);
-
-        var kind = await _sut.GetBinKindAsync(b1!.Id);
-
-        Assert.Equal(BinKind.FloatingOnly, kind);
-    }
-
-    [Fact]
-    public async Task GetBinKindAsync_classifies_waiting_bin_correctly()
-    {
-        await _sut.CreateBulkAsync(new[] { "Box 01" });
-        var b1 = await _sut.GetByLabelAsync("Box 01");
-        await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Waiting);
-
-        var kind = await _sut.GetBinKindAsync(b1!.Id);
-
-        Assert.Equal(BinKind.WaitingMinifig, kind);
-    }
-
-    [Fact]
-    public async Task GetBinKindAsync_classifies_complete_only_bin_correctly()
-    {
-        await _sut.CreateBulkAsync(new[] { "Box 01" });
-        var b1 = await _sut.GetByLabelAsync("Box 01");
-        await SeedMinifigInBinAsync(b1!.Id, "fig1", TrackedMinifigStatus.Complete);
-
-        var kind = await _sut.GetBinKindAsync(b1!.Id);
-
-        Assert.Equal(BinKind.CompleteOnly, kind);
-    }
-
-    [Fact]
-    public async Task GetBinKindAsync_treats_waiting_plus_complete_as_WaitingMinifig()
-    {
-        // Reifungspfad: wartende Figur ist komplett geworden und liegt
-        // jetzt zusammen mit einer noch wartenden im Bin.
-        await _sut.CreateBulkAsync(new[] { "Box 01" });
-        var b1 = await _sut.GetByLabelAsync("Box 01");
-        await SeedMinifigInBinAsync(b1!.Id, "wait1", TrackedMinifigStatus.Waiting);
-        await SeedMinifigInBinAsync(b1!.Id, "done1", TrackedMinifigStatus.Complete);
-
-        var kind = await _sut.GetBinKindAsync(b1!.Id);
-
-        Assert.Equal(BinKind.WaitingMinifig, kind);
-    }
 
     [Fact]
     public async Task FindBestandMixBins_returns_empty_when_no_mix()

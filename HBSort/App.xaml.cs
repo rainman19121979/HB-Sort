@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Http;
 using System.Windows;
 using HBSort.Core.Database;
+using HBSort.Core.Models;
 using HBSort.Core.Services;
 using HBSort.Services;
 using HBSort.Views;
@@ -144,6 +145,14 @@ public partial class App : Application
             // "Unbekannt" und die Default-Regel wird wirkungslos.
             // Idempotent: bearbeitet nur Zeilen mit null/empty PartName.
             await BackfillTrackedMinifigPartNamesAsync();
+
+            // 6.513 v0.1.23: Backfill der StorageBin.Kind-Spalte. Die EF-Core-
+            // Migration AddStorageBinKind setzt die neue Spalte initial auf
+            // Empty (Default 0). Bestand-Bins mit Inhalten werden hier
+            // einmalig korrekt klassifiziert (Empty/Floating/Waiting/Complete).
+            // Idempotent - mehrfaches Aufrufen ist safe; bei bereits korrekt
+            // gesetzten Bins passiert nichts.
+            await BackfillStorageBinKindAsync();
 
             // 6.52 BL-Preis-Cache-Anti-Vergiftung (UX X.34 v0.1.20):
             // Eintraege mit allen Preis-Feldern NULL und total_quantity=0
@@ -655,6 +664,69 @@ public partial class App : Application
             Log.Warning(ex,
                 "TrackedMinifigPart.PartName-Backfill geworfen - " +
                 "unkritisch, naechster App-Start versucht es wieder");
+        }
+    }
+
+    /// <summary>
+    /// v0.1.23: Backfill der StorageBin.Kind-Spalte. Wird einmalig beim
+    /// App-Start ausgefuehrt (idempotent, mehrfache Aufrufe sind safe).
+    /// Klassifiziert alle Bins anhand ihrer aktuellen Inhalte:
+    /// - Empty: keine Minifigs, keine FloatingParts
+    /// - Floating: nur FloatingParts
+    /// - Waiting: mindestens eine wartende Figur (Reifungspfad - mit oder
+    ///   ohne komplette Figuren im selben Bin)
+    /// - Complete: nur komplette Figuren
+    ///
+    /// Mix-Bins (Wartend+Floating, Floating+Complete) werden bewusst als
+    /// Waiting bzw. Complete klassifiziert; eine separate Warnung dafuer
+    /// laeuft ueber WarnAboutBestandMixBinsAsync.
+    /// </summary>
+    private static async Task BackfillStorageBinKindAsync()
+    {
+        try
+        {
+            using var scope = Services.CreateScope();
+            var ctx = scope.ServiceProvider.GetRequiredService<UserDataContext>();
+
+            var bins = await ctx.StorageBins
+                .Include(b => b.TrackedMinifigs)
+                .Include(b => b.FloatingParts)
+                .ToListAsync();
+
+            int updated = 0;
+            foreach (var bin in bins)
+            {
+                var waitingCount = bin.TrackedMinifigs.Count(m => m.Status == TrackedMinifigStatus.Waiting);
+                var completeCount = bin.TrackedMinifigs.Count(m => m.Status == TrackedMinifigStatus.Complete);
+                var floatingCount = bin.FloatingParts.Count;
+
+                StorageBinKind newKind;
+                if (waitingCount == 0 && completeCount == 0 && floatingCount == 0)
+                    newKind = StorageBinKind.Empty;
+                else if (waitingCount > 0)
+                    newKind = StorageBinKind.Waiting;        // Reifungs-zentrisch
+                else if (floatingCount > 0)
+                    newKind = StorageBinKind.Floating;
+                else
+                    newKind = StorageBinKind.Complete;
+
+                if (bin.Kind != newKind)
+                {
+                    bin.Kind = newKind;
+                    updated++;
+                }
+            }
+
+            await ctx.SaveChangesAsync();
+            Log.Information(
+                "Bin-Typ-Backfill v0.1.23: {Updated}/{Total} Bins aktualisiert",
+                updated, bins.Count);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex,
+                "Bin-Typ-Backfill v0.1.23 geworfen - " +
+                "naechster App-Start versucht es wieder");
         }
     }
 

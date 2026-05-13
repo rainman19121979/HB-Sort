@@ -184,6 +184,13 @@ public partial class MinifigSummaryDialog : Window
                 Close();
             }
         }
+        catch (HBSort.Core.Services.InvalidBinKindException strict)
+        {
+            // v0.1.23 Strict-Mode: Ziel-Bin akzeptiert die Figur nicht.
+            Log.Warning(strict, "Verschieben: Strict-Mode-Verletzung");
+            await App.Services.GetRequiredService<IDialogService>()
+                .ShowErrorAsync("Verschieben nicht moeglich", strict.Message);
+        }
         catch (System.Exception ex)
         {
             Log.Error(ex, "Verschieben fehlgeschlagen");

@@ -15,10 +15,14 @@ namespace HBSort.Core.Services;
 public class DataHealService : IDataHealService
 {
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
+    private readonly IStorageBinService? _binService;
 
-    public DataHealService(IDbContextFactory<UserDataContext> ctxFactory)
+    public DataHealService(
+        IDbContextFactory<UserDataContext> ctxFactory,
+        IStorageBinService? binService = null)
     {
         _ctxFactory = ctxFactory;
+        _binService = binService;
     }
 
     public async Task<DataHealResult> HealAsync(CancellationToken ct = default)
@@ -84,6 +88,21 @@ public class DataHealService : IDataHealService
 
         if (binsToHeal.Count > 0 || restoredCount > 0)
             await ctx.SaveChangesAsync(ct);
+
+        // v0.1.23: Bin.Kind fuer geheilte Bins + alle Bins die wartende
+        // Figuren aus der Orphan-Heilung dazubekamen neu berechnen.
+        if (_binService != null)
+        {
+            var affectedBins = binsToHeal.Select(b => b.Id)
+                .Concat(orphans.Where(o => o.StorageBinId.HasValue).Select(o => o.StorageBinId!.Value))
+                .Distinct()
+                .ToList();
+            foreach (var binId in affectedBins)
+            {
+                try { await _binService.RecalculateKindAsync(binId, ct); }
+                catch (Exception ex) { Log.Warning(ex, "RecalculateKindAsync({BinId}) im DataHeal geworfen", binId); }
+            }
+        }
 
         return new DataHealResult(
             RestoredBinAssignments: restoredCount,

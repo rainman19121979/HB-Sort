@@ -25,6 +25,7 @@ public class MinifigPersistenceService : IMinifigPersistenceService
 {
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
     private readonly ICategoryBinMappingService? _categoryMapping;
+    private readonly IStorageBinService? _binService;
 
     public event EventHandler? DataChanged;
 
@@ -35,13 +36,35 @@ public class MinifigPersistenceService : IMinifigPersistenceService
     /// Zerlegen auf "Unbekannt" gesetzt (Default-Regel-konform). Production
     /// (DI) reicht den echten Service durch -> Heuristik ueber den PartName
     /// findet typischerweise die Kategorie.
+    ///
+    /// v0.1.23: <paramref name="binService"/> ist optional. Wenn null,
+    /// werden RecalculateKindAsync-Aufrufe nach Schreib-Aktionen
+    /// uebersprungen (Test-Backwards-Compat). Production (DI) reicht den
+    /// Service durch, damit Bin.Kind nach jeder Aktion korrekt ist.
     /// </summary>
     public MinifigPersistenceService(
         IDbContextFactory<UserDataContext> ctxFactory,
-        ICategoryBinMappingService? categoryMapping = null)
+        ICategoryBinMappingService? categoryMapping = null,
+        IStorageBinService? binService = null)
     {
         _ctxFactory = ctxFactory;
         _categoryMapping = categoryMapping;
+        _binService = binService;
+    }
+
+    /// <summary>
+    /// v0.1.23 Helper: ruft RecalculateKindAsync fuer alle uebergebenen
+    /// Bin-Ids (Duplikate werden gefiltert, null gefiltert).
+    /// </summary>
+    private async Task RecalcBinKindsAsync(IEnumerable<int?> binIds, CancellationToken ct)
+    {
+        if (_binService == null) return;
+        var distinct = binIds.Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+        foreach (var binId in distinct)
+        {
+            try { await _binService.RecalculateKindAsync(binId, ct); }
+            catch (Exception ex) { Log.Warning(ex, "RecalculateKindAsync({BinId}) geworfen", binId); }
+        }
     }
 
     public void RaiseDataChanged() => DataChanged?.Invoke(this, EventArgs.Empty);
@@ -122,9 +145,13 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             UndoData = System.Text.Json.JsonSerializer.Serialize(snapshot)
         });
 
+        var affectedBin = minifig.StorageBinId;
         // RequiredParts werden via Cascade-Delete entfernt (EF Core: Cascade auf TrackedMinifig).
         ctx.TrackedMinifigs.Remove(minifig);
         await ctx.SaveChangesAsync(ct);
+
+        // v0.1.23: Bin.Kind neu berechnen nach Loeschen.
+        await RecalcBinKindsAsync(new[] { affectedBin }, ct);
 
         Log.Information("Figur '{Name}' (Id={Id}, Status={Status}) geloescht - {OriginCount} FloatingParts entkoppelt",
             minifig.Name, minifig.Id, minifig.Status, origins.Count);
@@ -241,13 +268,22 @@ public class MinifigPersistenceService : IMinifigPersistenceService
 
             // Bug B Fix (UX X.28): wenn das Ziel-Fach als "frei" markiert war,
             // jetzt wieder als belegt markieren. Bin existiert-Check inklusive.
-            var targetBin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == binId, ct);
+            // v0.1.23: inkl. TrackedMinifigs+RequiredParts fuer Strict-Mode-Bypass.
+            var targetBin = await ctx.StorageBins
+                .Include(b => b.TrackedMinifigs)
+                    .ThenInclude(m => m.RequiredParts)
+                .FirstOrDefaultAsync(b => b.Id == binId, ct);
             if (targetBin == null)
             {
                 Log.Warning("DismantleAsync: TargetBinId={BinId} nicht gefunden, Teil {Part} wird uebersprungen",
                     binId, part.PartNumber);
                 continue;
             }
+            // v0.1.23 Strict-Mode (S2): Floating darf nur in Empty/Floating
+            // oder Waiting-mit-Match.
+            BinKindGuard.EnsureBinAcceptsFloatingPart(
+                targetBin, part.PartNumber, part.ColorId,
+                $"Teil aus Zerlegung in Fach '{targetBin.Label}' ablegen");
             if (targetBin.FreedAt != null)
             {
                 Log.Information("Fach '{Label}' war als frei markiert (seit {FreedAt}) - wird durch Zerlege-Teil wieder belegt",
@@ -311,9 +347,35 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         // Phase 6: Tagesstatistik fuer "zerlegt" hochzaehlen.
         await IncrementDailyStatAsync(ctx, s => s.MinifigsDismantledCount++, ct);
 
+        // v0.1.23: Bin-Liste fuer Recalc sammeln. Quell-Bin (Figur war drin)
+        // PLUS alle Ziel-Bins aus den FloatingPart-Choices PLUS Bins der
+        // wartenden Figuren bei Direkt-Zuordnung (die aendern ihren Status).
+        var affectedBins = new List<int?>
+        {
+            minifig.StorageBinId
+        };
+        affectedBins.AddRange(choiceList
+            .Where(c => c.IsKept && c.TargetBinId.HasValue)
+            .Select(c => (int?)c.TargetBinId!.Value));
+        var assignPartIds = choiceList
+            .Where(c => c.IsKept && c.AssignToTrackedMinifigPartId.HasValue)
+            .Select(c => c.AssignToTrackedMinifigPartId!.Value)
+            .ToList();
+        if (assignPartIds.Count > 0)
+        {
+            var assignedMinifigBins = await ctx.TrackedMinifigParts
+                .Where(p => assignPartIds.Contains(p.Id))
+                .Select(p => p.TrackedMinifig.StorageBinId)
+                .ToListAsync(ct);
+            affectedBins.AddRange(assignedMinifigBins);
+        }
+
         // Figur und ihre RequiredParts loeschen (Cascade entfernt RequiredParts).
         ctx.TrackedMinifigs.Remove(minifig);
         await ctx.SaveChangesAsync(ct);
+
+        // v0.1.23: Bin.Kind neu berechnen nach Zerlegen.
+        await RecalcBinKindsAsync(affectedBins, ct);
 
         Log.Information(
             "Figur '{Name}' (Id={Id}) zerlegt: {Count} Teile-Eintraege ({Qty} Stueck) in Pool, Figur geloescht",
@@ -339,8 +401,10 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             .ToListAsync(ct);
         if (stale.Count == 0) return 0;
 
+        var affectedBins = stale.Select(m => m.StorageBinId).ToList();
         ctx.TrackedMinifigs.RemoveRange(stale);
         await ctx.SaveChangesAsync(ct);
+        await RecalcBinKindsAsync(affectedBins, ct);
         Log.Information("Cleanup: {Count} alte DISMANTLED-Figuren geloescht", stale.Count);
         DataChanged?.Invoke(this, EventArgs.Empty);
         return stale.Count;
@@ -356,8 +420,10 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         var toDelete = pseudo.Where(m => m.RequiredParts.Count == 1).ToList();
         if (toDelete.Count == 0) return 0;
 
+        var affectedBins = toDelete.Select(m => m.StorageBinId).ToList();
         ctx.TrackedMinifigs.RemoveRange(toDelete);
         await ctx.SaveChangesAsync(ct);
+        await RecalcBinKindsAsync(affectedBins, ct);
         Log.Information("Cleanup: {Count} Pseudo-1/1-Figuren geloescht", toDelete.Count);
         DataChanged?.Invoke(this, EventArgs.Empty);
         return toDelete.Count;
@@ -391,6 +457,7 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             return 0;
         }
 
+        var affectedBins = minifigs.Select(m => m.StorageBinId).ToList();
         ctx.TrackedMinifigs.RemoveRange(minifigs);
 
         // Audit-Trail (ScanEvent ist die einzige Event-Tabelle die wir haben).
@@ -403,6 +470,7 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         });
 
         await ctx.SaveChangesAsync(ct);
+        await RecalcBinKindsAsync(affectedBins, ct);
         Log.Information(
             "BSX-Export-Cleanup: {Count} Figuren geloescht, {Origins} Floating-Parts entkoppelt",
             removed, origins.Count);
@@ -448,8 +516,10 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             });
         }
 
+        var affectedBins = floats.Select(fp => (int?)fp.StorageBinId).ToList();
         ctx.FloatingParts.RemoveRange(floats);
         await ctx.SaveChangesAsync(ct);
+        await RecalcBinKindsAsync(affectedBins, ct);
 
         Log.Information(
             "BSX-Export-Cleanup: {Count} FloatingPart-Eintrag(e) entfernt",
@@ -479,6 +549,10 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         await IncrementDailyStatAsync(ctx, s => s.MinifigsCompletedCount++, ct);
         await ctx.SaveChangesAsync(ct);
 
+        // v0.1.23 S23: Status-Wechsel Waiting->Complete kann Bin.Kind aendern
+        // (letzte wartende komplettiert -> Bin wird Complete).
+        await RecalcBinKindsAsync(new[] { m.StorageBinId }, ct);
+
         Log.Information("Figur '{Name}' (Id={Id}) als COMPLETE markiert",
             m.Name, m.Id);
         DataChanged?.Invoke(this, EventArgs.Empty);
@@ -499,6 +573,9 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         // bleibt historisch korrekt gezaehlt.
         await ctx.SaveChangesAsync(ct);
 
+        // v0.1.23 S24: Status-Wechsel Complete->Waiting setzt Bin.Kind auf Waiting.
+        await RecalcBinKindsAsync(new[] { m.StorageBinId }, ct);
+
         Log.Information("Figur '{Name}' (Id={Id}) wieder auf Waiting gesetzt",
             m.Name, m.Id);
         DataChanged?.Invoke(this, EventArgs.Empty);
@@ -516,10 +593,16 @@ public class MinifigPersistenceService : IMinifigPersistenceService
 
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
 
-        // Bin existiert?
-        var bin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == input.StorageBinId, ct);
+        // Bin existiert? Inkl. TrackedMinifigs+RequiredParts fuer Strict-Mode-Check.
+        var bin = await ctx.StorageBins
+            .Include(b => b.TrackedMinifigs)
+                .ThenInclude(m => m.RequiredParts)
+            .FirstOrDefaultAsync(b => b.Id == input.StorageBinId, ct);
         if (bin == null)
             throw new InvalidOperationException($"Lagerfach {input.StorageBinId} existiert nicht.");
+
+        // v0.1.23 Strict-Mode (S1): typ-Vertraeglichkeit pruefen.
+        BinKindGuard.EnsureBinAcceptsMinifig(bin, $"Figur '{input.Name}' anlegen");
 
         // Bug B Fix (UX X.28): wenn das Fach als "frei" markiert war, jetzt wieder als belegt markieren.
         if (bin.FreedAt != null)
@@ -566,6 +649,8 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         //    bereits FloatingParts mit derselben Part-No+Color-Id liegen.
         var reverseMatched = 0;
         var completedParts = 0;
+        // v0.1.23: Bin-Ids aus Reverse-Match sammeln fuer RecalcKind am Ende.
+        var reverseMatchBinIds = new HashSet<int>();
         // UX X.32 Block C (v0.1.19): pro Konsum-Vorgang ein Info-Eintrag
         // fuers Sammel-Popup. Aggregiert pro (PartNo, ColorId, BinId) -
         // wenn ein Required-Part aus 2 Faechern bedient wird, zwei Eintraege.
@@ -622,6 +707,9 @@ public class MinifigPersistenceService : IMinifigPersistenceService
                     SourceBinLabel = fp.StorageBin?.Label ?? string.Empty
                 });
 
+                // v0.1.23: Quell-Bin merken fuer RecalcKind.
+                reverseMatchBinIds.Add(fp.StorageBinId);
+
                 if (fp.Quantity <= 0)
                 {
                     ctx.FloatingParts.Remove(fp);
@@ -666,6 +754,12 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         }, ct);
 
         await ctx.SaveChangesAsync(ct);
+
+        // v0.1.23: Bin.Kind neu berechnen fuer Ziel-Bin + alle Quell-Bins
+        // aus dem Reverse-Match.
+        var binsToRecalc = new List<int?> { input.StorageBinId };
+        binsToRecalc.AddRange(reverseMatchBinIds.Select(id => (int?)id));
+        await RecalcBinKindsAsync(binsToRecalc, ct);
 
         Log.Information(
             "Minifigur '{Name}' (BL:{Bl}) gespeichert. Bin={Bin}, ReverseMatched={Rm}, Complete={Done}",
@@ -789,9 +883,15 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             });
         }
 
+        // v0.1.23: betroffene Bins aus beiden Quellen sammeln vor dem Remove.
+        var affectedBins = minifigs.Select(m => m.StorageBinId)
+            .Concat(floats.Select(fp => (int?)fp.StorageBinId))
+            .ToList();
+
         ctx.TrackedMinifigs.RemoveRange(minifigs);
         ctx.FloatingParts.RemoveRange(floats);
         await ctx.SaveChangesAsync(ct);
+        await RecalcBinKindsAsync(affectedBins, ct);
 
         Log.Information("Bulk-Delete: {M} Minifigs, {F} FloatingParts geloescht",
             minifigs.Count, floats.Count);
@@ -812,9 +912,30 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
 
         // Ziel-Bin existiert? Sonst werfen - kein Halbzustand.
-        var targetBin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == targetBinId, ct);
+        // v0.1.23 Strict-Mode: inkl. Minifigs+RequiredParts fuer Floating-Bypass.
+        var targetBin = await ctx.StorageBins
+            .Include(b => b.TrackedMinifigs)
+                .ThenInclude(m => m.RequiredParts)
+            .FirstOrDefaultAsync(b => b.Id == targetBinId, ct);
         if (targetBin == null)
             throw new InvalidOperationException($"Lagerfach {targetBinId} existiert nicht.");
+
+        var minifigs = await ctx.TrackedMinifigs
+            .Where(m => mIds.Contains(m.Id))
+            .ToListAsync(ct);
+        var floats = await ctx.FloatingParts
+            .Where(p => fIds.Contains(p.Id))
+            .ToListAsync(ct);
+
+        // v0.1.23 Strict-Mode (S7): pro Item-Typ pruefen ob Ziel-Bin akzeptiert.
+        if (minifigs.Any(m => m.StorageBinId != targetBinId))
+            BinKindGuard.EnsureBinAcceptsMinifig(targetBin, "Figuren in Bulk verschieben");
+        foreach (var fp in floats)
+        {
+            if (fp.StorageBinId == targetBinId) continue;
+            BinKindGuard.EnsureBinAcceptsFloatingPart(
+                targetBin, fp.PartNumber, fp.ColorId, "Einzelteil in Bulk verschieben");
+        }
 
         // Bug-B-Fix-Konvention: wenn Ziel-Bin als frei markiert war, reaktivieren.
         if (targetBin.FreedAt != null)
@@ -824,12 +945,11 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             targetBin.FreedAt = null;
         }
 
-        var minifigs = await ctx.TrackedMinifigs
-            .Where(m => mIds.Contains(m.Id))
-            .ToListAsync(ct);
-        var floats = await ctx.FloatingParts
-            .Where(p => fIds.Contains(p.Id))
-            .ToListAsync(ct);
+        // v0.1.23: betroffene Bins (Quell + Ziel) sammeln vor dem Move.
+        var affectedBins = minifigs.Select(m => m.StorageBinId)
+            .Concat(floats.Select(fp => (int?)fp.StorageBinId))
+            .Concat(new[] { (int?)targetBinId })
+            .ToList();
 
         var now = DateTime.UtcNow;
 
@@ -882,6 +1002,7 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         }
 
         await ctx.SaveChangesAsync(ct);
+        await RecalcBinKindsAsync(affectedBins, ct);
 
         Log.Information("Bulk-Move: {M} Minifigs, {F} FloatingParts nach '{Bin}' verschoben",
             minifigs.Count, floatingMoved, targetBin.Label);

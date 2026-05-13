@@ -579,9 +579,14 @@ public partial class DismantleWizardViewModel : ObservableObject
     /// <summary>
     /// UX X.32 Block B (v0.1.19): Pending-Mode-Persist - die Figur ist NICHT
     /// in der DB, also nur die markierten Teile direkt als FloatingParts
-    /// einlagern. Bei vorhandenem Eintrag (gleiches Bin + PartNo + ColorId)
-    /// wird die Quantity additiv erhoeht (Stapel-Wachstum). Bin.FreedAt wird
-    /// zurueckgesetzt falls als frei markiert (UX-X.6-Konvention).
+    /// einlagern.
+    ///
+    /// v0.1.23 (A9, S13-Refactor): laeuft jetzt komplett ueber
+    /// <see cref="IPartLookupService.AddPartToFloatingAsync"/> statt
+    /// inline-DB-Writes im VM. Damit greift Strict-Mode, RecalcKind und
+    /// FreedAt-Reset zentral im Service. Nur die Summary-ScanEvent fuer
+    /// "Direkt-Zerlegen" wird hier noch als ein Eintrag pro Pending-Confirm
+    /// geschrieben (Audit-Trail).
     /// </summary>
     private async Task<DismantleResult> ConfirmPendingModeAsync()
     {
@@ -591,6 +596,96 @@ public partial class DismantleWizardViewModel : ObservableObject
             return new DismantleResult { Success = true, CreatedFloatingParts = 0 };
         }
 
+        if (_partLookup == null)
+        {
+            // Test-Pfade ohne PartLookup-Service: Legacy-Inline-DB-Write.
+            // Production ist _partLookup immer gesetzt (App.xaml.cs DI).
+            return await ConfirmPendingModeLegacyAsync(keep);
+        }
+
+        var instructionItems = new List<BinInstructionItem>();
+        var createdCount = 0;
+        var totalQty = 0;
+
+        foreach (var item in keep)
+        {
+            if (item.TargetBin == null) continue; // ohne Ziel ueberspringen
+
+            var qty = item.QuantityCollected > 0 ? item.QuantityCollected : item.QuantityNeeded;
+            if (qty <= 0) continue;
+
+            // Pre-Tag-Fix v0.1.19-beta.7: BrickognizeCategory ueber Heuristik
+            // damit Default-Regel "max 1 PartId pro Kategorie pro Bin" greift.
+            var derivedCategory = _categoryMapping?.DeriveCategoryFromPartName(item.PartName)
+                ?? ICategoryBinMappingService.UnknownCategory;
+
+            try
+            {
+                await _partLookup.AddPartToFloatingAsync(
+                    item.BlPartNo, item.BlColorId,
+                    item.PartName, item.ColorName,
+                    qty, item.TargetBin.Id,
+                    derivedCategory);
+            }
+            catch (InvalidBinKindException strict)
+            {
+                // Strict-Mode-Verletzung: Bin akzeptiert das Teil nicht (z.B.
+                // weil dort nur Complete-Figuren liegen). Wir werfen weiter
+                // damit der UI-Layer (Wizard-Dialog) den User informieren kann.
+                Log.Warning(strict,
+                    "ConfirmPendingModeAsync: Strict-Mode-Verletzung beim Lagern von {Part} in '{Bin}'",
+                    item.BlPartNo, item.TargetBin.Label);
+                throw;
+            }
+
+            createdCount++;
+            totalQty += qty;
+            instructionItems.Add(new BinInstructionItem
+            {
+                ItemLabel = $"{item.PartName} ({item.BlPartNo}) - {item.ColorName}",
+                QuantityText = $"{qty} Stueck",
+                BinLabel = item.TargetBin.Label,
+                ImageUrl = item.ImageUrl
+            });
+        }
+
+        // v0.1.23 (UX X.33 Block B): Summary-ScanEvent fuer den Verlauf-Tab
+        // damit der Direkt-Zerlegen-Pfad sichtbar bleibt - die einzelnen
+        // FloatingPart-Eintraege schreibt AddPartToFloatingAsync schon.
+        if (createdCount > 0)
+        {
+            await using var auditCtx = await _ctxFactory.CreateDbContextAsync();
+            auditCtx.ScanEvents.Add(new ScanEvent
+            {
+                Timestamp = DateTime.UtcNow,
+                Type = ScanType.MinifigScan,
+                RecognizedId = BricklinkId,
+                ResultDescription = $"Direkt-Zerlegen (Pending) - {createdCount} Einzelteil-Eintraege ({totalQty} Stueck)",
+                WasUndone = false
+            });
+            await auditCtx.SaveChangesAsync();
+        }
+
+        LastBinInstructionItems = instructionItems;
+
+        Log.Information("Pending-Dismantle: {Count} FloatingPart-Eintraege angelegt/aktualisiert ({Total} Stueck)",
+            createdCount, totalQty);
+
+        return new DismantleResult
+        {
+            Success = true,
+            CreatedFloatingParts = createdCount,
+            TotalPartsTransferred = totalQty
+        };
+    }
+
+    /// <summary>
+    /// v0.1.23 Legacy-Fallback: inline-DB-Write fuer Test-Pfade ohne
+    /// PartLookupService. Spiegelt das Verhalten vor dem A9-Refactor.
+    /// </summary>
+    private async Task<DismantleResult> ConfirmPendingModeLegacyAsync(
+        List<DismantlePartItemViewModel> keep)
+    {
         var instructionItems = new List<BinInstructionItem>();
         var createdCount = 0;
         var totalQty = 0;
@@ -600,38 +695,24 @@ public partial class DismantleWizardViewModel : ObservableObject
 
         foreach (var item in keep)
         {
-            if (item.TargetBin == null) continue; // ohne Ziel ueberspringen
-
+            if (item.TargetBin == null) continue;
             var qty = item.QuantityCollected > 0 ? item.QuantityCollected : item.QuantityNeeded;
             if (qty <= 0) continue;
 
-            // Bin-FreedAt zuruecksetzen falls als frei markiert (UX-X.6).
             var bin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == item.TargetBin.Id);
             if (bin == null) continue;
-            if (bin.FreedAt != null)
-            {
-                Log.Information("Pending-Dismantle: Fach '{Label}' war frei seit {FreedAt} - wird wieder belegt",
-                    bin.Label, bin.FreedAt);
-                bin.FreedAt = null;
-            }
+            if (bin.FreedAt != null) bin.FreedAt = null;
 
-            // Bestehender FloatingPart in Ziel-Bin? -> Quantity additiv.
             var existing = await ctx.FloatingParts.FirstOrDefaultAsync(fp =>
                 fp.PartNumber == item.BlPartNo
                 && fp.ColorId == item.BlColorId
                 && fp.StorageBinId == item.TargetBin.Id);
-
             if (existing != null)
             {
                 existing.Quantity += qty;
             }
             else
             {
-                // Pre-Tag-Fix v0.1.19-beta.7: BrickognizeCategory IMMER setzen
-                // (Heuristik via PartName-Praefix gegen SeenBrickognizeCategories,
-                // Fallback "Unbekannt"). Sonst greift die Default-Regel "max 1
-                // PartId pro Kategorie pro Bin" nicht und User kann z.B. zwei
-                // verschiedene Koepfe ins gleiche Fach lagern.
                 var derivedCategory = _categoryMapping?.DeriveCategoryFromPartName(item.PartName)
                     ?? ICategoryBinMappingService.UnknownCategory;
                 ctx.FloatingParts.Add(new FloatingPart
@@ -646,21 +727,6 @@ public partial class DismantleWizardViewModel : ObservableObject
                     AddedAt = now
                 });
             }
-
-            // UX X.33 v0.1.19-beta.7 Drift-Fix: pro angelegtem FloatingPart
-            // einen ScanEvent damit Direkt-Zerlegen im Verlauf-Tab sichtbar
-            // ist (vorher: keine Audit-Spur). Form analog zu
-            // PartLookupService.AddPartToFloatingAsync, mit Hinweis dass es
-            // ein Direkt-Zerlegen-Pfad war.
-            ctx.ScanEvents.Add(new ScanEvent
-            {
-                Timestamp = now,
-                Type = ScanType.PartScan,
-                RecognizedId = item.BlPartNo,
-                ResultDescription = $"Direkt-Zerlegen: Einzelteil {item.BlPartNo}/{item.BlColorId} in '{item.TargetBin.Label}' gelagert (+{qty})",
-                WasUndone = false
-            });
-
             createdCount++;
             totalQty += qty;
             instructionItems.Add(new BinInstructionItem
@@ -674,10 +740,6 @@ public partial class DismantleWizardViewModel : ObservableObject
 
         await ctx.SaveChangesAsync();
         LastBinInstructionItems = instructionItems;
-
-        Log.Information("Pending-Dismantle: {Count} FloatingPart-Eintraege angelegt/aktualisiert ({Total} Stueck)",
-            createdCount, totalQty);
-
         return new DismantleResult
         {
             Success = true,

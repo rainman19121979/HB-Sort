@@ -130,6 +130,13 @@ public partial class BuildSuggestionDetailDialog : Window
             DialogResult = true;
             Close();
         }
+        catch (HBSort.Core.Services.InvalidBinKindException strict)
+        {
+            // v0.1.23 Strict-Mode: Ziel-Bin akzeptiert die Figur nicht.
+            Log.Warning(strict, "BuildSuggestion: Strict-Mode-Verletzung");
+            _notifications.ShowError(strict.Message);
+            _vm.IsCreating = false;
+        }
         catch (Exception ex)
         {
             Log.Error(ex, "BuildSuggestion: Figur anlegen fehlgeschlagen");

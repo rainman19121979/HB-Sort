@@ -11,12 +11,12 @@
     <!-- UX X.28 (v0.1.15): Version-Strings werden im CI-Pipeline-Tag-Build
          ueberschrieben (-p:Version, -p:AssemblyVersion, -p:FileVersion,
          -p:InformationalVersion). Lokal-Build (Visual Studio F5) zeigt
-         "0.1.15-dev" als InformationalVersion -> Splash-Marker fuer User
+         "0.1.23-dev" als InformationalVersion -> Splash-Marker fuer User
          dass dies kein Tag-Release ist. -->
-    <Version>0.1.15</Version>
-    <AssemblyVersion>0.1.15.0</AssemblyVersion>
-    <FileVersion>0.1.15.0</FileVersion>
-    <InformationalVersion>0.1.15-dev</InformationalVersion>
+    <Version>0.1.23</Version>
+    <AssemblyVersion>0.1.23.0</AssemblyVersion>
+    <FileVersion>0.1.23.0</FileVersion>
+    <InformationalVersion>0.1.23-dev</InformationalVersion>
     <AssemblyTitle>HB-Sort</AssemblyTitle>
     <Product>HB-Sort</Product>
     <Company>HB-Bricks</Company>

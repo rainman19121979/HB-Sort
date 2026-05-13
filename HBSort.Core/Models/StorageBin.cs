@@ -23,6 +23,14 @@ public class StorageBin
     /// <summary>Optionale Notizen zum Fach (max. 500 Zeichen, vom User pflegbar).</summary>
     public string? Notes { get; set; }
 
+    /// <summary>
+    /// v0.1.23: persistierter Bin-Typ. Wird vom Service nach jeder Schreib-
+    /// Aktion via RecalculateKindAsync aktualisiert. Default Empty fuer
+    /// neu angelegte Bins. Migration AddStorageBinKind plus Backfill-
+    /// Methode beim App-Start setzen den Wert bei bestehenden DB-Eintraegen.
+    /// </summary>
+    public StorageBinKind Kind { get; set; } = StorageBinKind.Empty;
+
     /// <summary>Alle Minifiguren die aktuell in diesem Fach liegen</summary>
     public List<TrackedMinifig> TrackedMinifigs { get; set; } = [];
 
