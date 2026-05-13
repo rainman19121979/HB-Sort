@@ -32,7 +32,7 @@
     <!-- System.Text.Json ist ab .NET 8 eingebaut, braucht kein extra Paket -->
 
     <!-- Serilog für Logging auch in der Core-Schicht -->
-    <PackageReference Include="Serilog" Version="4.2.0" />
+    <PackageReference Include="Serilog" Version="4.3.1" />
 
     <!-- DI-Abstraktion -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
