@@ -49,37 +49,20 @@ public partial class MainWindow : Window
         // wieder aktiviert werden.
         FocusTrap.Focus();
 
-        // v0.1.22-beta.1 Fix 2026-05-12: First-Run-Check und Camera-Init via
-        // Dispatcher.BeginInvoke mit ContextIdle-Priority. Damit wartet die
-        // Logik bis WPF alle initialen Render-Passes fuer MainWindow durch hat.
+        // v0.1.22-beta.3 (zweiter Versuch) 2026-05-13: Camera-Init wurde in
+        // Application_Startup verschoben (Splash-Pfad mit eigenem Status
+        // "Initialisiere Kamera..."). User sieht beim App-Start zuerst den
+        // Splash mit dem Camera-Status, danach erscheint das MainWindow
+        // startklar inkl. Live-Bild.
         //
-        // Vorher (UX X.34 v0.1.20-beta.3): synchroner await in Loaded -
-        //   - ShowDialog() blockt den UI-Thread BEVOR MainWindow gerendert ist,
-        //     Welcome-Dialog erschien auf jungfraeulicher Installation vor dem
-        //     noch leeren MainWindow.
-        //   - InitializeCameraAsync blockierte 5-10s den Loaded-Handler,
-        //     sichtbare Luecke zwischen Splash-Close und sichtbarem MainWindow.
-        //
-        // Mit ContextIdle:
-        //   - WPF schliesst alle Render-Passes ab BEVOR die Lambda laeuft
-        //   - MainWindow ist vollstaendig sichtbar wenn Welcome (falls noetig)
-        //     erscheint
-        //   - Camera-Init laeuft asynchron, blockt nicht mehr (User kann
-        //     waehrenddessen Welcome bedienen, scannen geht erst nach
-        //     "Bereit"-Status)
+        // Welcome-Dialog (First-Run) + Brickognize-Health-Check bleiben hier
+        // via Dispatcher.BeginInvoke + ContextIdle: erst nach den initialen
+        // Render-Passes feuern damit Welcome auf einem gerenderten Window
+        // erscheint (nicht auf einem leeren Frame).
         Dispatcher.BeginInvoke(new Action(async () =>
         {
             await ShowFirstRunDialogIfNeededAsync();
-
-            // v0.1.22-beta.1 Fix: Camera-Init als fire-and-forget statt await.
-            // Sonst blockt der Loaded-Handler 5-10s und MainWindow rendert
-            // nicht fertig. Wenn der User scannen will bevor Camera bereit
-            // ist, zeigt die App schon einen Toast "Camera nicht bereit".
-            _ = _viewModel.ScanViewModel.InitializeCameraAsync();
-
-            // Brickognize-Health-Check im Hintergrund (war schon fire-and-forget).
             _ = _viewModel.RunBrickognizeHealthCheckAsync();
-
             _viewModel.StatusText = "Bereit";
         }), System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
