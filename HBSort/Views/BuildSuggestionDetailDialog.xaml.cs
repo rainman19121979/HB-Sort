@@ -162,7 +162,8 @@ public partial class BuildSuggestionDetailDialog : Window
 
         if (owner?.DataContext is HBSort.ViewModels.MainViewModel main)
         {
-            main.OpenSettings();
+            // v0.1.22-beta.3: direkt auf Lagerfaecher-Tab springen
+            main.OpenSettingsOnTab(SettingsTab.Lagerfaecher);
         }
     }
 

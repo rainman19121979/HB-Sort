@@ -73,7 +73,8 @@ public partial class MinifigDetailView : UserControl
         var window = Window.GetWindow(this);
         if (window?.DataContext is MainViewModel main)
         {
-            main.OpenSettings();
+            // v0.1.22-beta.3: direkt auf Lagerfaecher-Tab springen.
+            main.OpenSettingsOnTab(HBSort.Views.SettingsTab.Lagerfaecher);
         }
     }
 

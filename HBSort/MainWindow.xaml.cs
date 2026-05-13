@@ -33,7 +33,7 @@ public partial class MainWindow : Window
 
         // UX X.20 Teil 6: Strg+, oeffnet Einstellungen. Das VM feuert das Event,
         // weil es nicht selbst Window-Instanzen erstellen darf.
-        _viewModel.OpenSettingsRequested += (_, _) => OpenSettings_Click(this, new RoutedEventArgs());
+        _viewModel.OpenSettingsRequested += (_, args) => OpenSettingsForTab(args.InitialTab);
 
         // UX X.21 Teil 3: Strg+Q beendet die App. Analog zum Settings-Event -
         // das VM darf nicht selbst Application.Shutdown() rufen.
@@ -349,9 +349,17 @@ public partial class MainWindow : Window
         => _viewModel.SwitchToHistoryTabCommand.Execute(null);
 
     private void OpenSettings_Click(object sender, RoutedEventArgs e)
+        => OpenSettingsForTab(Views.SettingsTab.Default);
+
+    /// <summary>
+    /// v0.1.22-beta.3 (2026-05-13): Settings mit Tab-Hint oeffnen. Volle-
+    /// Faecher-Banner-Buttons aus den Dialogen springen so direkt auf den
+    /// Lagerfaecher-Tab statt auf dem Default-Tab (Erkennung) zu landen.
+    /// </summary>
+    private void OpenSettingsForTab(Views.SettingsTab initialTab)
     {
         var settingsVm = App.Services.GetRequiredService<SettingsViewModel>();
-        var settingsWindow = new Views.SettingsWindow(settingsVm) { Owner = this };
+        var settingsWindow = new Views.SettingsWindow(settingsVm, initialTab) { Owner = this };
 
         try
         {

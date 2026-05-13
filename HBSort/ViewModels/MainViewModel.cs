@@ -479,11 +479,19 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// Strg+Komma: Einstellungen oeffnen. Wir feuern ein Event, das das
     /// MainWindow auffaengt und den SettingsDialog oeffnet - das VM darf
     /// kein Window direkt instanziieren.
+    ///
+    /// v0.1.22-beta.3 (2026-05-13): EventArgs erweitert um InitialTab.
+    /// Aufrufer (z.B. Volle-Faecher-Banner-Button) koennen so direkt auf
+    /// den Lagerfaecher-Tab springen statt auf dem Default zu landen.
     /// </summary>
-    public event EventHandler? OpenSettingsRequested;
+    public event EventHandler<OpenSettingsEventArgs>? OpenSettingsRequested;
 
     [RelayCommand]
-    public void OpenSettings() => OpenSettingsRequested?.Invoke(this, EventArgs.Empty);
+    public void OpenSettings() => OpenSettingsRequested?.Invoke(this, OpenSettingsEventArgs.Default);
+
+    /// <summary>v0.1.22-beta.3: Settings mit vorausgewaehltem Tab oeffnen.</summary>
+    public void OpenSettingsOnTab(HBSort.Views.SettingsTab tab)
+        => OpenSettingsRequested?.Invoke(this, new OpenSettingsEventArgs { InitialTab = tab });
 
     /// <summary>
     /// UX-Iteration X.21 Teil 3: Strg+Q = App beenden. Wir feuern ein Event,
@@ -673,4 +681,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
         Log.Information("MainViewModel disposed");
         GC.SuppressFinalize(this);
     }
+}
+
+/// <summary>
+/// v0.1.22-beta.3 (2026-05-13): EventArgs fuer OpenSettingsRequested
+/// damit Banner-Buttons & Co. einen Tab-Hint mitliefern koennen.
+/// </summary>
+public class OpenSettingsEventArgs : EventArgs
+{
+    public HBSort.Views.SettingsTab InitialTab { get; init; } = HBSort.Views.SettingsTab.Default;
+    public static readonly OpenSettingsEventArgs Default = new();
 }
