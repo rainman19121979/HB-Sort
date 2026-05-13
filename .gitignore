@@ -69,6 +69,9 @@ RELEASE_PROCESS.md
 # Bleiben lokal, sind nicht final dokumentiert + nicht stable.
 docs/*-konzept-*.md
 
+# Lokale Planungs-/Engineering-Dokumente (nicht im Repo)
+ENGINEERING_PRINCIPLES.md
+
 # Andere AI-Tooling-Files (falls jemand mit Cursor/Aider/Copilot arbeitet).
 PROMPT_*.md
 .cursor/
