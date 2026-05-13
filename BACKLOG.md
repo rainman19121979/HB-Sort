@@ -121,6 +121,12 @@ Items archiviert werden.
 - 📋 **DB-Ordner verschiebbar** - per Setting konfigurieren
 - 📋 **Channel-Switching Settings (Stable/Beta)** - Velopack-Setup
 - 📋 **SuggestBinForCompleteMinifig auch im DismantleWizard** - aktuell nur im Sortier-Tab
+- 📋 **Test-Harness fuer ScanViewModel + SettingsViewModel** -
+  beide haben 16+ DI-Parameter, kein existierender Test-Setup.
+  Eigene Test-Infrastruktur-Iteration noetig damit VM-Tests effizient
+  geschrieben werden koennen (entdeckt in v0.1.22-beta.4).
+- 📋 **Tot-Code SwitchCameraAsync entfernen** - `ScanViewModel.cs:1759`,
+  Command wird nirgends mehr aufgerufen (entdeckt in v0.1.22-beta.4).
 
 ---
 
@@ -133,6 +139,59 @@ Items archiviert werden.
 ---
 
 ## Erledigt ✅
+
+### v0.1.22 (Stable, 2026-05-13) - Performance + Bin-Typ-Trennung + Camera-Lazy-Enumeration
+
+Sammel-Iteration mit 4 Betas. Tag zeigt auf `a6fd3884`.
+
+- ✅ **perf: Bulk-FindFloatingLocations gegen N+1** (`e8d235a0`) -
+  CollectMinifigSelection + DismantleWizard: pro Required-Part-Lookup
+  jetzt EINE Query statt N.
+- ✅ **feat: Splash zeigt Init-Phasen-Status** (`fa72c4b7`) - statt
+  fixem "Bereitet App vor..." pro Phase ein eigener Status.
+- ✅ **perf: Profiling-Stopwatches an 4 Hotspots** (`aa6e01fc`) -
+  `[PROFILE]`-Log-Zeilen fuer CollectMinifig/Dismantle/BuildSuggestion/
+  SettingsViewModel-ctor.
+- ✅ **feat: CollectMinifigSelection Volle-Faecher-Banner** (`4b209b51`) -
+  Block-K-Konsistenz.
+- ✅ **refactor: DismantleWizard Helper-Refactor** (`15b59159`) -
+  `ReloadAvailableBinsAsync` + `ApplySmartHintIfAny` extrahiert.
+- ✅ **refactor: BinInstruction-Overlay konsolidiert** (`e40ff4aa`) -
+  Single + Group zu einer VM/View mit Mode-Switch.
+- ✅ **feat: Bin-Typ-Trennung mit Reifungspfad** (`47ccda9e`) -
+  `BinKind`-Enum + `GetBinKindAsync` + `FindBestandMixBinsAsync` +
+  App-Start-Mix-Bin-Toast.
+- ✅ **fix: Splash-Status sichtbar + Loaded blockt nicht mehr**
+  (`06325e26`) - `Dispatcher.Invoke(Render)` + `ContextIdle` fuer
+  First-Run-Dialog.
+- ✅ **feat: GetItemNamesAsync Bulk-Lookup** (`5a0a6740`) - eine Query
+  statt N pro Item-Name-Lookup.
+- ✅ **fix: PartName beim Block-D-Anlegen befuellen** (`23bcf5af`) -
+  CollectMinifigFromSuperset(WithSelection)Async holt jetzt PartName
+  aus bl_items.
+- ✅ **migration: TrackedMinifigPart.PartName-Backfill** (`695861a8`) -
+  App-Start-Migration fuer Bestand.
+- ✅ **Dependabot-Sammel-Bumps** (Welle 1-3, 5 Pakete): xunit 3.1.5,
+  Serilog 4.3.1, Sinks.Console 6.1.1, Sinks.File 7.0.0, ProtectedData
+  10.0.7. PRs #20-#24 (zwei davon lokal angewandt wegen Konflikt nach
+  Welle 1).
+- ✅ **feat: GetEligibleBinsAsync typ-gefilterte Bin-Liste** (`3b9bab85`).
+- ✅ **fix: Combobox-Filter in 4 Dialogen** (`2a3f6739`, `07234d61`,
+  `d74be9a7`, `654f1f1c`) - CollectMinifigSelection, MinifigSummary,
+  DismantleWizard, BuildSuggestionDetail.
+- ✅ **feat: SettingsWindow akzeptiert initialTab** (`93f7d96f`) +
+  **fix: Banner-Button springt auf Lagerfaecher-Tab** (`b562256a`).
+- ✅ **fix: Camera-Init zurueck in Splash-Pfad** (`defd3750`, `455a855b`) -
+  beta.3-Erstversuch hatte das vergessen.
+- ✅ **feat: Camera-Lazy-Enumeration** (`a6fd3884`) - App-Start ~15s
+  schneller. GetAvailableCameras() laeuft nur noch lazy im Settings-
+  Tab.
+
+Tests: 548/548 gruen.
+
+Konvention-Updates: `OpenSettingsRequested`-Event hat `OpenSettings
+EventArgs` mit `InitialTab`-Property; Banner-Buttons springen direkt
+auf den Lagerfaecher-Tab via `OpenSettingsOnTab(SettingsTab.Lagerfaecher)`.
 
 ### v0.1.21 (Hotfix, 2026-05-12) - bl_colors Cache-First + colors.xml im BulkImporter
 
@@ -305,8 +364,11 @@ Aenderungen am Cache-Schema + Provider-Logik.
 | **v0.1.20-beta.5** | ✅ released (2026-05-12) | UX X.34 - bl_prices Cache-Fix + Brickognize-Throttle + ScanViewModel-Dispose + 4-Nachkommastellen-Preise |
 | **v0.1.20** | ✅ released (Stable, 2026-05-12) | UX X.34 stable - alle beta.1..beta.5-Aenderungen konsolidiert |
 | **v0.1.21** | ✅ released (Stable, 2026-05-12) | Hotfix - bl_colors Cache-First + colors.xml im BulkImporter + Auto-Reimport-Trigger + CI-Padding-Fix |
-| **v0.2.0** | 💭 Brainstorming | BL-Inventar-Integration (eigene große Iteration) |
-| v0.2.1+ | offen | weitere Features aus Backlog |
+| **v0.1.22-beta.1..4** | ✅ released (2026-05-12/13) | Performance + Bin-Typ-Trennung + Splash-Fix + PartName-Fix + Dependabot + Camera-Lazy-Enumeration |
+| **v0.1.22** | ✅ released (Stable, 2026-05-13) | beta.1..beta.4 konsolidiert |
+| **v0.1.23** | 📋 geplant | Bin-Typ-Spalte (StorageBin.Kind als persistierte Enum), Strict-Mode, Migration. ~5h, eine Beta. |
+| **v0.1.24** | 📋 geplant | Anlegen-Dialog-Redesign (systemweite Floating-Auswahl) + BL-Inventar-Integration (Mass-Update-Export). ~20h, drei Betas. |
+| **v0.2.0** | 💭 Brainstorming | grosse Features aus Backlog (siehe oben) |
 
 Konvention:
 - Patch-Iteration (v0.x.Y) für Cleanup + kleine Features
@@ -314,4 +376,4 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-12 nach v0.1.21-Hotfix-Release + Versions-Schema-Konvention.*
+*Zuletzt aktualisiert: 2026-05-13 nach v0.1.22-Stable-Release.*
