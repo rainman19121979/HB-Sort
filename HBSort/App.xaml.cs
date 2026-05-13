@@ -137,6 +137,14 @@ public partial class App : Application
             // Idempotent - macht nur Eintraege mit null/empty an.
             await BackfillBrickognizeCategoriesAsync();
 
+            // 6.512 v0.1.22-beta.1 Fix 2026-05-12: Backfill fuer leere
+            // TrackedMinifigPart.PartName-Eintraege. Bestand vor dem Fix
+            // (Block-D-Anlegepfad) hat die Spalte leer - dadurch faellt die
+            // DeriveCategoryFromPartName-Heuristik beim Zerlegen auf
+            // "Unbekannt" und die Default-Regel wird wirkungslos.
+            // Idempotent: bearbeitet nur Zeilen mit null/empty PartName.
+            await BackfillTrackedMinifigPartNamesAsync();
+
             // 6.52 BL-Preis-Cache-Anti-Vergiftung (UX X.34 v0.1.20):
             // Eintraege mit allen Preis-Feldern NULL und total_quantity=0
             // sind das Resultat eines API-Calls mit leeren Filter-Strings
@@ -575,6 +583,58 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log.Warning(ex, "BrickognizeCategory-Backfill geworfen");
+        }
+    }
+
+    /// <summary>
+    /// v0.1.22-beta.1 Fix 2026-05-12: Backfill-Migration fuer
+    /// TrackedMinifigPart.PartName. Bestand vor dem Fix hat die Spalte
+    /// leer (Block-D-Anlege-Pfad in PartLookupService), wodurch die
+    /// DeriveCategoryFromPartName-Heuristik beim Zerlegen "Unbekannt"
+    /// liefert und die Default-Regel "max 1 PartId pro Kategorie pro Bin"
+    /// wirkungslos wird. Bulk-Lookup ueber IBlCacheRepository.GetItemNamesAsync.
+    /// Idempotent: bearbeitet nur Zeilen mit leerem/null PartName.
+    /// </summary>
+    private static async Task BackfillTrackedMinifigPartNamesAsync()
+    {
+        try
+        {
+            using var scope = Services.CreateScope();
+            var ctx = scope.ServiceProvider.GetRequiredService<UserDataContext>();
+            var cache = scope.ServiceProvider.GetRequiredService<IBlCacheRepository>();
+
+            // Track-Query damit wir die Spalte direkt aendern koennen.
+            var withoutName = await ctx.TrackedMinifigParts
+                .Where(p => p.PartName == null || p.PartName == "")
+                .ToListAsync();
+            if (withoutName.Count == 0) return;
+
+            // Bulk-Lookup ueber alle distinct PartNumbers.
+            var partNos = withoutName.Select(p => p.PartNumber).Distinct().ToList();
+            var names = await cache.GetItemNamesAsync(partNos);
+
+            int updated = 0;
+            foreach (var p in withoutName)
+            {
+                if (names.TryGetValue(p.PartNumber, out var name)
+                    && !string.IsNullOrEmpty(name))
+                {
+                    p.PartName = name;
+                    updated++;
+                }
+            }
+
+            await ctx.SaveChangesAsync();
+            Log.Information(
+                "TrackedMinifigPart.PartName-Backfill: {Updated}/{Total} " +
+                "Eintraege befuellt (Rest hat keinen bl_items-Eintrag)",
+                updated, withoutName.Count);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex,
+                "TrackedMinifigPart.PartName-Backfill geworfen - " +
+                "unkritisch, naechster App-Start versucht es wieder");
         }
     }
 
