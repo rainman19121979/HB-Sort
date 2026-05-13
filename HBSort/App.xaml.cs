@@ -184,6 +184,26 @@ public partial class App : Application
             // Supersets-Cache vor Einfuehrung von IsFromSupersets).
             await CleanupOnePartCompletesAsync();
 
+            // v0.1.22-beta.3 (zweiter Versuch) 2026-05-13: Camera-Init
+            // synchron im Splash-Pfad statt fire-and-forget in Window_Loaded.
+            // User-Wunsch: Hauptfenster erscheint vollstaendig startklar inkl.
+            // Live-Bild. Vorher zeigte das MainWindow 20s eine leere Camera-
+            // Area waehrend InitializeCameraAsync im Hintergrund lief.
+            splash.SetStatus("Initialisiere Kamera...");
+            try
+            {
+                var mainVm = Services.GetRequiredService<ViewModels.MainViewModel>();
+                await mainVm.ScanViewModel.InitializeCameraAsync();
+            }
+            catch (Exception cameraEx)
+            {
+                // Camera-Init darf den App-Start NICHT verhindern. Fehler nur
+                // loggen, App startet ohne Camera (User kann in Settings die
+                // Kamera waehlen).
+                Log.Warning(cameraEx, "Camera-Init beim Start fehlgeschlagen - " +
+                    "App startet ohne Live-Bild. User kann in Settings die Kamera waehlen.");
+            }
+
             splash.SetStatus("Bereite Hauptfenster vor...");
 
             // 7. Hauptfenster anzeigen
