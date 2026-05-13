@@ -19,6 +19,16 @@ public partial class SettingsWindow : Window
     private readonly SettingsViewModel _viewModel;
 
     public SettingsWindow(SettingsViewModel viewModel)
+        : this(viewModel, SettingsTab.Default)
+    {
+    }
+
+    /// <summary>
+    /// v0.1.22-beta.3 (2026-05-13): zusaetzlicher ctor-Pfad fuer Aufrufer
+    /// die direkt auf einen bestimmten Tab springen wollen (z.B. der
+    /// Volle-Faecher-Banner-Button -> SettingsTab.Lagerfaecher).
+    /// </summary>
+    public SettingsWindow(SettingsViewModel viewModel, SettingsTab initialTab)
     {
         InitializeComponent();
         _viewModel = viewModel;
@@ -35,6 +45,7 @@ public partial class SettingsWindow : Window
         // Phase 6: Statistik-Daten initial laden (best-effort, blockt nicht).
         // UX X.33 v0.1.19-beta.7 Block M: Category-Mappings ebenfalls einmalig
         // beim Oeffnen laden (best-effort, fail-silent).
+        // v0.1.22-beta.3: zusaetzlich Initial-Tab auswaehlen wenn != Default.
         Loaded += async (_, _) =>
         {
             try { await _viewModel.LoadStatsAsync(); }
@@ -42,7 +53,38 @@ public partial class SettingsWindow : Window
 
             try { await _viewModel.ReloadCategoryMappingsAsync(); }
             catch (System.Exception ex) { Log.Debug(ex, "ReloadCategoryMappingsAsync fehlgeschlagen"); }
+
+            if (initialTab != SettingsTab.Default)
+            {
+                SelectTab(initialTab);
+            }
         };
+    }
+
+    private void SelectTab(SettingsTab tab)
+    {
+        // Header-String muss exakt zum XAML-Header passen (case-insensitiv
+        // gegen Contains). Lagerfaecher-Tab = Header="Lagerfaecher" (Zeile 874
+        // in SettingsWindow.xaml).
+        var headerName = tab switch
+        {
+            SettingsTab.Lagerfaecher => "Lagerfaecher",
+            SettingsTab.BrickLink     => "BrickLink",
+            SettingsTab.Kategorien    => "Kategorien",
+            _ => null
+        };
+        if (headerName == null) return;
+
+        foreach (var obj in MainTabControl.Items)
+        {
+            if (obj is TabItem item
+                && item.Header is string header
+                && header.Contains(headerName, System.StringComparison.OrdinalIgnoreCase))
+            {
+                item.IsSelected = true;
+                return;
+            }
+        }
     }
 
     /// <summary>Speichern-Button: Settings uebernehmen und Fenster schliessen</summary>
@@ -595,4 +637,17 @@ public partial class SettingsWindow : Window
             b.IsEnabled = true;
         }
     }
+}
+
+/// <summary>
+/// v0.1.22-beta.3 (2026-05-13): Auswahl des Initial-Tabs beim Oeffnen des
+/// SettingsWindow. Default = den bestehenden zuerst-deklarierten Tab
+/// (Erkennung).
+/// </summary>
+public enum SettingsTab
+{
+    Default,
+    Lagerfaecher,
+    BrickLink,
+    Kategorien
 }

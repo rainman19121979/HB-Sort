@@ -23,7 +23,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TabControl Grid.Row="0">
+        <TabControl Grid.Row="0" x:Name="MainTabControl">
 
             <!-- ====================================== -->
             <!-- TAB 1: ERKENNUNG (UX X.11)
