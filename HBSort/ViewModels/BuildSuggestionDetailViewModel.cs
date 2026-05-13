@@ -193,17 +193,6 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
         OnPropertyChanged(nameof(TotalQuantityHave));
         OnPropertyChanged(nameof(AvailabilityLabel));
 
-        // 6) Lagerfaecher fuellen - frei zuerst (sortiert), dann belegte.
-        AvailableBins.Clear();
-        var free = await binService.GetFreeAsync();
-        var occupied = await binService.GetOccupiedAsync();
-        foreach (var b in free) AvailableBins.Add(b);
-        foreach (var b in occupied) AvailableBins.Add(b);
-
-        // UX X.31 (v0.1.18) + UX X.32 v0.1.19-beta.4: Default-Auswahl aus
-        // Suggest-Service holen, damit Faecher mit Complete-Figuren NICHT
-        // als "frei" vorgeschlagen werden (UX-X.6-Konvention).
-        //
         // UX X.33 v0.1.19-beta.7 Block L: wenn schon alle Required-Parts
         // im Floating-Pool liegen, wird die Figur durch den Reverse-Match
         // SOFORT Complete - dann muss der Default-Bin auch nach Complete-
@@ -213,6 +202,18 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
         // innerhalb der App-DI sicher erreichbar.
         var settings = App.Services.GetRequiredService<HBSort.Core.Services.ISettingsService>();
         var willBeComplete = Parts.Count > 0 && Parts.All(p => p.IsFullyAvailable);
+
+        // 6) Lagerfaecher fuellen - v0.1.22-beta.3 (2026-05-13): typ-gefiltert
+        //    je nach willBeComplete-Vorhersage (Reifungspfad-Mix wartend+complete
+        //    ist via GetEligibleBinsAsync intern erlaubt). Vorher GetFreeAsync +
+        //    GetOccupiedAsync - das hat auch FloatingOnly-Bins als Move-Ziel
+        //    angeboten, inkonsistent zum Volle-Faecher-Banner.
+        var binTargetKind = willBeComplete
+            ? BinTargetKind.CompleteMinifigTarget
+            : BinTargetKind.WaitingMinifigTarget;
+        AvailableBins.Clear();
+        var eligible = await binService.GetEligibleBinsAsync(binTargetKind);
+        foreach (var b in eligible) AvailableBins.Add(b);
         StorageBin? suggested;
         if (willBeComplete)
         {
