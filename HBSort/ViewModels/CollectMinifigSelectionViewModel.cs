@@ -104,7 +104,13 @@ public partial class CollectMinifigSelectionViewModel : ObservableObject
             // Teils uebergeben - das war fuer die NEUE wartende Figur falsch.
             if (_binService != null)
             {
-                var allBins = await _binService.GetAllAsync(ct);
+                // v0.1.22-beta.3 (2026-05-13): typ-gefilterte Liste - es
+                // werden nur Bins angeboten die fuer eine wartende Figur
+                // zulaessig sind (Empty / WaitingMinifig / CompleteOnly).
+                // Vorher zeigte die Combobox auch Floating-Bins, was zur
+                // Inkonsistenz mit dem Volle-Faecher-Banner fuehrte.
+                var allBins = await _binService.GetEligibleBinsAsync(
+                    BinTargetKind.WaitingMinifigTarget, ct: ct);
                 AvailableBins.Clear();
                 foreach (var b in allBins) AvailableBins.Add(b);
 
