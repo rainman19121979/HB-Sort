@@ -114,9 +114,16 @@ public partial class MinifigSummaryViewModel : ObservableObject
             _ = LoadAndPersistMinifigImageAsync(m.Id, m.BricklinkId ?? m.FigNum);
         }
 
-        // Move-Targets: alle Faecher AUSSER dem aktuellen
+        // Move-Targets: alle TYP-PASSENDEN Faecher AUSSER dem aktuellen.
+        // v0.1.22-beta.3 (2026-05-13): vorher GetAllAsync, was auch Floating-
+        // Bins als Move-Ziel angeboten hat - inkonsistent zum Volle-Faecher-
+        // Banner. Jetzt typ-gefiltert je nach Status der Figur.
+        var targetKind = Status == TrackedMinifigStatus.Complete
+            ? BinTargetKind.CompleteMinifigTarget
+            : BinTargetKind.WaitingMinifigTarget;
         AvailableBins.Clear();
-        var bins = await _binService.GetAllAsync();
+        var bins = await _binService.GetEligibleBinsAsync(
+            targetKind, excludeMinifigId: m.Id);
         foreach (var b in bins.Where(b => b.Id != CurrentBinId))
             AvailableBins.Add(b);
 
