@@ -54,6 +54,12 @@ public partial class SettingsWindow : Window
             try { await _viewModel.ReloadCategoryMappingsAsync(); }
             catch (System.Exception ex) { Log.Debug(ex, "ReloadCategoryMappingsAsync fehlgeschlagen"); }
 
+            // v0.1.22-beta.4: Lazy-Enumeration der Kameras beim Settings-
+            // Open (auf Thread-Pool, blockt UI nicht). Combobox zeigt
+            // bis dahin einen Platzhalter "Kamera {savedIndex}".
+            try { await _viewModel.EnumerateCamerasAsync(); }
+            catch (System.Exception ex) { Log.Debug(ex, "EnumerateCamerasAsync fehlgeschlagen"); }
+
             if (initialTab != SettingsTab.Default)
             {
                 SelectTab(initialTab);

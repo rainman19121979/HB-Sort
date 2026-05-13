@@ -453,19 +453,38 @@ public partial class ScanViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public async Task InitializeCameraAsync()
     {
-        AvailableCameras = _cameraService.GetAvailableCameras();
-
-        if (AvailableCameras.Count == 0)
-        {
-            ScanStatusText = "Keine Kamera gefunden! Bitte USB-Kamera anschliessen.";
-            Log.Warning("Keine Kamera gefunden");
-            return;
-        }
-
+        // v0.1.22-beta.4 2026-05-13: Lazy-Enumeration. Beim App-Start
+        // KEINE GetAvailableCameras()-Schleife (probiert 10 Indizes,
+        // jeder Probe-Konstruktor 1-3s = 17-20s UI-Block bei einer
+        // Kamera). Stattdessen: gespeicherten Index direkt oeffnen.
+        // Volle Enumeration nur lazy im Settings-Tab "Erkennung" wenn
+        // der User dort die Kamera-Combobox oeffnet.
         var savedIndex = _settingsService.Current.SelectedCameraIndex;
-        SelectedCameraIndex = savedIndex < AvailableCameras.Count ? savedIndex : 0;
+        if (savedIndex < 0) savedIndex = 0;
+        SelectedCameraIndex = savedIndex;
 
-        await StartCameraAsync(SelectedCameraIndex);
+        try
+        {
+            await StartCameraAsync(savedIndex);
+        }
+        catch (Exception ex)
+        {
+            // Kein Re-Throw - App soll trotzdem starten. StartCameraAsync
+            // setzt IsCameraRunning intern auf false bei Fehler; falls
+            // doch eine Exception durchkommt: defensiv behandeln.
+            Log.Warning(ex,
+                "Camera-Init mit gespeichertem Index {Idx} fehlgeschlagen - " +
+                "User muss in Settings eine andere Kamera waehlen", savedIndex);
+            IsCameraRunning = false;
+            ScanStatusText = "Kamera konnte nicht gestartet werden!";
+            try
+            {
+                _notifications.ShowError(
+                    "Kamera konnte nicht gestartet werden. Bitte in den " +
+                    "Einstellungen unter 'Erkennung' eine Kamera auswaehlen.");
+            }
+            catch { /* Notifications nicht verfuegbar */ }
+        }
     }
 
     public async Task StartCameraAsync(int index)

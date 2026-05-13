@@ -604,8 +604,56 @@ public partial class SettingsViewModel : ObservableObject
         // UX X.34 v0.1.20: VAT-Modus laden.
         PriceVatMode                   = s.Prices.VatMode;
 
-        // Kameras auflisten
-        AvailableCameras = _cameraService.GetAvailableCameras();
+        // v0.1.22-beta.4 2026-05-13: KEINE synchrone Enumeration mehr in
+        // LoadFromSettings. Die GetAvailableCameras()-Schleife dauert
+        // 17-20s und wurde frueher beim Settings-Open (=> auch beim
+        // SettingsViewModel-Konstruktor) gerufen. Jetzt: Enumeration nur
+        // lazy via EnumerateCamerasAsync() wenn der Settings-Dialog
+        // wirklich angezeigt wird (Loaded-Hook in SettingsWindow.xaml.cs).
+        //
+        // Die Combobox zeigt initial einen einzigen Platzhalter-Eintrag
+        // ("Kamera {savedIndex}"), damit der SelectedIndex-Binding-Pfad
+        // nicht ins Leere zeigt. Sobald EnumerateCamerasAsync durch ist,
+        // wird AvailableCameras ersetzt.
+        if (AvailableCameras.Count == 0)
+        {
+            var placeholder = SelectedCameraIndex >= 0
+                ? $"Kamera {SelectedCameraIndex}"
+                : "Kamera 0";
+            AvailableCameras = new List<string> { placeholder };
+        }
+    }
+
+    /// <summary>
+    /// v0.1.22-beta.4 2026-05-13: Lazy-Enumeration der angeschlossenen
+    /// Kameras. Wird vom SettingsWindow beim Loaded-Hook aufgerufen.
+    /// Re-Entrancy-Schutz via IsEnumeratingCameras-Flag. Die Probe-
+    /// Schleife (10x OpenCV-VideoCapture) laeuft auf einem Thread-Pool-
+    /// Worker, der UI-Thread bleibt frei fuer Spinner-Updates.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isEnumeratingCameras;
+
+    public async Task EnumerateCamerasAsync()
+    {
+        if (IsEnumeratingCameras) return;
+        IsEnumeratingCameras = true;
+        try
+        {
+            var cameras = await Task.Run(() => _cameraService.GetAvailableCameras());
+            // SelectedCameraIndex bleibt - Combobox aktualisiert sich automatisch
+            // sobald AvailableCameras gesetzt wird (PropertyChanged auf
+            // _availableCameras via [ObservableProperty]).
+            AvailableCameras = cameras;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Kamera-Enumeration fehlgeschlagen");
+        }
+        finally
+        {
+            IsEnumeratingCameras = false;
+        }
     }
 
     [RelayCommand]
