@@ -260,10 +260,25 @@ public partial class DismantleWizardViewModel : ObservableObject
     /// v0.1.22-beta.1 Block E: extrahierter Helper. Laedt alle Bins
     /// neu und ersetzt den AvailableBins-Inhalt. Wird von LoadAsync und
     /// LoadFromPendingAsync identisch gebraucht.
+    ///
+    /// v0.1.22-beta.3 (2026-05-13): typ-gefilterte Liste (FloatingTarget).
+    /// Beim Zerlegen werden Required-Parts zu FloatingParts - die Combobox
+    /// darf nur Floating-passende Bins anbieten (Empty / FloatingOnly).
+    /// Wartend-Bins mit fremden Figuren werden ausgeschlossen.
+    ///
+    /// Pragmatisch ohne Pro-Part-Reverse-Match-Filter: bei einer Figur
+    /// die zerlegt wird ist der Reverse-Match auf die eigenen RequiredParts
+    /// irrelevant, und ein Pro-Part-Filter waere N-mal GetEligibleBinsAsync
+    /// (kostspielig). Falls Praxis-Test zeigt dass Wartend-Bins mit
+    /// passendem RequiredPart trotzdem als Ziel sinnvoll waeren: spaetere
+    /// Iteration mit Bulk-Lookup-Variante.
     /// </summary>
     private async Task ReloadAvailableBinsAsync()
     {
-        var bins = await _binService.GetAllAsync();
+        var excludeId = TrackedMinifigId > 0 ? (int?)TrackedMinifigId : null;
+        var bins = await _binService.GetEligibleBinsAsync(
+            BinTargetKind.FloatingTarget,
+            excludeMinifigId: excludeId);
         AvailableBins.Clear();
         foreach (var b in bins) AvailableBins.Add(b);
     }
