@@ -64,6 +64,11 @@ CLAUDE.md
 # Recovery-Schritte). Bleibt lokal - nicht oeffentlich.
 RELEASE_PROCESS.md
 
+# Interne Iterations-Konzepte (Vorlagen die der User Claude Code als
+# Auftrag mitgibt + Brainstorming-Drafts fuer kommende Versionen).
+# Bleiben lokal, sind nicht final dokumentiert + nicht stable.
+docs/*-konzept-*.md
+
 # Andere AI-Tooling-Files (falls jemand mit Cursor/Aider/Copilot arbeitet).
 PROMPT_*.md
 .cursor/
