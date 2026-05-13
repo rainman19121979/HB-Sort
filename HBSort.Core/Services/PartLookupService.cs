@@ -16,17 +16,25 @@ public class PartLookupService : IPartLookupService
     private readonly IBlCatalogService _catalog;
     private readonly IMinifigPersistenceService _persistence;
     private readonly IPartImageProvider _imageProvider;
+    private readonly IBlCacheRepository? _cache;
 
     public PartLookupService(
         IDbContextFactory<UserDataContext> ctxFactory,
         IBlCatalogService catalog,
         IMinifigPersistenceService persistence,
-        IPartImageProvider imageProvider)
+        IPartImageProvider imageProvider,
+        IBlCacheRepository? cache = null)
     {
         _ctxFactory = ctxFactory;
         _catalog = catalog;
         _persistence = persistence;
         _imageProvider = imageProvider;
+        // v0.1.22-beta.1 Fix 2026-05-12: BlCacheRepository ist optional damit
+        // bestehende Test-Konstruktoren (4 Params) weiterhin laufen. Produktiv
+        // (App.xaml.cs DI) wird der Cache immer injiziert - die zwei
+        // Collect-Pfade unten brauchen GetItemNamesAsync fuer den PartName-
+        // Bulk-Lookup. Null-Fall faellt auf das alte Verhalten zurueck.
+        _cache = cache;
     }
 
     public async Task<PartLookupResult> LookupPartAsync(string blPartNo, int blColorId, CancellationToken ct = default)
@@ -418,6 +426,15 @@ public class PartLookupService : IPartLookupService
         var allColors = await _catalog.GetAllColorsAsync(ct);
         var colorMap = allColors.ToDictionary(c => c.ColorId);
 
+        // v0.1.22-beta.1 Fix 2026-05-12: PartName aus bl_items vorab bulk-
+        // laden. Vorher PartName=string.Empty -> DeriveCategoryFromPartName
+        // liefert "Unbekannt" -> Default-Regel beim Zerlegen wirkungslos
+        // (Mercedes-AMG-Helm-Fall mit Box19-01). Eine Query statt N+1.
+        var partNos = subsets.Select(s => s.ItemNo).Distinct().ToList();
+        var partNames = _cache != null
+            ? await _cache.GetItemNamesAsync(partNos, ct)
+            : new Dictionary<string, string>();
+
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
         var bin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == storageBinId, ct)
             ?? throw new InvalidOperationException($"Lagerfach {storageBinId} existiert nicht.");
@@ -443,11 +460,12 @@ public class PartLookupService : IPartLookupService
             RequiredParts = subsets.Select(s =>
             {
                 colorMap.TryGetValue(s.ColorId, out var color);
+                partNames.TryGetValue(s.ItemNo, out var partName);
                 return new TrackedMinifigPart
                 {
                     PartNumber = s.ItemNo,
                     ColorId = s.ColorId,
-                    PartName = string.Empty, // wird noch nicht gecached pro Item-Name; UI laed live
+                    PartName = partName ?? string.Empty, // siehe Bulk-Lookup oben
                     ColorName = color?.Name ?? $"Color {s.ColorId}",
                     QuantityNeeded = s.Quantity,
                     QuantityCollected = 0
@@ -558,6 +576,15 @@ public class PartLookupService : IPartLookupService
         var allColors = await _catalog.GetAllColorsAsync(ct);
         var colorMap = allColors.ToDictionary(c => c.ColorId);
 
+        // v0.1.22-beta.1 Fix 2026-05-12: PartName-Bulk-Lookup analog zum
+        // Schwester-Pfad CollectMinifigFromSupersetAsync. Pflicht damit die
+        // Default-Regel beim spaeteren Zerlegen via DeriveCategoryFromPartName
+        // greifen kann.
+        var partNos = subsets.Select(s => s.ItemNo).Distinct().ToList();
+        var partNames = _cache != null
+            ? await _cache.GetItemNamesAsync(partNos, ct)
+            : new Dictionary<string, string>();
+
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
         var bin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == storageBinId, ct)
             ?? throw new InvalidOperationException($"Lagerfach {storageBinId} existiert nicht.");
@@ -582,11 +609,12 @@ public class PartLookupService : IPartLookupService
             RequiredParts = subsets.Select(s =>
             {
                 colorMap.TryGetValue(s.ColorId, out var color);
+                partNames.TryGetValue(s.ItemNo, out var partName);
                 return new TrackedMinifigPart
                 {
                     PartNumber = s.ItemNo,
                     ColorId = s.ColorId,
-                    PartName = string.Empty,
+                    PartName = partName ?? string.Empty, // siehe Bulk-Lookup oben
                     ColorName = color?.Name ?? $"Color {s.ColorId}",
                     QuantityNeeded = s.Quantity,
                     QuantityCollected = 0
