@@ -141,6 +141,32 @@ Items archiviert werden.
   BinPickerDialog-Refactor oben automatisch erledigt (Datei
   verschwindet komplett).
 
+### Konzept-Items für spätere Iterationen (v0.1.25+)
+
+- 💭 **Bauteile-Bin als eigenes StorageBinKind** (Konzept-Idee, 2026-05-14)
+
+  Aus Befund 3 / DB-Snapshot Bin 97: User sortiert alle Teile einer
+  zerlegten Figur in ein gemeinsames Bin (5 Kategorien: Torso, Legs,
+  Hair, Head, Headgear). Das ist **kein** Verstoss gegen Kategorie-Sperre,
+  sondern ein **implizit existierender Bin-Typ** der im
+  StorageBinKind-Enum fehlt.
+
+  Mögliche Modellierung:
+  - Neuer Enum-Wert `StorageBinKind.MinifigParts` (oder `DisassembledSet`)
+  - Eigene Regel-Tabelle: welche Aktionen sind in einem Bauteile-Bin
+    erlaubt (vermutlich: nur DismantleWizard-Pfad, kein direkter
+    FloatingPart-Add)
+  - Visualisierung im UI: Bauteile-Bins sind **"reserviert"** und werden
+    bei normalen FloatingPart-Combobox-Aufrufen nicht angeboten
+  - Migration: Bestands-Bins mit 3+ verschiedenen Kategorien als
+    Vorschlag fuer User-Markierung anbieten
+
+  Aufwand-Vorausschau: ~4-6h Konzept + ~4-6h Implementierung
+  (eigene Iteration, NICHT in v0.1.24 oder v0.1.25-Diagnose-Track).
+
+  Voraussetzung: Befund 3-Diagnose-Track muss zeigen, dass Bauteile-Bins
+  ein wiederkehrendes Pattern sind (nicht nur Einzelfall Bin 97).
+
 ---
 
 ## Backlog — UX-Befunde aus v0.1.23-beta.1 Praxis-Test (2026-05-14)
@@ -178,31 +204,55 @@ Code-Verhalten seit v0.1.22 unveraendert.
   Complete leeren bevor Wartende dort einlagern kann. **Nicht ohne
   bewussten User-Entscheid umsetzen.**
 
-### Befund 3: Kategorie-Sperre nicht durchgaengig wirksam
+### Befund 3: Kategorie-Sperre nicht durchgaengig wirksam — Diagnose-Track
 
-- Sperre existiert in `SuggestBinForFloatingPartAsync` Schritt 3
-  (Default-Regel) und funktioniert in Isolation (3 Tests gruen).
-- Drei moegliche Erklaerungen warum die Beobachtung "zweiter Torso wird
-  trotzdem angeboten" auftritt:
-  - **Stapel-Match** (Schritt 1): gleiche PartNumber + ColorId → by-design
-    Stack-Wachstum, ueberstimmt Kategorie-Sperre
-  - **User-Mapping** (Schritt 2): Kategorie ist auf den Bin gemappt →
-    by-design User-Wille
-  - **Legacy-Bestand**: BrickognizeCategory=null bei alten FloatingParts
-    (vor v0.1.18-Backfill) → null vs "Minifigure, Torso Assembly" → kein
-    Match → Sperre greift nicht
-- Vor Fix-Entscheidung: Repro mit konkretem DB-Snapshot
-  (`SELECT PartNumber, ColorId, BrickognizeCategory FROM FloatingParts
-  WHERE StorageBinId=...`) und Settings-Snapshot (Category-Mappings).
-- Optional v0.1.24: Migration "BrickognizeCategory bei null nachpflegen
-  via DeriveCategoryFromPartName" — schliesst Legacy-Gap falls bestaetigt.
-  Aufwand: ~1-2h.
+**Status:** STOP-Empfehlung nach Challenger-Analyse (2026-05-14). Aus v0.1.24-Scope
+ausgeklammert, eigener Diagnose-Track laeuft. Frueheste Konzept-Iteration: v0.1.25,
+nach 2-3 dokumentierten Praxis-Vorfaellen.
+
+**Daten-Stand DB-Snapshot 2026-05-14:**
+- Mix-Kategorie-Bins: **Bin 97 (Box19-07)** mit 5 verschiedenen Kategorien
+  (Torso, Legs, Hair, Head, Headgear) — gewollt sortiertes Bauteile-Set einer
+  zerlegten Figur.
+- Legacy-null-Records: **0 von 5** — die ursprünglich vermutete Wurzel
+  "BrickognizeCategory=null" existiert in dieser DB nicht.
+
+**Drei moegliche Erklaerungen — neu bewertet:**
+- **Stapel-Match by-design** (Schritt 1 in SuggestBinForFloatingPartAsync):
+  gleiche PartNumber + ColorId → Stack-Wachstum, by-design.
+- **User-Mapping by-design** (Schritt 2): Kategorie ist auf den Bin gemappt → User-Wille.
+- **Bauteile-Bin-Workflow**: User hat bewusst alle Teile einer zerlegten Figur
+  in einem Bin gesammelt (siehe Bin 97). Das ist ein **implizit existierender
+  Bin-Typ** der noch nicht im StorageBinKind-Enum modelliert ist. Siehe
+  separates Backlog-Item "Bauteile-Bin als eigenes StorageBinKind".
+
+**Verworfene Loesungs-Optionen (Challenger-Analyse):**
+- Option A (Strict-Mode-Throw): REJECTED — würde Bin 97 lock-outen, gegen
+  User-Sortier-Pattern.
+- Option B (Warn-Modal pro Konflikt): REJECTED — Modal-Stau bei Bulk-Move.
+- Option D (Legacy-Migration für null-Records): REJECTED — 0 null-Records vorhanden.
+
+**Diagnose-Routine für naechsten "zweiter-Torso"-Vorfall:**
+1. SQL-Snapshot beim Vorfall:
+   ```sql
+   -- 1. Welche FloatingParts liegen im Ziel-Bin
+   SELECT Id, PartNumber, ColorId, BrickognizeCategory, Quantity
+   FROM FloatingParts WHERE StorageBinId = <bin_id>;
+   -- 2. Welche Kategorie hat der neu zu lagernde Part
+   SELECT BrickognizeCategory FROM bl_items WHERE PartNumber = '<new_part>';
+   -- 3. Existierende User-Mappings
+   -- (aus settings.json: CategoryToBinMapping)
+   ```
+2. Klassifizieren: Stapel-Match / User-Mapping / Bauteile-Bin / sonstiges
+3. Vorfall in BACKLOG.md unter dieser Stelle protokollieren
+4. Nach 2-3 protokollierten Vorfaellen: Wurzel-Verteilung klar →
+   Konzept-Entscheidung fuer v0.1.25 fundiert
 
 ### Backlog-Status
 
-Alle drei Befunde sind UX-/Roadmap-Items, **keine Bugs**. Klassifikation
-als "nice-to-have v0.1.24" oder spaeter — abhaengig von Praxis-Schmerz
-des Users.
+- Befund 1 + 2: UX-/Roadmap-Items für v0.1.24 (siehe Versions-Plan)
+- Befund 3: Diagnose-Track läuft, eigene v0.1.25-Mini-Iteration
+- 0 Bugs in v0.1.23 — Code-Verhalten seit v0.1.22 unveraendert
 
 ---
 
@@ -442,8 +492,10 @@ Aenderungen am Cache-Schema + Provider-Logik.
 | **v0.1.21** | ✅ released (Stable, 2026-05-12) | Hotfix - bl_colors Cache-First + colors.xml im BulkImporter + Auto-Reimport-Trigger + CI-Padding-Fix |
 | **v0.1.22-beta.1..4** | ✅ released (2026-05-12/13) | Performance + Bin-Typ-Trennung + Splash-Fix + PartName-Fix + Dependabot + Camera-Lazy-Enumeration |
 | **v0.1.22** | ✅ released (Stable, 2026-05-13) | beta.1..beta.4 konsolidiert |
-| **v0.1.23** | 📋 geplant | Bin-Typ-Spalte (StorageBin.Kind als persistierte Enum), Strict-Mode, Migration. ~5h, eine Beta. |
-| **v0.1.24** | 📋 geplant | Anlegen-Dialog-Redesign (systemweite Floating-Auswahl) + BL-Inventar-Integration (Mass-Update-Export). ~20h, drei Betas. |
+| **v0.1.23-beta.1** | ✅ released (2026-05-14) | Bin-Typ-Spalte (StorageBin.Kind als persistierte Enum), Strict-Mode, Migration, ScanViewModel-Pending-Filter. Tag auf bfd03728. |
+| **v0.1.23** | 📋 geplant (Stable-Promotion) | nach 1-2 Tagen Beta-Praxis. |
+| **v0.1.24** | 📋 geplant | UX-Konsistenz-Iteration: Anlegen-Dialog-Redesign + BL-Inventar-Integration + 18 UX-Findings aus UX-Analyst-Bericht. ~12-18h, drei Betas. **Kategorie-Thema explizit ausgeklammert** (siehe v0.1.25). |
+| **v0.1.25** | 💭 Brainstorming | Kategorie-Sperre + Bauteile-Bin-Konzept. Voraussetzung: 2-3 protokollierte Praxis-Vorfaelle aus Diagnose-Track (Befund 3). |
 | **v0.2.0** | 💭 Brainstorming | grosse Features aus Backlog (siehe oben) |
 
 Konvention:
@@ -452,4 +504,4 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-14 nach v0.1.23-beta.1 Praxis-Test (UX-Befunde aufgenommen).*
+*Zuletzt aktualisiert: 2026-05-14 nach v0.1.23-beta.1 Praxis-Test + Challenger-STOP fuer Kategorie-Thema (Diagnose-Track statt v0.1.24, Bauteile-Bin-Konzept als v0.1.25+).*

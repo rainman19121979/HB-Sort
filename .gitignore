@@ -69,6 +69,12 @@ RELEASE_PROCESS.md
 # Bleiben lokal, sind nicht final dokumentiert + nicht stable.
 docs/*-konzept-*.md
 
+# UX-Analyse-Berichte (Mode-A-Inventur des hbsort-ux-analyst Agents).
+# Stichpunkt-Bericht pro Iteration, lebt parallel zum Konzept-Dokument
+# und expandiert sich im Laufe der Iteration. Pattern deckt alle
+# Versionen ab (v0.1.24-ux-analyse.md, v0.1.25-ux-analyse.md, ...).
+docs/v*-ux-analyse.md
+
 # Lokale Planungs-/Engineering-Dokumente (nicht im Repo)
 ENGINEERING_PRINCIPLES.md
 
