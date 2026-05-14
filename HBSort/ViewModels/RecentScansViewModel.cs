@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Threading;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -28,6 +29,11 @@ public partial class RecentScansViewModel : ObservableObject, IDisposable
     private readonly IMinifigPersistenceService _persistence;
     private readonly EventHandler _onDataChanged;
 
+    // v0.1.23-beta.2 Fix C: Image-Loads abbrechen wenn ein neuer Refresh
+    // beginnt. Verhindert dass alte LoadImagesAsync-Schleifen Dispatcher-
+    // Calls absetzen, obwohl die Items-Snapshot schon ausgetauscht ist.
+    private CancellationTokenSource? _imageLoadCts;
+
     public ObservableCollection<ScanEventDisplay> Items { get; } = new();
 
     public RecentScansViewModel(
@@ -54,6 +60,8 @@ public partial class RecentScansViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         _persistence.DataChanged -= _onDataChanged;
+        _imageLoadCts?.Cancel();
+        _imageLoadCts?.Dispose();
         GC.SuppressFinalize(this);
     }
 
@@ -90,8 +98,14 @@ public partial class RecentScansViewModel : ObservableObject, IDisposable
             // UX X.20 Teil 2: Bilder im Hintergrund laden (best-effort).
             // Wir blockieren den Refresh nicht; die Bilder ploppen ein wenn
             // der Cache antwortet.
+            // v0.1.23-beta.2 Fix C: vorigen Image-Load abbrechen + neue CTS.
             if (_imageProvider != null)
-                _ = LoadImagesAsync();
+            {
+                _imageLoadCts?.Cancel();
+                _imageLoadCts?.Dispose();
+                _imageLoadCts = new CancellationTokenSource();
+                _ = LoadImagesAsync(_imageLoadCts.Token);
+            }
         }
         catch (Exception ex)
         {
@@ -104,7 +118,7 @@ public partial class RecentScansViewModel : ObservableObject, IDisposable
     /// ScanEventDisplay.ImageUrl. Bei Fehlern oder fehlendem RecognizedId
     /// bleibt das Bild leer - der Slot im Template ist dann unsichtbar.
     /// </summary>
-    private async Task LoadImagesAsync()
+    private async Task LoadImagesAsync(CancellationToken ct = default)
     {
         if (_imageProvider == null) return;
         // Snapshot der aktuellen Items - falls ein Refresh kommt, sind die
@@ -112,6 +126,7 @@ public partial class RecentScansViewModel : ObservableObject, IDisposable
         var snapshot = Items.ToList();
         foreach (var item in snapshot)
         {
+            if (ct.IsCancellationRequested) break;
             if (string.IsNullOrWhiteSpace(item.RecognizedId)) continue;
             try
             {
@@ -120,9 +135,13 @@ public partial class RecentScansViewModel : ObservableObject, IDisposable
                 // dann das ungefaerbte Standard-Bild.
                 var url = await _imageProvider.GetImageFileByBlAsync(
                     item.BlType, item.RecognizedId, null);
+                if (ct.IsCancellationRequested) break;
                 if (!string.IsNullOrEmpty(url))
                 {
-                    Application.Current?.Dispatcher.Invoke(() => item.ImageUrl = url);
+                    // v0.1.23-beta.2 Fix C: InvokeAsync statt Invoke.
+                    var disp = Application.Current?.Dispatcher;
+                    if (disp != null)
+                        await disp.InvokeAsync(() => item.ImageUrl = url);
                 }
             }
             catch (Exception ex)

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
+using System.Threading;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -51,6 +52,22 @@ public partial class ScanViewModel : ObservableObject, IDisposable
     /// eine andere Karte (oder beim naechsten Scan) wird der vorige Lookup gecancelt.
     /// </summary>
     private CancellationTokenSource? _lookupCts;
+
+    /// <summary>
+    /// v0.1.23-beta.2 Fix C: CTS fuer den Preload-Part-Image-Hintergrund-Lauf.
+    /// Vor jedem neuen Minifig-Scan wird der laufende Lauf abgebrochen, damit
+    /// kein alter Loop noch via Dispatcher den UI-Thread bedient nachdem der
+    /// User schon eine andere Figur fokussiert hat.
+    /// </summary>
+    private CancellationTokenSource? _preloadPartImagesCts;
+
+    /// <summary>
+    /// v0.1.23-beta.2 Fix C: CTS fuer den BL-Catalog-Match-Image-Loader im
+    /// Part-Lookup-Modus. Wird bei jedem Scan / Re-Lookup neu gestartet,
+    /// vorher gecancelt - das ist der wichtigste Hotpath fuer das Save-
+    /// Reaktivitaets-Problem aus Befund Performance v0.1.23-beta.1.
+    /// </summary>
+    private CancellationTokenSource? _blCatalogImagesCts;
 
     /// <summary>Index der aktuell ausgewaehlten Top-3-Karte (-1 = keine).</summary>
     [ObservableProperty]
@@ -1077,7 +1094,12 @@ public partial class ScanViewModel : ObservableObject, IDisposable
             LoadMinifigHeaderImageAsync(bricklinkId).FireAndForget("Scan-MinifigHeaderImage");
             if (_settingsService.Current.ImageCache.PreloadOnMinifigScan)
             {
-                PreloadPartImagesAsync(pending).FireAndForget("Scan-PreloadPartImages");
+                // v0.1.23-beta.2 Fix C: vorigen Preload-Lauf canceln.
+                _preloadPartImagesCts?.Cancel();
+                _preloadPartImagesCts?.Dispose();
+                _preloadPartImagesCts = new CancellationTokenSource();
+                PreloadPartImagesAsync(pending, _preloadPartImagesCts.Token)
+                    .FireAndForget("Scan-PreloadPartImages");
             }
 
             // Phase 4: Lagerfach-Liste fuer die ComboBox laden + Default setzen.
@@ -1162,7 +1184,12 @@ public partial class ScanViewModel : ObservableObject, IDisposable
         LoadKnownColorsForPendingPartAsync(pending).FireAndForget("PartScan-LoadKnownColors");
 
         // BL-Catalog-Treffer-Bilder im Hintergrund nachladen
-        LoadBlCatalogImagesAsync(pending).FireAndForget("PartScan-LoadBlCatalogImages");
+        // v0.1.23-beta.2 Fix C: vorigen Lauf canceln + neue CTS.
+        _blCatalogImagesCts?.Cancel();
+        _blCatalogImagesCts?.Dispose();
+        _blCatalogImagesCts = new CancellationTokenSource();
+        LoadBlCatalogImagesAsync(pending, _blCatalogImagesCts.Token)
+            .FireAndForget("PartScan-LoadBlCatalogImages");
     }
 
     /// <summary>Re-Lookup nach Farb-Korrektur ueber das Dropdown.</summary>
@@ -1182,7 +1209,13 @@ public partial class ScanViewModel : ObservableObject, IDisposable
         }
 
         LoadPartImageAsync(pending).FireAndForget("PartReLookup-LoadImage");
-        LoadBlCatalogImagesAsync(pending).FireAndForget("PartReLookup-LoadBlCatalogImages");
+
+        // v0.1.23-beta.2 Fix C: vorigen Lauf canceln + neue CTS.
+        _blCatalogImagesCts?.Cancel();
+        _blCatalogImagesCts?.Dispose();
+        _blCatalogImagesCts = new CancellationTokenSource();
+        LoadBlCatalogImagesAsync(pending, _blCatalogImagesCts.Token)
+            .FireAndForget("PartReLookup-LoadBlCatalogImages");
     }
 
     /// <summary>
@@ -1190,17 +1223,23 @@ public partial class ScanViewModel : ObservableObject, IDisposable
     /// Minifig-Bild via PartImageProvider laden falls noch nicht da.
     /// Aenderungen werden auf den UI-Thread gepostet (ImageUrl ist ObservableProperty).
     /// </summary>
-    private async Task LoadBlCatalogImagesAsync(PartLookupViewModel pending)
+    private async Task LoadBlCatalogImagesAsync(PartLookupViewModel pending, CancellationToken ct = default)
     {
         foreach (var match in pending.BlCatalogMatches.ToList())
         {
+            if (ct.IsCancellationRequested) break;
             if (!string.IsNullOrEmpty(match.ImageUrl)) continue;
             try
             {
                 var url = await _imageProvider.GetImageFileByBlAsync("M", match.BlMinifigId, null);
+                if (ct.IsCancellationRequested) break;
                 if (!string.IsNullOrEmpty(url))
                 {
-                    System.Windows.Application.Current?.Dispatcher.Invoke(() => match.ImageUrl = url);
+                    // v0.1.23-beta.2 Fix C: InvokeAsync statt Invoke - vermeidet
+                    // synchrone Blockierung des UI-Threads nach Save-Operation.
+                    var disp = System.Windows.Application.Current?.Dispatcher;
+                    if (disp != null)
+                        await disp.InvokeAsync(() => match.ImageUrl = url);
                 }
             }
             catch (Exception ex)
@@ -1588,22 +1627,30 @@ public partial class ScanViewModel : ObservableObject, IDisposable
     /// <summary>
     /// Laed die Teile-Bilder einer erkannten Minifigur im Hintergrund vor.
     /// SemaphoreSlim(5) als Throttle. Best-effort - einzelne Fehler werden nur geloggt.
+    /// v0.1.23-beta.2 Fix C: per CancellationToken abbrechbar.
     /// </summary>
-    private async Task PreloadPartImagesAsync(PendingMinifigViewModel pending)
+    private async Task PreloadPartImagesAsync(PendingMinifigViewModel pending, CancellationToken ct = default)
     {
-        using var throttle = new System.Threading.SemaphoreSlim(initialCount: 5);
+        using var throttle = new SemaphoreSlim(initialCount: 5);
         var tasks = pending.Parts.Select(async part =>
         {
-            await throttle.WaitAsync();
+            if (ct.IsCancellationRequested) return;
+            await throttle.WaitAsync(ct).ConfigureAwait(false);
             try
             {
+                if (ct.IsCancellationRequested) return;
                 // Direkt mit BL-IDs - kein Brickognize-Wrapper noetig.
                 var url = await _imageProvider.GetImageFileByBlAsync("P", part.BricklinkPartNo, part.BricklinkColorId);
+                if (ct.IsCancellationRequested) return;
 
-                System.Windows.Application.Current?.Dispatcher.Invoke(() =>
-                {
-                    part.ImageUrl = url;
-                });
+                // v0.1.23-beta.2 Fix C: InvokeAsync statt Invoke.
+                var disp = System.Windows.Application.Current?.Dispatcher;
+                if (disp != null)
+                    await disp.InvokeAsync(() => part.ImageUrl = url);
+            }
+            catch (OperationCanceledException)
+            {
+                // Erwartet beim Cancel - nicht loggen.
             }
             catch (Exception ex)
             {
@@ -1612,11 +1659,12 @@ public partial class ScanViewModel : ObservableObject, IDisposable
             }
             finally
             {
-                throttle.Release();
+                try { throttle.Release(); } catch { /* Semaphore disposed */ }
             }
         });
 
-        await Task.WhenAll(tasks);
+        try { await Task.WhenAll(tasks); }
+        catch (OperationCanceledException) { /* erwartet */ }
         Log.Information("Vorab-Cache abgeschlossen ({Count} Teile)", pending.Parts.Count);
     }
 
@@ -1889,6 +1937,12 @@ public partial class ScanViewModel : ObservableObject, IDisposable
         // Laufenden BL-Lookup canceln und Token disposen.
         try { _lookupCts?.Cancel(); } catch { /* ignore */ }
         try { _lookupCts?.Dispose(); } catch { /* ignore */ }
+
+        // v0.1.23-beta.2 Fix C: Image-Loader-CTS sauber beenden.
+        try { _preloadPartImagesCts?.Cancel(); } catch { /* ignore */ }
+        try { _preloadPartImagesCts?.Dispose(); } catch { /* ignore */ }
+        try { _blCatalogImagesCts?.Cancel(); } catch { /* ignore */ }
+        try { _blCatalogImagesCts?.Dispose(); } catch { /* ignore */ }
     }
 }
 

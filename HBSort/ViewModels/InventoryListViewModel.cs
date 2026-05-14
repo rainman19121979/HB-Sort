@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
+using System.Threading;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
@@ -19,11 +20,23 @@ namespace HBSort.ViewModels;
 /// Eine flache Liste aller Items (Minifiguren + Einzelteile) mit
 /// Status-Icon-Spalte, Bild, Color-Swatch, Lagerfach, Aktionen.
 /// </summary>
-public partial class InventoryListViewModel : ObservableObject
+public partial class InventoryListViewModel : ObservableObject, IDisposable
 {
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
     private readonly IBlCatalogService _catalog;
     private readonly IPartImageProvider _imageProvider;
+
+    // v0.1.23-beta.2 Fix D: Audit-K-2-Pattern wie in LiveStats/RecentScans/
+    // BuildSuggestions/WaitingDetail. Field-Subscription erlaubt Unsubscribe
+    // im Dispose, inline-Lambda haette das nicht ermoeglicht.
+    private readonly IMinifigPersistenceService _persistence;
+    private readonly EventHandler _onDataChanged;
+
+    // v0.1.23-beta.2 Fix C: Vorlauf-Image-Loads abbrechen, wenn ein neuer
+    // LoadAsync-Lauf startet. Verhindert dass ein langer LoadImagesAsync
+    // nach einer Save-Op den UI-Thread weiter blockiert obwohl die Items
+    // schon weiterzogen wurden.
+    private CancellationTokenSource? _imageLoadCts;
 
     /// <summary>Alle Items (flach, nach RowNumber sortiert).</summary>
     public ObservableCollection<InventoryRowItem> Items { get; } = new();
@@ -173,6 +186,7 @@ public partial class InventoryListViewModel : ObservableObject
         _ctxFactory = ctxFactory;
         _catalog = catalog;
         _imageProvider = imageProvider;
+        _persistence = persistence;
 
         ItemsView = CollectionViewSource.GetDefaultView(Items);
         ItemsView.Filter = RowFilter;
@@ -183,8 +197,10 @@ public partial class InventoryListViewModel : ObservableObject
         // wachsam und veraltete Selektionen koennten den Counter verfaelschen.
         Items.CollectionChanged += OnItemsCollectionChanged;
 
-        // Auto-Refresh
-        persistence.DataChanged += (_, _) =>
+        // Auto-Refresh: v0.1.23-beta.2 Fix D - Pattern angeglichen an die
+        // anderen DataChanged-Subscribers (LiveStats/RecentScans/
+        // BuildSuggestions/WaitingDetail): Field-Subscription + IDisposable.
+        _onDataChanged = (_, _) =>
         {
             var dispatcher = Application.Current?.Dispatcher;
             if (dispatcher != null && !dispatcher.CheckAccess())
@@ -192,6 +208,20 @@ public partial class InventoryListViewModel : ObservableObject
             else
                 _ = LoadAsync();
         };
+        _persistence.DataChanged += _onDataChanged;
+    }
+
+    /// <summary>
+    /// Audit-K-2-Pattern: meldet sich vom DataChanged-Event ab. Wird vom
+    /// DI-Container automatisch beim ServiceProvider-Dispose aufgerufen.
+    /// Bricht zusaetzlich laufende Image-Loads ab.
+    /// </summary>
+    public void Dispose()
+    {
+        _persistence.DataChanged -= _onDataChanged;
+        _imageLoadCts?.Cancel();
+        _imageLoadCts?.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     private void OnItemsCollectionChanged(
@@ -338,7 +368,13 @@ public partial class InventoryListViewModel : ObservableObject
             SelectedExportableCount = 0;
             OnPropertyChanged(nameof(HasAnyExportable));
 
-            _ = LoadImagesAsync();
+            // v0.1.23-beta.2 Fix C: Vorigen Image-Load abbrechen (falls noch
+            // laufend) und neue Cancellation-Source aufsetzen. So blockiert
+            // ein langer Image-Load nach Save den UI-Thread nicht weiter.
+            _imageLoadCts?.Cancel();
+            _imageLoadCts?.Dispose();
+            _imageLoadCts = new CancellationTokenSource();
+            _ = LoadImagesAsync(_imageLoadCts.Token);
         }
         catch (Exception ex)
         {
@@ -351,18 +387,27 @@ public partial class InventoryListViewModel : ObservableObject
         }
     }
 
-    private async Task LoadImagesAsync()
+    private async Task LoadImagesAsync(CancellationToken ct = default)
     {
         foreach (var r in Items.ToList())
         {
+            if (ct.IsCancellationRequested) break;
             if (!string.IsNullOrEmpty(r.ImageUrl)) continue;
             try
             {
                 var url = r.Type == InventoryItemType.Minifig
                     ? await _imageProvider.GetImageFileByBlAsync("M", r.ItemId, null)
                     : await _imageProvider.GetImageFileByBlAsync("P", r.ItemId, r.ColorId);
+                if (ct.IsCancellationRequested) break;
                 if (!string.IsNullOrEmpty(url))
-                    Application.Current?.Dispatcher.Invoke(() => r.ImageUrl = url);
+                {
+                    // v0.1.23-beta.2 Fix C: InvokeAsync statt Invoke - blockiert
+                    // den UI-Thread nicht synchron, wichtig nach Save-Operationen
+                    // wo die UI sofort wieder reaktiv sein muss.
+                    var disp = Application.Current?.Dispatcher;
+                    if (disp != null)
+                        await disp.InvokeAsync(() => r.ImageUrl = url);
+                }
             }
             catch { /* best-effort */ }
         }

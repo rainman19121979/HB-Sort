@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Threading;
 using System.Windows;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -39,6 +40,9 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
     private readonly IMinifigPersistenceService _persistence;
     private readonly EventHandler _onDataChanged;
 
+    // v0.1.23-beta.2 Fix C: laufende Image-Loads bei Refresh abbrechen.
+    private CancellationTokenSource? _imageLoadCts;
+
     public ObservableCollection<BuildSuggestionItem> Suggestions { get; } = new();
 
     [ObservableProperty]
@@ -78,6 +82,8 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         _persistence.DataChanged -= _onDataChanged;
+        _imageLoadCts?.Cancel();
+        _imageLoadCts?.Dispose();
         GC.SuppressFinalize(this);
     }
 
@@ -182,7 +188,11 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
                 ? "Keine Bauvorschlaege - keine deiner losen Teile passt zu einer ungetrackten Minifig."
                 : $"{top.Count} Vorschlaege (sortiert nach Match-%)";
 
-            _ = LoadImagesAsync();
+            // v0.1.23-beta.2 Fix C: vorigen Image-Load abbrechen + neue CTS.
+            _imageLoadCts?.Cancel();
+            _imageLoadCts?.Dispose();
+            _imageLoadCts = new CancellationTokenSource();
+            _ = LoadImagesAsync(_imageLoadCts.Token);
         }
         catch (Exception ex)
         {
@@ -195,16 +205,23 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
         }
     }
 
-    private async Task LoadImagesAsync()
+    private async Task LoadImagesAsync(CancellationToken ct = default)
     {
         foreach (var s in Suggestions.ToList())
         {
+            if (ct.IsCancellationRequested) break;
             if (!string.IsNullOrEmpty(s.ImageUrl)) continue;
             try
             {
                 var url = await _imageProvider.GetImageFileByBlAsync("M", s.BricklinkId, null);
+                if (ct.IsCancellationRequested) break;
                 if (!string.IsNullOrEmpty(url))
-                    Application.Current?.Dispatcher.Invoke(() => s.ImageUrl = url);
+                {
+                    // v0.1.23-beta.2 Fix C: InvokeAsync statt Invoke.
+                    var disp = Application.Current?.Dispatcher;
+                    if (disp != null)
+                        await disp.InvokeAsync(() => s.ImageUrl = url);
+                }
             }
             catch (Exception ex)
             {
