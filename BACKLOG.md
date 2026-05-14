@@ -140,6 +140,10 @@ Items archiviert werden.
   (GetAllAsync statt typ-gefilterter Aufruf). Wird mit dem
   BinPickerDialog-Refactor oben automatisch erledigt (Datei
   verschwindet komplett).
+- 📋 **GitHub Actions Migration windows-latest → windows-2025-vs2026**
+  Migration-Deadline Juni 2026. CI-Workflows in `.github/workflows/*.yml`
+  betroffen. Nicht-blockierend, aber rechtzeitig vor Deadline updaten.
+  Aufwand: ~30min (yml-Anpassung + Test-Run).
 
 ### Konzept-Items für spätere Iterationen (v0.1.25+)
 
@@ -177,6 +181,8 @@ Code-Verhalten seit v0.1.22 unveraendert.
 
 ### Befund 1: Limit-Einstellungen wirken nur als Suggest-Hint, nicht als Combobox-Filter
 
+**Status: in v0.1.24 Beta 1 integriert** (Befund B1 in v0.1.24-Konzept Sektion 3.2).
+
 - Settings `MaxCompleteFiguresPerBin` (Default 5) und `MaxWaitingFiguresPerBin`
   (Default 3) werden gelesen und an `SuggestBinForCompleteMinifigAsync` /
   `SuggestBinForWaitingMinifigAsync` durchgereicht.
@@ -190,6 +196,8 @@ Code-Verhalten seit v0.1.22 unveraendert.
   vorgeschlagenen Bins voll sind. Aufwand: ~1h.
 
 ### Befund 2: Complete-Bin als Ziel fuer wartende Figur
+
+**Status: in v0.1.24 Beta 1 integriert** (Befund B2 in v0.1.24-Konzept Sektion 3.2).
 
 - Aktuell: wartende Figur darf in Complete-Bin (Konzept Abschnitt 2,
   Regel-Tabelle — explizit erlaubt). Bin wechselt dann auf Waiting bis
@@ -265,6 +273,64 @@ nach 2-3 dokumentierten Praxis-Vorfaellen.
 ---
 
 ## Erledigt ✅
+
+### v0.1.23 (Stable, 2026-05-14) - Bin-Typ-Spalte mit Strict-Mode + Performance Quick-Wins
+
+Sammel-Iteration aus 2 Betas. Tag `v0.1.23` zeigt auf `ac7e77ee`
+(identisch mit `v0.1.23-beta.2`). Pipeline gruen, isPrerelease=false.
+
+**Beta 1** (Tag `bfd03728`):
+- ✅ **feat: Bin-Typ als persistierte Spalte** - EF-Migration
+  `StorageBin.Kind` (Enum: Empty/Floating/Waiting/Complete), Auto-
+  Backfill beim ersten App-Start nach Update.
+- ✅ **feat: Strict-Mode A1-A12** - 12 Aufrufer-Stellen pruefen Bin-Typ
+  vor Persist (`BinKindGuard.Ensure...`-Methoden, `InvalidBinKindException`).
+  Reifungspfad Waiting → Complete im selben Bin bleibt erlaubt.
+- ✅ **feat: Bin-Typ-Spalte im Lagerfaecher-Tab sichtbar** - neue
+  Spalte mit lokalisiertem Typ-Namen.
+- ✅ **fix: ScanViewModel-Pending-Filter** (`Z.1231 + Z.1387`) -
+  `GetAllAsync()` durch `GetEligibleBinsAsync()` ersetzt, sonst hatte
+  der Direkt-Scan-Pfad Floating-Bins als Ziel fuer Wartende angeboten.
+  Diagnose 2026-05-14.
+
+**Beta 2** (Tag `ac7e77ee`, Performance-Hotfix):
+- ✅ **perf D: InventoryListViewModel BeginInvoke + IDisposable**
+  (`bd64dfef`) - DataChanged-Subscriber konsistent mit den anderen 4
+  VMs (LiveStats/RecentScans/WaitingDetail/BuildSuggestions). Field-
+  Subscription statt Inline-Lambda; Memory-Leak-Fix nebenbei
+  (`IDisposable` + Unsubscribe).
+- ✅ **perf C: 5 Dispatcher.Invoke → InvokeAsync + CancellationToken**
+  (`ac7e77ee`) - in LoadImagesAsync-Pfaden von InventoryList/
+  RecentScans/BuildSuggestions/ScanViewModel (2 Stellen). Plus
+  SemaphoreSlim-Awareness in `ScanViewModel.PreloadPartImagesAsync`.
+  Pro VM `_imageLoadCts` damit voriger Image-Load-Task bei neuem
+  Save abgebrochen wird.
+
+Wirkung: ~70% Latenz-Reduktion nach Save-Operation in PartLookup-
+Modus. Wurzel: DataChanged-Storm mit synchronen Dispatcher.Invoke-
+Aufrufen blockierte UI-Thread vor Popup-Open (Diagnoser-Bericht
+2026-05-14). Strukturelle Wurzel-Fixes (B = RaiseDataChanged aus
+Service-Layer raus, E = RecalcBinKindAsync-Context-Piggyback) sind
+in v0.1.25 als separate Performance-Iteration vorgemerkt.
+
+**Stable-Promotion** (2026-05-14):
+- Tag `v0.1.23` auf Commit `ac7e77ee` (identisch mit beta.2).
+- Pipeline Run 25869236507: alle drei Jobs gruen (setup, build-zip,
+  build-velopack), keine Fehler.
+- Release-Notes user-freundlich ueberschrieben, 5 Assets, kein
+  Pre-Release-Flag.
+
+Tests: 559/559 gruen ueber beide Betas hinweg.
+
+**Praxis-Test-Befunde aus beta.1** (alle Nicht-Regression, Code-
+Verhalten seit v0.1.22 unveraendert):
+- Befund 1 (Limit als Suggest statt Combobox-Filter) → v0.1.24 Beta 1
+- Befund 2 (Complete-Bin als Ziel fuer wartende Figur) → v0.1.24 Beta 1
+- Befund 3 (Kategorie-Sperre nicht durchgaengig wirksam) → STOP nach
+  Challenger-Analyse, v0.1.25 Diagnose-Track (siehe Backlog-Sektion).
+
+**Nicht-blockierende Notice:** GitHub Actions windows-latest →
+windows-2025-vs2026 Migration bis Juni 2026 (siehe Backlog/System).
 
 ### v0.1.22 (Stable, 2026-05-13) - Performance + Bin-Typ-Trennung + Camera-Lazy-Enumeration
 
@@ -493,9 +559,10 @@ Aenderungen am Cache-Schema + Provider-Logik.
 | **v0.1.22-beta.1..4** | ✅ released (2026-05-12/13) | Performance + Bin-Typ-Trennung + Splash-Fix + PartName-Fix + Dependabot + Camera-Lazy-Enumeration |
 | **v0.1.22** | ✅ released (Stable, 2026-05-13) | beta.1..beta.4 konsolidiert |
 | **v0.1.23-beta.1** | ✅ released (2026-05-14) | Bin-Typ-Spalte (StorageBin.Kind als persistierte Enum), Strict-Mode, Migration, ScanViewModel-Pending-Filter. Tag auf bfd03728. |
-| **v0.1.23** | 📋 geplant (Stable-Promotion) | nach 1-2 Tagen Beta-Praxis. |
-| **v0.1.24** | 📋 geplant | UX-Konsistenz-Iteration: Anlegen-Dialog-Redesign + BL-Inventar-Integration + 18 UX-Findings aus UX-Analyst-Bericht. ~12-18h, drei Betas. **Kategorie-Thema explizit ausgeklammert** (siehe v0.1.25). |
-| **v0.1.25** | 💭 Brainstorming | Kategorie-Sperre + Bauteile-Bin-Konzept. Voraussetzung: 2-3 protokollierte Praxis-Vorfaelle aus Diagnose-Track (Befund 3). |
+| **v0.1.23-beta.2** | ✅ released (2026-05-14) | Performance-Hotfix: Quick-Wins D+C aus Diagnoser-Bericht (Dispatcher.Invoke→InvokeAsync + CancellationToken in 5 LoadImagesAsync-Pfaden + InventoryListViewModel BeginInvoke-Konsistenz, IDisposable-Pattern). Tag auf ac7e77ee. |
+| **v0.1.23** | ✅ released (Stable, 2026-05-14) | beta.1 + beta.2 konsolidiert. Tag auf ac7e77ee (identisch mit beta.2). Pipeline grün, isPrerelease=false. |
+| **v0.1.24** | 📋 geplant | UX-Konsistenz-Iteration: Anlegen-Dialog-Redesign + BL-Inventar-Integration + Sortier-Anweisung-Overlay-Pattern + 18 UX-Findings aus Mode-A-Bericht. ~22-26h, drei Betas. **Kategorie-Thema explizit ausgeklammert** (siehe v0.1.25). |
+| **v0.1.25** | 💭 Brainstorming | Performance-Wurzel-Fixes (B+E aus Diagnoser-Bericht: RaiseDataChanged aus Service-Layer raus, RecalcBinKindAsync-Context-Piggyback, ~4-5h) + Kategorie-Sperre + Bauteile-Bin-Konzept. Voraussetzung Kategorie-Track: 2-3 protokollierte Praxis-Vorfaelle aus Diagnose-Track (Befund 3). |
 | **v0.2.0** | 💭 Brainstorming | grosse Features aus Backlog (siehe oben) |
 
 Konvention:
@@ -504,4 +571,4 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-14 nach v0.1.23-beta.1 Praxis-Test + Challenger-STOP fuer Kategorie-Thema (Diagnose-Track statt v0.1.24, Bauteile-Bin-Konzept als v0.1.25+).*
+*Zuletzt aktualisiert: 2026-05-14 nach v0.1.23-Stable-Release (beta.1 + beta.2 + Stable-Promotion + Doku-Cleanup). Naechste Iteration: v0.1.24 Beta 1 (Sortier-Anweisung-Overlay-Pattern + UX-Konsistenz, Konzept implementation-ready in docs/v0.1.24-konzept-ux-konsistenz.md).*
