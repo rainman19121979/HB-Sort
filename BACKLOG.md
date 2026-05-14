@@ -143,6 +143,69 @@ Items archiviert werden.
 
 ---
 
+## Backlog — UX-Befunde aus v0.1.23-beta.1 Praxis-Test (2026-05-14)
+
+Drei Befunde aus dem Praxis-Test, alle als Nicht-Regression klassifiziert.
+Diagnose-Bericht im Chat 2026-05-14 hat bestaetigt: 0 v0.1.23-Bugs,
+Code-Verhalten seit v0.1.22 unveraendert.
+
+### Befund 1: Limit-Einstellungen wirken nur als Suggest-Hint, nicht als Combobox-Filter
+
+- Settings `MaxCompleteFiguresPerBin` (Default 5) und `MaxWaitingFiguresPerBin`
+  (Default 3) werden gelesen und an `SuggestBinForCompleteMinifigAsync` /
+  `SuggestBinForWaitingMinifigAsync` durchgereicht.
+- Wirkung: Stack-Wachstums-Default schlaegt ein neues Bin vor, sobald das
+  Limit im aktuellen Stack-Bin erreicht ist.
+- User-Erwartung: Limit als harter Filter im Combobox-Dropdown (volle Bins
+  ausgrauen oder verstecken).
+- Aktueller Stand: Limit wirkt nur auf Default-Vorschlag, Combobox listet
+  weiterhin alle typ-passenden Bins inkl. der vollen.
+- Wuensch fuer v0.1.24: Combobox-Filter + Banner-Erklaerung wenn alle
+  vorgeschlagenen Bins voll sind. Aufwand: ~1h.
+
+### Befund 2: Complete-Bin als Ziel fuer wartende Figur
+
+- Aktuell: wartende Figur darf in Complete-Bin (Konzept Abschnitt 2,
+  Regel-Tabelle — explizit erlaubt). Bin wechselt dann auf Waiting bis
+  die neue Figur komplett wird.
+- User-Beobachtung: irritiert dass "fertige" Bins als Anlege-Ziel
+  vorgeschlagen werden.
+- Hinweis: `SuggestBinForWaitingMinifigAsync` schliesst Complete als
+  Default-Vorschlag aus (Empty oder Stack-Waiting bevorzugt). Nur die
+  GetEligibleBinsAsync-Combobox-Liste enthaelt Complete-Bins.
+- UX-Diskussion offen: Konzept-Aenderung "Complete-Bin auch aus Liste
+  raus" wuerde Reifungspfad invers beschneiden — User muesste erst
+  Complete leeren bevor Wartende dort einlagern kann. **Nicht ohne
+  bewussten User-Entscheid umsetzen.**
+
+### Befund 3: Kategorie-Sperre nicht durchgaengig wirksam
+
+- Sperre existiert in `SuggestBinForFloatingPartAsync` Schritt 3
+  (Default-Regel) und funktioniert in Isolation (3 Tests gruen).
+- Drei moegliche Erklaerungen warum die Beobachtung "zweiter Torso wird
+  trotzdem angeboten" auftritt:
+  - **Stapel-Match** (Schritt 1): gleiche PartNumber + ColorId → by-design
+    Stack-Wachstum, ueberstimmt Kategorie-Sperre
+  - **User-Mapping** (Schritt 2): Kategorie ist auf den Bin gemappt →
+    by-design User-Wille
+  - **Legacy-Bestand**: BrickognizeCategory=null bei alten FloatingParts
+    (vor v0.1.18-Backfill) → null vs "Minifigure, Torso Assembly" → kein
+    Match → Sperre greift nicht
+- Vor Fix-Entscheidung: Repro mit konkretem DB-Snapshot
+  (`SELECT PartNumber, ColorId, BrickognizeCategory FROM FloatingParts
+  WHERE StorageBinId=...`) und Settings-Snapshot (Category-Mappings).
+- Optional v0.1.24: Migration "BrickognizeCategory bei null nachpflegen
+  via DeriveCategoryFromPartName" — schliesst Legacy-Gap falls bestaetigt.
+  Aufwand: ~1-2h.
+
+### Backlog-Status
+
+Alle drei Befunde sind UX-/Roadmap-Items, **keine Bugs**. Klassifikation
+als "nice-to-have v0.1.24" oder spaeter — abhaengig von Praxis-Schmerz
+des Users.
+
+---
+
 ## Externe Abhängigkeiten
 
 ### ✅ Brickognize-ToS (geklärt)
@@ -389,4 +452,4 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-14 nach v0.1.23-beta.1 Praxis-Test-Fix.*
+*Zuletzt aktualisiert: 2026-05-14 nach v0.1.23-beta.1 Praxis-Test (UX-Befunde aufgenommen).*
