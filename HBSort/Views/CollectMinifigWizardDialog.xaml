@@ -1,0 +1,396 @@
+<Window x:Class="HBSort.Views.CollectMinifigWizardDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.modernwpf.com/2019"
+        xmlns:vm="clr-namespace:HBSort.ViewModels"
+        xmlns:b="clr-namespace:HBSort.Behaviors"
+        ui:WindowHelper.UseModernWindowStyle="True"
+        Title="Figur anlegen"
+        ToolTipService.IsEnabled="{DynamicResource TooltipsEnabled}"
+        Icon="../Resources/app.ico"
+        Width="700" Height="720"
+        MinWidth="600" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        KeyDown="Window_KeyDown">
+    <!--
+        v0.1.24-beta.1 Phase 2a (Konzept 4.1.2 Rev. 3): 2-stufiger Wizard.
+        Stufe 1: WAS wird angelegt - Required-Parts in 3 Status-Gruppen.
+        Stufe 2: WO soll die Figur hin - Lagerfach + Bewegungs-Hinweis.
+
+        Sichtbarkeit pro Stufe via DataTrigger auf IsStageOne / IsStageTwo.
+        Keyboard:
+          - Stufe 1: Enter -> Weiter, Escape -> Abbruch
+          - Stufe 2: Enter -> Speichern, Ctrl+Z -> Zurueck, Escape -> Abbruch
+    -->
+    <Grid Margin="0">
+        <!-- ===== STUFE 1: WAS wird angelegt ===== -->
+        <Grid x:Name="Stage1Root" Margin="20" >
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsStageOne}" Value="True">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>     <!-- Header + Step-Indicator -->
+                <RowDefinition Height="Auto"/>     <!-- Figur-Header-Card -->
+                <RowDefinition Height="*"/>        <!-- Scroll: 3 Status-Gruppen -->
+                <RowDefinition Height="Auto"/>     <!-- Buttons -->
+            </Grid.RowDefinitions>
+
+            <!-- Header + Step-Indikator -->
+            <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                <TextBlock Text="Figur anlegen"
+                           FontSize="{StaticResource DialogHeaderFontSize}"
+                           FontWeight="SemiBold"/>
+                <TextBlock Text="Stufe 1 von 2 - was wird angelegt"
+                           FontSize="11"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                           Margin="0,2,0,0"/>
+            </StackPanel>
+
+            <!-- Figur-Header-Card -->
+            <Border Grid.Row="1"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                    BorderThickness="1" CornerRadius="6"
+                    Padding="12" Margin="0,0,0,12"
+                    Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0"
+                            Width="72" Height="72"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                            BorderThickness="1" CornerRadius="4"
+                            Margin="0,0,12,0">
+                        <Image Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
+                               Stretch="Uniform"
+                               b:ImageZoom.IsEnabled="True"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding MinifigName, Mode=OneWay}"
+                                   FontSize="16" FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <TextBlock FontFamily="Consolas" FontSize="13"
+                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                   Margin="0,2,0,0">
+                            <Run Text="BL:"/>
+                            <Run Text="{Binding BricklinkId, Mode=OneWay}"/>
+                        </TextBlock>
+                        <TextBlock Text="via Brickognize-Scan / BL-Catalog-Match"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                                   Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 3 Status-Gruppen scrollbar -->
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <!-- TRIGGER-Gruppe -->
+                    <StackPanel Margin="0,0,0,14">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasTriggerParts}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{StaticResource StatusWarningBrush}"
+                                   Margin="0,0,0,4">
+                            <Run Text="TRIGGER - GERADE GESCANNT"/>
+                        </TextBlock>
+                        <Border Background="{StaticResource WarningBoxBackground}"
+                                BorderBrush="{StaticResource StatusWarningBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6" Padding="2">
+                            <ItemsControl ItemsSource="{Binding TriggerParts}"
+                                          ItemTemplate="{StaticResource WizardPartItemTemplate}"/>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- IN-STORAGE-Gruppe -->
+                    <StackPanel Margin="0,0,0,14">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasInStorageParts}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{StaticResource StatusSuccessBrush}"
+                                   Margin="0,0,0,4">
+                            <Run Text="IM LAGER - WIRD KONSUMIERT ("/>
+                            <Run Text="{Binding InStoragePartCount, Mode=OneWay}"/>
+                            <Run Text=")"/>
+                        </TextBlock>
+                        <Border Background="{StaticResource SuccessBoxBackground}"
+                                BorderBrush="{StaticResource StatusSuccessBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6" Padding="2">
+                            <ItemsControl ItemsSource="{Binding InStorageParts}"
+                                          ItemTemplate="{StaticResource WizardPartItemTemplate}"/>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- MISSING-Gruppe -->
+                    <StackPanel Margin="0,0,0,14">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasMissingParts}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                   Margin="0,0,0,4">
+                            <Run Text="FEHLT - BLEIBT WARTEND, ODER MANUELL MARKIEREN ("/>
+                            <Run Text="{Binding MissingPartCount, Mode=OneWay}"/>
+                            <Run Text=")"/>
+                        </TextBlock>
+                        <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6" Padding="2">
+                            <ItemsControl ItemsSource="{Binding MissingParts}"
+                                          ItemTemplate="{StaticResource WizardPartItemTemplate}"/>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Stufe-1-Buttons -->
+            <StackPanel Grid.Row="3" Orientation="Horizontal"
+                        HorizontalAlignment="Right" Margin="0,12,0,0">
+                <Button Content="Abbrechen" IsCancel="True"
+                        MinWidth="110" Margin="0,0,8,0"
+                        Click="Cancel_Click"/>
+                <Button Content="Weiter →"
+                        MinWidth="140"
+                        Style="{StaticResource AccentButtonStyle}"
+                        Click="Next_Click"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ===== STUFE 2: WO soll die Figur hin ===== -->
+        <Grid x:Name="Stage2Root" Margin="20" >
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsStageTwo}" Value="True">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>     <!-- Header + Step-Indicator -->
+                <RowDefinition Height="Auto"/>     <!-- Kompakter Figur-Header -->
+                <RowDefinition Height="Auto"/>     <!-- Lagerfach-Label -->
+                <RowDefinition Height="Auto"/>     <!-- Combobox -->
+                <RowDefinition Height="Auto"/>     <!-- Volle-Faecher-Banner -->
+                <RowDefinition Height="*"/>        <!-- Spacer -->
+                <RowDefinition Height="Auto"/>     <!-- Hinweis-Block -->
+                <RowDefinition Height="Auto"/>     <!-- Buttons -->
+            </Grid.RowDefinitions>
+
+            <!-- Header + Step-Indikator -->
+            <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                <TextBlock Text="Figur anlegen"
+                           FontSize="{StaticResource DialogHeaderFontSize}"
+                           FontWeight="SemiBold"/>
+                <TextBlock Text="Stufe 2 von 2 - wo soll die Figur hin"
+                           FontSize="11"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                           Margin="0,2,0,0"/>
+            </StackPanel>
+
+            <!-- Kompakter Figur-Header (kein Bild) -->
+            <Border Grid.Row="1"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="0,0,0,10" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="{Binding MinifigName, Mode=OneWay}"
+                               FontSize="16" FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis"/>
+                    <TextBlock FontFamily="Consolas" FontSize="12"
+                               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                               Margin="0,2,0,0">
+                        <Run Text="BL:"/>
+                        <Run Text="{Binding BricklinkId, Mode=OneWay}"/>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
+            <!-- Lagerfach-Label -->
+            <TextBlock Grid.Row="2" Text="Lagerfach fuer die wartende Figur"
+                       FontWeight="SemiBold"
+                       Margin="0,0,0,6"/>
+
+            <!-- Combobox -->
+            <ComboBox Grid.Row="3" MinHeight="36" FontSize="13"
+                      ItemsSource="{Binding AvailableBins}"
+                      SelectedItem="{Binding SelectedBin}"
+                      DisplayMemberPath="Label"
+                      ToolTip="Fach in das die neue wartende Figur gelegt wird."
+                      Margin="0,0,0,12"/>
+
+            <!-- Volle-Faecher-Banner (analog v0.1.22-beta.1 Block D) -->
+            <Border Grid.Row="4"
+                    Background="{StaticResource WarningBoxBackground}"
+                    BorderBrush="{StaticResource StatusWarningBrush}"
+                    BorderThickness="1" CornerRadius="6" Padding="12"
+                    Margin="0,0,0,12"
+                    Visibility="{Binding IsAllBinsFullBannerVisible, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="Alle Lagerfaecher sind belegt. Bitte ein neues Fach anlegen oder ein bestehendes leeren."
+                           TextWrapping="Wrap" VerticalAlignment="Center"
+                           FontWeight="SemiBold" Foreground="{StaticResource StatusWarningBrush}"/>
+            </Border>
+
+            <!-- Pflicht-Hinweis-Block oberhalb Speichern (Konzept N5) -->
+            <Border Grid.Row="6"
+                    Background="{StaticResource InfoBoxBackground}"
+                    BorderBrush="{StaticResource StatusInfoBrush}"
+                    BorderThickness="1" CornerRadius="6" Padding="14"
+                    Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock FontWeight="SemiBold" FontSize="13"
+                               Foreground="{StaticResource StatusInfoBrush}"
+                               Text="{Binding MovementHint}"/>
+                    <TextBlock TextWrapping="Wrap" FontSize="12"
+                               Foreground="{StaticResource StatusInfoBrush}"
+                               Margin="0,4,0,0"
+                               Text="Beim Speichern erscheint eine Liste die du aktiv bestaetigen musst."/>
+                </StackPanel>
+            </Border>
+
+            <!-- Stufe-2-Buttons -->
+            <Grid Grid.Row="7">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="0"
+                        Content="← Zurueck"
+                        MinWidth="120"
+                        Click="Back_Click"
+                        ToolTip="Zurueck zu Stufe 1 - State bleibt erhalten. (Strg+Z)"/>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button Content="Abbrechen" IsCancel="True"
+                            MinWidth="110" Margin="0,0,8,0"
+                            Click="Cancel_Click"/>
+                    <Button Content="Speichern + Anlegen"
+                            MinWidth="180"
+                            Style="{StaticResource AccentButtonStyle}"
+                            IsEnabled="{Binding CanSave}"
+                            Click="Save_Click"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <!-- Loading-Overlay -->
+        <Border Background="#80FFFFFF"
+                Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="Laedt Required-Parts..."
+                       FontSize="14"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+    </Grid>
+
+    <Window.Resources>
+        <!--
+            Gemeinsames Item-Layout fuer alle 3 Status-Gruppen in Stufe 1.
+            Bild (40px) + Detail-Mono prominent + Name darunter + Bin-Pill
+            (InStorage) + Checkbox (Missing) + Quantity rechts.
+        -->
+        <DataTemplate x:Key="WizardPartItemTemplate" DataType="{x:Type vm:CollectWizardPartItem}">
+            <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                    BorderThickness="0,0,0,1" Padding="10,8" Margin="2,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="48"/>     <!-- Bild -->
+                        <ColumnDefinition Width="*"/>      <!-- Detail/Name -->
+                        <ColumnDefinition Width="Auto"/>   <!-- Bin-Pill / Checkbox -->
+                        <ColumnDefinition Width="Auto"/>   <!-- Quantity -->
+                    </Grid.ColumnDefinitions>
+
+                    <Image Grid.Column="0"
+                           Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
+                           Width="40" Height="40"
+                           Stretch="Uniform"
+                           Margin="0,0,10,0"
+                           b:ImageZoom.IsEnabled="True"/>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <!-- Detail (BL-ID + Farbe) prominent in Mono -->
+                        <TextBlock Text="{Binding DetailLabel}"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   FontFamily="Consolas"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <!-- Status-Text darunter (live aendert sich bei Manuell-Toggle) -->
+                        <TextBlock Text="{Binding StatusText}"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                   Margin="0,2,0,0"
+                                   TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+
+                    <!--
+                        Manuell-Markieren-Checkbox (nur Missing-Items).
+                        Visibility-Trigger via IsCheckBoxVisible.
+                    -->
+                    <CheckBox Grid.Column="2"
+                              VerticalAlignment="Center"
+                              Margin="8,0"
+                              Content="manuell vorhanden"
+                              IsChecked="{Binding IsManuallyClaimed, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                              ToolTip="Teil ist physisch vorhanden, aber nicht im Lager. Wird als gesammelt markiert ohne Lager-Verbrauch.">
+                        <CheckBox.Style>
+                            <Style TargetType="CheckBox">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsCheckBoxVisible}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </CheckBox.Style>
+                    </CheckBox>
+
+                    <TextBlock Grid.Column="3"
+                               Text="{Binding QuantityLabel}"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Margin="12,0,0,0"
+                               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </Window.Resources>
+</Window>

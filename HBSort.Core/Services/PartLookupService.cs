@@ -603,6 +603,7 @@ public class PartLookupService : IPartLookupService
         string blMinifigId, int storageBinId,
         string triggerPartNo, int triggerColorId, int triggerQuantity,
         IReadOnlyCollection<(string PartNo, int ColorId)> consumePartsFromFloating,
+        IReadOnlyCollection<(string PartNo, int ColorId)>? manuellClaimedParts = null,
         CancellationToken ct = default)
     {
         // Filter-Set fuer schnellen Lookup pro Required-Part. Stringvergleich
@@ -610,6 +611,15 @@ public class PartLookupService : IPartLookupService
         // (z.B. "3001" vs "3001a") nicht zu Misses fuehren.
         var filter = new HashSet<(string, int)>(
             consumePartsFromFloating?.Select(x => (x.PartNo.ToLowerInvariant(), x.ColorId))
+            ?? Enumerable.Empty<(string, int)>());
+
+        // v0.1.24-beta.1 Phase 2a (Konzept 6.3 / Befund A3): manuell-markierte
+        // Teile. Wird unten NACH dem Reverse-Match angewendet: QuantityCollected
+        // erhoehen ohne FloatingPart-Effekt. Cap auf QuantityNeeded damit
+        // doppelte Eintraege oder Race-mit-Trigger nicht ueber das Soll
+        // schiessen.
+        var manuellClaimed = new HashSet<(string, int)>(
+            manuellClaimedParts?.Select(x => (x.PartNo.ToLowerInvariant(), x.ColorId))
             ?? Enumerable.Empty<(string, int)>());
 
         // 1) Sicherstellen dass die volle Subsets-Liste der Minifig im Cache ist.
@@ -731,6 +741,31 @@ public class PartLookupService : IPartLookupService
             }
         }
 
+        // v0.1.24-beta.1 Phase 2a (Konzept 6.3): manuell-markierte Teile
+        // direkt als gesammelt eintragen. KEIN FloatingPart-Effekt - der
+        // User hat das Teil unabhaengig vom Lager (z.B. lose auf dem Tisch).
+        // Nur Required-Parts beruecksichtigen die noch Bedarf haben (kein
+        // Doppel-Eintrag wenn der Reverse-Match das Teil schon gefuellt
+        // hat oder der Trigger es ist).
+        var manuellClaimedApplied = 0;
+        foreach (var required in minifig.RequiredParts)
+        {
+            var key = (required.PartNumber.ToLowerInvariant(), required.ColorId);
+            if (!manuellClaimed.Contains(key)) continue;
+
+            var stillNeeded = required.QuantityNeeded - required.QuantityCollected;
+            if (stillNeeded <= 0)
+            {
+                Log.Warning(
+                    "ManuellClaimed: Teil {Part}/{Color} schon voll bei Figur {Bl}, ueberspringe",
+                    required.PartNumber, required.ColorId, blMinifigId);
+                continue;
+            }
+
+            required.QuantityCollected = required.QuantityNeeded;
+            manuellClaimedApplied++;
+        }
+
         var isComplete = minifig.RequiredParts.All(p => p.QuantityCollected >= p.QuantityNeeded)
                          && minifig.RequiredParts.Count > 0;
         if (isComplete)
@@ -739,14 +774,21 @@ public class PartLookupService : IPartLookupService
             minifig.CompletedAt = DateTime.UtcNow;
         }
 
+        // v0.1.24-beta.1 Phase 2a (Konzept 6.3): manuell-markierte Teile im
+        // Audit-Trail sichtbar machen. Suffix nur wenn der Pfad genutzt wurde
+        // - Backwards-Compat fuer den heutigen Aufrufer ohne manuellClaimed.
+        var manuellSuffix = manuellClaimedApplied > 0
+            ? $" + {manuellClaimedApplied} manuell markiert"
+            : string.Empty;
+
         ctx.ScanEvents.Add(new ScanEvent
         {
             Timestamp = DateTime.UtcNow,
             Type = ScanType.PartScan,
             RecognizedId = triggerPartNo,
             ResultDescription = isComplete
-                ? $"Neue Figur '{minifig.Name}' direkt komplett (User-Auswahl)"
-                : $"Neue Figur '{minifig.Name}' angelegt in '{bin.Label}' (User-Auswahl, {reverseMatched} Teile uebernommen)",
+                ? $"Neue Figur '{minifig.Name}' direkt komplett (User-Auswahl{manuellSuffix})"
+                : $"Neue Figur '{minifig.Name}' angelegt in '{bin.Label}' (User-Auswahl, {reverseMatched} Teile uebernommen{manuellSuffix})",
             WasUndone = false
         });
 
@@ -762,9 +804,10 @@ public class PartLookupService : IPartLookupService
 
         _persistence.RaiseDataChanged();
 
-        Log.Information("CollectMinifig (Selection): '{Name}' angelegt in '{Bin}', Trigger {Tp}/{Tc}, Filter={FilterCount}, Consumed={Cons}{Done}",
+        Log.Information("CollectMinifig (Selection): '{Name}' angelegt in '{Bin}', Trigger {Tp}/{Tc}, Filter={FilterCount}, Consumed={Cons}, ManuellClaimed={Mc}{Done}",
             minifig.Name, bin.Label, triggerPartNo, triggerColorId,
-            filter.Count, consumed.Count, isComplete ? " => COMPLETE" : "");
+            filter.Count, consumed.Count, manuellClaimedApplied,
+            isComplete ? " => COMPLETE" : "");
 
         return new CollectMinifigResult
         {

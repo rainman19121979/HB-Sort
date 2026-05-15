@@ -72,6 +72,14 @@ public interface IPartLookupService
     /// ein Reverse-Match versucht. Andere Required-Parts bleiben "fehlt /
     /// wartend".
     ///
+    /// v0.1.24-beta.1 Phase 2a (Konzept 6.3 / Befund A3): optionaler Parameter
+    /// <paramref name="manuellClaimedParts"/> markiert weitere Required-Parts
+    /// direkt als gesammelt OHNE FloatingPart-Effekt - User hat das Teil
+    /// physisch in der Hand, will es aber nicht aus dem Lager nehmen. Der
+    /// Service erhoeht QuantityCollected (cap auf QuantityNeeded) und
+    /// vermerkt die Anzahl im ScanEvent-ResultDescription. Bei null/empty
+    /// laeuft der alte Pfad unveraendert (Backwards-Compat).
+    ///
     /// Liefert ein <see cref="CollectMinifigResult"/> mit der angelegten
     /// Figur, dem Complete-Status und den konsumierten FloatingParts (fuer
     /// das Sammel-Popup im UI-Layer).
@@ -80,6 +88,7 @@ public interface IPartLookupService
         string blMinifigId, int storageBinId,
         string triggerPartNo, int triggerColorId, int triggerQuantity,
         IReadOnlyCollection<(string PartNo, int ColorId)> consumePartsFromFloating,
+        IReadOnlyCollection<(string PartNo, int ColorId)>? manuellClaimedParts = null,
         CancellationToken ct = default);
 
     /// <summary>

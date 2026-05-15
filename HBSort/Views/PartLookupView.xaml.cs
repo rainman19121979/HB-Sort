@@ -126,11 +126,11 @@ public partial class PartLookupView : UserControl
     /// <summary>
     /// "Diese Figur anlegen" auf einem BL-Catalog-Treffer.
     ///
-    /// UX X.32 v0.1.19-beta.4 Block D: Vor-Auswahl-Dialog. User markiert
-    /// welche Required-Parts beim Anlegen aus dem Floating-Pool gezogen
-    /// werden sollen. Trigger-Teil ist immer markiert + nicht abwaehlbar,
-    /// Reverse-Match-Treffer sind vor-markiert (gruen), Rest ist demarkiert
-    /// (grau / "fehlt - bleibt wartend").
+    /// v0.1.24-beta.1 Phase 2a (Konzept 4.1.2 Rev. 3): nutzt den 2-stufigen
+    /// <see cref="CollectMinifigWizardDialog"/>. Stufe 1 zeigt Required-Parts
+    /// in 3 Status-Gruppen (Trigger / Im Lager / Fehlt), Stufe 2 waehlt
+    /// Lagerfach + Speichern. Post-Save-Modal kommt vom Wizard selbst -
+    /// User klickt aktiv weg (KEIN Auto-Dismiss).
     /// </summary>
     private async void CollectFromBlCatalog_Click(object sender, RoutedEventArgs e)
     {
@@ -145,25 +145,20 @@ public partial class PartLookupView : UserControl
         var settings = App.Services.GetRequiredService<HBSort.Core.Services.ISettingsService>();
         var maxWaiting = settings.Current.MaxWaitingFiguresPerBin;
 
-        // UX X.32 v0.1.19-beta.4 (User-Befund): kein Default-Bin mehr aus
-        // dem Floating-Pool des gerade gescannten Teils. Der Selection-
-        // Dialog hat jetzt seinen eigenen Bin-Picker - Default = wartende-
-        // Figur-Vorschlag aus dem StorageBinService. Vorher landete die
-        // neue wartende Figur faelschlicherweise im Fach des Einzelteils.
-        var selectionVm = new ViewModels.CollectMinifigSelectionViewModel(
-            catalog, partLookup, imageProvider, binService);
+        var wizardVm = new ViewModels.CollectMinifigWizardViewModel(
+            catalog, partLookup, imageProvider, binService,
+            maxWaitingLimit: maxWaiting);
 
         vm.IsBusy = true;
         try
         {
-            await selectionVm.LoadAsync(
+            await wizardVm.LoadAsync(
                 match.BlMinifigId,
-                vm.BlPartNo, vm.BlColorId,
-                maxWaitingLimit: maxWaiting);
+                vm.BlPartNo, vm.BlColorId);
         }
         catch (System.Exception loadEx)
         {
-            Log.Error(loadEx, "CollectMinifigSelection LoadAsync fehlgeschlagen");
+            Log.Error(loadEx, "CollectMinifigWizard LoadAsync fehlgeschlagen");
             await App.Services.GetRequiredService<IDialogService>()
                 .ShowErrorAsync("Fehler", loadEx.Message);
             vm.IsBusy = false;
@@ -171,109 +166,42 @@ public partial class PartLookupView : UserControl
         }
         vm.IsBusy = false;
 
-        if (selectionVm.AvailableBins.Count == 0)
+        if (wizardVm.AvailableBins.Count == 0)
         {
             notif.ShowWarning("Kein Lagerfach verfuegbar - bitte erst ein Fach anlegen.");
             return;
         }
 
-        var dialog = new CollectMinifigSelectionDialog(selectionVm)
+        // Wizard kapselt Service-Call + Post-Save-Modal. Strict-Mode-Errors
+        // bleiben im Wizard (User waehlt neu, kein DialogResult=true).
+        var triggerQty = Math.Max(1, vm.Quantity);
+        var dialog = new CollectMinifigWizardDialog(
+            wizardVm, vm.BlPartNo, vm.BlColorId, triggerQty)
         {
             Owner = Window.GetWindow(this)
         };
         var result = dialog.ShowDialog();
-        if (result != true) return; // User hat verworfen
+        if (result != true || dialog.SaveResult == null) return; // User hat verworfen
 
-        // User-gewaehltes Bin aus dem Dialog (Default war SuggestBinForWaiting).
-        var bin = selectionVm.SelectedBin;
-        if (bin == null)
+        var collectResult = dialog.SaveResult;
+        var binLabel = wizardVm.SelectedBin?.Label ?? string.Empty;
+
+        // Toast als zusaetzliche Bestaetigung (Post-Save-Modal hat der
+        // Wizard selbst schon gezeigt).
+        if (collectResult.IsFullyComplete)
         {
-            notif.ShowWarning("Kein Lagerfach gewaehlt.");
-            return;
+            notif.ShowSuccess(
+                $"Figur '{collectResult.SavedMinifig.Name}' komplett in '{binLabel}'!");
+        }
+        else
+        {
+            notif.ShowSuccess(
+                $"Figur '{collectResult.SavedMinifig.Name}' angelegt in '{binLabel}'.");
         }
 
-        // Service-Aufruf mit User-Auswahl.
-        vm.IsBusy = true;
-        try
-        {
-            var collectResult = await partLookup.CollectMinifigFromSupersetWithSelectionAsync(
-                match.BlMinifigId,
-                bin.Id,
-                vm.BlPartNo,
-                vm.BlColorId,
-                Math.Max(1, vm.Quantity),
-                selectionVm.SelectedPartsForReverseMatch);
-
-            // Toast + ggf. Sammel-Popup.
-            var scan = GetScanViewModel();
-            var consumed = collectResult.ConsumedFloatingParts;
-
-            if (collectResult.IsFullyComplete)
-            {
-                notif.ShowSuccess(
-                    $"Figur '{collectResult.SavedMinifig.Name}' komplett in '{bin.Label}'!");
-            }
-            else
-            {
-                notif.ShowSuccess(
-                    $"Figur '{collectResult.SavedMinifig.Name}' angelegt in '{bin.Label}'.");
-            }
-
-            // UX X.32 v0.1.19-beta.4 (User-Befund): Anweisungs-Popup analog
-            // zum PersistPendingAsync-Pfad - bei 2+ konsumierten Teilen
-            // Sammel-Popup, sonst Einzel-Popup ("Lege Figur in Box X").
-            // Vorher kam bei 0 konsumierten Teilen NUR ein Toast - der
-            // User wollte aber konsistent das gleiche Popup wie beim
-            // direkten Wartend-Anlegen.
-            if (scan != null)
-            {
-                if (consumed.Count >= 2)
-                {
-                    var items = new List<HBSort.ViewModels.BinInstructionItem>
-                    {
-                        new()
-                        {
-                            ItemLabel = $"Figur '{collectResult.SavedMinifig.Name}'",
-                            QuantityText = "1 Stueck",
-                            BinLabel = bin.Label,
-                            ImageUrl = selectionVm.ImageUrl
-                        }
-                    };
-                    items.AddRange(consumed.Select(c => new HBSort.ViewModels.BinInstructionItem
-                    {
-                        ItemLabel = $"{c.PartName} ({c.BlPartNo}) - {c.ColorName}",
-                        QuantityText = $"{c.Quantity} Stueck (aus {c.SourceBinLabel})",
-                        BinLabel = bin.Label
-                    }));
-                    scan.ShowBinInstructionGroup(items);
-                }
-                else
-                {
-                    // Einzel-Popup mit Bin-Label + Figur-Bild.
-                    scan.ShowBinInstruction(bin.Label, selectionVm.ImageUrl);
-                }
-            }
-
-            // Pending ausblenden - Workflow ist abgeschlossen.
-            if (scan != null) scan.PendingPart = null;
-        }
-        catch (HBSort.Core.Services.InvalidBinKindException strict)
-        {
-            // v0.1.23 Strict-Mode: Ziel-Bin akzeptiert die Figur nicht.
-            Log.Warning(strict, "CollectFromBlCatalog: Strict-Mode-Verletzung");
-            await App.Services.GetRequiredService<IDialogService>()
-                .ShowErrorAsync("Aktion nicht moeglich", strict.Message);
-        }
-        catch (System.Exception ex)
-        {
-            Log.Error(ex, "CollectFromBlCatalog fehlgeschlagen");
-            await App.Services.GetRequiredService<IDialogService>()
-                .ShowErrorAsync("Fehler", ex.Message);
-        }
-        finally
-        {
-            vm.IsBusy = false;
-        }
+        // Pending ausblenden - Workflow ist abgeschlossen.
+        var scan = GetScanViewModel();
+        if (scan != null) scan.PendingPart = null;
     }
 
     /// <summary>Korrektur-Dropdown: User waehlt eine andere Farbe.</summary>
