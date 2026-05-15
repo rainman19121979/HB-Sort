@@ -304,6 +304,21 @@ public partial class InventoryListView : UserControl
                 }
 
                 var putItems = new List<HBSort.ViewModels.SortItemLine>();
+                // Phase 1.5 Polish (Praxis-Test 2026-05-15): FloatingParts haben
+                // kein ImageUrl-Feld in der DB — fuers Modal ueber den Image-Provider
+                // pro BL-ID + ColorId nachladen. Best-effort: bei Fehler bleibt das
+                // Bild leer (Modal-Layout zeigt dann nur ID + Name, kein Crash).
+                var imgProvider = Service<IPartImageProvider>();
+                async System.Threading.Tasks.Task<string?> LoadFloatingImageAsync(string partNo, int colorId)
+                {
+                    try { return await imgProvider.GetImageFileByBlAsync("P", partNo, colorId); }
+                    catch (Exception ex)
+                    {
+                        Log.Debug(ex, "Bulk-Move Bild-Lookup fuer {Part}/{Color} fehlgeschlagen",
+                            partNo, colorId);
+                        return null;
+                    }
+                }
                 await using (var ctx = await ctxFactory.CreateDbContextAsync())
                 {
                     if (minifigIds.Count > 0)
@@ -339,20 +354,32 @@ public partial class InventoryListView : UserControl
                         var floats = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
                             Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AsNoTracking(
                                 ctx.FloatingParts.Where(p => floatingIds.Contains(p.Id))));
-                        foreach (var fp in floats)
+
+                        // Phase 1.5 Polish: Bilder parallel laden statt sequenziell
+                        // foreach-await. Bei 10 Items: ~2s -> ~200ms.
+                        // LoadFloatingImageAsync nutzt nur imgProvider, keinen ctx,
+                        // daher kein Konflikt mit dem offenen DbContext.
+                        var imageUrls = await System.Threading.Tasks.Task.WhenAll(
+                            floats.Select(fp => LoadFloatingImageAsync(fp.PartNumber, fp.ColorId)));
+
+                        for (int i = 0; i < floats.Count; i++)
                         {
+                            var fp = floats[i];
+                            var imageUrl = imageUrls[i];
                             await EnsureBinLabelAsync(fp.StorageBinId, ctx);
                             sourceMap[fp.StorageBinId].Items.Add(new HBSort.ViewModels.SortItemLine
                             {
                                 Label = fp.PartName,
                                 Detail = $"{fp.PartNumber} - {fp.ColorName}",
-                                QuantityText = $"{fp.Quantity}x"
+                                QuantityText = $"{fp.Quantity}x",
+                                ImageUrl = imageUrl
                             });
                             putItems.Add(new HBSort.ViewModels.SortItemLine
                             {
                                 Label = fp.PartName,
                                 Detail = $"{fp.PartNumber} - {fp.ColorName}",
-                                QuantityText = $"{fp.Quantity}x"
+                                QuantityText = $"{fp.Quantity}x",
+                                ImageUrl = imageUrl
                             });
                         }
                     }

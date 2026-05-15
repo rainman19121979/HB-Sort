@@ -35,6 +35,18 @@ public partial class DismantleWizardViewModel : ObservableObject
     [ObservableProperty] private string _bricklinkId = string.Empty;
     [ObservableProperty] private bool _isLoading;
 
+    /// <summary>
+    /// v0.1.24-beta.1 Phase 1.5 Polish (Praxis-Test 2026-05-15): Label des
+    /// Lagerfachs in dem die Figur derzeit liegt. Wird im Post-Save-Modal
+    /// als Take-Sektion-Header verwendet ("Nimm aus Box03-12") statt der
+    /// virtuellen "Figur 'XYZ'"-Bezeichnung die nur den HeaderText wiederholt.
+    ///
+    /// Bei LoadFromPendingAsync (Direkt-Zerlegen ohne Lagerfach) bleibt
+    /// die Property leer — BuildSortInstructionFromState laesst dann die
+    /// Take-Sektion ganz weg, da der User die Teile schon in der Hand hat.
+    /// </summary>
+    [ObservableProperty] private string _originBinLabel = string.Empty;
+
     public ObservableCollection<DismantlePartItemViewModel> Parts { get; } = new();
     public ObservableCollection<StorageBin> AvailableBins { get; } = new();
 
@@ -104,6 +116,8 @@ public partial class DismantleWizardViewModel : ObservableObject
 
             MinifigName = m.Name;
             BricklinkId = m.BricklinkId ?? m.FigNum;
+            // Phase 1.5 Polish: Quell-Lagerfach merken fuer das Post-Save-Modal.
+            OriginBinLabel = m.StorageBin?.Label ?? string.Empty;
 
             // v0.1.22-beta.1 Block E: Helper-Refactor. Lagerfach-Liste
             // einmalig laden - identische Logik in LoadFromPendingAsync.
@@ -338,25 +352,43 @@ public partial class DismantleWizardViewModel : ObservableObject
             var allColors = _catalog == null ? new List<Core.Models.Bricklink.BlColor>()
                 : await _catalog.GetAllColorsAsync();
             var colorMap = allColors.ToDictionary(c => c.ColorId);
+            var partsList = Parts.ToList();
 
-            foreach (var p in Parts.ToList())
+            // Color-Swatches bleiben sequenziell — Dispatcher.Invoke ist
+            // bereits sehr schnell, kein Parallelisierungs-Gewinn und
+            // Brush-Erzeugung ist CPU-only.
+            foreach (var p in partsList)
             {
                 if (colorMap.TryGetValue(p.BlColorId, out var col) && col.Rgb != null)
                 {
                     var brush = ParseRgbBrush(col.Rgb);
                     Application.Current?.Dispatcher.Invoke(() => p.SwatchBrush = brush);
                 }
+            }
 
-                if (_imageProvider != null)
+            // Phase 1.5 Polish: Image-Loads parallel statt sequenziell foreach-await.
+            // Bei 6 Required-Parts: ~1.2s -> ~200ms. Wirkt sich direkt auf die
+            // Confirm-Klick-Latenz aus (siehe DismantleWizardDialog.Confirm_Click
+            // wo ImageLoadTask gewaited wird).
+            if (_imageProvider != null)
+            {
+                var imageTasks = partsList.Select(async p =>
                 {
                     try
                     {
-                        var url = await _imageProvider.GetImageFileByBlAsync("P", p.BlPartNo, p.BlColorId);
+                        var url = await _imageProvider.GetImageFileByBlAsync(
+                            "P", p.BlPartNo, p.BlColorId);
                         if (!string.IsNullOrEmpty(url))
+                        {
                             Application.Current?.Dispatcher.Invoke(() => p.ImageUrl = url);
+                        }
                     }
-                    catch { /* best-effort */ }
-                }
+                    catch
+                    {
+                        // best-effort: einzelner Fehler darf den ganzen Lauf nicht killen
+                    }
+                });
+                await Task.WhenAll(imageTasks);
             }
         }
         catch (Exception ex)
@@ -427,6 +459,9 @@ public partial class DismantleWizardViewModel : ObservableObject
         {
             MinifigName = pending.Name;
             BricklinkId = pending.BricklinkId;
+            // Phase 1.5 Polish: Pending-Pfad hat kein physisches Lagerfach.
+            // BuildSortInstructionFromState laesst die Take-Sektion dann weg.
+            OriginBinLabel = string.Empty;
 
             // v0.1.22-beta.1 Block E: Helper-Refactor (identisch zu LoadAsync).
             await ReloadAvailableBinsAsync();
@@ -534,16 +569,17 @@ public partial class DismantleWizardViewModel : ObservableObject
             .Where(p => p.IsKept && p.IsPutInBinMode && p.TargetBin != null)
             .ToList();
 
-        // Take-Sektion (virtuell aus der Figur). Die Figur selbst ist die
-        // Quell-"Box". Nur Teile auflisten die tatsaechlich rausgehen.
-        if (keptPut.Count > 0)
+        // Take-Sektion: physisches Quell-Lagerfach wo die Figur derzeit
+        // liegt (OriginBinLabel). Phase 1.5 Polish 2026-05-15: vorher
+        // virtueller "Figur 'XYZ'"-Header, der nur den HeaderText wiederholte
+        // und Lagerfach-Konsistenz mit Put-Sektion brach.
+        //
+        // Wenn OriginBinLabel leer ist (Pending-Pfad: Direkt-Zerlegen ohne
+        // dass die Figur in DB liegt), Take-Sektion ganz weglassen — User
+        // hat die Teile schon in der Hand, kein "Nimm aus X" sinnvoll.
+        if (keptPut.Count > 0 && !string.IsNullOrWhiteSpace(OriginBinLabel))
         {
-            var takeSection = new SortSection
-            {
-                BinLabel = string.IsNullOrWhiteSpace(MinifigName)
-                    ? "Figur"
-                    : $"Figur '{MinifigName}'"
-            };
+            var takeSection = new SortSection { BinLabel = OriginBinLabel };
             foreach (var p in keptPut)
             {
                 var qty = p.QuantityCollected > 0 ? p.QuantityCollected : p.QuantityNeeded;

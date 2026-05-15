@@ -85,18 +85,27 @@
         </Border>
 
         <!-- ===== SORT-INSTRUCTION-MODE (v0.1.24-beta.1) =====
-             Neues Post-Save-Modal mit Take/Put/Plus-Sektionen. Konzept 4.3
-             Rev. 3 + Polish: Modal-only fuer alle 6 Sortier-Triggers,
-             aktiv weggeklickt (Enter / OK-Klick / Esc), KEIN Auto-Dismiss.
-             Wireframe-Anker: Konzept 4.3.3. -->
+             Post-Save-Modal mit Take/Put/Plus-Sektionen. Konzept 4.3 Rev. 3.
+             Modal-only fuer alle 6 Sortier-Triggers, aktiv weggeklickt
+             (Enter / OK-Klick / Esc), KEIN Auto-Dismiss.
+
+             Phase 1.5 Polish (2026-05-15, User-Feedback): Layout aufgeraeumt
+             - Lagerfach prominent (FontSize 22, Akzent-Farbe) statt im
+               GroupBox-Header versteckt
+             - GroupBox-Container entfernt, Trennlinien statt Borders
+             - Items: Detail (BL-ID + Farbe) prominent in Monospace, Name
+               klein darunter als Fallback bei Bild-Fehler
+             - Header dezenter (kein Akzent mehr), Modal schmaler und mit
+               mehr Padding
+        -->
         <Border HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
-                BorderBrush="{DynamicResource SystemAccentColorLight2Brush}"
-                BorderThickness="2"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="1"
                 CornerRadius="8"
-                Padding="24"
-                MaxWidth="720" MaxHeight="700"
+                Padding="32"
+                MaxWidth="560" MaxHeight="700"
                 MouseLeftButtonUp="OverlayPanel_MouseLeftButtonUp">
             <Border.Style>
                 <Style TargetType="Border">
@@ -114,18 +123,20 @@
             </Border.Effect>
 
             <DockPanel LastChildFill="True">
-                <!-- Header: "Operation erfolgreich" o.ae. -->
+                <!-- Header: "Operation erfolgreich" o.ae. Dezenter (kein
+                     Akzent, kleinere FontSize) — der Bin-Label in den
+                     Sektionen ist das visuelle Highlight, nicht der Header. -->
                 <TextBlock DockPanel.Dock="Top"
                            Text="{Binding ScanViewModel.BinInstruction.HeaderText}"
                            TextWrapping="Wrap"
-                           FontSize="18" FontWeight="SemiBold"
-                           Foreground="{DynamicResource SystemAccentBrush}"
+                           FontSize="14"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                            HorizontalAlignment="Center"
                            TextAlignment="Center"
-                           Margin="0,0,0,16"/>
+                           Margin="0,0,0,24"/>
 
                 <!-- Bottom: OK-Button mit Enter-Default + Hinweis-Text -->
-                <StackPanel DockPanel.Dock="Bottom" HorizontalAlignment="Center" Margin="0,16,0,0">
+                <StackPanel DockPanel.Dock="Bottom" HorizontalAlignment="Center" Margin="0,24,0,0">
                     <Button Content="Verstanden (Enter)"
                             IsDefault="True"
                             HorizontalAlignment="Center"
@@ -137,14 +148,20 @@
                                FontSize="11"
                                Foreground="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
                                HorizontalAlignment="Center"
-                               Margin="0,6,0,0"/>
+                               Margin="0,8,0,0"/>
                 </StackPanel>
 
-                <!-- Mitte: scrollbarer Bereich mit Take/Put/Plus-Sektionen -->
+                <!-- Mitte: scrollbarer Bereich mit Take/Put/Plus-Sektionen.
+                     Layout pro Sektion:
+                       - Mini-Label "Nimm aus" / "Lege in" (FontSize 11, secondary)
+                       - Bin-Label prominent (FontSize 22, Bold, Akzent)
+                       - Trennlinie
+                       - Items: 48px-Bild, Detail prominent in Mono, Label klein
+                -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="520">
                     <StackPanel>
 
-                        <!-- Take-Sektionen ("Nimm aus {BinLabel}:") -->
+                        <!-- Take-Sektionen -->
                         <ItemsControl ItemsSource="{Binding ScanViewModel.BinInstruction.TakeSections}">
                             <ItemsControl.Style>
                                 <Style TargetType="ItemsControl">
@@ -159,19 +176,25 @@
                             </ItemsControl.Style>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <GroupBox Margin="0,0,0,12" Padding="8">
-                                        <GroupBox.Header>
-                                            <TextBlock FontWeight="SemiBold">
-                                                <Run Text="Nimm aus "/>
-                                                <Run Text="{Binding BinLabel}"
-                                                     Foreground="{DynamicResource SystemAccentBrush}"/>
-                                                <Run Text=":"/>
-                                            </TextBlock>
-                                        </GroupBox.Header>
+                                    <StackPanel Margin="0,0,0,16">
+                                        <!-- Sektion-Header: Mini-Label + prominenter Bin-Label -->
+                                        <TextBlock Text="Nimm aus"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                                   Margin="0,0,0,2"/>
+                                        <TextBlock Text="{Binding BinLabel}"
+                                                   FontSize="22"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource SystemAccentBrush}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Margin="0,0,0,8"/>
+                                        <Separator Margin="0,0,0,4"
+                                                   Background="{DynamicResource SystemControlForegroundBaseLowBrush}"/>
                                         <ItemsControl ItemsSource="{Binding Items}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Grid Margin="0,4">
+                                                    <Grid Margin="0,8">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="60"/>
                                                             <ColumnDefinition Width="*"/>
@@ -184,17 +207,23 @@
                                                                b:ImageZoom.IsEnabled="True"/>
                                                         <StackPanel Grid.Column="1"
                                                                     VerticalAlignment="Center"
-                                                                    Margin="8,0">
-                                                            <TextBlock Text="{Binding Label}"
-                                                                       FontWeight="SemiBold"
-                                                                       TextWrapping="Wrap"/>
+                                                                    Margin="12,0">
+                                                            <!-- Detail (BL-ID + Farbe) prominent -->
                                                             <TextBlock Text="{Binding Detail}"
+                                                                       FontSize="14"
+                                                                       FontWeight="SemiBold"
+                                                                       FontFamily="Consolas"
+                                                                       TextTrimming="CharacterEllipsis"/>
+                                                            <!-- Name klein darunter als Fallback -->
+                                                            <TextBlock Text="{Binding Label}"
                                                                        Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                                                                        FontSize="11"
-                                                                       TextWrapping="Wrap"/>
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       Margin="0,2,0,0"/>
                                                         </StackPanel>
                                                         <TextBlock Grid.Column="2"
                                                                    Text="{Binding QuantityText}"
+                                                                   FontSize="14"
                                                                    FontWeight="Bold"
                                                                    VerticalAlignment="Center"
                                                                    Margin="8,0,0,0"/>
@@ -202,12 +231,12 @@
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
-                                    </GroupBox>
+                                    </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <!-- Put-Sektionen ("Lege in {BinLabel}:") -->
+                        <!-- Put-Sektionen -->
                         <ItemsControl ItemsSource="{Binding ScanViewModel.BinInstruction.PutSections}">
                             <ItemsControl.Style>
                                 <Style TargetType="ItemsControl">
@@ -222,19 +251,24 @@
                             </ItemsControl.Style>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <GroupBox Margin="0,0,0,12" Padding="8">
-                                        <GroupBox.Header>
-                                            <TextBlock FontWeight="SemiBold">
-                                                <Run Text="Lege in "/>
-                                                <Run Text="{Binding BinLabel}"
-                                                     Foreground="{DynamicResource SystemAccentBrush}"/>
-                                                <Run Text=":"/>
-                                            </TextBlock>
-                                        </GroupBox.Header>
+                                    <StackPanel Margin="0,0,0,16">
+                                        <TextBlock Text="Lege in"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                                   Margin="0,0,0,2"/>
+                                        <TextBlock Text="{Binding BinLabel}"
+                                                   FontSize="22"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource SystemAccentBrush}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Margin="0,0,0,8"/>
+                                        <Separator Margin="0,0,0,4"
+                                                   Background="{DynamicResource SystemControlForegroundBaseLowBrush}"/>
                                         <ItemsControl ItemsSource="{Binding Items}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Grid Margin="0,4">
+                                                    <Grid Margin="0,8">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="60"/>
                                                             <ColumnDefinition Width="*"/>
@@ -247,17 +281,21 @@
                                                                b:ImageZoom.IsEnabled="True"/>
                                                         <StackPanel Grid.Column="1"
                                                                     VerticalAlignment="Center"
-                                                                    Margin="8,0">
-                                                            <TextBlock Text="{Binding Label}"
-                                                                       FontWeight="SemiBold"
-                                                                       TextWrapping="Wrap"/>
+                                                                    Margin="12,0">
                                                             <TextBlock Text="{Binding Detail}"
+                                                                       FontSize="14"
+                                                                       FontWeight="SemiBold"
+                                                                       FontFamily="Consolas"
+                                                                       TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock Text="{Binding Label}"
                                                                        Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                                                                        FontSize="11"
-                                                                       TextWrapping="Wrap"/>
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       Margin="0,2,0,0"/>
                                                         </StackPanel>
                                                         <TextBlock Grid.Column="2"
                                                                    Text="{Binding QuantityText}"
+                                                                   FontSize="14"
                                                                    FontWeight="Bold"
                                                                    VerticalAlignment="Center"
                                                                    Margin="8,0,0,0"/>
@@ -265,15 +303,15 @@
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
-                                    </GroupBox>
+                                    </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
                         <!-- Plus-Hinweis (optional, z.B. fuer neue Figur) -->
                         <Border CornerRadius="4"
-                                Padding="10,8"
-                                Margin="0,4,0,0"
+                                Padding="12,8"
+                                Margin="0,8,0,0"
                                 Background="{DynamicResource InfoBoxBackground}">
                             <Border.Style>
                                 <Style TargetType="Border">
@@ -288,6 +326,7 @@
                             </Border.Style>
                             <TextBlock Text="{Binding ScanViewModel.BinInstruction.PlusHint}"
                                        TextWrapping="Wrap"
+                                       FontSize="12"
                                        FontStyle="Italic"/>
                         </Border>
                     </StackPanel>
