@@ -795,12 +795,20 @@ public class StorageBinService : IStorageBinService
         string? partNo = null,
         int? colorId = null,
         int? excludeMinifigId = null,
+        int? waitingLimit = null,
+        int? completeLimit = null,
         CancellationToken ct = default)
     {
         // v0.1.23: Filter direkt ueber persistierte StorageBin.Kind-Spalte
         // (Index IX_StorageBins_Kind). Vorher (v0.1.22-beta.3): alle Bins
         // mit Include geladen + lokal klassifiziert. Jetzt: WHERE Kind IN ...
         // plus Reverse-Match-Pruefung nur fuer Floating-Target.
+        //
+        // v0.1.24-beta.1 (Konzept Befund B1): optionale Limit-Parameter
+        // (waitingLimit / completeLimit). Wenn gesetzt: Bins mit Count
+        // >= Limit werden ausgefiltert. Defensive Clamp auf >=1 - 0 oder
+        // negative Werte wuerden alle Bins filtern und sind vermutlich
+        // ein Bedienfehler des Aufrufers.
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
 
         StorageBinKind[] allowedKinds = targetKind switch
@@ -813,6 +821,12 @@ public class StorageBinService : IStorageBinService
                 new[] { StorageBinKind.Empty, StorageBinKind.Floating, StorageBinKind.Waiting },
             _ => throw new ArgumentOutOfRangeException(nameof(targetKind))
         };
+
+        // v0.1.24-beta.1: brauchen wir Minifig-Counts? Wenn waitingLimit oder
+        // completeLimit gesetzt sind: TrackedMinifigs einbeziehen damit wir
+        // die Counts in-memory ermitteln koennen. Sonst bleibt das Query so
+        // schlank wie bisher.
+        var needsCounts = waitingLimit.HasValue || completeLimit.HasValue;
 
         // FloatingTarget mit Waiting-Bypass braucht TrackedMinifigs + RequiredParts.
         // Andere Pfade nicht - dann ohne Include schneller.
@@ -827,6 +841,13 @@ public class StorageBinService : IStorageBinService
             query = query
                 .Include(b => b.TrackedMinifigs)
                     .ThenInclude(m => m.RequiredParts);
+        }
+        else if (needsCounts)
+        {
+            // Minifig-Targets brauchen die TrackedMinifigs-Liste nur, wenn die
+            // Limits gesetzt sind. Ohne Limits bleibt das alte schnelle Query
+            // erhalten (Backwards-Compat).
+            query = query.Include(b => b.TrackedMinifigs);
         }
 
         var bins = await query.ToListAsync(ct);
@@ -859,6 +880,29 @@ public class StorageBinService : IStorageBinService
         }
 
         // Minifig-Targets: alle bins mit erlaubtem Kind durchlassen.
-        return bins;
+        // v0.1.24-beta.1: Limit-Filter falls aktiv.
+        if (!needsCounts) return bins;
+
+        // Clamp Limits auf >=1 (0 oder negativ ist Bedienfehler).
+        var wLimit = waitingLimit.HasValue ? Math.Max(1, waitingLimit.Value) : (int?)null;
+        var cLimit = completeLimit.HasValue ? Math.Max(1, completeLimit.Value) : (int?)null;
+
+        var filtered = new List<StorageBin>(bins.Count);
+        foreach (var bin in bins)
+        {
+            // Counts ohne ausgeschlossene Minifig (analog excludeMinifigId-
+            // Konvention an anderen Service-Stellen).
+            var waiting = bin.TrackedMinifigs.Count(m =>
+                m.Status == TrackedMinifigStatus.Waiting
+                && (!excludeMinifigId.HasValue || m.Id != excludeMinifigId.Value));
+            var complete = bin.TrackedMinifigs.Count(m =>
+                m.Status == TrackedMinifigStatus.Complete
+                && (!excludeMinifigId.HasValue || m.Id != excludeMinifigId.Value));
+
+            if (wLimit.HasValue && waiting >= wLimit.Value) continue;
+            if (cLimit.HasValue && complete >= cLimit.Value) continue;
+            filtered.Add(bin);
+        }
+        return filtered;
     }
 }

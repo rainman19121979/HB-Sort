@@ -172,24 +172,78 @@ public partial class MinifigSummaryDialog : Window
             return;
         }
 
+        // v0.1.24-beta.1 (Konzept 4.3 Trigger 4): Quell-Bin-Label vor dem
+        // Move merken — der LoadAsync-Stand des VM hat das aktuelle Fach
+        // schon geladen (BinLabel-Property). Damit baut sich das Post-Save-
+        // Modal mit korrekter "Nimm aus X / Lege in Y"-Anweisung.
+        var oldBinLabel = _viewModel.BinLabel;
+        var targetBinLabel = _viewModel.MoveTarget.Label;
+        var minifigName = _viewModel.Name;
+        var bricklinkId = _viewModel.BricklinkId;
+        var imageUrl = _viewModel.ImageUrl;
+
         try
         {
             var ok = await _viewModel.MoveToAsync(_viewModel.MoveTarget.Id);
             if (ok)
             {
                 _notifications.ShowSuccess(
-                    $"Figur '{_viewModel.Name}' in Fach '{_viewModel.MoveTarget.Label}' verschoben.");
+                    $"Figur '{minifigName}' in Fach '{targetBinLabel}' verschoben.");
                 _persistence.RaiseDataChanged();
                 DialogResult = true;
                 Close();
+
+                // v0.1.24-beta.1: Post-Save-Modal mit Take/Put-Sektionen.
+                if (Owner is Window owner
+                    && owner.DataContext is MainViewModel mainVm
+                    && mainVm.ScanViewModel != null)
+                {
+                    var item = new HBSort.ViewModels.SortItemLine
+                    {
+                        Label = $"Figur '{minifigName}'",
+                        Detail = bricklinkId,
+                        QuantityText = "1x",
+                        ImageUrl = imageUrl
+                    };
+                    var instruction = new HBSort.ViewModels.SortInstruction
+                    {
+                        HeaderText = "Operation erfolgreich"
+                    };
+                    instruction.Take.Add(new HBSort.ViewModels.SortSection
+                    {
+                        BinLabel = oldBinLabel,
+                        Items = new List<HBSort.ViewModels.SortItemLine> { item }
+                    });
+                    instruction.Put.Add(new HBSort.ViewModels.SortSection
+                    {
+                        BinLabel = targetBinLabel,
+                        Items = new List<HBSort.ViewModels.SortItemLine> { item }
+                    });
+                    mainVm.ScanViewModel.ShowSortInstruction(instruction);
+                }
             }
         }
         catch (HBSort.Core.Services.InvalidBinKindException strict)
         {
             // v0.1.23 Strict-Mode: Ziel-Bin akzeptiert die Figur nicht.
+            // v0.1.24-beta.1 (Konzept E10): Sortier-Modal erscheint NICHT,
+            // statt dessen Error-Dialog mit konkreter Strict-Mode-Message.
             Log.Warning(strict, "Verschieben: Strict-Mode-Verletzung");
             await App.Services.GetRequiredService<IDialogService>()
                 .ShowErrorAsync("Verschieben nicht moeglich", strict.Message);
+            try { await _viewModel.LoadAsync(); }
+            catch (Exception reloadEx) { Log.Warning(reloadEx, "Reload nach Strict-Mode-Fehler fehlgeschlagen"); }
+        }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException race)
+        {
+            // v0.1.24-beta.1 (Konzept E10): Race-Bedingung beim Save.
+            Log.Warning(race, "Verschieben: DB-Konflikt beim Speichern");
+            await App.Services.GetRequiredService<IDialogService>()
+                .ShowErrorAsync(
+                    "Konflikt beim Speichern",
+                    "Die Daten haben sich in der Zwischenzeit geaendert. Bitte Auswahl erneut treffen.");
+            try { await _viewModel.LoadAsync(); }
+            catch (Exception reloadEx) { Log.Warning(reloadEx, "Reload nach Konflikt fehlgeschlagen"); }
         }
         catch (System.Exception ex)
         {

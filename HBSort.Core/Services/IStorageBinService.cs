@@ -167,12 +167,27 @@ public interface IStorageBinService
     /// <paramref name="excludeMinifigId"/>: TrackedMinifigs mit dieser Id
     /// werden bei der Klassifikation ignoriert (z.B. wenn die zu zerlegende
     /// Figur gerade verschwindet und das Bin damit "frei" wird).
+    ///
+    /// v0.1.24-beta.1 (Konzept Befund B1): optionale Limit-Filter fuer
+    /// Wartend- und Complete-Counts. Beide default null = kein Filter
+    /// (Backwards-Compat). Werte &lt;= 0 werden defensiv auf 1 geclamped
+    /// (sonst waeren alle Bins gefiltert, was ueblicherweise nicht das
+    /// User-Intent ist).
+    ///
+    /// <paramref name="waitingLimit"/>: wenn gesetzt, werden Bins mit
+    /// &gt;= <paramref name="waitingLimit"/> wartenden Figuren ausgefiltert
+    /// (analog <see cref="AppSettings.MaxWaitingFiguresPerBin"/>).
+    ///
+    /// <paramref name="completeLimit"/>: wenn gesetzt, werden Bins mit
+    /// &gt;= <paramref name="completeLimit"/> Complete-Figuren ausgefiltert.
     /// </summary>
     Task<List<StorageBin>> GetEligibleBinsAsync(
         BinTargetKind targetKind,
         string? partNo = null,
         int? colorId = null,
         int? excludeMinifigId = null,
+        int? waitingLimit = null,
+        int? completeLimit = null,
         CancellationToken ct = default);
 
     /// <summary>

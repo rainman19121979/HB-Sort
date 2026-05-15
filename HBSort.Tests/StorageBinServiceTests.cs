@@ -1006,4 +1006,125 @@ public class StorageBinServiceTests : IDisposable
         Assert.Contains(bW!.Id, ids);
         Assert.Contains(bC!.Id, ids);
     }
+
+    // ========================================================================
+    // v0.1.24-beta.1 (Konzept Befund B1): GetEligibleBinsAsync mit Limit-Parametern.
+    // Ein Bin mit >=waitingLimit wartenden Figuren bzw. >=completeLimit complete
+    // Figuren wird ausgefiltert. Null = kein Filter (Backwards-Compat).
+    // ========================================================================
+
+    [Fact]
+    public async Task GetEligibleBinsAsync_without_limits_returns_all_eligible_bins()
+    {
+        // F1: ohne Limits liefert die Methode dieselben Ergebnisse wie bisher.
+        // Backwards-Compat-Schutz: bestehende Aufrufer-Pfade ohne Limit sehen
+        // KEINE Verhaltensaenderung.
+        await _sut.CreateBulkAsync(new[] { "Empty", "WithWaiting" });
+        var bE = await _sut.GetByLabelAsync("Empty");
+        var bW = await _sut.GetByLabelAsync("WithWaiting");
+        await SeedMinifigInBinAsync(bW!.Id, "wait1", TrackedMinifigStatus.Waiting);
+        await SeedMinifigInBinAsync(bW!.Id, "wait2", TrackedMinifigStatus.Waiting);
+
+        var eligible = await _sut.GetEligibleBinsAsync(BinTargetKind.WaitingMinifigTarget);
+
+        var ids = eligible.Select(b => b.Id).ToHashSet();
+        Assert.Contains(bE!.Id, ids);
+        Assert.Contains(bW!.Id, ids); // ohne Limit ist auch das volle Bin drin
+    }
+
+    [Fact]
+    public async Task GetEligibleBinsAsync_waiting_limit_filters_bins_at_or_above_limit()
+    {
+        // F2: waitingLimit=3, ein Bin hat exakt 3 wartende Figuren -> ausgefiltert.
+        await _sut.CreateBulkAsync(new[] { "Full", "AlmostFull" });
+        var bFull = await _sut.GetByLabelAsync("Full");
+        var bAlmost = await _sut.GetByLabelAsync("AlmostFull");
+        // "Full" mit 3 wartenden, "AlmostFull" mit 2 wartenden.
+        await SeedMinifigInBinAsync(bFull!.Id, "w1", TrackedMinifigStatus.Waiting);
+        await SeedMinifigInBinAsync(bFull!.Id, "w2", TrackedMinifigStatus.Waiting);
+        await SeedMinifigInBinAsync(bFull!.Id, "w3", TrackedMinifigStatus.Waiting);
+        await SeedMinifigInBinAsync(bAlmost!.Id, "w4", TrackedMinifigStatus.Waiting);
+        await SeedMinifigInBinAsync(bAlmost!.Id, "w5", TrackedMinifigStatus.Waiting);
+
+        var eligible = await _sut.GetEligibleBinsAsync(
+            BinTargetKind.WaitingMinifigTarget,
+            waitingLimit: 3);
+
+        var ids = eligible.Select(b => b.Id).ToHashSet();
+        Assert.DoesNotContain(bFull!.Id, ids); // Limit erreicht -> raus
+        Assert.Contains(bAlmost!.Id, ids);     // unter Limit -> drin
+    }
+
+    [Fact]
+    public async Task GetEligibleBinsAsync_complete_limit_filters_bins_at_or_above_limit()
+    {
+        // F3: completeLimit=5, ein Bin hat 5 Complete-Figuren -> ausgefiltert.
+        await _sut.CreateBulkAsync(new[] { "FullComplete", "FreshBin" });
+        var bFull = await _sut.GetByLabelAsync("FullComplete");
+        var bFresh = await _sut.GetByLabelAsync("FreshBin");
+        for (var i = 0; i < 5; i++)
+        {
+            await SeedMinifigInBinAsync(bFull!.Id, $"c{i}", TrackedMinifigStatus.Complete);
+        }
+        // FreshBin bleibt leer.
+
+        var eligible = await _sut.GetEligibleBinsAsync(
+            BinTargetKind.CompleteMinifigTarget,
+            completeLimit: 5);
+
+        var ids = eligible.Select(b => b.Id).ToHashSet();
+        Assert.DoesNotContain(bFull!.Id, ids);
+        Assert.Contains(bFresh!.Id, ids);
+    }
+
+    [Fact]
+    public async Task GetEligibleBinsAsync_both_limits_filter_when_either_threshold_reached()
+    {
+        // F4: beide Limits aktiv, Bin wird ausgefiltert wenn EINER der beiden
+        // Schwellwerte erreicht ist (logisches ODER).
+        await _sut.CreateBulkAsync(new[] { "WaitingFull", "CompleteFull", "Mixed" });
+        var bWaitFull = await _sut.GetByLabelAsync("WaitingFull");
+        var bCompFull = await _sut.GetByLabelAsync("CompleteFull");
+        var bMixed = await _sut.GetByLabelAsync("Mixed");
+
+        // bWaitFull: 2 wartend, 0 complete -> trifft waitingLimit
+        await SeedMinifigInBinAsync(bWaitFull!.Id, "w1", TrackedMinifigStatus.Waiting);
+        await SeedMinifigInBinAsync(bWaitFull!.Id, "w2", TrackedMinifigStatus.Waiting);
+        // bCompFull: 0 wartend, 2 complete -> trifft completeLimit
+        await SeedMinifigInBinAsync(bCompFull!.Id, "c1", TrackedMinifigStatus.Complete);
+        await SeedMinifigInBinAsync(bCompFull!.Id, "c2", TrackedMinifigStatus.Complete);
+        // bMixed: 1 wartend, 1 complete -> beide unter Limit
+        await SeedMinifigInBinAsync(bMixed!.Id, "wm", TrackedMinifigStatus.Waiting);
+        await SeedMinifigInBinAsync(bMixed!.Id, "cm", TrackedMinifigStatus.Complete);
+
+        var eligible = await _sut.GetEligibleBinsAsync(
+            BinTargetKind.WaitingMinifigTarget,
+            waitingLimit: 2,
+            completeLimit: 2);
+
+        var ids = eligible.Select(b => b.Id).ToHashSet();
+        Assert.DoesNotContain(bWaitFull!.Id, ids);
+        Assert.DoesNotContain(bCompFull!.Id, ids);
+        Assert.Contains(bMixed!.Id, ids);
+    }
+
+    [Fact]
+    public async Task GetEligibleBinsAsync_limit_clamps_zero_or_negative_to_one()
+    {
+        // F5: defensive Clamp - waitingLimit=0 wird auf 1 hochgesetzt.
+        // Sonst wuerden auch leere Bins ausgefiltert (Count 0 >= 0 = true),
+        // was vermutlich ein Bedienfehler des Aufrufers ist.
+        await _sut.CreateBulkAsync(new[] { "Empty", "OneWaiting" });
+        var bE = await _sut.GetByLabelAsync("Empty");
+        var bOne = await _sut.GetByLabelAsync("OneWaiting");
+        await SeedMinifigInBinAsync(bOne!.Id, "w1", TrackedMinifigStatus.Waiting);
+
+        var eligible = await _sut.GetEligibleBinsAsync(
+            BinTargetKind.WaitingMinifigTarget,
+            waitingLimit: 0);
+
+        var ids = eligible.Select(b => b.Id).ToHashSet();
+        Assert.Contains(bE!.Id, ids);          // 0 wartend < 1 -> drin
+        Assert.DoesNotContain(bOne!.Id, ids);  // 1 wartend >= 1 -> raus (clamped)
+    }
 }

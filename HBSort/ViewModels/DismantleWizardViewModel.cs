@@ -273,7 +273,7 @@ public partial class DismantleWizardViewModel : ObservableObject
     /// passendem RequiredPart trotzdem als Ziel sinnvoll waeren: spaetere
     /// Iteration mit Bulk-Lookup-Variante.
     /// </summary>
-    private async Task ReloadAvailableBinsAsync()
+    public async Task ReloadAvailableBinsAsync()
     {
         var excludeId = TrackedMinifigId > 0 ? (int?)TrackedMinifigId : null;
         var bins = await _binService.GetEligibleBinsAsync(
@@ -486,6 +486,91 @@ public partial class DismantleWizardViewModel : ObservableObject
     /// nach erfolgreichem ConfirmAsync gelesen.
     /// </summary>
     public List<BinInstructionItem> LastBinInstructionItems { get; private set; } = new();
+
+    /// <summary>
+    /// v0.1.24-beta.1 (Konzept 4.3 Trigger 3): baut das SortInstruction-DTO
+    /// fuer das Post-Save-Modal nach erfolgreichem ConfirmAsync.
+    ///
+    /// Take-Sektion: eine virtuelle Sektion "Aus Figur '{Name}'" mit den
+    /// behaltenen Teilen (PutInBin-Mode). User nimmt die physisch aus der
+    /// Figur heraus. AssignToWaiting-Teile werden NICHT als Take gezeigt
+    /// (sie wandern in die Bestands-Figuren, kein "rausnehmen" sichtbar).
+    ///
+    /// Put-Sektionen: pro Ziel-Bin eine Sektion, mit allen behaltenen
+    /// Teilen die dort landen.
+    /// </summary>
+    public SortInstruction BuildSortInstructionFromState()
+    {
+        var instruction = new SortInstruction
+        {
+            HeaderText = string.IsNullOrWhiteSpace(MinifigName)
+                ? "Figur zerlegt"
+                : $"Figur '{MinifigName}' zerlegt"
+        };
+
+        // Behaltene Teile mit PutInBin-Mode (kommen tatsaechlich in ein Bin).
+        var keptPut = Parts
+            .Where(p => p.IsKept && p.IsPutInBinMode && p.TargetBin != null)
+            .ToList();
+
+        // Take-Sektion (virtuell aus der Figur). Die Figur selbst ist die
+        // Quell-"Box". Nur Teile auflisten die tatsaechlich rausgehen.
+        if (keptPut.Count > 0)
+        {
+            var takeSection = new SortSection
+            {
+                BinLabel = string.IsNullOrWhiteSpace(MinifigName)
+                    ? "Figur"
+                    : $"Figur '{MinifigName}'"
+            };
+            foreach (var p in keptPut)
+            {
+                var qty = p.QuantityCollected > 0 ? p.QuantityCollected : p.QuantityNeeded;
+                takeSection.Items.Add(new SortItemLine
+                {
+                    Label = p.PartName,
+                    Detail = $"{p.BlPartNo} - {p.ColorName}",
+                    QuantityText = $"{qty}x",
+                    ImageUrl = p.ImageUrl
+                });
+            }
+            instruction.Take.Add(takeSection);
+        }
+
+        // Put-Sektionen pro Ziel-Bin (gleiche Items, gruppiert nach BinId).
+        foreach (var byBin in keptPut.GroupBy(p => p.TargetBin!.Id))
+        {
+            var binLabel = byBin.First().TargetBin!.Label;
+            var section = new SortSection { BinLabel = binLabel };
+            foreach (var p in byBin)
+            {
+                var qty = p.QuantityCollected > 0 ? p.QuantityCollected : p.QuantityNeeded;
+                section.Items.Add(new SortItemLine
+                {
+                    Label = p.PartName,
+                    Detail = $"{p.BlPartNo} - {p.ColorName}",
+                    QuantityText = $"{qty}x",
+                    ImageUrl = p.ImageUrl
+                });
+            }
+            instruction.Put.Add(section);
+        }
+
+        // PlusHint fuer AssignToWaiting-Zuordnungen (Teile gehen an wartende
+        // Figuren, kein eigenes Ziel-Bin sichtbar).
+        var assigned = Parts.Where(p =>
+            p.IsKept && p.IsAssignToWaitingMode && p.SelectedMatch != null).ToList();
+        if (assigned.Count > 0)
+        {
+            var names = string.Join(", ",
+                assigned.Take(3).Select(p => $"'{p.PartName}'"));
+            var suffix = assigned.Count > 3 ? $" und {assigned.Count - 3} weitere" : "";
+            instruction.PlusHint =
+                $"Zusaetzlich: {assigned.Count} Teil(e) wartenden Figuren zugeordnet ({names}{suffix}).";
+        }
+
+        return instruction;
+    }
 
     /// <summary>
     /// UX X.33 v0.1.19-beta.7 Block N: Per-Teil-Bin-Vorschlag im Wizard.

@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Windows;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace HBSort.ViewModels;
@@ -58,6 +60,35 @@ public partial class BinInstructionViewModel : ObservableObject
     /// <summary>Item-Liste im Group-Mode.</summary>
     public ObservableCollection<BinInstructionItem> Items { get; } = new();
 
+    // ----- v0.1.24-beta.1 SortInstruction-Mode -----
+    //
+    // Neuer einheitlicher Post-Save-Modal-Pfad. Konzept 4.3 Rev. 3:
+    // Modal-only fuer alle 6 Sortier-Triggers, mit Take/Put/Plus-Sektionen.
+    // Single- und Group-Mode bleiben in v0.1.24 unveraendert erhalten
+    // (Single-Mode-Cleanup steht als OPEN-18 in v0.1.25, Group-Mode wird
+    // von BuildSuggestionDetailDialog noch genutzt).
+
+    /// <summary>v0.1.24-beta.1: Quell-Sektionen (Take aus dem DTO).</summary>
+    public ObservableCollection<SortSection> TakeSections { get; } = new();
+
+    /// <summary>v0.1.24-beta.1: Ziel-Sektionen (Put aus dem DTO).</summary>
+    public ObservableCollection<SortSection> PutSections { get; } = new();
+
+    /// <summary>v0.1.24-beta.1: optionaler Plus-Hinweis (z.B. fuer neue wartende Figur).</summary>
+    [ObservableProperty]
+    private string? _plusHint;
+
+    /// <summary>v0.1.24-beta.1: True wenn Plus-Hinweis sichtbar sein soll (DataTrigger im XAML).</summary>
+    public bool HasPlusHint => !string.IsNullOrWhiteSpace(PlusHint);
+
+    partial void OnPlusHintChanged(string? value) => OnPropertyChanged(nameof(HasPlusHint));
+
+    /// <summary>v0.1.24-beta.1: True solange Take-Sektion sichtbar sein soll (DataTrigger).</summary>
+    public bool HasTakeSections => TakeSections.Count > 0;
+
+    /// <summary>v0.1.24-beta.1: True solange Put-Sektion sichtbar sein soll (DataTrigger).</summary>
+    public bool HasPutSections => PutSections.Count > 0;
+
     /// <summary>
     /// Macht das Overlay im Single-Mode sichtbar (ein Bin + ein Item-Bild).
     /// Leeres Label wird als No-Op behandelt - sonst saehe der User ein
@@ -99,6 +130,78 @@ public partial class BinInstructionViewModel : ObservableObject
         HeaderText = DefaultHeaderText;
         Label = string.Empty;
         ImageUrl = null;
+
+        // v0.1.24-beta.1: SortInstruction-State zuruecksetzen damit das
+        // naechste Modal nicht alte Sektionen zeigt.
+        TakeSections.Clear();
+        PutSections.Clear();
+        PlusHint = null;
+        OnPropertyChanged(nameof(HasTakeSections));
+        OnPropertyChanged(nameof(HasPutSections));
+        OnPropertyChanged(nameof(HasPlusHint));
+    }
+
+    /// <summary>
+    /// v0.1.24-beta.1 (Konzept 4.3.5 + 4.3.6 + 4.3.8.1): zeigt das Post-Save-
+    /// Modal mit Take/Put/Plus-Sektionen. Wird von allen 6 Sortier-Triggers
+    /// nach erfolgreichem Persist gerufen.
+    ///
+    /// Performance-Pattern (Pflicht, Konzept 4.3.8.1): das Setzen der
+    /// Properties laeuft via Dispatcher.InvokeAsync mit
+    /// <see cref="DispatcherPriority.Render"/>. Damit hat der UI-Thread
+    /// freie Render-Slots bevor das Modal zeichnet — sonst wirkt der
+    /// Modal-Open traege wenn vorher DataChanged-Subscribers den Thread
+    /// belasten.
+    ///
+    /// Im Test-Pfad (ohne Application.Current) faellt die Methode auf
+    /// synchrone Aktualisierung zurueck.
+    /// </summary>
+    public void ShowSortInstruction(SortInstruction instruction)
+    {
+        if (instruction == null) return;
+        // E6 aus Konzept 4.3.9: leere Take + Put + leerer PlusHint => Modal
+        // gar nicht zeigen. Defensiv, sollte in der Praxis nicht auftreten.
+        if (instruction.Take.Count == 0
+            && instruction.Put.Count == 0
+            && string.IsNullOrWhiteSpace(instruction.PlusHint))
+        {
+            return;
+        }
+
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess())
+        {
+            // Test-Pfad oder schon auf UI-Thread: synchron aktualisieren.
+            ApplySortInstruction(instruction);
+        }
+        else
+        {
+            // Production-Pfad: Render-Priority damit das Modal nicht durch
+            // vorgelagerte DataChanged-Subscriber blockiert wird.
+            dispatcher.InvokeAsync(
+                () => ApplySortInstruction(instruction),
+                DispatcherPriority.Render);
+        }
+    }
+
+    private void ApplySortInstruction(SortInstruction instruction)
+    {
+        Mode = BinInstructionMode.SortInstruction;
+        HeaderText = string.IsNullOrWhiteSpace(instruction.HeaderText)
+            ? "Operation erfolgreich"
+            : instruction.HeaderText;
+
+        TakeSections.Clear();
+        foreach (var s in instruction.Take) TakeSections.Add(s);
+        PutSections.Clear();
+        foreach (var s in instruction.Put) PutSections.Add(s);
+        PlusHint = instruction.PlusHint;
+
+        OnPropertyChanged(nameof(HasTakeSections));
+        OnPropertyChanged(nameof(HasPutSections));
+        OnPropertyChanged(nameof(HasPlusHint));
+
+        IsVisible = true;
     }
 }
 
@@ -106,7 +209,12 @@ public partial class BinInstructionViewModel : ObservableObject
 public enum BinInstructionMode
 {
     Single,
-    Group
+    Group,
+    /// <summary>
+    /// v0.1.24-beta.1: neuer einheitlicher Post-Save-Modal-Modus mit
+    /// Take/Put/Plus-Sektionen (Konzept 4.3).
+    /// </summary>
+    SortInstruction
 }
 
 /// <summary>

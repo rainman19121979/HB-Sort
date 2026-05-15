@@ -285,14 +285,25 @@ public partial class InventoryListView : UserControl
             {
                 var persistence = Service<IMinifigPersistenceService>();
 
-                // UX X.32 v0.1.19-beta.4 Block E: Vorab Item-Labels einsammeln
-                // damit das Sammel-Popup nach dem Move ein "Lege X in Box Y"
-                // pro bewegtem Item zeigen kann. Wir lesen die DB BEVOR der
-                // Move passiert - die Labels sind sonst nach dem Update
-                // identisch zur Ziel-Bin-Spalte und wir koennen die User-
-                // Anweisung nicht mehr formulieren.
+                // v0.1.24-beta.1 (Trigger 2): Vor dem Move die Quell-Bins
+                // einsammeln, damit das Post-Save-Modal eine korrekte
+                // "Nimm aus X"-Sektion pro Quell-Bin zeigen kann. Vorher
+                // (v0.1.23) wurde nur die Ziel-Bin-Sektion gebaut, jetzt
+                // gehoeren Quell-Sektionen zum Pattern (Konzept 4.3.6).
                 var ctxFactory = Service<Microsoft.EntityFrameworkCore.IDbContextFactory<Core.Database.UserDataContext>>();
-                var movedItems = new List<HBSort.ViewModels.BinInstructionItem>();
+
+                // Pro Quell-Bin sammeln wir die Items die rauswandern.
+                var sourceMap = new Dictionary<int, (string Label, List<HBSort.ViewModels.SortItemLine> Items)>();
+
+                async System.Threading.Tasks.Task EnsureBinLabelAsync(int binId, Core.Database.UserDataContext ctx)
+                {
+                    if (sourceMap.ContainsKey(binId)) return;
+                    var bin = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
+                        ctx.StorageBins.Where(x => x.Id == binId));
+                    sourceMap[binId] = (bin?.Label ?? $"Fach #{binId}", new List<HBSort.ViewModels.SortItemLine>());
+                }
+
+                var putItems = new List<HBSort.ViewModels.SortItemLine>();
                 await using (var ctx = await ctxFactory.CreateDbContextAsync())
                 {
                     if (minifigIds.Count > 0)
@@ -302,11 +313,24 @@ public partial class InventoryListView : UserControl
                                 ctx.TrackedMinifigs.Where(m => minifigIds.Contains(m.Id))));
                         foreach (var m in minifigs)
                         {
-                            movedItems.Add(new HBSort.ViewModels.BinInstructionItem
+                            var sourceBinId = m.StorageBinId ?? -1;
+                            if (sourceBinId != -1)
                             {
-                                ItemLabel = $"Figur '{m.Name ?? m.BricklinkId ?? "?"}'",
-                                QuantityText = "1 Stueck",
-                                BinLabel = targetBin.Label
+                                await EnsureBinLabelAsync(sourceBinId, ctx);
+                                sourceMap[sourceBinId].Items.Add(new HBSort.ViewModels.SortItemLine
+                                {
+                                    Label = $"Figur '{m.Name ?? m.BricklinkId ?? "?"}'",
+                                    Detail = m.BricklinkId ?? string.Empty,
+                                    QuantityText = "1x",
+                                    ImageUrl = m.LocalImagePath ?? m.ImageUrl
+                                });
+                            }
+                            putItems.Add(new HBSort.ViewModels.SortItemLine
+                            {
+                                Label = $"Figur '{m.Name ?? m.BricklinkId ?? "?"}'",
+                                Detail = m.BricklinkId ?? string.Empty,
+                                QuantityText = "1x",
+                                ImageUrl = m.LocalImagePath ?? m.ImageUrl
                             });
                         }
                     }
@@ -317,34 +341,74 @@ public partial class InventoryListView : UserControl
                                 ctx.FloatingParts.Where(p => floatingIds.Contains(p.Id))));
                         foreach (var fp in floats)
                         {
-                            movedItems.Add(new HBSort.ViewModels.BinInstructionItem
+                            await EnsureBinLabelAsync(fp.StorageBinId, ctx);
+                            sourceMap[fp.StorageBinId].Items.Add(new HBSort.ViewModels.SortItemLine
                             {
-                                ItemLabel = $"{fp.PartName} ({fp.PartNumber}) - {fp.ColorName}",
-                                QuantityText = $"{fp.Quantity} Stueck",
-                                BinLabel = targetBin.Label
+                                Label = fp.PartName,
+                                Detail = $"{fp.PartNumber} - {fp.ColorName}",
+                                QuantityText = $"{fp.Quantity}x"
+                            });
+                            putItems.Add(new HBSort.ViewModels.SortItemLine
+                            {
+                                Label = fp.PartName,
+                                Detail = $"{fp.PartNumber} - {fp.ColorName}",
+                                QuantityText = $"{fp.Quantity}x"
                             });
                         }
                     }
                 }
 
+                // Quell-Bin == Ziel-Bin Eintraege filtern (kein "Nimm aus &
+                // Lege in dasselbe Bin"-Doppel) — Konzept E1.
+                sourceMap.Remove(targetBinId);
+
                 var (mMov, fMov) = await persistence.MoveSelectionAsync(minifigIds, floatingIds, targetBinId);
                 var notif = Service<INotificationService>();
                 notif.ShowSuccess($"{mMov} Figur(en) und {fMov} Einzelteil(e) nach '{targetBin.Label}' verschoben.");
 
-                // Sammel-Popup mit Item-Liste. Nur ab 1 bewegten Item zeigen
-                // (bei 0 macht ein Popup keinen Sinn).
-                if (movedItems.Count > 0
+                // v0.1.24-beta.1 (Konzept 4.3): Post-Save-Modal mit Take/Put-
+                // Sektionen. Take pro Quell-Bin, Put mit allen Items in das
+                // Ziel-Bin.
+                if (mMov + fMov > 0
                     && Window.GetWindow(this)?.DataContext is MainViewModel mainVm
                     && mainVm.ScanViewModel != null)
                 {
-                    mainVm.ScanViewModel.ShowBinInstructionGroup(movedItems);
+                    var instruction = new HBSort.ViewModels.SortInstruction
+                    {
+                        HeaderText = "Operation erfolgreich"
+                    };
+                    foreach (var (_, entry) in sourceMap)
+                    {
+                        if (entry.Items.Count == 0) continue;
+                        instruction.Take.Add(new HBSort.ViewModels.SortSection
+                        {
+                            BinLabel = entry.Label,
+                            Items = entry.Items
+                        });
+                    }
+                    instruction.Put.Add(new HBSort.ViewModels.SortSection
+                    {
+                        BinLabel = targetBin.Label,
+                        Items = putItems
+                    });
+                    mainVm.ScanViewModel.ShowSortInstruction(instruction);
                 }
             }
             catch (HBSort.Core.Services.InvalidBinKindException strict)
             {
                 // v0.1.23 Strict-Mode: Ziel-Bin akzeptiert mind. ein Item nicht.
+                // v0.1.24-beta.1 (Konzept E10): Sortier-Modal erscheint NICHT,
+                // statt dessen Error-Dialog mit konkreter Strict-Mode-Message.
                 Log.Warning(strict, "Bulk-Move: Strict-Mode-Verletzung");
                 await dialogs.ShowErrorAsync("Verschieben nicht moeglich", strict.Message);
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException race)
+            {
+                // v0.1.24-beta.1 (Konzept E10): Race-Bedingung beim Save.
+                Log.Warning(race, "Bulk-Move: DB-Konflikt beim Speichern");
+                await dialogs.ShowErrorAsync(
+                    "Konflikt beim Speichern",
+                    "Die Daten haben sich in der Zwischenzeit geaendert. Bitte Auswahl erneut treffen.");
             }
             catch (System.Exception ex)
             {

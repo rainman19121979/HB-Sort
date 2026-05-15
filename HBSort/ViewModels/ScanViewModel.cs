@@ -314,6 +314,23 @@ public partial class ScanViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsBinInstructionVisible));
     }
 
+    /// <summary>
+    /// v0.1.24-beta.1 (Konzept 4.3 Rev. 3): zeigt das einheitliche Post-Save-
+    /// Modal mit Take/Put/Plus-Sektionen. Wrapper um
+    /// <see cref="BinInstructionViewModel.ShowSortInstruction"/>. Wird von
+    /// allen 6 Sortier-Triggers nach erfolgreichem Persist gerufen (Bulk-
+    /// Move, DismantleWizard, Single-Move, StoreFloating,
+    /// Reverse-Match-Konsum, Wizard-Stufe-2-Save).
+    ///
+    /// Der DispatcherPriority.Render-Wrapper lebt im VM (Performance-Pattern
+    /// aus Konzept 4.3.8.1) — Aufrufer brauchen sich darum nicht zu kuemmern.
+    /// </summary>
+    public void ShowSortInstruction(SortInstruction instruction)
+    {
+        BinInstruction.ShowSortInstruction(instruction);
+        OnPropertyChanged(nameof(IsBinInstructionVisible));
+    }
+
     private System.Windows.Threading.DispatcherTimer? _binInstructionTimer;
 
     /// <summary>
@@ -404,15 +421,67 @@ public partial class ScanViewModel : ObservableObject, IDisposable
                 $"{pending.FloatingQuantity}x '{pending.PartName}' in {pending.SelectedFloatingBin.Label} eingelagert.",
                 pending.ImageUrl);
 
+            // v0.1.24-beta.1 (Trigger 6): Modal-Daten BEVOR PendingPart auf
+            // null gesetzt wird — sonst sind die Felder weg.
             var binLabel = pending.SelectedFloatingBin.Label;
             var partImage = pending.ImageUrl;
+            var partName = pending.PartName;
+            var blPartNo = pending.BlPartNo;
+            var colorName = pending.ColorName;
+            var qty = pending.FloatingQuantity;
 
             PendingPart = null;
+
+            // v0.1.24-beta.1 (Aufgabe K, Praxis-Befund 14.05.2026):
+            // Brickognize-Vorschlaege zuruecksetzen nach erfolgreichem Save,
+            // damit der naechste Scan nicht mit veralteten Daten startet.
+            ResetBrickognizeSuggestionsAfterSave();
+
+            // v0.1.24-beta.1 (Konzept 4.3 Trigger 6): Post-Save-Modal mit
+            // nur Put-Sektion (User hat Teil in der Hand, keine Take-
+            // Section). Konzept E7.
             if (!string.IsNullOrWhiteSpace(binLabel))
             {
-                ShowBinInstruction(binLabel, partImage);
+                var instruction = new SortInstruction
+                {
+                    HeaderText = "Operation erfolgreich"
+                };
+                instruction.Put.Add(new SortSection
+                {
+                    BinLabel = binLabel,
+                    Items = new List<SortItemLine>
+                    {
+                        new()
+                        {
+                            Label = partName,
+                            Detail = $"{blPartNo} - {colorName}",
+                            QuantityText = $"{qty}x",
+                            ImageUrl = partImage
+                        }
+                    }
+                });
+                ShowSortInstruction(instruction);
             }
             return true;
+        }
+        catch (HBSort.Core.Services.InvalidBinKindException strict)
+        {
+            // v0.1.24-beta.1 (Konzept E10): Strict-Mode-Verletzung beim
+            // Save (z.B. Ziel-Bin in der Zwischenzeit zu Complete-Bin
+            // mutiert). Sortier-Modal erscheint NICHT, statt dessen
+            // Error-Dialog. PendingPart bleibt offen, User kann neuen Bin
+            // waehlen.
+            Log.Warning(strict, "StoreFloating: Strict-Mode-Verletzung");
+            await _dialogs.ShowErrorAsync("Lagern nicht moeglich", strict.Message);
+            return false;
+        }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException race)
+        {
+            Log.Warning(race, "StoreFloating: DB-Konflikt beim Speichern");
+            await _dialogs.ShowErrorAsync(
+                "Konflikt beim Speichern",
+                "Die Daten haben sich in der Zwischenzeit geaendert. Bitte Auswahl erneut treffen.");
+            return false;
         }
         catch (Exception ex)
         {
@@ -424,6 +493,39 @@ public partial class ScanViewModel : ObservableObject, IDisposable
         {
             // pending kann bei Erfolg null sein - Defensive-Check.
             if (PendingPart != null) PendingPart.IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// v0.1.24-beta.1 (Aufgabe K, Praxis-Befund 14.05.2026): Brickognize-
+    /// Vorschlaege-State zuruecksetzen nach einem erfolgreichen Save-Pfad.
+    /// Sonst zeigen ResultCards (Top-3-Karten) und Score-Status veraltete
+    /// Daten des vorigen Scans.
+    ///
+    /// Zentraler Helper damit Trigger 1 (Reverse-Match-Konsum, Phase 2)
+    /// denselben Reset-Pfad nutzen kann ohne Duplikation.
+    /// </summary>
+    public void ResetBrickognizeSuggestionsAfterSave()
+    {
+        try
+        {
+            ResultCards.Clear();
+            HasResults = false;
+            ResultHeadlineText = string.Empty;
+            ShowSearchFallback = false;
+            RecognizedColors.Clear();
+            HasColors = false;
+            SelectedCardIndex = -1;
+            // PendingMinifig / PendingPart bewusst NICHT hier resetten —
+            // die Verkabelung im Aufrufer (z.B. StoreFloating) hat das schon
+            // gemacht oder soll es noch tun. Andere Aufrufer (z.B. Wizard-
+            // Stufe-2-Save in Phase 2) duerfen den Brickognize-State zuerst
+            // sehen — das hier ist das nachgeschaltete Cleanup.
+        }
+        catch (Exception ex)
+        {
+            // Defensive — der Reset ist Komfort, kein Hard-Requirement.
+            Log.Warning(ex, "ResetBrickognizeSuggestionsAfterSave fehlgeschlagen");
         }
     }
 

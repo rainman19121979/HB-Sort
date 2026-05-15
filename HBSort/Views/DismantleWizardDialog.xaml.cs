@@ -96,6 +96,12 @@ public partial class DismantleWizardDialog : Window
 
         try
         {
+            // v0.1.24-beta.1 (Konzept 4.3 Trigger 3): Sortier-Instruction
+            // VOR dem Persist bauen — sonst sind die TargetBins evtl. schon
+            // nicht mehr im erwarteten Zustand. Das DTO ist eine reine
+            // Snapshot-Kopie der User-Auswahl.
+            var sortInstruction = _viewModel.BuildSortInstructionFromState();
+
             Result = await _viewModel.ConfirmAsync();
 
             // UX X.25: Toast-Message zusammenstellen aus FloatingPart- und
@@ -123,15 +129,42 @@ public partial class DismantleWizardDialog : Window
                     $"... und {Result.CompletedMinifigNames.Count - 3} weitere Figuren komplett.");
             }
 
+            // v0.1.24-beta.1 (Konzept 4.3): Post-Save-Modal mit Take/Put-
+            // Sektionen. Wird im owner-Fenster gezeigt nachdem der Wizard
+            // geschlossen ist.
             DialogResult = true;
             Close();
+
+            if (Owner is Window owner
+                && owner.DataContext is MainViewModel mainVm
+                && mainVm.ScanViewModel != null)
+            {
+                mainVm.ScanViewModel.ShowSortInstruction(sortInstruction);
+            }
         }
         catch (HBSort.Core.Services.InvalidBinKindException strict)
         {
             // v0.1.23 Strict-Mode: Ziel-Bin akzeptiert das Teil nicht.
+            // v0.1.24-beta.1 (Konzept E10): Modal erscheint nicht, statt dessen
+            // Error-Dialog mit konkreter Strict-Mode-Message. Wizard bleibt
+            // offen, Bin-Liste wird neu geladen damit eine andere Auswahl
+            // moeglich ist.
             Log.Warning(strict, "Dismantle-Confirm: Strict-Mode-Verletzung");
             await App.Services.GetRequiredService<IDialogService>()
                 .ShowErrorAsync("Zerlegen nicht moeglich", strict.Message);
+            try { await _viewModel.ReloadAvailableBinsAsync(); }
+            catch (Exception reloadEx) { Log.Warning(reloadEx, "Reload-Bins nach Strict-Mode-Fehler fehlgeschlagen"); }
+        }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException race)
+        {
+            // v0.1.24-beta.1 (Konzept E10): Race-Bedingung beim Save.
+            Log.Warning(race, "Dismantle-Confirm: DB-Konflikt beim Speichern");
+            await App.Services.GetRequiredService<IDialogService>()
+                .ShowErrorAsync(
+                    "Konflikt beim Speichern",
+                    "Die Daten haben sich in der Zwischenzeit geaendert. Bitte Auswahl erneut treffen.");
+            try { await _viewModel.ReloadAvailableBinsAsync(); }
+            catch (Exception reloadEx) { Log.Warning(reloadEx, "Reload-Bins nach Konflikt fehlgeschlagen"); }
         }
         catch (System.Exception ex)
         {
