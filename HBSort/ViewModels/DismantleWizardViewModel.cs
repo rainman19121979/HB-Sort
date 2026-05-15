@@ -42,6 +42,23 @@ public partial class DismantleWizardViewModel : ObservableObject
     [ObservableProperty]
     private StorageBin? _defaultBin;
 
+    /// <summary>
+    /// v0.1.24-beta.1 Phase 1.5: Task fuers Image-Load-Pre-Caching der
+    /// Required-Parts. Aufrufer (DismantleWizardDialog.Confirm_Click) kann
+    /// darauf awaiten bevor das SortInstruction-DTO gebaut wird, damit alle
+    /// p.ImageUrl-Werte gesetzt sind und das Post-Save-Modal Bilder enthaelt.
+    ///
+    /// Wurzel-Fix fuer Befund "Bilder fehlen im Post-Save-Modal"
+    /// (Praxis-Test 2026-05-15): vorher fire-and-forget mit `_ = ...`,
+    /// p.ImageUrl war beim Confirm-Click oft noch null. Jetzt trackbar
+    /// als Task-Property - LoadAsync und LoadFromPendingAsync setzen die
+    /// Property statt fire-and-forget zu sein.
+    ///
+    /// Default Task.CompletedTask damit awaiten ohne vorigen Load-Aufruf
+    /// nicht haengt.
+    /// </summary>
+    public Task ImageLoadTask { get; private set; } = Task.CompletedTask;
+
     public DismantleWizardViewModel(
         int trackedMinifigId,
         IDbContextFactory<UserDataContext> ctxFactory,
@@ -188,9 +205,12 @@ public partial class DismantleWizardViewModel : ObservableObject
             }
 
             // Bilder + Color-Swatches im Hintergrund (best-effort).
+            // v0.1.24-beta.1 Phase 1.5: als trackbare Task-Property speichern
+            // damit Confirm_Click vor BuildSortInstructionFromState awaiten
+            // kann (sonst sind p.ImageUrl-Werte oft noch null im Modal).
             if (_imageProvider != null && _catalog != null)
             {
-                _ = LoadPartImagesAndSwatchesAsync();
+                ImageLoadTask = LoadPartImagesAndSwatchesAsync();
             }
 
             // UX X.25: pro Part die wartenden Figuren laden die das Teil noch
@@ -459,9 +479,10 @@ public partial class DismantleWizardViewModel : ObservableObject
             }
 
             // Bilder + Color-Swatches (best-effort, gleiche Logik wie LoadAsync).
+            // v0.1.24-beta.1 Phase 1.5: trackbar als ImageLoadTask (siehe LoadAsync).
             if (_imageProvider != null && _catalog != null)
             {
-                _ = LoadPartImagesAndSwatchesAsync();
+                ImageLoadTask = LoadPartImagesAndSwatchesAsync();
             }
         }
         catch (Exception ex)

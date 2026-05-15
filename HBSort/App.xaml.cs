@@ -408,6 +408,12 @@ public partial class App : Application
         // ViewModels
         services.AddSingleton<ViewModels.MainViewModel>();
         services.AddSingleton<ViewModels.ScanViewModel>();
+
+        // v0.1.24-beta.1 Phase 1.5: Presenter fuer Post-Save-Sortier-Modal.
+        // Wurzel-Fix fuer Owner.DataContext-Cast in verschachtelten Dialogen
+        // (DismantleWizard aus MinifigSummary). Constructor-Injection braucht
+        // MainViewModel - daher direkt nach dessen Registrierung.
+        services.AddSingleton<ISortInstructionPresenter, SortInstructionPresenter>();
         services.AddTransient<ViewModels.SettingsViewModel>();
         services.AddTransient<ViewModels.BinManagerViewModel>();
         services.AddTransient<ViewModels.BinBulkCreateViewModel>();

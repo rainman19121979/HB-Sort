@@ -1674,34 +1674,70 @@ public partial class ScanViewModel : ObservableObject, IDisposable
                     toastImage);
             }
 
-            // UX X.31/X.32 Block C (v0.1.19): Anweisungs-Overlay.
-            // - Reverse-Match >=2 konsumierte Teile: Sammel-Popup mit pro
-            //   konsumiertem Teil eine "Lege X aus Fach Y zur Figur"-Zeile.
-            //   PLUS die Figur selbst als erstes Item.
-            // - Sonst: Einzel-Popup (Figur in Bin) wie bisher.
-            if (result.ConsumedFloatingParts.Count >= 2 && !string.IsNullOrWhiteSpace(binLabelForInstruction))
+            // v0.1.24-beta.1 Phase 1.5 (Trigger 1): einheitliches Post-Save-
+            // Modal mit Take/Put-Sektionen. Loest die bisherigen Single-/
+            // Group-Aufrufe (ShowBinInstruction / ShowBinInstructionGroup)
+            // ab und nutzt den gleichen Modal-Pfad wie die anderen 5
+            // Sortier-Triggers. Konzept 4.3.7.
+            //
+            // - Take-Sektionen: pro Quell-Bin der konsumierten FloatingParts
+            //   eine Section (kann leer sein wenn keine FloatingParts
+            //   konsumiert wurden - dann nur Put).
+            // - Put-Sektion: die Figur kommt ins Ziel-Bin.
+            // - HeaderText: prominent bei Auto-Komplettierung.
+            //
+            // Die alten ShowBinInstruction/ShowBinInstructionGroup-Methoden
+            // bleiben erhalten - sie werden noch von BuildSuggestionDetail-
+            // Dialog, PartLookupView und MinifigDetailView gerufen. Cleanup
+            // dieser Pfade ist v0.1.25-Material.
+            if (!string.IsNullOrWhiteSpace(binLabelForInstruction))
             {
-                var items = new List<BinInstructionItem>
+                var instruction = new SortInstruction
                 {
-                    new()
-                    {
-                        ItemLabel = $"Figur '{pending.Name}'",
-                        QuantityText = "1 Stueck",
-                        BinLabel = binLabelForInstruction,
-                        ImageUrl = toastImage
-                    }
+                    HeaderText = result.IsFullyComplete
+                        ? $"Figur '{pending.Name}' komplett angelegt"
+                        : "Operation erfolgreich"
                 };
-                items.AddRange(result.ConsumedFloatingParts.Select(c => new BinInstructionItem
+
+                // Take-Sektionen: pro Quell-Bin der konsumierten Floating-
+                // Parts eine Section. Gruppiert nach SourceBinLabel.
+                // ConsumedFloatingPartInfo.ImageUrl wird vom Persistence-
+                // Service heute nicht befuellt - bleibt null, das Modal
+                // zeigt dann nur Label+Detail+Quantity ohne Bild.
+                foreach (var byBin in result.ConsumedFloatingParts
+                    .GroupBy(c => c.SourceBinLabel))
                 {
-                    ItemLabel = $"{c.PartName} ({c.BlPartNo}) - {c.ColorName}",
-                    QuantityText = $"{c.Quantity} Stueck (aus {c.SourceBinLabel})",
-                    BinLabel = binLabelForInstruction
-                }));
-                ShowBinInstructionGroup(items);
-            }
-            else if (!string.IsNullOrWhiteSpace(binLabelForInstruction))
-            {
-                ShowBinInstruction(binLabelForInstruction, toastImage);
+                    var section = new SortSection { BinLabel = byBin.Key };
+                    foreach (var c in byBin)
+                    {
+                        section.Items.Add(new SortItemLine
+                        {
+                            Label = c.PartName,
+                            Detail = $"{c.BlPartNo} - {c.ColorName}",
+                            QuantityText = $"{c.Quantity}x",
+                            ImageUrl = c.ImageUrl
+                        });
+                    }
+                    instruction.Take.Add(section);
+                }
+
+                // Put-Sektion: die Figur kommt ins Ziel-Bin.
+                instruction.Put.Add(new SortSection
+                {
+                    BinLabel = binLabelForInstruction,
+                    Items = new List<SortItemLine>
+                    {
+                        new()
+                        {
+                            Label = $"Figur '{pending.Name}'",
+                            Detail = pending.BricklinkId ?? string.Empty,
+                            QuantityText = "1x",
+                            ImageUrl = toastImage
+                        }
+                    }
+                });
+
+                ShowSortInstruction(instruction);
             }
 
             // Pending ausblenden, Top-3 wiederherstellen

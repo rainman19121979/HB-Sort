@@ -96,6 +96,24 @@ public partial class DismantleWizardDialog : Window
 
         try
         {
+            // v0.1.24-beta.1 Phase 1.5: Image-Load-Task awaiten damit das
+            // SortInstruction-DTO mit ImageUrls befuellt ist (Praxis-Befund
+            // 2026-05-15: Bilder fehlten im Modal weil LoadPartImagesAnd-
+            // SwatchesAsync vorher fire-and-forget war und beim Confirm-
+            // Click noch lief). Best-effort: Fehler ignorieren, lieber DTO
+            // ohne Bilder als gar kein Modal.
+            try
+            {
+                if (!_viewModel.ImageLoadTask.IsCompleted)
+                {
+                    await _viewModel.ImageLoadTask;
+                }
+            }
+            catch (Exception imgEx)
+            {
+                Log.Debug(imgEx, "ImageLoad-Await im Confirm-Pfad fehlgeschlagen");
+            }
+
             // v0.1.24-beta.1 (Konzept 4.3 Trigger 3): Sortier-Instruction
             // VOR dem Persist bauen — sonst sind die TargetBins evtl. schon
             // nicht mehr im erwarteten Zustand. Das DTO ist eine reine
@@ -135,12 +153,14 @@ public partial class DismantleWizardDialog : Window
             DialogResult = true;
             Close();
 
-            if (Owner is Window owner
-                && owner.DataContext is MainViewModel mainVm
-                && mainVm.ScanViewModel != null)
-            {
-                mainVm.ScanViewModel.ShowSortInstruction(sortInstruction);
-            }
+            // v0.1.24-beta.1 Phase 1.5: ISortInstructionPresenter loest den
+            // bisherigen Owner.DataContext-Cast ab. Vorher schlug der Cast
+            // fehl wenn der Wizard aus MinifigSummaryDialog geoeffnet wurde
+            // (Owner-Kette: MainWindow -> MinifigSummary -> Wizard, Cast
+            // traf den MinifigSummary-VM und nicht den MainViewModel).
+            // Praxis-Test-Befund 2026-05-15.
+            var presenter = App.Services.GetRequiredService<ISortInstructionPresenter>();
+            presenter.Show(sortInstruction);
         }
         catch (HBSort.Core.Services.InvalidBinKindException strict)
         {

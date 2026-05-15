@@ -194,33 +194,33 @@ public partial class MinifigSummaryDialog : Window
                 Close();
 
                 // v0.1.24-beta.1: Post-Save-Modal mit Take/Put-Sektionen.
-                if (Owner is Window owner
-                    && owner.DataContext is MainViewModel mainVm
-                    && mainVm.ScanViewModel != null)
+                // Phase 1.5: ISortInstructionPresenter statt Owner-Cast -
+                // funktioniert auch wenn dieser Dialog selbst nicht direkt
+                // vom MainWindow geoeffnet wird (konsistent mit den
+                // verschachtelten Wizard-Pfaden).
+                var item = new HBSort.ViewModels.SortItemLine
                 {
-                    var item = new HBSort.ViewModels.SortItemLine
-                    {
-                        Label = $"Figur '{minifigName}'",
-                        Detail = bricklinkId,
-                        QuantityText = "1x",
-                        ImageUrl = imageUrl
-                    };
-                    var instruction = new HBSort.ViewModels.SortInstruction
-                    {
-                        HeaderText = "Operation erfolgreich"
-                    };
-                    instruction.Take.Add(new HBSort.ViewModels.SortSection
-                    {
-                        BinLabel = oldBinLabel,
-                        Items = new List<HBSort.ViewModels.SortItemLine> { item }
-                    });
-                    instruction.Put.Add(new HBSort.ViewModels.SortSection
-                    {
-                        BinLabel = targetBinLabel,
-                        Items = new List<HBSort.ViewModels.SortItemLine> { item }
-                    });
-                    mainVm.ScanViewModel.ShowSortInstruction(instruction);
-                }
+                    Label = $"Figur '{minifigName}'",
+                    Detail = bricklinkId,
+                    QuantityText = "1x",
+                    ImageUrl = imageUrl
+                };
+                var instruction = new HBSort.ViewModels.SortInstruction
+                {
+                    HeaderText = "Operation erfolgreich"
+                };
+                instruction.Take.Add(new HBSort.ViewModels.SortSection
+                {
+                    BinLabel = oldBinLabel,
+                    Items = new List<HBSort.ViewModels.SortItemLine> { item }
+                });
+                instruction.Put.Add(new HBSort.ViewModels.SortSection
+                {
+                    BinLabel = targetBinLabel,
+                    Items = new List<HBSort.ViewModels.SortItemLine> { item }
+                });
+                var presenter = App.Services.GetRequiredService<ISortInstructionPresenter>();
+                presenter.Show(instruction);
             }
         }
         catch (HBSort.Core.Services.InvalidBinKindException strict)
