@@ -157,6 +157,39 @@ public partial class PendingMinifigViewModel : ObservableObject
 
     /// <summary>Speichern erlaubt? (Bin gewaehlt, kein Lookup, nicht gerade am Speichern)</summary>
     public bool CanPersist => SelectedBin != null && !IsLoading && !IsPersisting;
+
+    /// <summary>
+    /// v0.1.24-beta.1 Phase 2a-Polish: Liste der explizit per "Aus Fach"-
+    /// Button uebernommenen FloatingParts. Wird von
+    /// <c>ScanViewModel.TransferFloatingPartToPendingAsync</c> gefuellt
+    /// nach jedem erfolgreichen Transfer.
+    ///
+    /// <para>
+    /// Beim PersistPending wird daraus die Take-Sektion des Post-Save-
+    /// Modals gebaut. Wenn die Liste leer ist (User hat keine "Aus Fach"-
+    /// Buttons gedrueckt), zeigt das Modal nur die Put-Sektion.
+    /// </para>
+    ///
+    /// <para>Engineering-Prinzip 1.4: explizit ueber implizit.</para>
+    /// </summary>
+    public List<ConsumedFromBin> ConsumedFromBins { get; } = new();
+
+    /// <summary>
+    /// Eintrag fuer <see cref="ConsumedFromBins"/>. Stack-Logik: bei
+    /// wiederholtem "Aus Fach"-Klick fuer dieselbe (PartNo, ColorId,
+    /// SourceBinLabel)-Kombination wird <see cref="Quantity"/> erhoeht
+    /// statt einen neuen Eintrag anzulegen.
+    /// </summary>
+    public sealed class ConsumedFromBin
+    {
+        public string PartNo { get; init; } = string.Empty;
+        public int ColorId { get; init; }
+        public string PartName { get; init; } = string.Empty;
+        public string ColorName { get; init; } = string.Empty;
+        public int Quantity { get; set; } = 1;
+        public string SourceBinLabel { get; init; } = string.Empty;
+        public string? ImageUrl { get; init; }
+    }
 }
 
 /// <summary>

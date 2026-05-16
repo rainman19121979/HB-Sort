@@ -656,68 +656,91 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         // wenn ein Required-Part aus 2 Faechern bedient wird, zwei Eintraege.
         var consumed = new List<ConsumedFloatingPartInfo>();
 
-        Log.Information(
-            "PersistAndStore Reverse-Match: Minifig='{Name}' (BL:{Bl}), {Cnt} RequiredParts",
-            minifig.Name, minifig.BricklinkId, minifig.RequiredParts.Count);
-
-        foreach (var required in minifig.RequiredParts)
+        // v0.1.24-beta.1 Phase 2a-Polish: Reverse-Match nur wenn der Aufrufer
+        // ihn explizit anfordert (Default true => BuildSuggestion-Pfad bleibt
+        // unveraendert). MinifigDetailView/PersistPending setzt false und liefert
+        // QuantityCollected schon aus expliziten "Aus Fach"-Klicks vorbefuellt.
+        if (input.ConsumeFloatingParts)
         {
-            // Alle passenden FloatingParts (egal in welchem Fach), aelteste zuerst.
-            // Include(StorageBin) damit wir das Fach-Label fuer das Sammel-Popup
-            // ohne Extra-Query haben.
-            var candidates = await ctx.FloatingParts
-                .Include(fp => fp.StorageBin)
-                .Where(fp => fp.PartNumber == required.PartNumber
-                          && fp.ColorId == required.ColorId)
-                .OrderBy(fp => fp.AddedAt)
-                .ToListAsync(ct);
-
             Log.Information(
-                "  RequiredPart {Part}/{Color} (need={Need}, have={Have}): {Cands} FloatingPart-Kandidaten",
-                required.PartNumber, required.ColorId,
-                required.QuantityNeeded, required.QuantityCollected,
-                candidates.Count);
-            foreach (var c in candidates)
+                "PersistAndStore Reverse-Match: Minifig='{Name}' (BL:{Bl}), {Cnt} RequiredParts",
+                minifig.Name, minifig.BricklinkId, minifig.RequiredParts.Count);
+
+            foreach (var required in minifig.RequiredParts)
             {
-                Log.Information("    -> FP Id={Id} '{Name}' Qty={Qty} Bin='{Bin}'",
-                    c.Id, c.PartName, c.Quantity, c.StorageBin?.Label ?? "?");
-            }
+                // Alle passenden FloatingParts (egal in welchem Fach), aelteste zuerst.
+                // Include(StorageBin) damit wir das Fach-Label fuer das Sammel-Popup
+                // ohne Extra-Query haben.
+                var candidates = await ctx.FloatingParts
+                    .Include(fp => fp.StorageBin)
+                    .Where(fp => fp.PartNumber == required.PartNumber
+                              && fp.ColorId == required.ColorId)
+                    .OrderBy(fp => fp.AddedAt)
+                    .ToListAsync(ct);
 
-            foreach (var fp in candidates)
-            {
-                var stillNeeded = required.QuantityNeeded - required.QuantityCollected;
-                if (stillNeeded <= 0) break;
-
-                var take = Math.Min(stillNeeded, fp.Quantity);
-                required.QuantityCollected += take;
-                fp.Quantity -= take;
-                reverseMatched += take;
-
-                Log.Information("    KONSUMIERT: nimm {Take} aus FP Id={Id} (Bin '{Bin}'); FP-Rest={Rest}, Required jetzt {Have}/{Need}",
-                    take, fp.Id, fp.StorageBin?.Label ?? "?", fp.Quantity,
-                    required.QuantityCollected, required.QuantityNeeded);
-
-                consumed.Add(new ConsumedFloatingPartInfo
+                Log.Information(
+                    "  RequiredPart {Part}/{Color} (need={Need}, have={Have}): {Cands} FloatingPart-Kandidaten",
+                    required.PartNumber, required.ColorId,
+                    required.QuantityNeeded, required.QuantityCollected,
+                    candidates.Count);
+                foreach (var c in candidates)
                 {
-                    BlPartNo = required.PartNumber,
-                    BlColorId = required.ColorId,
-                    PartName = required.PartName,
-                    ColorName = required.ColorName,
-                    Quantity = take,
-                    SourceBinLabel = fp.StorageBin?.Label ?? string.Empty
-                });
-
-                // v0.1.23: Quell-Bin merken fuer RecalcKind.
-                reverseMatchBinIds.Add(fp.StorageBinId);
-
-                if (fp.Quantity <= 0)
-                {
-                    ctx.FloatingParts.Remove(fp);
+                    Log.Information("    -> FP Id={Id} '{Name}' Qty={Qty} Bin='{Bin}'",
+                        c.Id, c.PartName, c.Quantity, c.StorageBin?.Label ?? "?");
                 }
-            }
 
-            if (required.QuantityCollected >= required.QuantityNeeded)
-                completedParts++;
+                foreach (var fp in candidates)
+                {
+                    var stillNeeded = required.QuantityNeeded - required.QuantityCollected;
+                    if (stillNeeded <= 0) break;
+
+                    var take = Math.Min(stillNeeded, fp.Quantity);
+                    required.QuantityCollected += take;
+                    fp.Quantity -= take;
+                    reverseMatched += take;
+
+                    Log.Information("    KONSUMIERT: nimm {Take} aus FP Id={Id} (Bin '{Bin}'); FP-Rest={Rest}, Required jetzt {Have}/{Need}",
+                        take, fp.Id, fp.StorageBin?.Label ?? "?", fp.Quantity,
+                        required.QuantityCollected, required.QuantityNeeded);
+
+                    consumed.Add(new ConsumedFloatingPartInfo
+                    {
+                        BlPartNo = required.PartNumber,
+                        BlColorId = required.ColorId,
+                        PartName = required.PartName,
+                        ColorName = required.ColorName,
+                        Quantity = take,
+                        SourceBinLabel = fp.StorageBin?.Label ?? string.Empty
+                    });
+
+                    // v0.1.23: Quell-Bin merken fuer RecalcKind.
+                    reverseMatchBinIds.Add(fp.StorageBinId);
+
+                    if (fp.Quantity <= 0)
+                    {
+                        ctx.FloatingParts.Remove(fp);
+                    }
+                }
+
+                if (required.QuantityCollected >= required.QuantityNeeded)
+                    completedParts++;
+            }
+        }
+        else
+        {
+            // Flag=false: Service konsumiert nicht selbst. Trotzdem
+            // completedParts korrekt zaehlen, damit IsFullyComplete
+            // anhand der vom UI vorbefuellten QuantityCollected korrekt
+            // berechnet werden kann.
+            Log.Information(
+                "PersistAndStore ohne Reverse-Match (ConsumeFloatingParts=false): Minifig='{Name}' (BL:{Bl})",
+                minifig.Name, minifig.BricklinkId);
+
+            foreach (var required in minifig.RequiredParts)
+            {
+                if (required.QuantityCollected >= required.QuantityNeeded)
+                    completedParts++;
+            }
         }
 
         var isComplete = minifig.RequiredParts.All(p => p.QuantityCollected >= p.QuantityNeeded)

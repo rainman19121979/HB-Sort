@@ -1624,6 +1624,14 @@ public partial class ScanViewModel : ObservableObject, IDisposable
         try
         {
             // Required-Parts aus den Pending-Parts extrahieren
+            //
+            // v0.1.24-beta.1 Phase 2a-Polish: ConsumeFloatingParts=false.
+            // Der Pool-Konsum passiert hier ausschliesslich ueber explizite
+            // "Aus Fach"-Klicks (TransferFloatingPartToPendingAsync), die
+            // QuantityCollected schon hochgezaehlt UND PendingMinifig.
+            // ConsumedFromBins gefuellt haben. Der Service soll NICHT
+            // zusaetzlich nach passenden FloatingParts suchen.
+            // (BuildSuggestionDetailDialog laesst den Default true.)
             var input = new PersistMinifigInput
             {
                 BricklinkId = pending.BricklinkId,
@@ -1632,6 +1640,7 @@ public partial class ScanViewModel : ObservableObject, IDisposable
                 LocalImagePath = pending.ImageUrl, // BL-Provider liefert Pfad als URL-Form
                 UserNotes = pending.UserNotes,
                 StorageBinId = pending.SelectedBin.Id,
+                ConsumeFloatingParts = false,
                 RequiredParts = pending.Parts.Select(p => new PersistMinifigPart
                 {
                     BricklinkPartNo = p.BricklinkPartNo,
@@ -1640,10 +1649,8 @@ public partial class ScanViewModel : ObservableObject, IDisposable
                     ColorName = p.ColorName,
                     QuantityNeeded = p.Quantity,
                     // Manuelle Markierung im Pending: "Habe ich" -> alle Teile dieser
-                    // Sorte als gesammelt. Reverse-Match laeuft danach (skipt volle Eintraege).
-                    // QuantityCollected kommt direkt aus dem Pending-VM:
-                    // entweder via Anhaken-Checkbox (= Quantity) oder via
-                    // "Aus Fach uebernehmen"-Button (= 1..Quantity).
+                    // Sorte als gesammelt. QuantityCollected kommt aus dem Pending-VM
+                    // (Anhaken-Checkbox = Quantity ODER "Aus Fach uebernehmen" = 1..Quantity).
                     QuantityCollected = p.QuantityCollected
                 }).ToList()
             };
@@ -1652,19 +1659,25 @@ public partial class ScanViewModel : ObservableObject, IDisposable
 
             // UX X.20 Teil 5: Toast mit Item-Bild. Bei Auto-Komplettierung
             // kombinierter Hinweis ("komplett in Box X").
+            //
+            // v0.1.24-beta.1 Phase 2a-Polish: Pool-Uebernahmen werden aus
+            // PendingMinifig.ConsumedFromBins gezaehlt (explizite "Aus Fach"-
+            // Klicks), nicht aus result.ReverseMatchedFloating (das ist 0
+            // weil ConsumeFloatingParts=false).
             var toastImage = pending.ImageUrl;
             var binLabelForInstruction = pending.SelectedBin?.Label ?? string.Empty;
+            var totalConsumed = pending.ConsumedFromBins.Sum(c => c.Quantity);
             if (result.IsFullyComplete)
             {
                 _notifications.ShowSuccess(
                     $"Figur '{pending.Name}' komplett in {pending.SelectedBin?.Label ?? "(kein Fach)"}!",
                     toastImage);
             }
-            else if (result.ReverseMatchedFloating > 0)
+            else if (totalConsumed > 0)
             {
                 _notifications.ShowSuccess(
                     $"'{pending.Name}' in {pending.SelectedBin?.Label} eingelagert. " +
-                    $"{result.ReverseMatchedFloating} passende Teil(e) aus dem Pool uebernommen.",
+                    $"{totalConsumed} Teil(e) wurden aus Lagerfaechern uebernommen.",
                     toastImage);
             }
             else
@@ -1699,12 +1712,14 @@ public partial class ScanViewModel : ObservableObject, IDisposable
                         : "Operation erfolgreich"
                 };
 
-                // Take-Sektionen: pro Quell-Bin der konsumierten Floating-
-                // Parts eine Section. Gruppiert nach SourceBinLabel.
-                // ConsumedFloatingPartInfo.ImageUrl wird vom Persistence-
-                // Service heute nicht befuellt - bleibt null, das Modal
-                // zeigt dann nur Label+Detail+Quantity ohne Bild.
-                foreach (var byBin in result.ConsumedFloatingParts
+                // v0.1.24-beta.1 Phase 2a-Polish: Take-Sektionen aus der
+                // ConsumedFromBins-Tracking-Liste (gefuellt von expliziten
+                // "Aus Fach"-Klicks via TransferFloatingPartToPendingAsync).
+                // Das ersetzt die alte Quelle result.ConsumedFloatingParts:
+                // erstens kommen jetzt Bilder mit (Befund B aus Praxis-Test
+                // 2026-05-16), zweitens wird nicht mehr automatisch
+                // konsumiert (Befund A).
+                foreach (var byBin in pending.ConsumedFromBins
                     .GroupBy(c => c.SourceBinLabel))
                 {
                     var section = new SortSection { BinLabel = byBin.Key };
@@ -1713,7 +1728,7 @@ public partial class ScanViewModel : ObservableObject, IDisposable
                         section.Items.Add(new SortItemLine
                         {
                             Label = c.PartName,
-                            Detail = $"{c.BlPartNo} - {c.ColorName}",
+                            Detail = $"{c.PartNo} - {c.ColorName}",
                             QuantityText = $"{c.Quantity}x",
                             ImageUrl = c.ImageUrl
                         });
@@ -1881,6 +1896,34 @@ public partial class ScanViewModel : ObservableObject, IDisposable
 
             // Im Pending-VM hochzaehlen.
             part.QuantityCollected = Math.Min(part.QuantityCollected + 1, part.Quantity);
+
+            // v0.1.24-beta.1 Phase 2a-Polish: Tracking-Liste fuer das Post-
+            // Save-Modal befuellen. Wenn dasselbe (PartNo, ColorId, Bin)
+            // schon einmal uebernommen wurde, Quantity++ (Stack-Logik).
+            if (PendingMinifig != null)
+            {
+                var existing = PendingMinifig.ConsumedFromBins
+                    .FirstOrDefault(c => c.PartNo == part.BricklinkPartNo
+                                      && c.ColorId == part.BricklinkColorId
+                                      && c.SourceBinLabel == result.SourceBinLabel);
+                if (existing != null)
+                {
+                    existing.Quantity++;
+                }
+                else
+                {
+                    PendingMinifig.ConsumedFromBins.Add(new PendingMinifigViewModel.ConsumedFromBin
+                    {
+                        PartNo = part.BricklinkPartNo,
+                        ColorId = part.BricklinkColorId,
+                        PartName = part.PartName,
+                        ColorName = part.ColorName,
+                        Quantity = 1,
+                        SourceBinLabel = result.SourceBinLabel ?? "?",
+                        ImageUrl = part.ImageUrl
+                    });
+                }
+            }
 
             var toastMsg = result.BinFreedAfterTransfer
                 ? $"Teil aus '{result.SourceBinLabel}' uebernommen (Fach jetzt frei)."

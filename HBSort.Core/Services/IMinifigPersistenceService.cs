@@ -215,6 +215,35 @@ public class PersistMinifigInput
 
     /// <summary>Required-Parts der Figur. Werden 1:1 in TrackedMinifigPart kopiert.</summary>
     public List<PersistMinifigPart> RequiredParts { get; init; } = new();
+
+    /// <summary>
+    /// v0.1.24-beta.1 Phase 2a-Polish (2026-05-16): Steuert ob der Service
+    /// automatisch nach Reverse-Match-Treffern im FloatingPool sucht und
+    /// diese konsumiert.
+    ///
+    /// <para>
+    /// <c>true</c> (Default): Service erledigt den Reverse-Match-Konsum
+    /// selbst. Genutzt vom BuildSuggestionDetail-Pfad ("Was kann ich
+    /// bauen?"), wo der Aufrufer mit <c>QuantityCollected=0</c> persistiert
+    /// und sich darauf verlaesst dass der Service alle passenden
+    /// FloatingParts aufaddiert.
+    /// </para>
+    ///
+    /// <para>
+    /// <c>false</c>: Service persistiert nur was im Input
+    /// <c>RequiredParts[].QuantityCollected</c> schon drinsteht. Genutzt
+    /// vom MinifigDetailView/PersistPending-Pfad, wo der User Teile
+    /// explizit per "Aus Fach"-Button uebernommen hat — diese Klicks
+    /// erhoehen <c>QuantityCollected</c> bereits via
+    /// <c>TransferFloatingPartToPendingAsync</c> ohne Service-Beteiligung.
+    /// </para>
+    ///
+    /// <para>
+    /// Engineering-Prinzip 1.4: explizit ueber implizit. Der Aufrufer
+    /// signalisiert seinen Vertrag, kein magischer Default.
+    /// </para>
+    /// </summary>
+    public bool ConsumeFloatingParts { get; init; } = true;
 }
 
 /// <summary>Ein Required-Part beim Persistieren.</summary>

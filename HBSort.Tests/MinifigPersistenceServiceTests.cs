@@ -381,6 +381,141 @@ public class MinifigPersistenceServiceTests : IDisposable
         Assert.Equal(2, part.QuantityCollected); // gecapped auf QuantityNeeded
     }
 
+    // ====================================================================
+    // v0.1.24-beta.1 Phase 2a-Polish: ConsumeFloatingParts-Flag
+    // ====================================================================
+
+    [Fact]
+    public async Task PersistAndStore_with_ConsumeFloatingParts_true_consumes_pool()
+    {
+        // Default-Verhalten (= BuildSuggestion-Pfad): Flag steht auf true,
+        // Service durchsucht FloatingPool und konsumiert passende Teile.
+        var binId = await SeedBinAsync("Box T01-target");
+        var fpBinId = await SeedBinAsync("Box T01-pool");
+        await SeedFloatingAsync(fpBinId, "3001", 11, qty: 1,
+            partName: "Brick", colorName: "Black");
+        await SeedFloatingAsync(fpBinId, "3024", 0, qty: 2,
+            partName: "Plate", colorName: "White");
+
+        // Explizit ConsumeFloatingParts=true setzen (auch wenn Default).
+        var input = new PersistMinifigInput
+        {
+            BricklinkId = "polish-true-001",
+            Name = "Polish True",
+            StorageBinId = binId,
+            ConsumeFloatingParts = true,
+            RequiredParts = new List<PersistMinifigPart>
+            {
+                new() { BricklinkPartNo = "3001", BricklinkColorId = 11, QuantityNeeded = 1, QuantityCollected = 0 },
+                new() { BricklinkPartNo = "3024", BricklinkColorId = 0,  QuantityNeeded = 2, QuantityCollected = 0 }
+            }
+        };
+
+        var result = await _sut.PersistAndStoreAsync(input);
+
+        Assert.True(result.IsFullyComplete);
+        Assert.Equal(3, result.ReverseMatchedFloating);
+        Assert.Equal(2, result.ConsumedFloatingParts.Count);
+
+        // FloatingParts sind weg, QuantityCollected hochgezaehlt.
+        await using var ctx = await _factory.CreateDbContextAsync();
+        Assert.Empty(await ctx.FloatingParts.ToListAsync());
+        var saved = await ctx.TrackedMinifigs
+            .Include(m => m.RequiredParts)
+            .SingleAsync(m => m.BricklinkId == "polish-true-001");
+        Assert.All(saved.RequiredParts, p => Assert.Equal(p.QuantityNeeded, p.QuantityCollected));
+    }
+
+    [Fact]
+    public async Task PersistAndStore_with_ConsumeFloatingParts_false_does_not_touch_pool()
+    {
+        // Flag false (= MinifigDetailView/PersistPending-Pfad): Service
+        // konsumiert NICHT selbst. FloatingPool bleibt unveraendert.
+        // Required-Parts behalten ihr QuantityCollected aus dem Input.
+        var binId = await SeedBinAsync("Box T02-target");
+        var fpBinId = await SeedBinAsync("Box T02-pool");
+        var fpId1 = await SeedFloatingAsync(fpBinId, "3001", 11, qty: 1);
+        var fpId2 = await SeedFloatingAsync(fpBinId, "3024", 0, qty: 2);
+
+        var input = new PersistMinifigInput
+        {
+            BricklinkId = "polish-false-001",
+            Name = "Polish False NoConsume",
+            StorageBinId = binId,
+            ConsumeFloatingParts = false,
+            RequiredParts = new List<PersistMinifigPart>
+            {
+                new() { BricklinkPartNo = "3001", BricklinkColorId = 11, QuantityNeeded = 1, QuantityCollected = 0 },
+                new() { BricklinkPartNo = "3024", BricklinkColorId = 0,  QuantityNeeded = 2, QuantityCollected = 0 }
+            }
+        };
+
+        var result = await _sut.PersistAndStoreAsync(input);
+
+        Assert.False(result.IsFullyComplete);
+        Assert.Equal(0, result.ReverseMatchedFloating);
+        Assert.Empty(result.ConsumedFloatingParts);
+        Assert.Equal(TrackedMinifigStatus.Waiting, result.SavedMinifig.Status);
+
+        // FloatingParts unveraendert (Quantity gleich, Eintraege da).
+        await using var ctx = await _factory.CreateDbContextAsync();
+        var fp1 = await ctx.FloatingParts.SingleAsync(f => f.Id == fpId1);
+        var fp2 = await ctx.FloatingParts.SingleAsync(f => f.Id == fpId2);
+        Assert.Equal(1, fp1.Quantity);
+        Assert.Equal(2, fp2.Quantity);
+
+        // QuantityCollected bleibt 0 (Service hat nichts dazugefuegt).
+        var saved = await ctx.TrackedMinifigs
+            .Include(m => m.RequiredParts)
+            .SingleAsync(m => m.BricklinkId == "polish-false-001");
+        Assert.All(saved.RequiredParts, p => Assert.Equal(0, p.QuantityCollected));
+    }
+
+    [Fact]
+    public async Task PersistAndStore_with_ConsumeFloatingParts_false_persists_explicit_quantities()
+    {
+        // Flag false, aber RequiredParts haben QuantityCollected vorbefuellt
+        // (vom UI ueber explizite "Aus Fach"-Klicks). Service uebernimmt
+        // diese Werte 1:1, fasst aber den Pool nicht an. IsFullyComplete
+        // basiert auf der vorbefuellten Menge.
+        var binId = await SeedBinAsync("Box T03-target");
+        var fpBinId = await SeedBinAsync("Box T03-pool");
+        var fpId = await SeedFloatingAsync(fpBinId, "3001", 11, qty: 3);
+
+        var input = new PersistMinifigInput
+        {
+            BricklinkId = "polish-false-002",
+            Name = "Polish False ExplicitQty",
+            StorageBinId = binId,
+            ConsumeFloatingParts = false,
+            RequiredParts = new List<PersistMinifigPart>
+            {
+                // UI hat 2 von 3 als gesammelt vorbefuellt.
+                new() { BricklinkPartNo = "3001", BricklinkColorId = 11, QuantityNeeded = 3, QuantityCollected = 2 }
+            }
+        };
+
+        var result = await _sut.PersistAndStoreAsync(input);
+
+        // 2/3 -> nicht komplett, ReverseMatched=0 (kein Pool-Konsum).
+        Assert.False(result.IsFullyComplete);
+        Assert.Equal(0, result.ReverseMatchedFloating);
+        Assert.Empty(result.ConsumedFloatingParts);
+
+        // Pool unveraendert.
+        await using var ctx = await _factory.CreateDbContextAsync();
+        var fp = await ctx.FloatingParts.SingleAsync(f => f.Id == fpId);
+        Assert.Equal(3, fp.Quantity);
+
+        // QuantityCollected=2 in DB persistiert (nicht auf 0 gestellt, nicht auf 3 erhoeht).
+        var saved = await ctx.TrackedMinifigs
+            .Include(m => m.RequiredParts)
+            .SingleAsync(m => m.BricklinkId == "polish-false-002");
+        var part = Assert.Single(saved.RequiredParts);
+        Assert.Equal(2, part.QuantityCollected);
+        Assert.Equal(3, part.QuantityNeeded);
+    }
+
     /// <summary>Hilfsfunktion: PersistMinifigInput mit Required-Parts bauen.</summary>
     private static PersistMinifigInput MakeInput(string bricklinkId, string name, int binId,
         IEnumerable<(string PartNo, int ColorId, int Qty)> parts)
