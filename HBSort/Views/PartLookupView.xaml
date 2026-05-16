@@ -333,8 +333,8 @@
                                   FontSize="13"
                                   ItemsSource="{Binding AvailableBins}"
                                   SelectedItem="{Binding SelectedFloatingBin}"
-                                  DisplayMemberPath="Label"
-                                  ToolTip="Wo soll das Teil hin?"/>
+                                  DisplayMemberPath="DisplayText"
+                                  ToolTip="Wo soll das Teil hin? Suffix wie '(5 Einzelteile)' zeigt die aktuelle Belegung."/>
                         <TextBlock Grid.Column="1" Text="Anzahl:"
                                    VerticalAlignment="Center" Margin="12,0,6,0"
                                    Foreground="Gray"

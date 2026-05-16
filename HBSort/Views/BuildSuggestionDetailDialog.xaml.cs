@@ -50,7 +50,7 @@ public partial class BuildSuggestionDetailDialog : Window
                 ImageUrl = _vm.ImageUrl,
                 LocalImagePath = _vm.ImageUrl,
                 UserNotes = _vm.UserNotes,
-                StorageBinId = _vm.SelectedBin.Id,
+                StorageBinId = _vm.SelectedBin.Bin.Id,
                 Confidence = null,           // Bauvorschlag hat keine Brickognize-Konfidenz
                 ScanImagePath = null,
                 RequiredParts = _vm.Parts.Select(p => new PersistMinifigPart
@@ -70,13 +70,13 @@ public partial class BuildSuggestionDetailDialog : Window
             if (result.IsFullyComplete)
             {
                 _notifications.ShowSuccess(
-                    $"Figur '{_vm.Name}' direkt KOMPLETT angelegt im Fach '{_vm.SelectedBin.Label}' " +
+                    $"Figur '{_vm.Name}' direkt KOMPLETT angelegt im Fach '{_vm.SelectedBin.Bin.Label}' " +
                     $"({result.ReverseMatchedFloating} Teile aus dem Pool uebernommen).");
             }
             else
             {
                 _notifications.ShowSuccess(
-                    $"Figur '{_vm.Name}' im Fach '{_vm.SelectedBin.Label}' angelegt " +
+                    $"Figur '{_vm.Name}' im Fach '{_vm.SelectedBin.Bin.Label}' angelegt " +
                     $"({result.ReverseMatchedFloating} Teile bereits vorhanden).");
             }
 
@@ -86,7 +86,7 @@ public partial class BuildSuggestionDetailDialog : Window
             // (IsTargetItem=true fuer visuelle Abgrenzung im Overlay).
             // Items kommen aus result.ConsumedFloatingParts (vom Service
             // mit Quell-Bin-Label seit X.32 befuellt).
-            var binLabel = _vm.SelectedBin.Label;
+            var binLabel = _vm.SelectedBin.Bin.Label;
             var minifigImage = _vm.ImageUrl;
             var instructionItems = result.ConsumedFloatingParts
                 .Select(c => new HBSort.ViewModels.BinInstructionItem

@@ -253,8 +253,8 @@
             <ComboBox Grid.Row="3" MinHeight="36" FontSize="13"
                       ItemsSource="{Binding AvailableBins}"
                       SelectedItem="{Binding SelectedBin}"
-                      DisplayMemberPath="Label"
-                      ToolTip="Fach in das die neue wartende Figur gelegt wird."
+                      DisplayMemberPath="DisplayText"
+                      ToolTip="Fach in das die neue wartende Figur gelegt wird. Suffix '(2 wartend, 3 fertig)' zeigt die aktuelle Belegung."
                       Margin="0,0,0,12"/>
 
             <!-- Volle-Faecher-Banner (analog v0.1.22-beta.1 Block D) -->

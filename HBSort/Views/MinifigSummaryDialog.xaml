@@ -152,8 +152,9 @@
                        VerticalAlignment="Center" Margin="0,0,8,0"/>
             <ComboBox Grid.Column="1" x:Name="MoveTargetCombo"
                       ItemsSource="{Binding AvailableBins}"
-                      DisplayMemberPath="Label"
-                      SelectedItem="{Binding MoveTarget}"/>
+                      DisplayMemberPath="DisplayText"
+                      SelectedItem="{Binding MoveTarget}"
+                      ToolTip="Ziel-Fach fuer das Verschieben. Suffix '(2 wartend, 3 fertig)' zeigt die aktuelle Belegung."/>
         </Grid>
 
         <!-- Buttons -->

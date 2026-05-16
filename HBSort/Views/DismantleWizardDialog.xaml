@@ -92,8 +92,9 @@
                                             <ComboBox ItemsSource="{Binding DataContext.AvailableBins,
                                                           RelativeSource={RelativeSource AncestorType=Window}}"
                                                       SelectedItem="{Binding TargetBin, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                      DisplayMemberPath="Label"
-                                                      IsEnabled="{Binding IsKept}"/>
+                                                      DisplayMemberPath="DisplayText"
+                                                      IsEnabled="{Binding IsKept}"
+                                                      ToolTip="Ziel-Fach fuer dieses Teil. Suffix '(5 Einzelteile)' zeigt die aktuelle Belegung."/>
                                             <TextBlock Text="{Binding SmartHint}"
                                                        FontSize="10" FontStyle="Italic"
                                                        Foreground="#2196F3"
@@ -209,7 +210,8 @@
             <ComboBox Grid.Column="4"
                       ItemsSource="{Binding AvailableBins}"
                       SelectedItem="{Binding DefaultBin, Mode=TwoWay}"
-                      DisplayMemberPath="Label"/>
+                      DisplayMemberPath="DisplayText"
+                      ToolTip="Default-Fach das per 'Auf alle anwenden' auf alle Teile angewendet wird. Suffix zeigt die aktuelle Belegung."/>
             <Button Grid.Column="5" Content="Auf alle anwenden" Click="ApplyDefault_Click"
                     Padding="8,2" Margin="6,0,0,0"/>
         </Grid>

@@ -304,8 +304,8 @@
                         <ComboBox Grid.Column="1" MinHeight="34" FontSize="13"
                                   ItemsSource="{Binding AvailableBins}"
                                   SelectedItem="{Binding SelectedBin}"
-                                  DisplayMemberPath="Label"
-                                  ToolTip="Fach in das die Figur gelegt wird. Default vom Vorschlags-Service - bei vollen Faechern erscheint ein Hinweis-Banner."/>
+                                  DisplayMemberPath="DisplayText"
+                                  ToolTip="Fach in das die Figur gelegt wird. Default vom Vorschlags-Service - bei vollen Faechern erscheint ein Hinweis-Banner. Suffix '(2 wartend, 3 fertig)' zeigt die aktuelle Belegung."/>
 
                         <!-- Buttons rechtsbuendig in 1 Zeile -->
                         <StackPanel Grid.Column="2" Orientation="Horizontal"

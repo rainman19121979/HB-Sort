@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using HBSort.Core.Models;
 using HBSort.Core.Models.Bricklink;
 using HBSort.Core.Services;
+using HBSort.Helpers;
 
 namespace HBSort.ViewModels;
 
@@ -66,11 +67,16 @@ public partial class PartLookupViewModel : ObservableObject
     [ObservableProperty]
     private BlColor? _selectedColor;
 
-    /// <summary>Lagerfaecher fuer Floating-Part-Lager-Combo.</summary>
-    public ObservableCollection<StorageBin> AvailableBins { get; } = new();
+    /// <summary>
+    /// Lagerfaecher fuer Floating-Part-Lager-Combo.
+    /// v0.1.24-beta.1 Phase 2b: <see cref="BinDisplayItem"/> mit Belegungs-
+    /// Suffix ("Box 005 (5 Einzelteile)") — Konsumenten greifen via
+    /// <c>SelectedFloatingBin.Bin.Id</c> / <c>SelectedFloatingBin.Bin.Label</c>.
+    /// </summary>
+    public ObservableCollection<BinDisplayItem> AvailableBins { get; } = new();
 
     [ObservableProperty]
-    private StorageBin? _selectedFloatingBin;
+    private BinDisplayItem? _selectedFloatingBin;
 
     /// <summary>Anzahl Teile fuer Floating-Lagerung.</summary>
     [ObservableProperty]

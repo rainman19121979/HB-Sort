@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using HBSort.Core.Database;
 using HBSort.Core.Models;
 using HBSort.Core.Services;
+using HBSort.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
@@ -48,11 +49,17 @@ public partial class DismantleWizardViewModel : ObservableObject
     [ObservableProperty] private string _originBinLabel = string.Empty;
 
     public ObservableCollection<DismantlePartItemViewModel> Parts { get; } = new();
-    public ObservableCollection<StorageBin> AvailableBins { get; } = new();
+
+    /// <summary>
+    /// Bin-Liste fuer alle Ziel-Combobox-Aufrufer (Default-Bin + pro-Part-
+    /// TargetBin). v0.1.24-beta.1 Phase 2b: <see cref="BinDisplayItem"/>
+    /// mit Belegungs-Suffix — Konsumenten ueber <c>.Bin.Id</c> / <c>.Bin.Label</c>.
+    /// </summary>
+    public ObservableCollection<BinDisplayItem> AvailableBins { get; } = new();
 
     /// <summary>Default-Bin fuer "Auf alle anwenden".</summary>
     [ObservableProperty]
-    private StorageBin? _defaultBin;
+    private BinDisplayItem? _defaultBin;
 
     /// <summary>
     /// v0.1.24-beta.1 Phase 1.5: Task fuers Image-Load-Pre-Caching der
@@ -129,7 +136,8 @@ public partial class DismantleWizardViewModel : ObservableObject
             // ignoriert Complete-Figuren entgegen UX-X.6-Konvention). Jetzt
             // SuggestBinForWaitingMinifigAsync mit MaxWaitingFiguresPerBin -
             // konsistent zum Sortier-Tab.
-            StorageBin? targetBin = m.StorageBinId.HasValue
+            // v0.1.24-beta.1 Phase 2b: AvailableBins ist jetzt BinDisplayItem.
+            BinDisplayItem? targetBin = m.StorageBinId.HasValue
                 ? AvailableBins.FirstOrDefault(b => b.Id == m.StorageBinId.Value)
                 : null;
             if (targetBin == null)
@@ -186,7 +194,7 @@ public partial class DismantleWizardViewModel : ObservableObject
                     IsKept = p.QuantityCollected > 0,
                 };
 
-                StorageBin? perPartBin = null;
+                BinDisplayItem? perPartBin = null;
                 try
                 {
                     swPickBin.Start();
@@ -310,11 +318,14 @@ public partial class DismantleWizardViewModel : ObservableObject
     public async Task ReloadAvailableBinsAsync()
     {
         var excludeId = TrackedMinifigId > 0 ? (int?)TrackedMinifigId : null;
-        var bins = await _binService.GetEligibleBinsAsync(
+        // v0.1.24-beta.1 Phase 2b: WithCounts-Variante fuer Combobox-Suffix
+        // ("Box 005 (5 Einzelteile)" / "(2 wartend)" / leer).
+        var bins = await _binService.GetEligibleBinsWithCountsAsync(
             BinTargetKind.FloatingTarget,
             excludeMinifigId: excludeId);
         AvailableBins.Clear();
-        foreach (var b in bins) AvailableBins.Add(b);
+        foreach (var b in bins)
+            AvailableBins.Add(new BinDisplayItem(b.Bin, BinDisplayFormatter.FormatBinDisplayText(b)));
     }
 
     /// <summary>
@@ -332,6 +343,8 @@ public partial class DismantleWizardViewModel : ObservableObject
             || locations.Count == 0) return;
 
         var best = locations[0]; // sortiert nach Menge absteigend
+        // v0.1.24-beta.1 Phase 2b: AvailableBins ist BinDisplayItem — Id-Match
+        // via Convenience-Property.
         var bin = AvailableBins.FirstOrDefault(b => b.Id == best.StorageBinId);
         if (bin == null)
         {
@@ -430,7 +443,8 @@ public partial class DismantleWizardViewModel : ObservableObject
     public void ApplyDefaultBin()
     {
         if (DefaultBin == null) return;
-        // Bin-Objekt aus AvailableBins (Reference-Equality fuer ComboBox)
+        // Bin-Item aus AvailableBins (Reference-Equality fuer ComboBox).
+        // v0.1.24-beta.1 Phase 2b: BinDisplayItem statt rohem StorageBin.
         var bin = AvailableBins.FirstOrDefault(b => b.Id == DefaultBin.Id);
         if (bin == null) return;
         foreach (var p in Parts) p.TargetBin = bin;
@@ -487,7 +501,7 @@ public partial class DismantleWizardViewModel : ObservableObject
                 var partVm = DismantlePartItemViewModel.FromPending(p);
                 partVm.IsKept = true;
 
-                StorageBin? perPartBin = null;
+                BinDisplayItem? perPartBin = null;
                 try
                 {
                     swPickBin.Start();
@@ -595,9 +609,9 @@ public partial class DismantleWizardViewModel : ObservableObject
         }
 
         // Put-Sektionen pro Ziel-Bin (gleiche Items, gruppiert nach BinId).
-        foreach (var byBin in keptPut.GroupBy(p => p.TargetBin!.Id))
+        foreach (var byBin in keptPut.GroupBy(p => p.TargetBin!.Bin.Id))
         {
-            var binLabel = byBin.First().TargetBin!.Label;
+            var binLabel = byBin.First().TargetBin!.Bin.Label;
             var section = new SortSection { BinLabel = binLabel };
             foreach (var p in byBin)
             {
@@ -645,8 +659,14 @@ public partial class DismantleWizardViewModel : ObservableObject
     /// Liefert null wenn kein passendes Fach frei ist - der Aufrufer
     /// (LoadAsync / LoadFromPendingAsync) zeigt dann den Volle-Faecher-
     /// Hinweis pro Teil.
+    /// v0.1.24-beta.1 Phase 2b: liefert <see cref="BinDisplayItem"/> aus
+    /// <see cref="AvailableBins"/> (Reference-Equality fuer Combobox). Wenn
+    /// der Suggest-Service ein Bin liefert das nicht in AvailableBins
+    /// auftaucht (sollte nicht vorkommen — beide nutzen denselben
+    /// FloatingTarget-Filter), wird null zurueckgegeben statt eines
+    /// "fremden" BinDisplayItem-Wrappers ohne Count-Suffix.
     /// </summary>
-    private async Task<StorageBin?> PickPerPartBinAsync(
+    private async Task<BinDisplayItem?> PickPerPartBinAsync(
         string blPartNo, int blColorId,
         int? excludeMinifigId,
         string? partName = null)
@@ -664,7 +684,7 @@ public partial class DismantleWizardViewModel : ObservableObject
         if (suggested == null)
             return null; // Aufrufer zeigt Volle-Faecher-Hinweis pro Teil.
 
-        return AvailableBins.FirstOrDefault(b => b.Id == suggested.Id) ?? suggested;
+        return AvailableBins.FirstOrDefault(b => b.Id == suggested.Id);
     }
 
     /// <summary>
@@ -704,7 +724,7 @@ public partial class DismantleWizardViewModel : ObservableObject
                 ? p.SelectedMatch.TrackedMinifigPartId
                 : (int?)null;
             var targetBin = p.IsKept && p.IsPutInBinMode
-                ? p.TargetBin?.Id
+                ? p.TargetBin?.Bin.Id
                 : (int?)null;
 
             return new DismantlePartChoice
@@ -766,7 +786,7 @@ public partial class DismantleWizardViewModel : ObservableObject
                 await _partLookup.AddPartToFloatingAsync(
                     item.BlPartNo, item.BlColorId,
                     item.PartName, item.ColorName,
-                    qty, item.TargetBin.Id,
+                    qty, item.TargetBin.Bin.Id,
                     derivedCategory);
             }
             catch (InvalidBinKindException strict)
@@ -776,7 +796,7 @@ public partial class DismantleWizardViewModel : ObservableObject
                 // damit der UI-Layer (Wizard-Dialog) den User informieren kann.
                 Log.Warning(strict,
                     "ConfirmPendingModeAsync: Strict-Mode-Verletzung beim Lagern von {Part} in '{Bin}'",
-                    item.BlPartNo, item.TargetBin.Label);
+                    item.BlPartNo, item.TargetBin.Bin.Label);
                 throw;
             }
 
@@ -786,7 +806,7 @@ public partial class DismantleWizardViewModel : ObservableObject
             {
                 ItemLabel = $"{item.PartName} ({item.BlPartNo}) - {item.ColorName}",
                 QuantityText = $"{qty} Stueck",
-                BinLabel = item.TargetBin.Label,
+                BinLabel = item.TargetBin.Bin.Label,
                 ImageUrl = item.ImageUrl
             });
         }
@@ -841,14 +861,14 @@ public partial class DismantleWizardViewModel : ObservableObject
             var qty = item.QuantityCollected > 0 ? item.QuantityCollected : item.QuantityNeeded;
             if (qty <= 0) continue;
 
-            var bin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == item.TargetBin.Id);
+            var bin = await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == item.TargetBin.Bin.Id);
             if (bin == null) continue;
             if (bin.FreedAt != null) bin.FreedAt = null;
 
             var existing = await ctx.FloatingParts.FirstOrDefaultAsync(fp =>
                 fp.PartNumber == item.BlPartNo
                 && fp.ColorId == item.BlColorId
-                && fp.StorageBinId == item.TargetBin.Id);
+                && fp.StorageBinId == item.TargetBin.Bin.Id);
             if (existing != null)
             {
                 existing.Quantity += qty;
@@ -864,7 +884,7 @@ public partial class DismantleWizardViewModel : ObservableObject
                     PartName = item.PartName,
                     ColorName = item.ColorName,
                     Quantity = qty,
-                    StorageBinId = item.TargetBin.Id,
+                    StorageBinId = item.TargetBin.Bin.Id,
                     BrickognizeCategory = derivedCategory,
                     AddedAt = now
                 });
@@ -875,7 +895,7 @@ public partial class DismantleWizardViewModel : ObservableObject
             {
                 ItemLabel = $"{item.PartName} ({item.BlPartNo}) - {item.ColorName}",
                 QuantityText = $"{qty} Stueck",
-                BinLabel = item.TargetBin.Label,
+                BinLabel = item.TargetBin.Bin.Label,
                 ImageUrl = item.ImageUrl
             });
         }
@@ -918,14 +938,19 @@ public partial class DismantlePartItemViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(StatusLabel))]
     private bool _isKept;
 
+    /// <summary>
+    /// v0.1.24-beta.1 Phase 2b: <see cref="BinDisplayItem"/> statt rohem
+    /// <see cref="StorageBin"/> — die Pro-Teil-Combobox nutzt jetzt
+    /// "Box 005 (2 wartend, 5 Einzelteile)"-Suffix.
+    /// </summary>
     [ObservableProperty]
-    private StorageBin? _targetBin;
+    private BinDisplayItem? _targetBin;
 
     // UX X.33 Block N: wenn der User manuell ein Bin in der Combobox waehlt,
     // wird der Volle-Faecher-Hinweis entfernt. Andersrum nicht: wenn er den
     // Bin per Code-Pfad auf null setzt, bleibt der Warn-Status wie er ist
     // (LoadAsync setzt das passend).
-    partial void OnTargetBinChanged(StorageBin? value)
+    partial void OnTargetBinChanged(BinDisplayItem? value)
     {
         if (value != null) NoFreeBinWarning = false;
     }

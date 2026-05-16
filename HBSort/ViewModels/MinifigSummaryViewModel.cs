@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using HBSort.Core.Database;
 using HBSort.Core.Models;
 using HBSort.Core.Services;
+using HBSort.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -55,11 +56,15 @@ public partial class MinifigSummaryViewModel : ObservableObject
     /// <summary>Teile mit Status fuer die Anzeige.</summary>
     public ObservableCollection<SummaryPartViewModel> Parts { get; } = new();
 
-    /// <summary>Verfuegbare Faecher fuer "Verschieben" (ohne aktuelles Fach).</summary>
-    public ObservableCollection<StorageBin> AvailableBins { get; } = new();
+    /// <summary>
+    /// Verfuegbare Faecher fuer "Verschieben" (ohne aktuelles Fach).
+    /// v0.1.24-beta.1 Phase 2b: <see cref="BinDisplayItem"/> mit Belegungs-
+    /// Suffix — Konsumenten ueber <c>MoveTarget.Bin.Id</c> / <c>.Bin.Label</c>.
+    /// </summary>
+    public ObservableCollection<BinDisplayItem> AvailableBins { get; } = new();
 
     [ObservableProperty]
-    private StorageBin? _moveTarget;
+    private BinDisplayItem? _moveTarget;
 
     public MinifigSummaryViewModel(
         int minifigId,
@@ -125,10 +130,13 @@ public partial class MinifigSummaryViewModel : ObservableObject
             ? BinTargetKind.CompleteMinifigTarget
             : BinTargetKind.WaitingMinifigTarget;
         AvailableBins.Clear();
-        var bins = await _binService.GetEligibleBinsAsync(
+        // v0.1.24-beta.1 Phase 2b: WithCounts-Variante fuer Combobox-Suffix.
+        // excludeMinifigId=m.Id sorgt dafuer dass die zu verschiebende Figur
+        // sich selbst nicht im Count zaehlt.
+        var bins = await _binService.GetEligibleBinsWithCountsAsync(
             targetKind, excludeMinifigId: m.Id);
-        foreach (var b in bins.Where(b => b.Id != CurrentBinId))
-            AvailableBins.Add(b);
+        foreach (var b in bins.Where(x => x.Bin.Id != CurrentBinId))
+            AvailableBins.Add(new BinDisplayItem(b.Bin, BinDisplayFormatter.FormatBinDisplayText(b)));
 
         // Trigger property notifications fuer die berechneten Properties
         OnPropertyChanged(nameof(Name));

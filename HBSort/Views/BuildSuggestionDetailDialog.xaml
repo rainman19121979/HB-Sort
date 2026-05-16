@@ -148,7 +148,7 @@
             <ComboBox Grid.Row="0" Grid.Column="1"
                       ItemsSource="{Binding AvailableBins}"
                       SelectedItem="{Binding SelectedBin}"
-                      DisplayMemberPath="Label"/>
+                      DisplayMemberPath="DisplayText"/>
 
             <!-- UX X.30 (v0.1.17): "Notizen" -> "Beschreibung", landet beim
                  BSX-Export im oeffentlichen Comments-Feld. -->

@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using HBSort.Core.Database;
 using HBSort.Core.Models;
 using HBSort.Core.Services;
+using HBSort.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
@@ -40,12 +41,17 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
     /// <summary>Required-Parts der Figur mit "Vorhanden / Fehlt"-Status.</summary>
     public ObservableCollection<BuildSuggestionPartViewModel> Parts { get; } = new();
 
-    /// <summary>Lagerfach-Auswahl (frei zuerst, dann Trenner, dann belegte).</summary>
-    public ObservableCollection<StorageBin> AvailableBins { get; } = new();
+    /// <summary>
+    /// Lagerfach-Auswahl. v0.1.24-beta.1 Phase 2b: <see cref="BinDisplayItem"/>
+    /// statt rohem <see cref="StorageBin"/> — die Combobox zeigt jetzt
+    /// "Box 005 (2 wartend)" statt nur "Box 005". Konsumenten greifen ueber
+    /// <c>SelectedBin.Bin.Id</c> / <c>SelectedBin.Bin.Label</c> auf das Original.
+    /// </summary>
+    public ObservableCollection<BinDisplayItem> AvailableBins { get; } = new();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanCreate))]
-    private StorageBin? _selectedBin;
+    private BinDisplayItem? _selectedBin;
 
     [ObservableProperty]
     private string _userNotes = string.Empty;
@@ -212,8 +218,12 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
             ? BinTargetKind.CompleteMinifigTarget
             : BinTargetKind.WaitingMinifigTarget;
         AvailableBins.Clear();
-        var eligible = await binService.GetEligibleBinsAsync(binTargetKind);
-        foreach (var b in eligible) AvailableBins.Add(b);
+        // v0.1.24-beta.1 Phase 2b: GetEligibleBinsWithCountsAsync + Suffix-
+        // Formatter (Konzept B2 / OPEN-7). Suffix wie "(2 wartend)" macht
+        // die Combobox selbstklaerend.
+        var eligible = await binService.GetEligibleBinsWithCountsAsync(binTargetKind);
+        foreach (var b in eligible)
+            AvailableBins.Add(new BinDisplayItem(b.Bin, BinDisplayFormatter.FormatBinDisplayText(b)));
         StorageBin? suggested;
         if (willBeComplete)
         {

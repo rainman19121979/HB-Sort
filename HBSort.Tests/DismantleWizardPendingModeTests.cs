@@ -252,7 +252,7 @@ public class DismantleWizardPendingModeTests : IDisposable
 
         Assert.Equal(4, wizard.Parts.Count);
         // Alle Teile landen im ersten truly-free Bin (Box 01, sortiert nach Label).
-        Assert.All(wizard.Parts, p => Assert.Equal("Box 01", p.TargetBin?.Label));
+        Assert.All(wizard.Parts, p => Assert.Equal("Box 01", p.TargetBin?.Bin.Label));
     }
 
     [Fact]
@@ -285,12 +285,12 @@ public class DismantleWizardPendingModeTests : IDisposable
         Assert.Equal(2, wizard.Parts.Count);
         // Brick geht ins Stapel-Fach Box 01.
         var brickPart = wizard.Parts.Single(p => p.BlPartNo == "3001");
-        Assert.Equal("Box 01", brickPart.TargetBin?.Label);
+        Assert.Equal("Box 01", brickPart.TargetBin?.Bin.Label);
         // Plate geht in ein anderes Fach (Box 02), weil Box 01 ein Stapel-
         // Bin nur fuer "3001/11" ist - und Box 01 ist trotzdem nicht in
         // usedBins (Stapel-Bin wird nicht getrackt).
         var platePart = wizard.Parts.Single(p => p.BlPartNo == "3024");
-        Assert.Equal("Box 02", platePart.TargetBin?.Label);
+        Assert.Equal("Box 02", platePart.TargetBin?.Bin.Label);
     }
 
     [Fact]
@@ -321,7 +321,7 @@ public class DismantleWizardPendingModeTests : IDisposable
 
         Assert.Equal(2, wizard.Parts.Count);
         // Beide gehen in Box 01 (Stapel-Bin, mehrfach OK).
-        Assert.All(wizard.Parts, p => Assert.Equal("Box 01", p.TargetBin?.Label));
+        Assert.All(wizard.Parts, p => Assert.Equal("Box 01", p.TargetBin?.Bin.Label));
     }
 
     [Fact]

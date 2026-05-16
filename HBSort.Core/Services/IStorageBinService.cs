@@ -191,6 +191,36 @@ public interface IStorageBinService
         CancellationToken ct = default);
 
     /// <summary>
+    /// v0.1.24-beta.1 Phase 2b (Konzept Befund B2 / OPEN-7): liefert eligible
+    /// Bins wie <see cref="GetEligibleBinsAsync"/>, zusaetzlich pro Bin die
+    /// Belegungs-Counts (WaitingCount, CompleteCount, FloatingCount). Wird
+    /// von Combobox-DataTemplates verwendet um Suffixes wie
+    /// "(2 wartend, 3 fertig)" zu rendern.
+    ///
+    /// <para>
+    /// Selbe Filter-Logik wie <see cref="GetEligibleBinsAsync"/> (allowedKinds
+    /// pro BinTargetKind, Reverse-Match-Pruefung fuer Floating-Target,
+    /// Limit-Filter mit Clamp auf &gt;=1). WaitingCount/CompleteCount
+    /// beruecksichtigen <paramref name="excludeMinifigId"/> analog zur
+    /// Limit-Filterung. FloatingCount immer ohne Exclude (FloatingParts
+    /// haben kein Minifig-Bezug).
+    /// </para>
+    /// <para>
+    /// Performance: lädt dieselben Bins wie <see cref="GetEligibleBinsAsync"/>,
+    /// nutzt aber Include fuer TrackedMinifigs+FloatingParts und aggregiert
+    /// In-Memory. Kein zusaetzlicher DB-Roundtrip pro Bin.
+    /// </para>
+    /// </summary>
+    Task<List<StorageBinWithCounts>> GetEligibleBinsWithCountsAsync(
+        BinTargetKind targetKind,
+        string? partNo = null,
+        int? colorId = null,
+        int? excludeMinifigId = null,
+        int? waitingLimit = null,
+        int? completeLimit = null,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// v0.1.22-beta.1 Block G: scannt einmalig die DB nach Mix-Bins die
     /// durch die neue Bin-Typ-Trennung nicht mehr entstehen sollten.
     /// Wird beim App-Start gerufen und liefert eine Liste der betroffenen
@@ -206,6 +236,22 @@ public record BinMixWarning(
     int BinId,
     string Label,
     string Reason);
+
+/// <summary>
+/// v0.1.24-beta.1 Phase 2b (Konzept Befund B2 / OPEN-7): Bin mit Belegungs-
+/// Counts fuer die Combobox-Suffix-Anzeige.
+/// <para>
+/// <see cref="WaitingCount"/> / <see cref="CompleteCount"/> beruecksichtigen
+/// excludeMinifigId (analog zu <see cref="IStorageBinService.GetEligibleBinsAsync"/>).
+/// <see cref="FloatingCount"/> immer ohne Exclude (FloatingParts haben
+/// keinen Minifig-Bezug).
+/// </para>
+/// </summary>
+public record StorageBinWithCounts(
+    StorageBin Bin,
+    int WaitingCount,
+    int CompleteCount,
+    int FloatingCount);
 
 /// <summary>
 /// v0.1.22-beta.3 (2026-05-13): Zweck eines Bin-Vorschlags fuer

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using HBSort.Core.Models;
 using HBSort.Core.Services;
+using HBSort.Helpers;
 using Serilog;
 
 namespace HBSort.ViewModels;
@@ -74,14 +75,19 @@ public partial class CollectMinifigWizardViewModel : ObservableObject
 
     // ----- Lagerfach -----
 
-    /// <summary>Typ-gefilterte Liste fuer wartende Figuren (analog v0.1.22-beta.3).</summary>
-    public ObservableCollection<StorageBin> AvailableBins { get; } = new();
+    /// <summary>
+    /// Typ-gefilterte Liste fuer wartende Figuren (analog v0.1.22-beta.3).
+    /// v0.1.24-beta.1 Phase 2b: <see cref="BinDisplayItem"/> mit Belegungs-
+    /// Suffix ("Box 005 (2 wartend)") — Konsumenten ueber
+    /// <c>SelectedBin.Bin.Id</c> / <c>SelectedBin.Bin.Label</c>.
+    /// </summary>
+    public ObservableCollection<BinDisplayItem> AvailableBins { get; } = new();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(MovementCount))]
     [NotifyPropertyChangedFor(nameof(MovementHint))]
     [NotifyPropertyChangedFor(nameof(CanSave))]
-    private StorageBin? _selectedBin;
+    private BinDisplayItem? _selectedBin;
 
     /// <summary>
     /// v0.1.22-beta.1 Block D-Banner: sichtbar wenn Suggest=null UND alle
@@ -257,10 +263,12 @@ public partial class CollectMinifigWizardViewModel : ObservableObject
     {
         if (_binService == null) return;
 
-        var allBins = await _binService.GetEligibleBinsAsync(
+        // v0.1.24-beta.1 Phase 2b: WithCounts-Variante fuer Combobox-Suffix.
+        var allBins = await _binService.GetEligibleBinsWithCountsAsync(
             BinTargetKind.WaitingMinifigTarget, ct: ct);
         AvailableBins.Clear();
-        foreach (var b in allBins) AvailableBins.Add(b);
+        foreach (var b in allBins)
+            AvailableBins.Add(new BinDisplayItem(b.Bin, BinDisplayFormatter.FormatBinDisplayText(b)));
 
         var suggested = await _binService.SuggestBinForWaitingMinifigAsync(
             _maxWaitingLimit, ct);
@@ -268,9 +276,12 @@ public partial class CollectMinifigWizardViewModel : ObservableObject
             ? AvailableBins.FirstOrDefault(b => b.Id == suggested.Id)
             : null;
 
+        // Banner: alle Items pruefen — BinDisplayItem.Bin.FreedAt fuer
+        // die "alle Bins als belegt"-Logik. AvailableBins ist getypt
+        // als BinDisplayItem; via .Bin Zugriff aufs Original-Field.
         IsAllBinsFullBannerVisible = suggested == null
             && AvailableBins.Count > 0
-            && AvailableBins.All(b => b.FreedAt == null);
+            && AvailableBins.All(b => b.Bin.FreedAt == null);
     }
 
     // ----- Hilfsmethoden -----

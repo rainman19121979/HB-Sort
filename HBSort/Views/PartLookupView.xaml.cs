@@ -184,7 +184,7 @@ public partial class PartLookupView : UserControl
         if (result != true || dialog.SaveResult == null) return; // User hat verworfen
 
         var collectResult = dialog.SaveResult;
-        var binLabel = wizardVm.SelectedBin?.Label ?? string.Empty;
+        var binLabel = wizardVm.SelectedBin?.Bin.Label ?? string.Empty;
 
         // Toast als zusaetzliche Bestaetigung (Post-Save-Modal hat der
         // Wizard selbst schon gezeigt).

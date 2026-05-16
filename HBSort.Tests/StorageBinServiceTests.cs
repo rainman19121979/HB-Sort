@@ -1127,4 +1127,117 @@ public class StorageBinServiceTests : IDisposable
         Assert.Contains(bE!.Id, ids);          // 0 wartend < 1 -> drin
         Assert.DoesNotContain(bOne!.Id, ids);  // 1 wartend >= 1 -> raus (clamped)
     }
+
+    // ========================================================================
+    // v0.1.24-beta.1 Phase 2b (Konzept Befund B2 / OPEN-7):
+    // GetEligibleBinsWithCountsAsync — gleiche Filter wie GetEligibleBinsAsync,
+    // zusaetzlich pro Bin WaitingCount / CompleteCount / FloatingCount.
+    // ========================================================================
+
+    [Fact]
+    public async Task GetEligibleBinsWithCountsAsync_returns_correct_waiting_and_complete_counts()
+    {
+        await _sut.CreateBulkAsync(new[] { "Mixed", "WaitingOnly", "Empty" });
+        var bMixed = await _sut.GetByLabelAsync("Mixed");
+        var bWait = await _sut.GetByLabelAsync("WaitingOnly");
+        var bEmpty = await _sut.GetByLabelAsync("Empty");
+
+        // Mixed: 2 wartend + 1 complete (Reifungspfad).
+        await SeedMinifigInBinAsync(bMixed!.Id, "w1", TrackedMinifigStatus.Waiting);
+        await SeedMinifigInBinAsync(bMixed!.Id, "w2", TrackedMinifigStatus.Waiting);
+        await SeedMinifigInBinAsync(bMixed!.Id, "c1", TrackedMinifigStatus.Complete);
+        // WaitingOnly: 1 wartend.
+        await SeedMinifigInBinAsync(bWait!.Id, "w3", TrackedMinifigStatus.Waiting);
+
+        var withCounts = await _sut.GetEligibleBinsWithCountsAsync(
+            BinTargetKind.WaitingMinifigTarget);
+
+        var mixedItem = withCounts.Single(b => b.Bin.Id == bMixed.Id);
+        Assert.Equal(2, mixedItem.WaitingCount);
+        Assert.Equal(1, mixedItem.CompleteCount);
+        Assert.Equal(0, mixedItem.FloatingCount);
+
+        var waitItem = withCounts.Single(b => b.Bin.Id == bWait.Id);
+        Assert.Equal(1, waitItem.WaitingCount);
+        Assert.Equal(0, waitItem.CompleteCount);
+
+        var emptyItem = withCounts.Single(b => b.Bin.Id == bEmpty!.Id);
+        Assert.Equal(0, emptyItem.WaitingCount);
+        Assert.Equal(0, emptyItem.CompleteCount);
+        Assert.Equal(0, emptyItem.FloatingCount);
+    }
+
+    [Fact]
+    public async Task GetEligibleBinsWithCountsAsync_returns_floating_count()
+    {
+        await _sut.CreateSingleAsync("FloatingBox");
+        var bin = await _sut.GetByLabelAsync("FloatingBox");
+        await SeedFloatingPartInBinAsync(bin!.Id, "3001", qty: 5);
+        await SeedFloatingPartInBinAsync(bin!.Id, "3024", qty: 2, colorId: 5);
+
+        var withCounts = await _sut.GetEligibleBinsWithCountsAsync(
+            BinTargetKind.FloatingTarget);
+
+        var item = withCounts.Single(b => b.Bin.Id == bin.Id);
+        // FloatingCount zaehlt die FloatingPart-Eintraege (Zeilen), nicht
+        // die Quantity-Summen — analog Konzept B2 / OPEN-7-Beispiel
+        // "(5 Einzelteile)" = 5 verschiedene PartId-Eintraege.
+        Assert.Equal(2, item.FloatingCount);
+        Assert.Equal(0, item.WaitingCount);
+        Assert.Equal(0, item.CompleteCount);
+    }
+
+    [Fact]
+    public async Task GetEligibleBinsWithCountsAsync_excludes_minifig_in_counts()
+    {
+        await _sut.CreateSingleAsync("Box 01");
+        var bin = await _sut.GetByLabelAsync("Box 01");
+        var excludeId = await SeedMinifigInBinAsync(bin!.Id, "exclude-me", TrackedMinifigStatus.Waiting);
+        await SeedMinifigInBinAsync(bin!.Id, "stay", TrackedMinifigStatus.Waiting);
+
+        var withCounts = await _sut.GetEligibleBinsWithCountsAsync(
+            BinTargetKind.WaitingMinifigTarget,
+            excludeMinifigId: excludeId);
+
+        var item = withCounts.Single(b => b.Bin.Id == bin.Id);
+        // Eine wartende Figur ist excluded — WaitingCount sieht nur "stay".
+        Assert.Equal(1, item.WaitingCount);
+    }
+
+    [Fact]
+    public async Task GetEligibleBinsWithCountsAsync_respects_waiting_limit()
+    {
+        await _sut.CreateBulkAsync(new[] { "Box A", "Box B" });
+        var bA = await _sut.GetByLabelAsync("Box A");
+        var bB = await _sut.GetByLabelAsync("Box B");
+
+        // Box A: 2 wartend (>= Limit 2 -> raus).
+        await SeedMinifigInBinAsync(bA!.Id, "w1", TrackedMinifigStatus.Waiting);
+        await SeedMinifigInBinAsync(bA!.Id, "w2", TrackedMinifigStatus.Waiting);
+        // Box B: 1 wartend (< Limit 2 -> drin).
+        await SeedMinifigInBinAsync(bB!.Id, "w3", TrackedMinifigStatus.Waiting);
+
+        var withCounts = await _sut.GetEligibleBinsWithCountsAsync(
+            BinTargetKind.WaitingMinifigTarget,
+            waitingLimit: 2);
+
+        var ids = withCounts.Select(b => b.Bin.Id).ToHashSet();
+        Assert.DoesNotContain(bA.Id, ids);
+        Assert.Contains(bB.Id, ids);
+    }
+
+    [Fact]
+    public async Task GetEligibleBinsWithCountsAsync_empty_bin_has_zero_counts()
+    {
+        await _sut.CreateSingleAsync("Empty");
+        var bin = await _sut.GetByLabelAsync("Empty");
+
+        var withCounts = await _sut.GetEligibleBinsWithCountsAsync(
+            BinTargetKind.WaitingMinifigTarget);
+
+        var item = withCounts.Single(b => b.Bin.Id == bin!.Id);
+        Assert.Equal(0, item.WaitingCount);
+        Assert.Equal(0, item.CompleteCount);
+        Assert.Equal(0, item.FloatingCount);
+    }
 }

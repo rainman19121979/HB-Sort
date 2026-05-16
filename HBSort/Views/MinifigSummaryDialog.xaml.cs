@@ -177,14 +177,14 @@ public partial class MinifigSummaryDialog : Window
         // schon geladen (BinLabel-Property). Damit baut sich das Post-Save-
         // Modal mit korrekter "Nimm aus X / Lege in Y"-Anweisung.
         var oldBinLabel = _viewModel.BinLabel;
-        var targetBinLabel = _viewModel.MoveTarget.Label;
+        var targetBinLabel = _viewModel.MoveTarget.Bin.Label;
         var minifigName = _viewModel.Name;
         var bricklinkId = _viewModel.BricklinkId;
         var imageUrl = _viewModel.ImageUrl;
 
         try
         {
-            var ok = await _viewModel.MoveToAsync(_viewModel.MoveTarget.Id);
+            var ok = await _viewModel.MoveToAsync(_viewModel.MoveTarget.Bin.Id);
             if (ok)
             {
                 _notifications.ShowSuccess(

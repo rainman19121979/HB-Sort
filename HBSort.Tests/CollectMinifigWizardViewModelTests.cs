@@ -186,7 +186,9 @@ public class CollectMinifigWizardViewModelTests
         Assert.False(vm.CanSave);
 
         // Manuell setzen -> CanSave true.
-        vm.SelectedBin = new StorageBin { Id = 1, Label = "X" };
+        // v0.1.24-beta.1 Phase 2b: SelectedBin ist BinDisplayItem.
+        vm.SelectedBin = new HBSort.Helpers.BinDisplayItem(
+            new StorageBin { Id = 1, Label = "X" }, "X");
         Assert.True(vm.CanSave);
     }
 

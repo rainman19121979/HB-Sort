@@ -107,7 +107,7 @@ public partial class CollectMinifigWizardDialog : Window
 
         try
         {
-            var bin = _viewModel.SelectedBin;
+            var bin = _viewModel.SelectedBin.Bin;
             var result = await partLookup.CollectMinifigFromSupersetWithSelectionAsync(
                 blMinifigId: _viewModel.BricklinkId,
                 storageBinId: bin.Id,

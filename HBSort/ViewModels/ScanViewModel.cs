@@ -12,6 +12,7 @@ using HBSort.Core.Helpers;
 using HBSort.Core.Models;
 using HBSort.Core.Models.Exceptions;
 using HBSort.Core.Services;
+using HBSort.Helpers;
 using HBSort.Services;
 using Serilog;
 
@@ -242,6 +243,8 @@ public partial class ScanViewModel : ObservableObject, IDisposable
 
             System.Windows.Application.Current?.Dispatcher.Invoke(() =>
             {
+                // v0.1.24-beta.1 Phase 2b: BinDisplayItem statt rohes StorageBin —
+                // .Id (Convenience an BinDisplayItem) bleibt unveraendert.
                 var newBin = pending.AvailableBins.FirstOrDefault(b => b.Id == newBest.Id);
                 if (newBin != null && newBin.Id != pending.SelectedBin?.Id)
                 {
@@ -408,7 +411,7 @@ public partial class ScanViewModel : ObservableObject, IDisposable
             await _partLookup.AddPartToFloatingAsync(
                 pending.BlPartNo, pending.BlColorId,
                 pending.PartName, pending.ColorName,
-                pending.FloatingQuantity, pending.SelectedFloatingBin.Id,
+                pending.FloatingQuantity, pending.SelectedFloatingBin.Bin.Id,
                 pending.BrickognizeCategory);
 
             // UX X.33 Block N (v0.1.19-beta.7 Refactor): Auto-Mapping
@@ -418,12 +421,12 @@ public partial class ScanViewModel : ObservableObject, IDisposable
             // wenn kein Mapping da ist.
 
             _notifications.ShowSuccess(
-                $"{pending.FloatingQuantity}x '{pending.PartName}' in {pending.SelectedFloatingBin.Label} eingelagert.",
+                $"{pending.FloatingQuantity}x '{pending.PartName}' in {pending.SelectedFloatingBin.Bin.Label} eingelagert.",
                 pending.ImageUrl);
 
             // v0.1.24-beta.1 (Trigger 6): Modal-Daten BEVOR PendingPart auf
             // null gesetzt wird — sonst sind die Felder weg.
-            var binLabel = pending.SelectedFloatingBin.Label;
+            var binLabel = pending.SelectedFloatingBin.Bin.Label;
             var partImage = pending.ImageUrl;
             var partName = pending.PartName;
             var blPartNo = pending.BlPartNo;
@@ -1376,7 +1379,10 @@ public partial class ScanViewModel : ObservableObject, IDisposable
             // ueberhaupt erst auswaehlen. partNo/colorId werden durchgereicht
             // damit Wartend-Bins mit passendem Reverse-Match-Required-Part
             // weiterhin zulaessig sind.
-            var allBins = await _binService.GetEligibleBinsAsync(
+            // v0.1.24-beta.1 Phase 2b: WithCounts-Variante fuer Combobox-Suffix.
+            // FloatingCount ist hier besonders relevant ("(5 Einzelteile)" zeigt
+            // dass das Bin schon Stapel hat).
+            var allBins = await _binService.GetEligibleBinsWithCountsAsync(
                 BinTargetKind.FloatingTarget,
                 partNo: pending.BlPartNo,
                 colorId: pending.BlColorId);
@@ -1408,10 +1414,11 @@ public partial class ScanViewModel : ObservableObject, IDisposable
             System.Windows.Application.Current?.Dispatcher.Invoke(() =>
             {
                 pending.AvailableBins.Clear();
-                foreach (var b in allBins) pending.AvailableBins.Add(b);
+                foreach (var b in allBins)
+                    pending.AvailableBins.Add(new BinDisplayItem(b.Bin, BinDisplayFormatter.FormatBinDisplayText(b)));
 
                 // Reference-Equality-Lookup damit die ComboBox den Eintrag
-                // in ItemsSource findet.
+                // in ItemsSource findet (Id ist Convenience-Property auf BinDisplayItem).
                 var defaultBin = suggested != null
                     ? pending.AvailableBins.FirstOrDefault(b => b.Id == suggested.Id)
                     : null;
@@ -1545,7 +1552,9 @@ public partial class ScanViewModel : ObservableObject, IDisposable
             var targetKind = pending.WillBeComplete
                 ? BinTargetKind.CompleteMinifigTarget
                 : BinTargetKind.WaitingMinifigTarget;
-            var allBins = await _binService.GetEligibleBinsAsync(targetKind);
+            // v0.1.24-beta.1 Phase 2b: WithCounts-Variante fuer Combobox-Suffix
+            // ("Box 005 (2 wartend, 3 fertig)" / "(5 Einzelteile)" / leer).
+            var allBins = await _binService.GetEligibleBinsWithCountsAsync(targetKind);
             // UX X.31 Block B Bug-Fix v2 (v0.1.18): Initial-Suggest abhaengig
             // vom Pending-Status. "Alles vorab abgehakt" + Reverse-Match heisst:
             // Pending kann beim Erscheinen schon Complete sein - dann Complete-
@@ -1567,17 +1576,16 @@ public partial class ScanViewModel : ObservableObject, IDisposable
             System.Windows.Application.Current?.Dispatcher.Invoke(() =>
             {
                 pending.AvailableBins.Clear();
-                foreach (var bin in allBins)
-                    pending.AvailableBins.Add(bin);
+                foreach (var b in allBins)
+                    pending.AvailableBins.Add(new BinDisplayItem(b.Bin, BinDisplayFormatter.FormatBinDisplayText(b)));
 
                 // UX X.33 v0.1.19-beta.7 Block K: bei null vom Service NICHT
                 // mehr stillschweigend auf irgendein Fach fallback - User
                 // soll Warnung sehen und ein neues Fach anlegen oder leeren.
                 if (firstFree != null)
                 {
-                    // WICHTIG: Bin-Objekt aus AvailableBins holen (gleiche Id),
-                    // nicht das separate firstFree-Objekt verwenden, sonst findet
-                    // die ComboBox den Eintrag nicht in ItemsSource (Reference-Equality).
+                    // WICHTIG: Item aus AvailableBins holen (gleiche Id) damit
+                    // die ComboBox den Eintrag findet (Reference-Equality).
                     pending.SelectedBin = pending.AvailableBins.FirstOrDefault(b => b.Id == firstFree.Id);
                     pending.NoFreeBinWarning = null;
                 }
@@ -1639,7 +1647,7 @@ public partial class ScanViewModel : ObservableObject, IDisposable
                 ImageUrl = pending.ImageUrl,
                 LocalImagePath = pending.ImageUrl, // BL-Provider liefert Pfad als URL-Form
                 UserNotes = pending.UserNotes,
-                StorageBinId = pending.SelectedBin.Id,
+                StorageBinId = pending.SelectedBin.Bin.Id,
                 ConsumeFloatingParts = false,
                 RequiredParts = pending.Parts.Select(p => new PersistMinifigPart
                 {
@@ -1665,25 +1673,25 @@ public partial class ScanViewModel : ObservableObject, IDisposable
             // Klicks), nicht aus result.ReverseMatchedFloating (das ist 0
             // weil ConsumeFloatingParts=false).
             var toastImage = pending.ImageUrl;
-            var binLabelForInstruction = pending.SelectedBin?.Label ?? string.Empty;
+            var binLabelForInstruction = pending.SelectedBin?.Bin.Label ?? string.Empty;
             var totalConsumed = pending.ConsumedFromBins.Sum(c => c.Quantity);
             if (result.IsFullyComplete)
             {
                 _notifications.ShowSuccess(
-                    $"Figur '{pending.Name}' komplett in {pending.SelectedBin?.Label ?? "(kein Fach)"}!",
+                    $"Figur '{pending.Name}' komplett in {pending.SelectedBin?.Bin.Label ?? "(kein Fach)"}!",
                     toastImage);
             }
             else if (totalConsumed > 0)
             {
                 _notifications.ShowSuccess(
-                    $"'{pending.Name}' in {pending.SelectedBin?.Label} eingelagert. " +
+                    $"'{pending.Name}' in {pending.SelectedBin?.Bin.Label} eingelagert. " +
                     $"{totalConsumed} Teil(e) wurden aus Lagerfaechern uebernommen.",
                     toastImage);
             }
             else
             {
                 _notifications.ShowSuccess(
-                    $"'{pending.Name}' in {pending.SelectedBin?.Label} eingelagert.",
+                    $"'{pending.Name}' in {pending.SelectedBin?.Bin.Label} eingelagert.",
                     toastImage);
             }
 

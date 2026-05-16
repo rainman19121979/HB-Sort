@@ -905,4 +905,108 @@ public class StorageBinService : IStorageBinService
         }
         return filtered;
     }
+
+    /// <summary>
+    /// v0.1.24-beta.1 Phase 2b (Konzept Befund B2 / OPEN-7): wie
+    /// <see cref="GetEligibleBinsAsync"/>, aber zusaetzlich pro Bin die
+    /// Belegungs-Counts (WaitingCount, CompleteCount, FloatingCount).
+    ///
+    /// Eigenstaendige Query mit Include fuer TrackedMinifigs + FloatingParts
+    /// (anders als <see cref="GetEligibleBinsAsync"/>, das die Includes nur
+    /// fuer FloatingTarget oder Limit-Filter macht). Aggregation passiert
+    /// in-memory ueber die schon geladenen Listen — kein N+1.
+    /// </summary>
+    public async Task<List<StorageBinWithCounts>> GetEligibleBinsWithCountsAsync(
+        BinTargetKind targetKind,
+        string? partNo = null,
+        int? colorId = null,
+        int? excludeMinifigId = null,
+        int? waitingLimit = null,
+        int? completeLimit = null,
+        CancellationToken ct = default)
+    {
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+
+        StorageBinKind[] allowedKinds = targetKind switch
+        {
+            BinTargetKind.WaitingMinifigTarget =>
+                new[] { StorageBinKind.Empty, StorageBinKind.Waiting, StorageBinKind.Complete },
+            BinTargetKind.CompleteMinifigTarget =>
+                new[] { StorageBinKind.Empty, StorageBinKind.Waiting, StorageBinKind.Complete },
+            BinTargetKind.FloatingTarget =>
+                new[] { StorageBinKind.Empty, StorageBinKind.Floating, StorageBinKind.Waiting },
+            _ => throw new ArgumentOutOfRangeException(nameof(targetKind))
+        };
+
+        // Counts brauchen TrackedMinifigs + FloatingParts pro Bin. Floating-
+        // Target braucht zusaetzlich RequiredParts fuer den Reverse-Match-Filter.
+        var query = ctx.StorageBins.AsNoTracking()
+            .Where(b => allowedKinds.Contains(b.Kind))
+            .Include(b => b.TrackedMinifigs)
+            .Include(b => b.FloatingParts)
+            .OrderBy(b => b.Label)
+            .AsQueryable();
+
+        if (targetKind == BinTargetKind.FloatingTarget)
+        {
+            query = query
+                .Include(b => b.TrackedMinifigs)
+                    .ThenInclude(m => m.RequiredParts);
+        }
+
+        var bins = await query.ToListAsync(ct);
+
+        // Reverse-Match-Bypass nur für FloatingTarget mit Waiting-Bins
+        // (identische Logik wie GetEligibleBinsAsync — Empty/Floating
+        // durchlassen, Waiting nur wenn ein wartendes Required-Part zu
+        // (partNo, colorId) passt).
+        var eligible = new List<StorageBin>(bins.Count);
+        if (targetKind == BinTargetKind.FloatingTarget)
+        {
+            foreach (var bin in bins)
+            {
+                if (bin.Kind == StorageBinKind.Empty || bin.Kind == StorageBinKind.Floating)
+                {
+                    eligible.Add(bin);
+                    continue;
+                }
+                if (string.IsNullOrEmpty(partNo) || !colorId.HasValue) continue;
+
+                var matchFound = bin.TrackedMinifigs.Any(m =>
+                    m.Status == TrackedMinifigStatus.Waiting
+                    && (!excludeMinifigId.HasValue || m.Id != excludeMinifigId.Value)
+                    && m.RequiredParts.Any(rp =>
+                        rp.PartNumber == partNo
+                        && rp.ColorId == colorId.Value
+                        && rp.QuantityCollected < rp.QuantityNeeded));
+                if (matchFound) eligible.Add(bin);
+            }
+        }
+        else
+        {
+            eligible.AddRange(bins);
+        }
+
+        // Clamp Limits auf >=1 (identisch zu GetEligibleBinsAsync).
+        var wLimit = waitingLimit.HasValue ? Math.Max(1, waitingLimit.Value) : (int?)null;
+        var cLimit = completeLimit.HasValue ? Math.Max(1, completeLimit.Value) : (int?)null;
+
+        var result = new List<StorageBinWithCounts>(eligible.Count);
+        foreach (var bin in eligible)
+        {
+            var waiting = bin.TrackedMinifigs.Count(m =>
+                m.Status == TrackedMinifigStatus.Waiting
+                && (!excludeMinifigId.HasValue || m.Id != excludeMinifigId.Value));
+            var complete = bin.TrackedMinifigs.Count(m =>
+                m.Status == TrackedMinifigStatus.Complete
+                && (!excludeMinifigId.HasValue || m.Id != excludeMinifigId.Value));
+            var floating = bin.FloatingParts.Count;
+
+            if (wLimit.HasValue && waiting >= wLimit.Value) continue;
+            if (cLimit.HasValue && complete >= cLimit.Value) continue;
+
+            result.Add(new StorageBinWithCounts(bin, waiting, complete, floating));
+        }
+        return result;
+    }
 }

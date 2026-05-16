@@ -4,6 +4,7 @@ using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using HBSort.Core.Models;
 using HBSort.Core.Models.Bricklink;
+using HBSort.Helpers;
 
 namespace HBSort.ViewModels;
 
@@ -127,13 +128,18 @@ public partial class PendingMinifigViewModel : ObservableObject
 
     // ===== Phase 4: Lagerfach-Auswahl + Notizen =====
 
-    /// <summary>Liste der waehlbaren Lagerfaecher fuer die ComboBox.</summary>
-    public ObservableCollection<StorageBin> AvailableBins { get; } = new();
+    /// <summary>
+    /// Liste der waehlbaren Lagerfaecher fuer die ComboBox.
+    /// v0.1.24-beta.1 Phase 2b: <see cref="BinDisplayItem"/> mit Belegungs-
+    /// Suffix ("Box 005 (2 wartend)") — Konsumenten greifen via
+    /// <c>SelectedBin.Bin.Id</c> / <c>SelectedBin.Bin.Label</c> auf das Original.
+    /// </summary>
+    public ObservableCollection<BinDisplayItem> AvailableBins { get; } = new();
 
     /// <summary>Aktuell gewaehltes Lagerfach (Default: erstes freies).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanPersist))]
-    private StorageBin? _selectedBin;
+    private BinDisplayItem? _selectedBin;
 
     /// <summary>
     /// UX X.33 v0.1.19-beta.7 Block K: Warnung wenn alle Lagerfaecher belegt
