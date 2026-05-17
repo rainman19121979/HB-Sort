@@ -25,8 +25,12 @@
 
         <!-- Header -->
         <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <!-- v0.1.24-beta.1 Phase 3 (Aufgabe I): FontSize von 22 auf
+                 DialogHeaderFontSize (20) harmonisiert. Welcome-Headline
+                 bleibt Bold statt SemiBold weil First-Run-Dialog absichtlich
+                 etwas mehr Aufmerksamkeit zieht. -->
             <TextBlock Text="Willkommen bei HB-Sort!"
-                       FontSize="22" FontWeight="Bold"/>
+                       FontSize="{StaticResource DialogHeaderFontSize}" FontWeight="Bold"/>
             <TextBlock Text="Bevor du sortieren kannst, ein paar kurze Einrichtungsschritte:"
                        TextWrapping="Wrap" Margin="0,4,0,0"/>
         </StackPanel>

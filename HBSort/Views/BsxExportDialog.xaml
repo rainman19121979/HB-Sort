@@ -28,7 +28,7 @@
         <!-- Kopf -->
         <StackPanel Grid.Row="0" Margin="0,0,0,8">
             <TextBlock x:Name="HeaderText"
-                       FontSize="18" FontWeight="SemiBold"
+                       FontSize="{StaticResource DialogHeaderFontSize}" FontWeight="SemiBold"
                        Text="BSX-Export"/>
             <TextBlock x:Name="SubText"
                        FontSize="12" Foreground="Gray"
@@ -207,6 +207,7 @@
                     Margin="0,0,8,0" Click="Cancel_Click"/>
             <Button Content="Exportieren" Width="120"
                     Style="{StaticResource AccentButtonStyle}"
+                    IsDefault="True"
                     Click="Export_Click"/>
         </StackPanel>
     </Grid>

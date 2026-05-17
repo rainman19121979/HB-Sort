@@ -264,8 +264,11 @@ public partial class InventoryListView : UserControl
                 return;
             }
 
-            // Bin-Picker (Phase-5-Helper aus SupersetsDialog.xaml.cs - statische
-            // Show-Methode, kein eigener Dialog noetig).
+            // Bin-Picker (statische Show-Methode, kein eigener Dialog noetig).
+            // v0.1.24-beta.1 Phase 3 (Aufgabe G): BinPickerDialog wurde aus
+            // SupersetsDialog.xaml.cs in eine eigene Datei (BinPickerDialog.cs)
+            // extrahiert; SupersetsDialog selbst ist mit dem Wizard-Pfad obsolet
+            // und entfallen.
             var targetBin = BinPickerDialog.Show(
                 Window.GetWindow(this)!,
                 allBins,

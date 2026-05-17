@@ -127,23 +127,36 @@ Items archiviert werden.
   geschrieben werden koennen (entdeckt in v0.1.22-beta.4).
 - 📋 **Tot-Code SwitchCameraAsync entfernen** - `ScanViewModel.cs:1759`,
   Command wird nirgends mehr aufgerufen (entdeckt in v0.1.22-beta.4).
-- 📋 **BinPickerDialog in eigene Datei extrahieren**
-  (`HBSort/Views/BinPickerDialog.cs`) und SupersetsDialog.xaml /
-  .xaml.cs / SupersetsDialogViewModel.cs entfernen. Aktuell ist die
-  Hilfsklasse BinPickerDialog als `internal static class` in
-  `SupersetsDialog.xaml.cs:71` eingebettet — wird von
-  `InventoryListView.xaml.cs:269` (Bulk-Move) genutzt. SupersetsDialog
-  selbst ist nicht mehr per UI erreichbar (Trigger-Button in
-  PartLookupView wurde mit "Spec UX-1 FIX 5" entfernt). Natuerlicher
-  Ort: v0.1.24 Anlegen-Dialog-Redesign.
-- 📋 **SupersetsDialogViewModel.GetAllBinsAsync latenter Filter-Bug**
-  (GetAllAsync statt typ-gefilterter Aufruf). Wird mit dem
-  BinPickerDialog-Refactor oben automatisch erledigt (Datei
-  verschwindet komplett).
+- ✅ **BinPickerDialog in eigene Datei extrahieren** — erledigt in
+  v0.1.24-beta.1 Phase 3 (2026-05-17). `HBSort/Views/BinPickerDialog.cs`
+  enthaelt jetzt den `internal static class`-Helper; wird von
+  `InventoryListView.xaml.cs` (Bulk-Move) weiterhin produktiv genutzt.
+  Datei extrahiert, statt komplett zu loeschen, weil Bulk-Move einen
+  schlanken Picker braucht (kein 2-stufiger Wizard).
+- ✅ **SupersetsDialogViewModel.GetAllBinsAsync latenter Filter-Bug** —
+  erledigt in v0.1.24-beta.1 Phase 3 (2026-05-17) via Komplett-Loeschung
+  von SupersetsDialog.xaml/.xaml.cs/SupersetsDialogViewModel.cs (keine
+  Aufrufer, war seit "Spec UX-1 FIX 5" UI-unreachable).
 - 📋 **GitHub Actions Migration windows-latest → windows-2025-vs2026**
   Migration-Deadline Juni 2026. CI-Workflows in `.github/workflows/*.yml`
   betroffen. Nicht-blockierend, aber rechtzeitig vor Deadline updaten.
   Aufwand: ~30min (yml-Anpassung + Test-Run).
+
+### v0.1.25 — geplant (Performance-Wurzel + Single-Mode-Cleanup + Diagnose-Track)
+
+- 📋 **OPEN-18: Single-Mode-Cleanup** — Audit-Bedarf welche Service-
+  Aufrufe Single-Item vs. Bulk sind, ggf. konsolidieren (aus Phase 2a-
+  Polish Diagnose 2026-05-16). Aufwand: ~2h.
+- 📋 **Performance-Wurzelfixes B + E** — `RaiseDataChanged` aus Service-
+  Layer raus, `RecalcBinKindAsync`-Context-Piggyback. Strukturelle
+  Wurzeln aus Diagnoser-Bericht 2026-05-14 (Quick-Wins D+C waren in
+  v0.1.23-beta.2 erledigt). Aufwand: ~4-5h.
+- 📋 **Kategorie-Sperre-Diagnose-Track** — wartet auf 2-3 dokumentierte
+  Praxis-Vorfaelle (Befund 3 aus v0.1.23-beta.1). Ohne Vorfall-Daten kein
+  Konzept-Entscheid (Engineering-Prinzip 1.2).
+- 📋 **Klick-Optimierung Anlege-Workflow** (Design-Schema D9) — wartet
+  auf User-Praxis-Erfahrung mit v0.1.24-beta.1. Aufwand: ~1-2h, je nach
+  Befunden.
 
 ### Konzept-Items für spätere Iterationen (v0.1.25+)
 
@@ -273,6 +286,62 @@ nach 2-3 dokumentierten Praxis-Vorfaellen.
 ---
 
 ## Erledigt ✅
+
+### v0.1.24-beta.1 (2026-05-17) - UX-Konsistenz-Iteration (Modal-Pattern + Wizard + Cleanup)
+
+Drei-Phasen-Iteration (Phase 1, 1.5, 1.5 Polish, 2a, 2a-Polish, 2b, 2b-Hotfix, 3),
+alle praxis-getestet (grün). Tag folgt separat nach finalem Praxis-Test.
+
+**Phase 1 — Modal-Pattern + Service-Layer** (`40c57b98`):
+- ✅ **feat: Modal-Pattern für post-save Workflows** (Konzept B1) — alle
+  6 Sortier-Trigger (Trigger 1-6) zeigen jetzt ein Modal mit Take/Put-
+  Sektionen. Aktiv weggeklickt, KEIN Auto-Dismiss.
+- ✅ **feat: GetEligibleBinsAsync Limit-Parameter** (Aufgabe D, Befund B1) —
+  `waitingLimit` / `completeLimit` als optionale Parameter.
+- ✅ **feat: ISortInstructionPresenter** + `DispatcherPriority.Render`-
+  Pattern für reaktive Modal-Open-Performance.
+
+**Phase 1.5 / Phase 1.5 Polish** (`a638a80c`, `39d05910`):
+- ✅ Post-Save-Modal-Konsolidierung + Layout-Polish (BinLabel prominent
+  in Akzent, Item-Detail in Mono, Items mit dezentem Background).
+
+**Phase 2a — Wizard 2-stufig** (`40d14ffb`):
+- ✅ **feat: Wizard 2-stufig für neue Figuren** (Aufgaben A+B+C) —
+  `CollectMinifigWizardDialog` ersetzt `CollectMinifigSelectionDialog`.
+  Stufe 1: Required-Parts in 3 Status-Gruppen (Trigger / Im Lager / Fehlt)
+  mit Manuell-Markieren-Option. Stufe 2: Lagerfach + Bewegungs-Hinweis.
+- ✅ **feat: IsManuallyClaimed Persist-Pfad** — Required-Parts die NICHT
+  im Lager sind, aber physisch vorhanden, können als "manuell vorhanden"
+  markiert werden (kein FloatingPart-Konsum).
+
+**Phase 2a-Polish — Reverse-Match-Konsum-Fix** (`4b4e1ce4`):
+- ✅ **fix: Reverse-Match-Auto-Konsum nur via expliziten Klick** (User-
+  Wunsch 2026-05-16) — im MinifigDetailView-Pfad wird der Floating-
+  Konsum jetzt parametrisiert (`consumePartsFromFloating`-Flag).
+
+**Phase 2b — Combobox-Suffix** (`8ac0c493`):
+- ✅ **feat: Combobox-Suffix mit Belegungs-Counts** (Aufgabe K, Befund B2) —
+  alle Lagerfach-Comboboxen zeigen Suffix wie "(2 wartend, 3 fertig)".
+
+**Phase 2b-Hotfix — Window.Resources-Position** (`c6845a5c`):
+- ✅ **hotfix: Window.Resources an Anfang verschoben** — WPF-Parser läuft
+  top-down; StaticResource-Auflösung scheiterte bei Resources am Ende.
+
+**Phase 3 — Cleanup + Audit + Doku** (dieser Commit):
+- ✅ **Tote Dialog-Klassen entfernt** (Aufgabe G) — `SupersetsDialog.xaml(.cs)`
+  + `SupersetsDialogViewModel.cs` gelöscht (0 Produktiv-Aufrufer).
+  `BinPickerDialog` als `internal static class` in eigene Datei
+  `HBSort/Views/BinPickerDialog.cs` extrahiert (Bulk-Move-Pfad braucht ihn
+  weiterhin).
+- ✅ **Dialog-Konvention-Audit** (Aufgabe I) — 14 Dialoge/Overlays/Windows
+  geprüft auf 8 Kriterien (ModernStyle, CenterOwner, Icon, Tooltips,
+  IsCancel, IsDefault, DialogHeaderFontSize, Resources-Position). 6
+  triviale Inkonsistenzen direkt gefixt (5x FontSize harmonisiert auf
+  `DialogHeaderFontSize`=20, 1x `IsDefault` an BSX-Export-Button
+  ergänzt). Keine substantiellen Befunde, kein Window.Resources-Bug
+  außerhalb von Phase 2b-Hotfix-Stelle.
+
+Tests: 589/589 grün (vorher 564 vor Phase 1).
 
 ### v0.1.23 (Stable, 2026-05-14) - Bin-Typ-Spalte mit Strict-Mode + Performance Quick-Wins
 
@@ -561,8 +630,10 @@ Aenderungen am Cache-Schema + Provider-Logik.
 | **v0.1.23-beta.1** | ✅ released (2026-05-14) | Bin-Typ-Spalte (StorageBin.Kind als persistierte Enum), Strict-Mode, Migration, ScanViewModel-Pending-Filter. Tag auf bfd03728. |
 | **v0.1.23-beta.2** | ✅ released (2026-05-14) | Performance-Hotfix: Quick-Wins D+C aus Diagnoser-Bericht (Dispatcher.Invoke→InvokeAsync + CancellationToken in 5 LoadImagesAsync-Pfaden + InventoryListViewModel BeginInvoke-Konsistenz, IDisposable-Pattern). Tag auf ac7e77ee. |
 | **v0.1.23** | ✅ released (Stable, 2026-05-14) | beta.1 + beta.2 konsolidiert. Tag auf ac7e77ee (identisch mit beta.2). Pipeline grün, isPrerelease=false. |
-| **v0.1.24** | 📋 geplant | UX-Konsistenz-Iteration: Anlegen-Dialog-Redesign + BL-Inventar-Integration + Sortier-Anweisung-Overlay-Pattern + 18 UX-Findings aus Mode-A-Bericht. ~22-26h, drei Betas. **Kategorie-Thema explizit ausgeklammert** (siehe v0.1.25). |
-| **v0.1.25** | 💭 Brainstorming | Performance-Wurzel-Fixes (B+E aus Diagnoser-Bericht: RaiseDataChanged aus Service-Layer raus, RecalcBinKindAsync-Context-Piggyback, ~4-5h) + Kategorie-Sperre + Bauteile-Bin-Konzept. Voraussetzung Kategorie-Track: 2-3 protokollierte Praxis-Vorfaelle aus Diagnose-Track (Befund 3). |
+| **v0.1.24-beta.1** | ✅ released (Phase 1+1.5+2a+2a-Polish+2b+2b-Hotfix+3, 2026-05-15..17) | Modal-Pattern + Wizard 2-stufig + IsManuallyClaimed + Combobox-Suffix + tote Dialoge entfernt + Audit. 589 Tests grün. Tag folgt nach finalem Praxis-Test. |
+| **v0.1.24-beta.2** | 📋 geplant | BL-Inventar Beta 2 (Komplettierungs-Integration) + Klick-Optimierung Anlege-Workflow (wartet auf Praxis-Befund). |
+| **v0.1.24-beta.3** | 📋 geplant | BL-Inventar Beta 3 (Mass-Update-Export) + Dark-Mode-Status-Brushes + Polish + Praxis-Audit. |
+| **v0.1.25** | 💭 Brainstorming | Performance-Wurzel-Fixes (B+E aus Diagnoser-Bericht: RaiseDataChanged aus Service-Layer raus, RecalcBinKindAsync-Context-Piggyback, ~4-5h) + OPEN-18 Single-Mode-Cleanup + Kategorie-Sperre + Bauteile-Bin-Konzept. Voraussetzung Kategorie-Track: 2-3 protokollierte Praxis-Vorfaelle aus Diagnose-Track (Befund 3). |
 | **v0.2.0** | 💭 Brainstorming | grosse Features aus Backlog (siehe oben) |
 
 Konvention:
@@ -571,4 +642,4 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-14 nach v0.1.23-Stable-Release (beta.1 + beta.2 + Stable-Promotion + Doku-Cleanup). Naechste Iteration: v0.1.24 Beta 1 (Sortier-Anweisung-Overlay-Pattern + UX-Konsistenz, Konzept implementation-ready in docs/v0.1.24-konzept-ux-konsistenz.md).*
+*Zuletzt aktualisiert: 2026-05-17 nach v0.1.24-beta.1 Phase 3 (Cleanup + Dialog-Audit + Doku). Naechster Schritt: finaler Praxis-Test, dann Tag `v0.1.24-beta.1`. Danach v0.1.24-beta.2 (BL-Inventar Beta 2 + Klick-Optimierung).*
