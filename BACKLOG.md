@@ -144,34 +144,19 @@ Items archiviert werden.
 
 ### v0.1.25 — geplant (Performance-Wurzel + Single-Mode-Cleanup + Diagnose-Track)
 
-- 📋 **StorageBin.Kind-Drift bei Bestandsdaten** — Praxis-Test
-  v0.1.24-beta.1 (2026-05-17): DB-Snapshot zeigt 3 Bins mit Kind-Werten
-  die nicht zum aktuellen Inhalt passen:
-  - **Box19-03** (Id=93): Kind=1 (Waiting) trotz 0 Minifig + 3 Floating
-    → sollte Kind=3 (Floating) sein
-  - **Box19-13** (Id=103): Kind=3 (Floating) trotz 1 Minifig + 0 Floating
-    → sollte Kind=2 (Complete) sein
-  - **Box20-04** (Id=126): Kind=3 (Floating) trotz 1 Minifig + 0 Floating
-    → sollte Kind=2 (Complete) sein
+- ❌ **StorageBin.Kind-Drift bei Bestandsdaten** — KORRIGIERT 2026-05-17.
+  Eintrag wurde basierend auf einem Lesefehler der StorageBinKind-Enum-
+  Werte erstellt. Tatsaechliche Werte: Empty=0, Floating=1, Waiting=2,
+  Complete=3. Die drei Bins (Box19-03, Box19-13, Box20-04) sind
+  **konsistent**, kein Drift vorhanden:
+  - Box19-03 Kind=1 (Floating), 0 Minifig + 3 Floating → korrekt
+  - Box19-13 Kind=3 (Complete), 1 Minifig + 0 Floating → korrekt
+  - Box20-04 Kind=3 (Complete), 1 Minifig + 0 Floating → korrekt
 
-  Vermutung: `RecalculateKindAsync` ist an einer Service-Stelle nicht
-  aufgerufen worden (Drift aus früheren Versionen, vor v0.1.23 als die
-  Kind-Spalte eingeführt wurde). v0.1.24-beta.1 verursacht den Drift
-  NICHT, macht ihn nur sichtbar via Combobox-Counts.
-
-  Sichtbare Auswirkung heute: gering — Empty-Bins erscheinen korrekt,
-  Default-Combobox-Pfade funktionieren. Aber Box19-03 wird in
-  FloatingTarget-Combobox fälschlich als Waiting-Bin filtriert, Box19-13
-  + Box20-04 würden als Floating durchgelassen obwohl sie Minifig enthalten.
-
-  Zwei-Schritt-Fix für v0.1.25:
-  1. **Einmal-Migration** beim App-Start: alle Bins via `RecalculateKindAsync`
-     neu klassifizieren. Idempotent, schnell. Setzt Drift auf Null zurück.
-  2. **Wurzel-Audit**: alle Service-Stellen die TrackedMinifigs/FloatingParts
-     mutieren — ist `RecalculateKindAsync` zuverlässig aufgerufen? Findet
-     den Drift-Quellpunkt damit er nicht wieder auftaucht. Audit-Kandidaten:
-     `MinifigPersistenceService`, `FloatingTransferService`, `EmptyAsync`,
-     `DeleteAsync`, `MoveMinifigAsync`. Aufwand: ~1-2h Audit + ~30min Migration.
+  Eintrag bleibt als Reflexions-Hinweis stehen: Engineering-Prinzip 1.2
+  (Diagnose vor Aktion) gilt auch fuer Backlog-Eintraege. Vor Diagnose
+  eigentlich `StorageBinKind.cs` lesen, nicht aus dem Gedaechtnis
+  rekonstruieren. Siehe Komplexitaets-Audit 2026-05-17.
 
 - 📋 **OPEN-18: Single-Mode-Cleanup** — Audit-Bedarf welche Service-
   Aufrufe Single-Item vs. Bulk sind, ggf. konsolidieren (aus Phase 2a-
