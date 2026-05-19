@@ -13,7 +13,7 @@
   <!-- NuGet-Pakete für die Core-Bibliothek (reine Logik, kein UI) -->
   <ItemGroup>
     <!-- Entity Framework Core mit SQLite für die userdata.db -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.26" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.27" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.26">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
