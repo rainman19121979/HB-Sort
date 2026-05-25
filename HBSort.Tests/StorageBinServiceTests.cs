@@ -557,15 +557,25 @@ public class StorageBinServiceTests : IDisposable
     }
 
     // ===== Bug-Fix v0.1.19-beta.2: excludeMinifigId fuer DismantleWizard =====
+    // v0.1.24-beta.4 Bugfix: Semantik geaendert. Der urspruengliche
+    // v0.1.19-beta.2-Test erwartete dass Complete-Bin der excluded-Figur als
+    // Floating-Ziel akzeptiert wird (Annahme "Bin wird nach Confirm frei").
+    // Das fuehrte zur Discrepancy mit AvailableBins (GetEligibleBinsWithCounts
+    // filtert Complete kategorisch raus). Folge: Suggest lieferte ein Bin
+    // zurueck, das PickPerPartBinAsync in der UI-Combobox nicht findet ->
+    // null -> "Kein Fach frei" obwohl leere Bins frei waren. Jetzt liefert
+    // Suggest in dieser Situation das naechste freie Empty-Bin, konsistent
+    // zu dem was die Combobox anzeigt.
 
     [Fact]
-    public async Task SuggestBinForFloatingPart_excludeMinifigId_treats_excluded_bin_as_free()
+    public async Task SuggestBinForFloatingPart_excludeMinifigId_skips_complete_bin_and_picks_next_empty()
     {
-        // Szenario: Box 01 hat eine Complete-Figur (cty0685). Sie soll gleich
-        // zerlegt werden -> ihr Fach ist eigentlich ein guter Kandidat fuer
-        // die Teile. Mit excludeMinifigId=cty0685.Id soll Box 01 als Stufe-2-
-        // Treffer (wirklich frei) zurueckkommen.
-        await _sut.CreateBulkAsync(new[] { "Box 01" });
+        // Szenario (v0.1.24-beta.4 Bugfix-Repro): Box 01 hat eine Complete-
+        // Figur (cty0685) die zerlegt werden soll. Box 02 ist leer. Mit
+        // excludeMinifigId=cty0685.Id darf der Service NICHT mehr Box 01
+        // vorschlagen (waere ein Complete-Bin, das in AvailableBins nicht
+        // sichtbar ist) - sondern Box 02 als naechstes verfuegbares Empty.
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
         var b1 = await _sut.GetByLabelAsync("Box 01");
         var minifigId = await SeedMinifigInBinAsync(b1!.Id, "cty0685", TrackedMinifigStatus.Complete);
 
@@ -573,7 +583,25 @@ public class StorageBinServiceTests : IDisposable
             "3024", 11, "", excludeMinifigId: minifigId);
 
         Assert.NotNull(suggestion);
-        Assert.Equal("Box 01", suggestion!.Label);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForFloatingPart_excludeMinifigId_returns_null_when_only_complete_bin_available()
+    {
+        // Edge-Case fuer den v0.1.24-beta.4 Fix: einziges Bin ist das Complete-
+        // Bin der excluded-Figur. Service liefert null statt das Complete-Bin
+        // zurueckzugeben (das in AvailableBins ohnehin nicht sichtbar waere).
+        // Aufrufer (DismantleWizard) zeigt dann den "Kein Fach frei"-Hinweis
+        // und der User muss ein neues Bin anlegen oder ein anderes leeren.
+        await _sut.CreateBulkAsync(new[] { "Box 01" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        var minifigId = await SeedMinifigInBinAsync(b1!.Id, "cty0685", TrackedMinifigStatus.Complete);
+
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync(
+            "3024", 11, "", excludeMinifigId: minifigId);
+
+        Assert.Null(suggestion);
     }
 
     [Fact]

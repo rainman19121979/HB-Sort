@@ -214,15 +214,24 @@ public class StorageBinService : IStorageBinService
         // Pending-Persist-Logik konsumiert FloatingParts ueber den Reverse-
         // Match in MinifigPersistenceService.PersistAndStoreAsync.
         // ============================================================
-        // v0.1.23: bin.Kind-Pre-Filter ueber den Index. Wenn excludeMinifigId
-        // gesetzt ist (z.B. zu zerlegende Figur loescht sich gleich), darf
-        // auch Complete- oder Waiting-Bin der Excluded-Figur durchgelassen
-        // werden - die zweite Where-Klausel (TrackedMinifigs.Any) filtert
-        // dann Bins mit anderen verbleibenden Minifigs aus.
-        StorageBinKind[] allowedKinds = hasExclude
-            ? new[] { StorageBinKind.Empty, StorageBinKind.Floating,
-                      StorageBinKind.Waiting, StorageBinKind.Complete }
-            : new[] { StorageBinKind.Empty, StorageBinKind.Floating };
+        // v0.1.24-beta.4 Bugfix: allowedKinds ist jetzt unabhaengig von
+        // excludeMinifigId immer [Empty, Floating, Waiting] - symmetrisch
+        // zu GetEligibleBinsWithCountsAsync(FloatingTarget). Vorher: wenn
+        // excludeMinifigId gesetzt war (Dismantle-Pfad), wurde auch Complete
+        // erlaubt mit der Annahme "Bin der zu zerlegenden Figur wird gleich
+        // frei". Das fuehrte zum Bug: Suggest lieferte ein Complete-Bin
+        // zurueck, das PickPerPartBinAsync in AvailableBins nicht findet
+        // (Combobox filtert Complete kategorisch raus) -> null ->
+        // "Kein Fach frei" obwohl leere Bins frei waeren. Complete-Bin wird
+        // erst NACH dem Confirm via RecalculateKindAsync zum Empty/Floating-
+        // Bin; der Vorschlags-Service darf das nicht antizipieren. Die
+        // zweite Where-Klausel (TrackedMinifigs.Any) filtert weiterhin Bins
+        // mit fremden Minifigs raus - die excluded-Figur in einem Waiting-
+        // Bin (Misch-Pfad) bleibt damit als Kandidat moeglich.
+        StorageBinKind[] allowedKinds = new[]
+        {
+            StorageBinKind.Empty, StorageBinKind.Floating, StorageBinKind.Waiting
+        };
 
         var candidates = await ctx.StorageBins
             .AsNoTracking()
