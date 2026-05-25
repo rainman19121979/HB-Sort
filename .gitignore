@@ -75,6 +75,10 @@ docs/*-konzept-*.md
 # Versionen ab (v0.1.24-ux-analyse.md, v0.1.25-ux-analyse.md, ...).
 docs/v*-ux-analyse.md
 
+# Visual-Design-Schemata (lebende Doku zur UI-Konvention, lokal-only).
+# Pattern deckt design-schema.md + zukuenftige Schema-Drafts ab.
+docs/*-schema.md
+
 # Lokale Planungs-/Engineering-Dokumente (nicht im Repo)
 ENGINEERING_PRINCIPLES.md
 
