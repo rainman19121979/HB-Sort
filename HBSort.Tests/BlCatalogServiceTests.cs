@@ -361,5 +361,9 @@ public class BlCatalogServiceTests : IDisposable
                 ? list
                 : new List<BricklinkKnownColorDto>());
         }
+
+        // v0.1.24-beta.6 Phase 1: Stub - BlCatalogServiceTests rufen das nicht.
+        public Task<List<BricklinkInventoryLotDto>> GetInventoryAsync(CancellationToken ct = default)
+            => Task.FromResult(new List<BricklinkInventoryLotDto>());
     }
 }

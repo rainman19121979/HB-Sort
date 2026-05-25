@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HBSort.Core.Database;
 using HBSort.Core.Models;
+using HBSort.Core.Models.Exceptions;
 using HBSort.Core.Services;
 using HBSort.Services;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +36,9 @@ public partial class SettingsViewModel : ObservableObject
     private readonly ITooltipsService _tooltips;
     private readonly IUpdateService _updateService;
     private readonly IBackupService _backupService;
+    // v0.1.24-beta.6 Phase 1: BL-Store-Inventar-Sync.
+    private readonly IBlInventoryService _blInventory;
+    private readonly INotificationService _notifications;
 
     /// <summary>Tab "Lagerfaecher" - eigenes ViewModel mit Liste + Commands.</summary>
     public BinManagerViewModel BinManager { get; }
@@ -399,6 +403,18 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _backupsSummary = string.Empty;
 
+    // --- v0.1.24-beta.6 Phase 1: BL-Store-Inventar-Sync ---
+
+    /// <summary>True solange ein Sync laeuft. Button wird per CanExecute disabled,
+    /// der Status-Text zeigt "Synchronisiere..." an.</summary>
+    [ObservableProperty]
+    private bool _isSyncingInventory;
+
+    /// <summary>Letzter Sync-Status. Default leer; nach Sync entweder
+    /// Erfolgsmeldung ("N Lots synchronisiert, ...") oder Fehlermeldung.</summary>
+    [ObservableProperty]
+    private string _blInventoryStatusText = string.Empty;
+
     // --- UX X.29 Block F (v0.1.16): Hotkey-Tab ---
 
     /// <summary>
@@ -457,7 +473,9 @@ public partial class SettingsViewModel : ObservableObject
         ITooltipsService tooltips,
         IUpdateService updateService,
         IBackupService backupService,
-        IStorageBinService binService)
+        IStorageBinService binService,
+        IBlInventoryService blInventory,
+        INotificationService notifications)
     {
         _settingsService = settingsService;
         _cameraService = cameraService;
@@ -474,6 +492,8 @@ public partial class SettingsViewModel : ObservableObject
         _updateService = updateService;
         _backupService = backupService;
         _binService = binService;
+        _blInventory = blInventory;
+        _notifications = notifications;
         BinManager = binManager;
 
         // v0.1.22-beta.1 Block B: ctor-Profiling. Block C entscheidet ob die
@@ -1043,6 +1063,53 @@ public partial class SettingsViewModel : ObservableObject
             BricklinkTestResultText = $"Fehler: {ex.Message}";
         }
     }
+
+    /// <summary>
+    /// v0.1.24-beta.6 Phase 1: holt das komplette BL-Store-Inventar (1 API-Call)
+    /// und speichert es als Snapshot in userdata.db (alte Lots werden vorher
+    /// geloescht). Erfolg/Fehler via Toast - der Tab-Status-Text bleibt nach
+    /// Sync stehen damit der User die Zahl sieht ohne den Tab zu wechseln.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanSyncInventory))]
+    public async Task SyncInventoryAsync()
+    {
+        IsSyncingInventory = true;
+        SyncInventoryCommand.NotifyCanExecuteChanged();
+        BlInventoryStatusText = "Synchronisiere...";
+        try
+        {
+            var count = await _blInventory.SyncInventoryAsync();
+            var msg = $"{count} Lots aus dem BrickLink-Store synchronisiert.";
+            BlInventoryStatusText = $"{msg} (UTC {DateTime.UtcNow:HH:mm:ss})";
+            _notifications.ShowSuccess(msg);
+        }
+        catch (BricklinkAuthException auth)
+        {
+            Log.Warning(auth, "BL-Inventar-Sync: Auth fehlt/falsch");
+            BlInventoryStatusText = $"Auth-Fehler: {auth.Message}";
+            _notifications.ShowError(
+                "BrickLink-Tokens fehlen oder sind ungueltig. Bitte oben pruefen.");
+        }
+        catch (BricklinkRateLimitException rl)
+        {
+            Log.Warning(rl, "BL-Inventar-Sync: Rate-Limit");
+            BlInventoryStatusText = $"Rate-Limit: {rl.Message}";
+            _notifications.ShowError(rl.Message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "BL-Inventar-Sync fehlgeschlagen");
+            BlInventoryStatusText = $"Fehler: {ex.Message}";
+            _notifications.ShowError($"Inventar-Sync fehlgeschlagen: {ex.Message}");
+        }
+        finally
+        {
+            IsSyncingInventory = false;
+            SyncInventoryCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    private bool CanSyncInventory() => !IsSyncingInventory;
 
     /// <summary>
     /// Laedt die Cache-Stats aus dem BlCatalogService und formatiert sie fuer die UI.

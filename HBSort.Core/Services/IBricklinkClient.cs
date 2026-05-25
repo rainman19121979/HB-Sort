@@ -50,6 +50,16 @@ public interface IBricklinkClient
     /// </summary>
     Task<List<BricklinkKnownColorDto>> GetKnownColorsAsync(
         string itemType, string itemNo, CancellationToken ct = default);
+
+    // --- v0.1.24-beta.6 Phase 1: BL-Store-Inventar ---
+
+    /// <summary>
+    /// Holt alle Verkaufs-Lots aus dem BL-Store des Users (BricklinkSharp:
+    /// GetInventoryListAsync). Ein Lot = eine Artikel-Position im Store
+    /// (z.B. "100x Plate 1x1 / Red / Used / 0.03 EUR"). Liefert DTOs - das
+    /// Mapping nach BlInventoryLot-Entity passiert in BlInventoryService.
+    /// </summary>
+    Task<List<BricklinkInventoryLotDto>> GetInventoryAsync(CancellationToken ct = default);
 }
 
 /// <summary>Resultat eines TestConnection-Aufrufs.</summary>
@@ -127,4 +137,39 @@ public class BricklinkKnownColorDto
     public int ColorId { get; set; }
     /// <summary>Anzahl Eintraege im BL-Catalog (informativ).</summary>
     public int Quantity { get; set; }
+}
+
+/// <summary>
+/// v0.1.24-beta.6 Phase 1: DTO fuer einen Verkaufs-Lot aus dem BL-Store-
+/// Inventar. Spiegelt die Felder aus BricklinkSharp.Inventory die wir
+/// brauchen - die Service-Schicht mappt das auf <see cref="HBSort.Core.Models.BlInventoryLot"/>.
+/// </summary>
+public class BricklinkInventoryLotDto
+{
+    /// <summary>BL-seitige inventory_id (stabil pro Lot).</summary>
+    public int LotId { get; set; }
+
+    /// <summary>"P", "M", "S" etc. (Kurzform analog zu BricklinkSubsetDto.ItemType).</summary>
+    public string ItemType { get; set; } = string.Empty;
+
+    /// <summary>BL-Artikelnummer.</summary>
+    public string ItemNo { get; set; } = string.Empty;
+
+    /// <summary>BL-Color-ID. Null wenn das Item farblos ist.</summary>
+    public int? ColorId { get; set; }
+
+    /// <summary>Color-Name gecacht (z.B. "Red"). Null wenn ColorId=null.</summary>
+    public string? ColorName { get; set; }
+
+    /// <summary>Optionale User-Description aus dem Listing.</summary>
+    public string? Description { get; set; }
+
+    /// <summary>Stueckzahl im Lot.</summary>
+    public int Quantity { get; set; }
+
+    /// <summary>Stueckpreis in Store-Waehrung.</summary>
+    public decimal UnitPrice { get; set; }
+
+    /// <summary>"N" = New, "U" = Used.</summary>
+    public string Condition { get; set; } = "U";
 }

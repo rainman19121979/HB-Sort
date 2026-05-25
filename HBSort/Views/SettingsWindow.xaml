@@ -707,7 +707,37 @@
 
                         <Separator Margin="0,16,0,16"/>
 
-                        <!-- ===== SEKTION 4: Catalog-Daten ===== -->
+                        <!-- ===== SEKTION 4: BL-Store-Inventar (v0.1.24-beta.6 Phase 1) ===== -->
+                        <TextBlock Text="BL-Store-Inventar"
+                                   FontSize="15" FontWeight="SemiBold"
+                                   Margin="0,0,0,4"/>
+
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12" Margin="0,0,0,8">
+                            Spiegelt deinen kompletten BL-Verkaufs-Bestand (alle Lots) lokal in
+                            userdata.db. Phase 1 = manueller Sync ueber den Button. Pro Klick
+                            ein API-Call. Lokale Reservierungen (ReservedQuantity) bleiben
+                            ueber Re-Syncs hinweg erhalten.
+                        </TextBlock>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                            <Button Content="Inventar synchronisieren"
+                                    Command="{Binding SyncInventoryCommand}"
+                                    Width="200" Margin="0,0,8,0"
+                                    ToolTip="Holt alle Verkaufs-Lots aus dem BL-Store und speichert sie lokal. Snapshot-Replace mit Erhalt der ReservedQuantity."/>
+                            <TextBlock Text="laeuft..."
+                                       VerticalAlignment="Center"
+                                       Foreground="Gray" FontStyle="Italic"
+                                       Visibility="{Binding IsSyncingInventory, Converter={StaticResource BoolToVisibility}}"/>
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding BlInventoryStatusText}"
+                                   Margin="0,8,0,0" FontStyle="Italic"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+
+                        <Separator Margin="0,16,0,16"/>
+
+                        <!-- ===== SEKTION 5: Catalog-Daten ===== -->
                         <TextBlock Text="Catalog-Daten"
                                    FontSize="15" FontWeight="SemiBold"
                                    Margin="0,0,0,4"/>

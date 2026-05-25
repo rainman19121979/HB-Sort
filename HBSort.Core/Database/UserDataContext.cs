@@ -21,6 +21,8 @@ public class UserDataContext : DbContext
     public DbSet<FloatingPart> FloatingParts => Set<FloatingPart>();
     public DbSet<ScanEvent> ScanEvents => Set<ScanEvent>();
     public DbSet<DailyStats> DailyStats => Set<DailyStats>();
+    // v0.1.24-beta.6 Phase 1: gespiegelter BL-Store-Inventar (Snapshot).
+    public DbSet<BlInventoryLot> BlInventoryLots => Set<BlInventoryLot>();
 
     public UserDataContext(DbContextOptions<UserDataContext> options) : base(options)
     {
@@ -115,6 +117,23 @@ public class UserDataContext : DbContext
         modelBuilder.Entity<DailyStats>(entity =>
         {
             entity.HasKey(e => e.Date);
+        });
+
+        // --- BlInventoryLot (v0.1.24-beta.6 Phase 1) ---
+        // Primary Key = LotId (BL-seitige inventory_id), kein Auto-Increment.
+        // Damit kann Snapshot-Replace per RemoveRange/AddRange ohne Id-Mapping
+        // arbeiten. ItemType+ItemNo+ColorId-Composite-Index unterstuetzt den
+        // spaeteren Phase-2-Matching-Pfad (FloatingPart -> Inventory-Lookup).
+        modelBuilder.Entity<BlInventoryLot>(entity =>
+        {
+            entity.HasKey(e => e.LotId);
+            entity.Property(e => e.LotId).ValueGeneratedNever();
+            entity.Property(e => e.ItemType).HasMaxLength(8).IsRequired();
+            entity.Property(e => e.ItemNo).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.ColorName).HasMaxLength(64);
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.Condition).HasMaxLength(2).IsRequired();
+            entity.HasIndex(e => new { e.ItemType, e.ItemNo, e.ColorId });
         });
     }
 }

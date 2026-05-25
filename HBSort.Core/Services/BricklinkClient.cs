@@ -350,6 +350,107 @@ public class BricklinkClient : IBricklinkClient
     }
 
     // ========================================================================
+    // v0.1.24-beta.6 Phase 1: BL-Store-Inventar
+    // ========================================================================
+
+    public async Task<List<BricklinkInventoryLotDto>> GetInventoryAsync(CancellationToken ct = default)
+    {
+        // Rate-Limit-Gate: GetInventoryList ist ein echter BL-Call. Analog
+        // zu TestConnectionAsync zaehlen wir den Aufruf mit (auch fehlgeschlagene
+        // Calls, BL zaehlt sie ebenfalls).
+        if (_rateLimiter != null && !await _rateLimiter.CanMakeCallAsync(ct))
+        {
+            throw new BricklinkRateLimitException(
+                "Eigener Hard-Limit erreicht - Inventar-Sync wird blockiert. " +
+                "Bitte spaeter erneut versuchen oder Hard-Threshold in den Einstellungen anpassen.");
+        }
+
+        var sw = Stopwatch.StartNew();
+        var client = await CreateClientAsync();
+        int statusCode = 200;
+        bool success = false;
+        try
+        {
+            // BricklinkSharp.IBricklinkClient.GetInventoryListAsync() liefert
+            // alle Lots des Stores als Inventory[]. Phase 1 nutzt KEINE Filter -
+            // wir holen den kompletten Bestand und speichern ihn lokal.
+            var lots = await client.GetInventoryListAsync();
+            sw.Stop();
+            success = true;
+            Log.Information("BL GetInventoryList -> {Count} Lots ({Ms} ms)",
+                lots?.Length ?? 0, sw.ElapsedMilliseconds);
+
+            var result = new List<BricklinkInventoryLotDto>();
+            if (lots == null) return result;
+            foreach (var lot in lots)
+            {
+                if (lot.Item == null) continue;
+                var typeStr = ItemTypeToShortString(lot.Item.Type);
+                // BL liefert ColorId=0 fuer farblose Items (Minifig/Set/Box) -
+                // wir normalisieren das auf null fuer die EF-Spalte.
+                int? colorId = lot.ColorId > 0 ? lot.ColorId : (int?)null;
+                result.Add(new BricklinkInventoryLotDto
+                {
+                    LotId = lot.InventoryId,
+                    ItemType = typeStr,
+                    ItemNo = lot.Item.Number ?? string.Empty,
+                    ColorId = colorId,
+                    ColorName = colorId.HasValue
+                        ? WebUtility.HtmlDecode(lot.ColorName ?? string.Empty)
+                        : null,
+                    // Description ist die User-Beschreibung des Lots im Store.
+                    // HTML-Decode an der API-Boundary (siehe GetItemAsync).
+                    Description = string.IsNullOrEmpty(lot.Description)
+                        ? null
+                        : WebUtility.HtmlDecode(lot.Description),
+                    Quantity = lot.Quantity,
+                    UnitPrice = lot.UnitPrice,
+                    Condition = ConditionToShortString(lot.Condition)
+                });
+            }
+            return result;
+        }
+        catch (Exception ex) when (!(ex is BricklinkAuthException))
+        {
+            sw.Stop();
+            var msg = ex.Message ?? string.Empty;
+            statusCode = msg.Contains("401") ? 401
+                       : msg.Contains("403") ? 403
+                       : msg.Contains("429") ? 429
+                       : 500;
+            throw TranslateBricklinkException(ex);
+        }
+        finally
+        {
+            client?.Dispose();
+            if (_rateLimiter != null)
+            {
+                try
+                {
+                    await _rateLimiter.LogCallAsync("GetInventoryList", "-", "-",
+                        (int)sw.ElapsedMilliseconds, statusCode, success, ct);
+                }
+                catch (Exception logEx)
+                {
+                    Log.Warning(logEx, "BL GetInventoryList LogCall geworfen");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Mappt BricklinkSharp.Condition (Enum: New/Used) auf das BL-Standard-
+    /// Kuerzel "N"/"U". Default "U" fuer Unbekannt - in der Praxis liefert die
+    /// API immer einen der zwei Werte.
+    /// </summary>
+    private static string ConditionToShortString(Condition c) => c switch
+    {
+        Condition.New  => "N",
+        Condition.Used => "U",
+        _              => "U"
+    };
+
+    // ========================================================================
     // Helpers
     // ========================================================================
 

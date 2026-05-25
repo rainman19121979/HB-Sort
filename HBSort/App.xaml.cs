@@ -324,6 +324,9 @@ public partial class App : Application
         services.AddSingleton<IBricklinkTokenStorage, BricklinkTokenStorage>();
         services.AddSingleton<IBricklinkClient, BricklinkClient>();
 
+        // v0.1.24-beta.6 Phase 1: BL-Store-Inventar-Spiegel (userdata.db).
+        services.AddSingleton<IBlInventoryService, BlInventoryService>();
+
         // Phase R2: BL-Cache-Repository + BlCatalogService (Cache-First-Lookup).
         services.AddSingleton<IBlCacheRepository, BlCacheRepository>();
         // Phase 5.5: BrickStore-Bulk-Import (GitHub-Download + lokaler Folder).
