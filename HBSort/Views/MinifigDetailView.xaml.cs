@@ -155,11 +155,14 @@ public partial class MinifigDetailView : UserControl
             scan.PendingMinifig = null;
             scan.MinifigStatusText = string.Empty;
 
-            // Sammel-Popup mit den Bin-Anweisungen aus dem Wizard.
-            if (wizardVm.LastBinInstructionItems.Count > 0)
-            {
-                scan.ShowBinInstructionGroup(wizardVm.LastBinInstructionItems);
-            }
+            // v0.1.24-beta.3 (V10): kein eigener ShowBinInstructionGroup-
+            // Aufruf mehr. DismantleWizardDialog.Confirm_Click feuert seit
+            // v0.1.24-beta.1 Phase 1.5 selbst ISortInstructionPresenter.Show
+            // mit der SortInstruction aus BuildSortInstructionFromState. Der
+            // alte Legacy-Aufruf hier hat das bereits gezeigte SortInstruction-
+            // Modal mit Group-Mode ueberschrieben (Race via Dispatcher-Render-
+            // Priority - das SortInstruction-Modal kam asynchron, der Group-
+            // Aufruf hier synchron).
         }
     }
 }
