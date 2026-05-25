@@ -1720,45 +1720,19 @@ public partial class ScanViewModel : ObservableObject, IDisposable
                         : "Operation erfolgreich"
                 };
 
-                // v0.1.24-beta.1 Phase 2a-Polish: Take-Sektionen aus der
+                // v0.1.24-beta.2 (V5): Take/Put-Aufbau via
+                // SortInstructionBuilder. Take-Quelle ist die
                 // ConsumedFromBins-Tracking-Liste (gefuellt von expliziten
-                // "Aus Fach"-Klicks via TransferFloatingPartToPendingAsync).
-                // Das ersetzt die alte Quelle result.ConsumedFloatingParts:
-                // erstens kommen jetzt Bilder mit (Befund B aus Praxis-Test
-                // 2026-05-16), zweitens wird nicht mehr automatisch
-                // konsumiert (Befund A).
-                foreach (var byBin in pending.ConsumedFromBins
-                    .GroupBy(c => c.SourceBinLabel))
-                {
-                    var section = new SortSection { BinLabel = byBin.Key };
-                    foreach (var c in byBin)
-                    {
-                        section.Items.Add(new SortItemLine
-                        {
-                            Label = c.PartName,
-                            Detail = $"{c.PartNo} - {c.ColorName}",
-                            QuantityText = $"{c.Quantity}x",
-                            ImageUrl = c.ImageUrl
-                        });
-                    }
-                    instruction.Take.Add(section);
-                }
-
-                // Put-Sektion: die Figur kommt ins Ziel-Bin.
-                instruction.Put.Add(new SortSection
-                {
-                    BinLabel = binLabelForInstruction,
-                    Items = new List<SortItemLine>
-                    {
-                        new()
-                        {
-                            Label = $"Figur '{pending.Name}'",
-                            Detail = pending.BricklinkId ?? string.Empty,
-                            QuantityText = "1x",
-                            ImageUrl = toastImage
-                        }
-                    }
-                });
+                // "Aus Fach"-Klicks via TransferFloatingPartToPendingAsync —
+                // ersetzt die alte Service-Quelle result.ConsumedFloatingParts
+                // seit Phase 2a-Polish, weil dort Bilder fehlten).
+                SortInstructionBuilder.AddTakeSections(instruction, pending.ConsumedFromBins);
+                SortInstructionBuilder.AddMinifigPut(
+                    instruction,
+                    binLabelForInstruction,
+                    pending.Name,
+                    pending.BricklinkId,
+                    toastImage);
 
                 ShowSortInstruction(instruction);
             }

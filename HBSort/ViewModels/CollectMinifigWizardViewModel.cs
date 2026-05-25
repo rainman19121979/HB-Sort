@@ -374,38 +374,14 @@ public partial class CollectMinifigWizardViewModel : ObservableObject
                 : "Operation erfolgreich"
         };
 
-        // Take-Sektionen: pro Quell-Bin gruppiert.
-        foreach (var byBin in consumed.GroupBy(c => c.SourceBinLabel))
-        {
-            var section = new SortSection { BinLabel = byBin.Key };
-            foreach (var c in byBin)
-            {
-                section.Items.Add(new SortItemLine
-                {
-                    Label = c.PartName,
-                    Detail = $"{c.BlPartNo} - {c.ColorName}",
-                    QuantityText = $"{c.Quantity}x",
-                    ImageUrl = c.ImageUrl
-                });
-            }
-            instruction.Take.Add(section);
-        }
-
-        // Put-Sektion: die Figur kommt ins Ziel-Bin.
-        instruction.Put.Add(new SortSection
-        {
-            BinLabel = targetBinLabel,
-            Items = new List<SortItemLine>
-            {
-                new()
-                {
-                    Label = $"Figur '{MinifigName}'",
-                    Detail = BricklinkId ?? string.Empty,
-                    QuantityText = "1x",
-                    ImageUrl = ImageUrl
-                }
-            }
-        });
+        // v0.1.24-beta.2 (V5): Take + Put via gemeinsamem Builder.
+        SortInstructionBuilder.AddTakeSections(instruction, consumed);
+        SortInstructionBuilder.AddMinifigPut(
+            instruction,
+            targetBinLabel,
+            MinifigName,
+            BricklinkId,
+            ImageUrl);
 
         // PlusHint bei manuell-markierten Teilen - User hat zwar selbst
         // gesagt "ich habe die Teile", aber Audit-Hinweis im Modal.
