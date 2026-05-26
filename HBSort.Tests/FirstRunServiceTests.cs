@@ -111,6 +111,7 @@ public class FirstRunServiceTests : IDisposable
         public Task<bool> IsItemStaleAsync(string itemType, string itemNo, int staleDays, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Dictionary<string, int>> GetCategoryIdsForPartsAsync(IEnumerable<string> partNumbers, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Dictionary<string, string>> GetItemNamesAsync(IEnumerable<string> partNumbers, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<Dictionary<(string ItemType, string ItemNo), BlItemSummary>> GetItemSummariesAsync(IEnumerable<(string ItemType, string ItemNo)> keys, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<List<BlSubset>> GetSubsetsAsync(string parentType, string parentNo, CancellationToken ct = default) => throw new NotImplementedException();
         public Task ReplaceSubsetsAsync(string parentType, string parentNo, IEnumerable<BlSubset> subsets, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<int> BulkInsertSubsetsAsync(IEnumerable<BlSubset> subsets, CancellationToken ct = default) => throw new NotImplementedException();

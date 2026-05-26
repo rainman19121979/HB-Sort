@@ -438,6 +438,11 @@ public partial class App : Application
         // UX X.29 (v0.1.16): Verlauf-Tab.
         services.AddSingleton<ViewModels.HistoryViewModel>();
 
+        // v0.1.24-beta.7 Phase 2: BrickLink-Inventar-Tab. Singleton damit der
+        // Lade-Zustand und das InventoryChanged-Subscription beim Tab-Wechsel
+        // erhalten bleiben.
+        services.AddSingleton<ViewModels.BlInventoryViewModel>();
+
         // UX-Iteration X.23: Velopack-Auto-Update via GitHub Releases.
         // Singleton weil der UpdateManager den letzten Check-Stand cached
         // (pendingUpdate). Aufgerufen vom MainViewModel beim App-Start

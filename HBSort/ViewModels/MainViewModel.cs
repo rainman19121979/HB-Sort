@@ -51,6 +51,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>UX X.29 (v0.1.16): Verlauf-Tab.</summary>
     public HistoryViewModel History { get; }
 
+    /// <summary>v0.1.24-beta.7 Phase 2: BrickLink-Inventar-Tab.</summary>
+    public BlInventoryViewModel BlInventory { get; }
+
     /// <summary>
     /// Hilfe-Tab (UX-Iteration X.9): integrierte Doku als dritter
     /// Haupt-Tab. Wird vom DI als Singleton bereitgestellt damit die
@@ -85,12 +88,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(IsMainTabInventory))]
     [NotifyPropertyChangedFor(nameof(IsMainTabHelp))]
     [NotifyPropertyChangedFor(nameof(IsMainTabHistory))]
+    [NotifyPropertyChangedFor(nameof(IsMainTabBlInventory))]
     private int _mainTabIndex = 0;
 
-    public bool IsMainTabSorting   => MainTabIndex == 0;
-    public bool IsMainTabInventory => MainTabIndex == 1;
-    public bool IsMainTabHelp      => MainTabIndex == 2;
-    public bool IsMainTabHistory   => MainTabIndex == 3;
+    public bool IsMainTabSorting     => MainTabIndex == 0;
+    public bool IsMainTabInventory   => MainTabIndex == 1;
+    public bool IsMainTabHelp        => MainTabIndex == 2;
+    public bool IsMainTabHistory     => MainTabIndex == 3;
+    // v0.1.24-beta.7 Phase 2: BrickLink-Inventar-Tab (Index 4, hinter Verlauf).
+    public bool IsMainTabBlInventory => MainTabIndex == 4;
 
     /// <summary>Toast-Liste fuer das XAML-Binding (ItemsControl).</summary>
     public ObservableCollection<ToastItem> ActiveToasts => _notificationService.ActiveToasts;
@@ -153,7 +159,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         IUpdateService updateService,
         IBlBulkImportService blBulkImport,
         IUndoService undoService,
-        IBackupService backupService)
+        IBackupService backupService,
+        BlInventoryViewModel blInventory)
     {
         _settingsService = settingsService;
         ScanViewModel = scanViewModel;
@@ -164,6 +171,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         RecentScans = recentScans;
         Help = help;
         History = history;
+        BlInventory = blInventory;
         _undoService = undoService;
         _backupService = backupService;
         _brickognizeClient = brickognizeClient;

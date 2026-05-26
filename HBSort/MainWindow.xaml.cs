@@ -331,6 +331,10 @@ public partial class MainWindow : Window
     private void MainTabHistory_Click(object sender, RoutedEventArgs e)
         => _viewModel.SwitchToHistoryTabCommand.Execute(null);
 
+    /// <summary>v0.1.24-beta.7 Phase 2: Header-Tab "BrickLink Inventar" geklickt -> MainTabIndex=4.</summary>
+    private void MainTabBlInventory_Click(object sender, RoutedEventArgs e)
+        => _viewModel.MainTabIndex = 4;
+
     private void OpenSettings_Click(object sender, RoutedEventArgs e)
         => OpenSettingsForTab(Views.SettingsTab.Default);
 

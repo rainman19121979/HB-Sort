@@ -28,4 +28,12 @@ public interface IBlInventoryService
     /// fuer stabile Reihenfolge.
     /// </summary>
     Task<List<BlInventoryLot>> GetInventoryAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// v0.1.24-beta.7 Phase 2: feuert nach jedem erfolgreichen
+    /// <see cref="SyncInventoryAsync"/>. Damit kann der Inventar-Tab seine
+    /// Liste auto-refreshen wenn der Sync aus dem Settings-Tab heraus
+    /// ausgeloest wurde - eine Sync-Code-Quelle, mehrere UI-Konsumenten.
+    /// </summary>
+    event EventHandler? InventoryChanged;
 }

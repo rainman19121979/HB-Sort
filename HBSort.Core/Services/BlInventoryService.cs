@@ -56,6 +56,9 @@ public class BlInventoryService : IBlInventoryService
         _bricklinkClient = bricklinkClient;
     }
 
+    /// <inheritdoc />
+    public event EventHandler? InventoryChanged;
+
     public async Task<int> SyncInventoryAsync(CancellationToken ct = default)
     {
         // 1) Frischen Snapshot von der BL-API ziehen. Auth/RateLimit-Errors
@@ -112,6 +115,10 @@ public class BlInventoryService : IBlInventoryService
             deletedCount, lots.Count, restoredReservations,
             reservedByLot.Count - restoredReservations,
             syncedAt);
+
+        // v0.1.24-beta.7 Phase 2: alle Konsumenten informieren (Inventar-Tab
+        // refreshed seine Liste, auch wenn der Sync aus dem Settings-Tab kam).
+        InventoryChanged?.Invoke(this, EventArgs.Empty);
         return lots.Count;
     }
 

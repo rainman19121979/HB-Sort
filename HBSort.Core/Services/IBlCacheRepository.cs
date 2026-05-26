@@ -3,6 +3,14 @@ using HBSort.Core.Models.Bricklink;
 namespace HBSort.Core.Services;
 
 /// <summary>
+/// v0.1.24-beta.7 Phase 2: schmaler Projection-DTO fuer Bulk-Lookups -
+/// nur die zwei Felder die der BL-Inventar-Tab fuer Anzeige + Thumbnail
+/// braucht. Vermeidet das Laden des kompletten <see cref="BlItem"/>
+/// (inkl. JsonFull) fuer ~10k Eintraege.
+/// </summary>
+public sealed record BlItemSummary(string Name, string? ImageUrl);
+
+/// <summary>
 /// Direkt-Zugriff auf bl_cache.db. Microsoft.Data.Sqlite, kein EF.
 /// Keine Cache-Logik (wann refresh, wann fallback) - die liegt im BlCatalogService.
 /// </summary>
@@ -49,6 +57,17 @@ public interface IBlCacheRepository
     /// </summary>
     Task<Dictionary<string, int>> GetCategoryIdsForPartsAsync(
         IEnumerable<string> partNumbers,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// v0.1.24-beta.7 Phase 2: liefert Name + ImageUrl pro (ItemType, ItemNo).
+    /// Anders als <see cref="GetItemNamesAsync"/> ist diese Methode multi-typ-
+    /// faehig (P / M / S / ...). Intern gruppiert nach <c>item_type</c> mit
+    /// 500er-Chunks (SQLite-Parameter-Limit). Leere Eingabe -&gt; leeres Dict,
+    /// kein DB-Hit. Eintraege ohne bl_items-Match tauchen NICHT im Result auf.
+    /// </summary>
+    Task<Dictionary<(string ItemType, string ItemNo), BlItemSummary>> GetItemSummariesAsync(
+        IEnumerable<(string ItemType, string ItemNo)> keys,
         CancellationToken ct = default);
 
     // --- Subsets ---

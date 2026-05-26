@@ -374,6 +374,73 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
     /// Chunking auf 500 Items pro IN-Klausel - SQLite-Default-Limit ist
     /// 999 Parameter, wir bleiben mit Sicherheits-Puffer drunter.
     /// </summary>
+    /// <summary>
+    /// v0.1.24-beta.7 Phase 2: Bulk-Lookup von Name + ImageUrl pro
+    /// (ItemType, ItemNo). Gruppiert intern nach <c>item_type</c> und macht
+    /// eine IN-Query je Typ mit 500er-Chunks. Bestand der BL-Inventar-Tab
+    /// hat typisch 9k Parts + 300 Minifigs + 30 Sets - 3 Queries, schnell.
+    /// </summary>
+    public Task<Dictionary<(string ItemType, string ItemNo), BlItemSummary>> GetItemSummariesAsync(
+        IEnumerable<(string ItemType, string ItemNo)> keys,
+        CancellationToken ct = default)
+    {
+        var result = new Dictionary<(string, string), BlItemSummary>();
+        if (keys == null) return Task.FromResult(result);
+
+        // Gruppieren + Duplikate raus. Distinct pro (Type, No) damit IN-Query
+        // keine doppelten Parameter hat.
+        var byType = keys
+            .Where(k => !string.IsNullOrWhiteSpace(k.ItemType) && !string.IsNullOrWhiteSpace(k.ItemNo))
+            .GroupBy(k => k.ItemType)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(k => k.ItemNo).Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+
+        if (byType.Count == 0) return Task.FromResult(result);
+
+        const int chunkSize = 500;
+        lock (_lock)
+        {
+            foreach (var kv in byType)
+            {
+                var itemType = kv.Key;
+                var nos = kv.Value;
+
+                for (int offset = 0; offset < nos.Count; offset += chunkSize)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var chunk = nos.Skip(offset).Take(chunkSize).ToList();
+
+                    using var cmd = _connection.CreateCommand();
+                    cmd.Parameters.AddWithValue("$type", itemType);
+                    var paramNames = new string[chunk.Count];
+                    for (int i = 0; i < chunk.Count; i++)
+                    {
+                        var name = $"$p{i}";
+                        paramNames[i] = name;
+                        cmd.Parameters.AddWithValue(name, chunk[i]);
+                    }
+                    cmd.CommandText =
+                        "SELECT item_no, name, image_url FROM bl_items " +
+                        "WHERE item_type = $type " +
+                        "  AND item_no IN (" + string.Join(",", paramNames) + ");";
+
+                    using var reader = cmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        var no = reader.GetString(0);
+                        var name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
+                        var imageUrl = reader.IsDBNull(2) ? null : reader.GetString(2);
+                        // HTML-Decode konsistent zu ReadItem/GetItemNamesAsync.
+                        var decoded = System.Net.WebUtility.HtmlDecode(name);
+                        result[(itemType, no)] = new BlItemSummary(decoded, imageUrl);
+                    }
+                }
+            }
+        }
+        return Task.FromResult(result);
+    }
+
     public Task<Dictionary<string, string>> GetItemNamesAsync(
         IEnumerable<string> partNumbers,
         CancellationToken ct = default)
