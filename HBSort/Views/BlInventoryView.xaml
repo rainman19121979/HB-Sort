@@ -177,6 +177,10 @@
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
                         <DataGridTextColumn Header="Zustand" Binding="{Binding ConditionLabel}" Width="86"/>
+                        <!-- v0.1.24-beta.8 Phase 3 (Fix 2): Shop-Position (Remarks).
+                             Zellen ohne Remarks bleiben leer. -->
+                        <DataGridTextColumn Header="Shop-Position" Binding="{Binding Remarks}" Width="140"
+                                            ToolTipService.ToolTip="BL-Remarks - typisch die physische Position im Shop (z.B. Box A.2)."/>
                     </DataGrid.Columns>
                 </DataGrid>
             </Border>
@@ -295,6 +299,17 @@
                             <TextBlock Grid.Row="8" Text="Zustand:" Foreground="Gray" Margin="0,4,0,0"/>
                             <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding ConditionLabel}" Margin="0,4,0,0"/>
                         </Grid>
+
+                        <!-- v0.1.24-beta.8 Phase 3: BL-Remarks (Shop-
+                             Position-Notiz) wenn vorhanden. Wrap, kleinere
+                             Schrift - typischerweise "Box A.2, Regal 3". -->
+                        <TextBlock Text="Shop-Position (BL-Remarks):"
+                                   Foreground="Gray" FontSize="11"
+                                   Margin="0,16,0,0"
+                                   Visibility="{Binding HasRemarks, Converter={StaticResource BoolToVisibility}}"/>
+                        <TextBlock Text="{Binding Remarks}"
+                                   FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0"
+                                   Visibility="{Binding HasRemarks, Converter={StaticResource BoolToVisibility}}"/>
 
                         <!-- Letzter Sync separat unten - User-Vertrauen + Diagnose. -->
                         <TextBlock Text="Letzter Sync:" Foreground="Gray" FontSize="11"

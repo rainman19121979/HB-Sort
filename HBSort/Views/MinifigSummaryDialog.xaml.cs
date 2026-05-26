@@ -134,9 +134,22 @@ public partial class MinifigSummaryDialog : Window
             }
             else
             {
+                // v0.1.24-beta.8 Phase 3 (Fix 4): wenn das Teil BL-Reservierungen
+                // hat, diese ZUERST aufheben (Shop-Bestand freigeben + ScanEvent).
+                // Danach den physischen Stand zuruecksetzen wie bisher.
+                int releasedBl = 0;
+                if (partVm.QuantityReservedFromBl > 0)
+                {
+                    releasedBl = await _viewModel.ReleaseAllBlReservationsAsync(partVm);
+                }
                 await lookup.UnassignPartFromMinifigAsync(partVm.Id);
                 partVm.QuantityCollected = 0;
-                _notifications.ShowInfo($"Markierung fuer '{partVm.PartName}' aufgehoben.");
+                if (releasedBl > 0)
+                    _notifications.ShowInfo(
+                        $"Markierung fuer '{partVm.PartName}' aufgehoben. " +
+                        $"{releasedBl} BL-Shop-Reservierung(en) freigegeben.");
+                else
+                    _notifications.ShowInfo($"Markierung fuer '{partVm.PartName}' aufgehoben.");
             }
             // Dialog-Daten neu laden, damit auch ProgressLabel/CompletedParts stimmen.
             await _viewModel.LoadAsync();
@@ -163,6 +176,48 @@ public partial class MinifigSummaryDialog : Window
     // UX X.20 Teil 7: "Wieder oeffnen"-Button + Reopen_Click-Handler entfernt.
     // Status-Wechsel laeuft jetzt automatisch ueber das Toggling der Teile-
     // Haekchen (siehe PartCheckBox_Click + PartLookupService.UnassignPart...).
+
+    /// <summary>
+    /// v0.1.24-beta.8 Phase 3: Klick auf das BL-Shop-Badge eines fehlenden
+    /// Required-Parts. Oeffnet den Reservierungs-Dialog; bei Bestaetigung
+    /// laeuft die Reservierung ueber den VM-Pfad (Lot reservieren +
+    /// QuantityReservedFromBl++ + ScanEvent + Komplett-Check).
+    /// </summary>
+    private async void BlBadge_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (sender is not System.Windows.FrameworkElement el
+            || el.Tag is not SummaryPartViewModel partVm) return;
+        if (partVm.BlAvailability is not { HasAny: true } availability) return;
+
+        var dialog = new BlReserveDialog(partVm, _viewModel.Name, availability)
+        {
+            Owner = this
+        };
+        var ok = dialog.ShowDialog();
+        if (ok != true || dialog.SelectedLot == null) return;
+
+        try
+        {
+            var success = await _viewModel.ApplyBlReservationAsync(partVm, dialog.SelectedLot);
+            if (success)
+            {
+                var conditionLabel = dialog.SelectedLot.Condition == "N" ? "Neu" : "Gebraucht";
+                _notifications.ShowSuccess(
+                    $"'{partVm.PartName}' ({conditionLabel}) im BL-Shop fuer '{_viewModel.Name}' reserviert.");
+            }
+            else
+            {
+                _notifications.ShowError(
+                    "Reservierung fehlgeschlagen - das Lot ist eventuell schon verbraucht. " +
+                    "Bitte BL-Inventar neu synchronisieren.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "BlBadge_Click: Reservierung geworfen");
+            _notifications.ShowError($"Fehler bei der Reservierung: {ex.Message}");
+        }
+    }
 
     private async void Move_Click(object sender, RoutedEventArgs e)
     {

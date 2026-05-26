@@ -127,11 +127,28 @@
                                             <Run Text="{Binding ColorName, Mode=OneWay}"/>
                                         </TextBlock>
                                     </StackPanel>
-                                    <TextBlock Grid.Column="4"
-                                               Text="{Binding QuantityLabel}"
-                                               FontWeight="SemiBold"
-                                               VerticalAlignment="Center"
-                                               Margin="6,0"/>
+                                    <StackPanel Grid.Column="4" Orientation="Horizontal"
+                                                VerticalAlignment="Center" Margin="6,0">
+                                        <TextBlock Text="{Binding QuantityLabel}"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"/>
+                                        <!-- v0.1.24-beta.8 Phase 3: BL-Shop-Badge.
+                                             Sichtbar nur wenn Teil noch fehlt UND
+                                             BL-Inventar es anbietet. Klick oeffnet
+                                             Reservierungs-Dialog. -->
+                                        <Border Margin="8,0,0,0"
+                                                Background="#0277BD"
+                                                CornerRadius="3" Padding="6,2"
+                                                Cursor="Hand"
+                                                Tag="{Binding}"
+                                                MouseLeftButtonUp="BlBadge_Click"
+                                                ToolTip="{Binding BlAvailability.BadgeTooltip}"
+                                                Visibility="{Binding ShowBlBadge, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="{Binding BlAvailability.BadgeText}"
+                                                       Foreground="White" FontWeight="SemiBold"
+                                                       FontSize="10"/>
+                                        </Border>
+                                    </StackPanel>
                                 </Grid>
                             </Border>
                         </DataTemplate>

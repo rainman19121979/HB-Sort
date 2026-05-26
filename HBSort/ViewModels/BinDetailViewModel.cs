@@ -170,7 +170,8 @@ public partial class TrackedMinifigSummaryViewModel : ObservableObject
             _ => m.Status.ToString().ToUpperInvariant()
         };
         TotalParts = m.RequiredParts.Count;
-        CompletedParts = m.RequiredParts.Count(p => p.QuantityCollected >= p.QuantityNeeded);
+        // v0.1.24-beta.8 Phase 3: effektiv-komplett (physisch + BL-reserviert).
+        CompletedParts = m.RequiredParts.Count(p => p.IsEffectivelyComplete);
         _imageUrl = m.LocalImagePath ?? m.ImageUrl;
     }
 }

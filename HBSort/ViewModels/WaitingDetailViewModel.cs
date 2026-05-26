@@ -71,14 +71,17 @@ public partial class WaitingDetailViewModel : ObservableObject, IDisposable
             Items.Clear();
             foreach (var m in waiting)
             {
+                // v0.1.24-beta.8 Phase 3: "noch fehlend" inkludiert nicht
+                // mehr Teile die im BL-Shop reserviert sind - die sind
+                // effektiv beschafft, nur physisch noch nicht da.
                 var missing = m.RequiredParts
-                    .Where(p => p.QuantityCollected < p.QuantityNeeded)
+                    .Where(p => p.EffectivelyMissing > 0)
                     .Select(p => new MissingPartInfo
                     {
                         PartNumber = p.PartNumber,
                         ColorName = p.ColorName,
                         PartName = p.PartName,
-                        Missing = p.QuantityNeeded - p.QuantityCollected
+                        Missing = p.EffectivelyMissing
                     })
                     .ToList();
 

@@ -73,6 +73,13 @@ public class ScanEvent
 ///   Import            - BL-Daten-Import (NICHT undobar - Backup nutzen)
 ///   UndoApplied       - Audit: ein anderer ScanEvent wurde rueckgaengig
 ///                       gemacht. Selbst nicht erneut undobar.
+///
+/// v0.1.24-beta.8 Phase 3: BL-Inventar-Reservierungen.
+///   BlInventoryReservation - User hat ein Lot im BL-Shop fuer eine wartende
+///                            Figur reserviert. RecognizedId = LotId,
+///                            ResultDescription = "Reserviert: {PartName}
+///                            ({Condition}) fuer {MinifigName}".
+///   BlInventoryRelease     - Reservierung wieder aufgehoben (Undo).
 /// </summary>
 public enum ScanType
 {
@@ -86,5 +93,7 @@ public enum ScanType
     BinFreed,
     BinCreated,
     Import,
-    UndoApplied
+    UndoApplied,
+    BlInventoryReservation,
+    BlInventoryRelease
 }

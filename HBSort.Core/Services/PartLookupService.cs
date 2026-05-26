@@ -60,18 +60,21 @@ public class PartLookupService : IPartLookupService
         var colorName = color?.Name ?? $"Color {blColorId}";
         var colorRgb = color?.Rgb;
 
-        // Reverse-Match in userdata.db
+        // Reverse-Match in userdata.db. v0.1.24-beta.8 Phase 3: nur Teile
+        // die effektiv (physisch + BL-reserviert) noch nicht gedeckt sind
+        // werden gematched. Bereits via BL reservierte Teile verschwinden
+        // damit aus dem "noch fehlend"-Set.
         await using var dbCtx = await _ctxFactory.CreateDbContextAsync(ct);
         var query = dbCtx.TrackedMinifigParts.AsNoTracking()
             .Where(p => p.PartNumber == blPartNo
                      && p.ColorId == blColorId
-                     && p.QuantityCollected < p.QuantityNeeded
+                     && (p.QuantityCollected + p.QuantityReservedFromBl) < p.QuantityNeeded
                      && p.TrackedMinifig.Status == TrackedMinifigStatus.Waiting)
             .Include(p => p.TrackedMinifig)
                 .ThenInclude(m => m.StorageBin)
             // Sortierung: zuerst Figuren denen am meisten zum Komplett fehlt,
             // dann nach Bin-Label.
-            .OrderByDescending(p => p.QuantityNeeded - p.QuantityCollected)
+            .OrderByDescending(p => p.QuantityNeeded - (p.QuantityCollected + p.QuantityReservedFromBl))
             .ThenBy(p => p.TrackedMinifig.StorageBin!.Label);
 
         var matches = new List<WaitingMinifigMatch>();
@@ -116,6 +119,8 @@ public class PartLookupService : IPartLookupService
             .FirstOrDefaultAsync(p => p.Id == trackedMinifigPartId, ct);
         if (part == null) return false;
 
+        // v0.1.24-beta.8 Phase 3: physisches Cap auf QuantityCollected
+        // (Reservierungen werden hier nicht beruehrt).
         if (part.QuantityCollected >= part.QuantityNeeded)
         {
             // Schon komplett; nichts zu tun.
@@ -125,8 +130,12 @@ public class PartLookupService : IPartLookupService
         part.QuantityCollected++;
         bool minifigCompleted = false;
 
+        // Komplett-Check ueber EFFECTIVE (physisch + BL-reserviert). Damit
+        // gilt die Figur als komplett wenn alle Teile entweder physisch da
+        // sind ODER im BL-Shop reserviert.
         var allComplete = part.TrackedMinifig.RequiredParts.All(p =>
-            (p.Id == part.Id ? part.QuantityCollected : p.QuantityCollected) >= p.QuantityNeeded);
+            (p.Id == part.Id ? part.QuantityCollected : p.QuantityCollected)
+            + p.QuantityReservedFromBl >= p.QuantityNeeded);
 
         if (allComplete && part.TrackedMinifig.Status != TrackedMinifigStatus.Complete)
         {
@@ -550,8 +559,10 @@ public class PartLookupService : IPartLookupService
             }
         }
 
-        // Falls durch Reverse-Match komplett -> Status=Complete
-        var isComplete = minifig.RequiredParts.All(p => p.QuantityCollected >= p.QuantityNeeded)
+        // v0.1.24-beta.8 Phase 3: Komplett-Check ueber Effective
+        // (QuantityCollected + QuantityReservedFromBl).
+        var isComplete = minifig.RequiredParts.All(p =>
+                             (p.QuantityCollected + p.QuantityReservedFromBl) >= p.QuantityNeeded)
                          && minifig.RequiredParts.Count > 0;
         if (isComplete)
         {
@@ -766,7 +777,9 @@ public class PartLookupService : IPartLookupService
             manuellClaimedApplied++;
         }
 
-        var isComplete = minifig.RequiredParts.All(p => p.QuantityCollected >= p.QuantityNeeded)
+        // v0.1.24-beta.8 Phase 3: Komplett-Check ueber Effective.
+        var isComplete = minifig.RequiredParts.All(p =>
+                             (p.QuantityCollected + p.QuantityReservedFromBl) >= p.QuantityNeeded)
                          && minifig.RequiredParts.Count > 0;
         if (isComplete)
         {

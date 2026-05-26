@@ -132,6 +132,7 @@ public class UserDataContext : DbContext
             entity.Property(e => e.ItemNo).HasMaxLength(64).IsRequired();
             entity.Property(e => e.ColorName).HasMaxLength(64);
             entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.Remarks).HasMaxLength(500);
             entity.Property(e => e.Condition).HasMaxLength(2).IsRequired();
             entity.HasIndex(e => new { e.ItemType, e.ItemNo, e.ColorId });
         });

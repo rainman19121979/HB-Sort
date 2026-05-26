@@ -33,6 +33,14 @@ public class BlInventoryLot
     /// <summary>User-Beschreibung des Lots (Listing-Description aus dem BL-Store). Optional.</summary>
     public string? Description { get; set; }
 
+    /// <summary>
+    /// v0.1.24-beta.8 Phase 3: BL-Remarks-Feld - User-Notiz pro Lot, typisch
+    /// die physische Position im Shop (z.B. "Box A.2, Regal 3"). Wird beim
+    /// Sync von BL geholt und im Detail-Panel + Reservierungs-Dialog gezeigt
+    /// damit der User das Teil schnell findet.
+    /// </summary>
+    public string? Remarks { get; set; }
+
     /// <summary>Stueckzahl im Lot.</summary>
     public int Quantity { get; set; }
 

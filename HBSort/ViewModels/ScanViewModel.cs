@@ -533,6 +533,8 @@ public partial class ScanViewModel : ObservableObject, IDisposable
     }
 
     private readonly ICategoryBinMappingService _categoryMapping;
+    // v0.1.24-beta.8 Phase 3: BL-Inventar-Hinweis nach Part-Scan ohne Wartende-Match.
+    private readonly IBlInventoryService _blInventory;
 
     public ScanViewModel(
         ICameraService cameraService,
@@ -550,8 +552,10 @@ public partial class ScanViewModel : ObservableObject, IDisposable
         IDialogService dialogs,
         IFloatingPartTransferService floatingTransfer,
         IBlPriceCacheService priceCache,
-        ICategoryBinMappingService categoryMapping)
+        ICategoryBinMappingService categoryMapping,
+        IBlInventoryService blInventory)
     {
+        _blInventory = blInventory;
         _cameraService = cameraService;
         _settingsService = settingsService;
         _brickognizeClient = brickognizeClient;
@@ -1272,6 +1276,14 @@ public partial class ScanViewModel : ObservableObject, IDisposable
         {
             var result = await _partLookup.LookupPartAsync(blPartNo, blColorId);
             pending.ApplyLookupResult(result);
+
+            // v0.1.24-beta.8 Phase 3: wenn keine wartende Figur das Teil
+            // braucht, aber es im BL-Shop liegt -> informativer Toast.
+            // Kein State-Change, nur Hinweis "du hast das auch in deinem Shop".
+            if (result.WaitingMatches.Count == 0)
+            {
+                _ = NotifyBlInventoryIfAnyAsync(blPartNo, blColorId);
+            }
         }
         catch (Exception ex)
         {
@@ -1295,6 +1307,34 @@ public partial class ScanViewModel : ObservableObject, IDisposable
         _blCatalogImagesCts = new CancellationTokenSource();
         LoadBlCatalogImagesAsync(pending, _blCatalogImagesCts.Token)
             .FireAndForget("PartScan-LoadBlCatalogImages");
+    }
+
+    /// <summary>
+    /// v0.1.24-beta.8 Phase 3: informativer Toast wenn das gescannte Teil
+    /// zwar keiner wartenden Figur zugeordnet werden konnte, aber im
+    /// BL-Shop-Inventar liegt. Best-effort - Fehler werden geloggt aber
+    /// nicht eskaliert.
+    /// </summary>
+    private async Task NotifyBlInventoryIfAnyAsync(string blPartNo, int blColorId)
+    {
+        try
+        {
+            if (!await _blInventory.HasAnyInventoryAsync()) return;
+            var lots = await _blInventory.FindLotsForPartAsync(blPartNo, blColorId);
+            if (lots.Count == 0) return;
+
+            var newQty = lots.Where(l => l.Condition == "N").Sum(l => l.Quantity - l.ReservedQuantity);
+            var usedQty = lots.Where(l => l.Condition == "U").Sum(l => l.Quantity - l.ReservedQuantity);
+            if (newQty + usedQty == 0) return;
+
+            _notifications.ShowInfo(
+                $"Teil nicht im HBSort-Lager gesucht, aber {newQty}× Neu / {usedQty}× Gebraucht " +
+                $"in deinem BrickLink-Shop verfuegbar.");
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "BL-Inventar-Hinweis fuer {Part}/{Color} nicht ermittelbar", blPartNo, blColorId);
+        }
     }
 
     /// <summary>Re-Lookup nach Farb-Korrektur ueber das Dropdown.</summary>

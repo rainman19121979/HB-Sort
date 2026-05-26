@@ -11,24 +11,33 @@
     -->
     <Grid Margin="8">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>   <!-- 0: Header + Checkbox -->
+            <RowDefinition Height="*"/>      <!-- 1: ScrollViewer mit beiden Sektionen -->
+            <RowDefinition Height="Auto"/>   <!-- 2: SummaryText -->
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="WAS KANN ICH BAUEN?"
-                   FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
+        <Grid Grid.Row="0" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="WAS KANN ICH BAUEN?"
+                       FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            <!-- v0.1.24-beta.8 Phase 3: BL-Inventar-Toggle. Sichtbar nur wenn
+                 der User ueberhaupt synchronisiert hat (HasAnyBlInventory).
+                 Default aus (IncludeBlInventory=false) -> Standardverhalten
+                 unveraendert. -->
+            <CheckBox Grid.Column="1"
+                      Content="BL-Inventar beruecksichtigen"
+                      IsChecked="{Binding IncludeBlInventory, Mode=TwoWay}"
+                      Visibility="{Binding HasAnyBlInventory, Converter={StaticResource BoolToVisibility}}"
+                      ToolTip="Zeigt zusaetzlich Figuren die mit deinem BrickLink-Shop-Bestand vervollstaendigt werden koennen."/>
+        </Grid>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <ItemsControl ItemsSource="{Binding Suggestions}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <!--
-                            Klick auf den Border oeffnet den Detail-Dialog
-                            (siehe BuildSuggestionsView.xaml.cs::Suggestion_MouseDown).
-                            Tag traegt das ViewModel-Objekt, damit der Handler die
-                            ausgewaehlte Suggestion identifizieren kann.
-                        -->
                         <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
                                 BorderThickness="1" CornerRadius="4"
                                 Padding="6" Margin="0,2"
@@ -42,15 +51,8 @@
                                     <ColumnDefinition Width="48"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <!--
-                                    ImageZoom auf dem Bild: Klick auf das Bild
-                                    selbst oeffnet das grosse Vorschau-Overlay.
-                                    Das Border drumherum hat Suggestion_MouseDown,
-                                    der den Detail-Dialog oeffnet - Klick auf den
-                                    Rest der Karte oeffnet weiterhin den Dialog,
-                                    nur das Bild ist zoombar.
-                                -->
                                 <Image Grid.Column="0" Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
                                        Width="44" Height="44" Stretch="Uniform"
                                        b:ImageZoom.IsEnabled="True"/>
@@ -64,7 +66,21 @@
                                     <TextBlock Text="{Binding MissingLabel}" FontSize="10"
                                                Foreground="Gray"/>
                                 </StackPanel>
+                                <!-- v0.1.24-beta.8 Phase 3 (Fix 5): BL-Shop-Badge
+                                     fuer Erweiterungen. Nur sichtbar wenn das Item
+                                     ueber den BL-Pfad kommt (IsBlShopAddition). -->
                                 <Border Grid.Column="2"
+                                        Background="#0277BD"
+                                        CornerRadius="4" Padding="6,2"
+                                        Margin="0,0,6,0"
+                                        VerticalAlignment="Center"
+                                        ToolTip="Diese Figur ist nur mit Teilen aus deinem BrickLink-Shop komplett baubar."
+                                        Visibility="{Binding IsBlShopAddition, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="{Binding BlShopBadgeLabel}"
+                                               Foreground="White" FontWeight="SemiBold"
+                                               FontSize="10"/>
+                                </Border>
+                                <Border Grid.Column="3"
                                         Background="{Binding MatchBrush}"
                                         CornerRadius="4" Padding="6,2"
                                         VerticalAlignment="Center">

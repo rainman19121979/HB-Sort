@@ -30,6 +30,9 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
     private readonly IBlCacheRepository _blCache;
     private readonly IPartImageProvider _imageProvider;
+    // v0.1.24-beta.8 Phase 3: BL-Inventar-Zugriff fuer die optionale
+    // "Mit BL-Shop vervollstaendigbar"-Sektion.
+    private readonly IBlInventoryService _blInventory;
 
     // Audit K-2: Wir merken uns die DataChanged-Subscription (als Field), damit
     // wir sie in Dispose() sauber abmelden koennen. Ohne das Unsubscribe wuerde
@@ -43,6 +46,14 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
     // v0.1.23-beta.2 Fix C: laufende Image-Loads bei Refresh abbrechen.
     private CancellationTokenSource? _imageLoadCts;
 
+    /// <summary>
+    /// v0.1.24-beta.8 Phase 3 (Fix 5): eine einheitliche Liste.
+    /// - Toggle aus: nur Figuren die komplett aus HBSort-FloatingParts
+    ///   baubar sind (MatchPercent=100, kein BL).
+    /// - Toggle an: zusaetzlich Figuren die mit HBSort+BL=100% baubar sind
+    ///   (HasBlShopAddition=true, Badge "X Teile aus Shop").
+    /// Sortierung: HBSort-only zuerst, BL-erweiterte danach.
+    /// </summary>
     public ObservableCollection<BuildSuggestionItem> Suggestions { get; } = new();
 
     [ObservableProperty]
@@ -51,16 +62,32 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string _summaryText = string.Empty;
 
+    /// <summary>
+    /// v0.1.24-beta.8 Phase 3: Checkbox oben in der View. Default aus -
+    /// Verhalten ohne BL-Inventar bleibt unveraendert. Bei Aenderung wird
+    /// die Liste neu berechnet.
+    /// </summary>
+    [ObservableProperty]
+    private bool _includeBlInventory;
+
+    /// <summary>True wenn der User BL-Inventar synchronisiert hat (steuert Checkbox-Sichtbarkeit).</summary>
+    [ObservableProperty]
+    private bool _hasAnyBlInventory;
+
+    partial void OnIncludeBlInventoryChanged(bool value) => _ = RefreshAsync();
+
     public BuildSuggestionsViewModel(
         IDbContextFactory<UserDataContext> ctxFactory,
         IBlCacheRepository blCache,
         IPartImageProvider imageProvider,
-        IMinifigPersistenceService persistence)
+        IMinifigPersistenceService persistence,
+        IBlInventoryService blInventory)
     {
         _ctxFactory = ctxFactory;
         _blCache = blCache;
         _imageProvider = imageProvider;
         _persistence = persistence;
+        _blInventory = blInventory;
 
         _onDataChanged = (_, _) =>
         {
@@ -174,19 +201,34 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
                 });
             }
 
-            // 5) Sortieren + Top N.
-            var top = suggestions
-                .OrderByDescending(s => s.MatchPercent)
-                .ThenBy(s => s.MissingPartsCount)
+            // 5) v0.1.24-beta.8 Phase 3 (Fix 5): einheitliche Liste statt
+            //    zwei Sektionen. Toggle-off zeigt nur HBSort-100%, Toggle-on
+            //    ergaenzt um Figuren die mit BL-Shop auf 100% kommen.
+            HasAnyBlInventory = await _blInventory.HasAnyInventoryAsync();
+            var hbsortComplete = suggestions
+                .Where(s => s.MatchPercent >= 100)
+                .OrderBy(s => s.Name)
                 .Take(MaxSuggestions)
                 .ToList();
 
-            Suggestions.Clear();
-            foreach (var s in top) Suggestions.Add(s);
+            var blCompletable = new List<BuildSuggestionItem>();
+            if (IncludeBlInventory && HasAnyBlInventory)
+            {
+                blCompletable = await BuildBlCompletableAsync(suggestions, haveMap);
+            }
 
-            SummaryText = top.Count == 0
-                ? "Keine Bauvorschlaege - keine deiner losen Teile passt zu einer ungetrackten Minifig."
-                : $"{top.Count} Vorschlaege (sortiert nach Match-%)";
+            Suggestions.Clear();
+            // Erst HBSort-100% (alphabetisch), dann BL-Erweiterungen
+            // (nach Aufwand: wenig BL-Teile zuerst).
+            foreach (var s in hbsortComplete) Suggestions.Add(s);
+            foreach (var s in blCompletable.OrderBy(s => s.BlShopPartCount).ThenBy(s => s.Name))
+                Suggestions.Add(s);
+
+            SummaryText = Suggestions.Count == 0
+                ? "Keine Bauvorschlaege - keine deiner losen Teile reicht fuer eine ungetrackte Minifig."
+                : (IncludeBlInventory && HasAnyBlInventory
+                    ? $"{hbsortComplete.Count} aus HBSort + {blCompletable.Count} mit BL-Shop-Ergaenzung"
+                    : $"{hbsortComplete.Count} Vorschlaege (komplett aus HBSort baubar)");
 
             // v0.1.23-beta.2 Fix C: vorigen Image-Load abbrechen + neue CTS.
             _imageLoadCts?.Cancel();
@@ -217,7 +259,6 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
                 if (ct.IsCancellationRequested) break;
                 if (!string.IsNullOrEmpty(url))
                 {
-                    // v0.1.23-beta.2 Fix C: InvokeAsync statt Invoke.
                     var disp = Application.Current?.Dispatcher;
                     if (disp != null)
                         await disp.InvokeAsync(() => s.ImageUrl = url);
@@ -228,6 +269,83 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
                 Log.Debug(ex, "BuildSuggestions: Bild fuer {Bl} nicht ladbar", s.BricklinkId);
             }
         }
+    }
+
+    /// <summary>
+    /// v0.1.24-beta.8 Phase 3 (Fix 5): aus den nicht-HBSort-100%-Kandidaten
+    /// die heraussuchen, die mit BL-Shop-Ergaenzung auf 100% kommen. Diese
+    /// werden als zusaetzliche BuildSuggestionItems (mit
+    /// <see cref="BuildSuggestionItem.IsBlShopAddition"/>=true) in die eine
+    /// gemeinsame Liste eingefuegt.
+    /// </summary>
+    private async Task<List<BuildSuggestionItem>> BuildBlCompletableAsync(
+        List<BuildSuggestionItem> allCandidates,
+        Dictionary<(string PartNo, int ColorId), int> haveMap)
+    {
+        const int maxBlAdditions = 20;
+        var teilbare = allCandidates.Where(s => s.MatchPercent < 100).ToList();
+        var result = new List<BuildSuggestionItem>();
+
+        // Verfuegbarkeits-Map fuer BL-Inventar - eine Query pro (Part, Color)
+        // gecached, damit wir bei vielen Kandidaten mit gleichen Parts nicht
+        // N-mal die DB fragen.
+        var blCache = new Dictionary<(string, int), int>();
+
+        foreach (var c in teilbare)
+        {
+            if (result.Count >= maxBlAdditions) break;
+
+            var subsets = await _blCache.GetSubsetsAsync("M", c.BricklinkId);
+            subsets = subsets.Where(s => !s.IsFromSupersets && s.ItemType == "P").ToList();
+            if (subsets.Count == 0) continue;
+
+            int blShopCount = 0;
+            bool canComplete = true;
+
+            foreach (var s in subsets)
+            {
+                var key = (s.ItemNo, s.ColorId);
+                haveMap.TryGetValue(key, out var hbHave);
+                var hbTaken = Math.Min(hbHave, s.Quantity);
+                var stillNeeded = s.Quantity - hbTaken;
+                if (stillNeeded <= 0) continue;
+
+                if (!blCache.TryGetValue(key, out var blAvail))
+                {
+                    var lots = await _blInventory.FindLotsForPartAsync(s.ItemNo, s.ColorId);
+                    blAvail = lots.Sum(l => l.Quantity - l.ReservedQuantity);
+                    blCache[key] = blAvail;
+                }
+
+                var blTaken = Math.Min(stillNeeded, blAvail);
+                if (blTaken < stillNeeded)
+                {
+                    canComplete = false;
+                    break;
+                }
+                blShopCount += blTaken;
+            }
+
+            if (!canComplete || blShopCount == 0) continue;
+
+            // Effektiv-100%-Vorschlag mit BL-Badge. Reuse von c (gleiches
+            // ImageUrl-Loading) waere riskant - eigenes Item, Match-% auf
+            // 100, MissingLabel auf passenden Hinweis.
+            result.Add(new BuildSuggestionItem
+            {
+                BricklinkId = c.BricklinkId,
+                Name = c.Name,
+                MatchPercent = 100,
+                TotalParts = c.TotalParts,
+                MissingPartsCount = 0,
+                TotalQtyNeeded = c.TotalQtyNeeded,
+                TotalQtyHave = c.TotalQtyNeeded, // alles gedeckt (HBSort + BL)
+                IsBlShopAddition = true,
+                BlShopPartCount = blShopCount
+            });
+        }
+
+        return result;
     }
 }
 
@@ -242,18 +360,42 @@ public partial class BuildSuggestionItem : ObservableObject
     public int TotalQtyNeeded { get; init; }
     public int TotalQtyHave { get; init; }
 
+    /// <summary>
+    /// v0.1.24-beta.8 Phase 3 (Fix 5): true wenn diese Figur nur mit
+    /// BL-Shop-Ergaenzung auf 100% kommt (nicht allein aus HBSort).
+    /// Steuert den BL-Badge in der UI.
+    /// </summary>
+    public bool IsBlShopAddition { get; init; }
+
+    /// <summary>Anzahl Teile die aus dem BL-Shop kommen muessten (Badge-Text).</summary>
+    public int BlShopPartCount { get; init; }
+
     [ObservableProperty]
     private string? _imageUrl;
 
     public string MatchLabel => $"{MatchPercent}% ({TotalQtyHave}/{TotalQtyNeeded})";
-    public string MissingLabel => MissingPartsCount == 0
-        ? "Komplett!"
-        : $"Es fehlen {MissingPartsCount} Teile-Sorten";
+
+    public string MissingLabel
+    {
+        get
+        {
+            if (IsBlShopAddition)
+                return $"Komplett mit {BlShopPartCount} Teilen aus BL-Shop";
+            return MissingPartsCount == 0
+                ? "Komplett!"
+                : $"Es fehlen {MissingPartsCount} Teile-Sorten";
+        }
+    }
+
+    public string BlShopBadgeLabel => $"{BlShopPartCount} Teile aus Shop";
 
     public Brush MatchBrush
     {
         get
         {
+            // BL-Erweiterungen bekommen das BL-Blau (visuelle Trennung).
+            if (IsBlShopAddition)
+                return FreezeBrush(Color.FromRgb(2, 119, 189)); // #0277BD
             Brush b = MatchPercent >= 100
                 ? FreezeBrush(Color.FromRgb(46, 125, 50))      // Vollgruen
                 : MatchPercent >= 75

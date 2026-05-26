@@ -421,6 +421,10 @@ public partial class BlInventoryRow : ObservableObject
     /// <summary>BL-Listing-Description aus dem Lot. Fallback wenn kein Catalog-Name.</summary>
     public string Description { get; init; } = string.Empty;
 
+    /// <summary>v0.1.24-beta.8 Phase 3: BL-Remarks (Shop-Position-Notiz).</summary>
+    public string Remarks { get; init; } = string.Empty;
+    public bool HasRemarks => !string.IsNullOrWhiteSpace(Remarks);
+
     /// <summary>Display-Text fuer die Beschreibungs-Spalte: Catalog-Name wenn vorhanden, sonst Description.</summary>
     public string DescriptionDisplay => !string.IsNullOrWhiteSpace(CatalogName)
         ? CatalogName!
@@ -474,6 +478,7 @@ public partial class BlInventoryRow : ObservableObject
             ColorName = colorName,
             CatalogName = summary?.Name,
             Description = lot.Description ?? string.Empty,
+            Remarks = lot.Remarks ?? string.Empty,
             Quantity = lot.Quantity,
             ReservedQuantity = lot.ReservedQuantity,
             UnitPrice = lot.UnitPrice,

@@ -532,7 +532,8 @@ public partial class InventoryRowItem : ObservableObject
         var (icon, label, brush) = StatusVisuals(status);
 
         var totalParts = m.RequiredParts.Count;
-        var collectedParts = m.RequiredParts.Count(p => p.QuantityCollected >= p.QuantityNeeded);
+        // v0.1.24-beta.8 Phase 3: effektiv-komplett (physisch + BL-reserviert).
+        var collectedParts = m.RequiredParts.Count(p => p.IsEffectivelyComplete);
         var progress = totalParts == 0 ? string.Empty : $"{collectedParts}/{totalParts}";
 
         return new InventoryRowItem

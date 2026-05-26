@@ -92,12 +92,13 @@ public static class BinKindGuard
         }
 
         // Waiting: Reverse-Match-Bypass.
+        // v0.1.24-beta.8 Phase 3: effektive Restmenge (physisch + BL-reserviert).
         var hasMatch = bin.TrackedMinifigs.Any(m =>
             m.Status == TrackedMinifigStatus.Waiting
             && m.RequiredParts.Any(rp =>
                 rp.PartNumber == blPartNo
                 && rp.ColorId == blColorId
-                && rp.QuantityCollected < rp.QuantityNeeded));
+                && (rp.QuantityCollected + rp.QuantityReservedFromBl) < rp.QuantityNeeded));
         if (!hasMatch)
         {
             throw new InvalidBinKindException(

@@ -403,6 +403,11 @@ public class BricklinkClient : IBricklinkClient
                     Description = string.IsNullOrEmpty(lot.Description)
                         ? null
                         : WebUtility.HtmlDecode(lot.Description),
+                    // v0.1.24-beta.8 Phase 3: Remarks (User-Notiz / Shop-
+                    // Position) mit-syncen.
+                    Remarks = string.IsNullOrEmpty(lot.Remarks)
+                        ? null
+                        : WebUtility.HtmlDecode(lot.Remarks),
                     Quantity = lot.Quantity,
                     UnitPrice = lot.UnitPrice,
                     Condition = ConditionToShortString(lot.Condition)

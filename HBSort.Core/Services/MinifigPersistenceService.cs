@@ -229,6 +229,7 @@ public class MinifigPersistenceService : IMinifigPersistenceService
                     continue;
                 }
 
+                // v0.1.24-beta.8 Phase 3: physisches Cap auf QuantityCollected.
                 if (waitingPart.QuantityCollected >= waitingPart.QuantityNeeded)
                 {
                     Log.Information("DismantleAsync: Teil {Part} schon komplett bei wartender Figur, ueberspringen",
@@ -239,9 +240,10 @@ public class MinifigPersistenceService : IMinifigPersistenceService
                 waitingPart.QuantityCollected++;
                 assignedCount++;
 
-                // Komplettierungs-Check fuer die wartende Figur (analog AssignPartToMinifigAsync).
+                // Komplettierungs-Check ueber Effective (physisch + BL-reserviert).
                 var allComplete = waitingPart.TrackedMinifig.RequiredParts.All(p =>
-                    (p.Id == waitingPart.Id ? waitingPart.QuantityCollected : p.QuantityCollected) >= p.QuantityNeeded);
+                    (p.Id == waitingPart.Id ? waitingPart.QuantityCollected : p.QuantityCollected)
+                    + p.QuantityReservedFromBl >= p.QuantityNeeded);
                 if (allComplete && waitingPart.TrackedMinifig.Status != TrackedMinifigStatus.Complete)
                 {
                     waitingPart.TrackedMinifig.Status = TrackedMinifigStatus.Complete;
@@ -539,8 +541,9 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         if (m.Status != TrackedMinifigStatus.Waiting) return false;
         if (m.RequiredParts.Count == 0) return false;
 
+        // v0.1.24-beta.8 Phase 3: Komplett-Check ueber Effective.
         var allComplete = m.RequiredParts
-            .All(p => p.QuantityCollected >= p.QuantityNeeded);
+            .All(p => (p.QuantityCollected + p.QuantityReservedFromBl) >= p.QuantityNeeded);
         if (!allComplete) return false;
 
         m.Status = TrackedMinifigStatus.Complete;
@@ -743,7 +746,10 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             }
         }
 
-        var isComplete = minifig.RequiredParts.All(p => p.QuantityCollected >= p.QuantityNeeded)
+        // v0.1.24-beta.8 Phase 3: Komplett-Check ueber Effective
+        // (physisch + BL-reserviert).
+        var isComplete = minifig.RequiredParts.All(p =>
+                             (p.QuantityCollected + p.QuantityReservedFromBl) >= p.QuantityNeeded)
                          && minifig.RequiredParts.Count > 0;
 
         if (isComplete)

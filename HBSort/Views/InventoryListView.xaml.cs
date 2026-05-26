@@ -126,10 +126,11 @@ public partial class InventoryListView : UserControl
             var persistence = Service<IMinifigPersistenceService>();
             var imgProvider = Service<IPartImageProvider>();
             var catalog = Service<IBlCatalogService>();
+            var blInventory = Service<IBlInventoryService>();
 
             var vm = new MinifigSummaryViewModel(
                 row.UnderlyingMinifigId.Value, ctxFactory, binService,
-                imgProvider, catalog, persistence);
+                imgProvider, catalog, persistence, blInventory);
             var dialog = new MinifigSummaryDialog(vm, notif, persistence) { Owner = window };
             dialog.ShowDialog();
         }
@@ -464,7 +465,8 @@ public partial class InventoryListView : UserControl
             var persistence = Service<IMinifigPersistenceService>();
             var imgProvider = Service<IPartImageProvider>();
             var catalog = Service<IBlCatalogService>();
-            var vm = new MinifigSummaryViewModel(row.UnderlyingMinifigId.Value, ctxFactory, binService, imgProvider, catalog, persistence);
+            var blInventory = Service<IBlInventoryService>();
+            var vm = new MinifigSummaryViewModel(row.UnderlyingMinifigId.Value, ctxFactory, binService, imgProvider, catalog, persistence, blInventory);
             var dialog = new MinifigSummaryDialog(vm, notif, persistence) { Owner = window };
             dialog.ShowDialog();
         }

@@ -164,6 +164,12 @@ public class BricklinkInventoryLotDto
     /// <summary>Optionale User-Description aus dem Listing.</summary>
     public string? Description { get; set; }
 
+    /// <summary>
+    /// v0.1.24-beta.8 Phase 3: optionale Remarks (User-Notiz pro Lot, typisch
+    /// die physische Position im Shop).
+    /// </summary>
+    public string? Remarks { get; set; }
+
     /// <summary>Stueckzahl im Lot.</summary>
     public int Quantity { get; set; }
 

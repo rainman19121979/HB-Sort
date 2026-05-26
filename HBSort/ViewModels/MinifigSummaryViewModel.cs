@@ -29,6 +29,8 @@ public partial class MinifigSummaryViewModel : ObservableObject
     private readonly IPartImageProvider? _imageProvider;
     private readonly IBlCatalogService? _catalog;
     private readonly IMinifigPersistenceService? _persistence;
+    // v0.1.24-beta.8 Phase 3: BL-Inventar-Lookup fuer fehlende Teile.
+    private readonly IBlInventoryService? _blInventory;
 
     public int MinifigId { get; }
     public string Name { get; private set; } = string.Empty;
@@ -72,7 +74,8 @@ public partial class MinifigSummaryViewModel : ObservableObject
         IStorageBinService binService,
         IPartImageProvider? imageProvider = null,
         IBlCatalogService? catalog = null,
-        IMinifigPersistenceService? persistence = null)
+        IMinifigPersistenceService? persistence = null,
+        IBlInventoryService? blInventory = null)
     {
         MinifigId = minifigId;
         _ctxFactory = ctxFactory;
@@ -80,6 +83,7 @@ public partial class MinifigSummaryViewModel : ObservableObject
         _imageProvider = imageProvider;
         _catalog = catalog;
         _persistence = persistence;
+        _blInventory = blInventory;
     }
 
     /// <summary>Laed die Figur aus der DB inkl. Parts + alle anderen Faecher als Move-Targets.</summary>
@@ -101,7 +105,8 @@ public partial class MinifigSummaryViewModel : ObservableObject
         Status = m.Status;
         Notes = m.UserNotes;
         TotalParts = m.RequiredParts.Count;
-        CompletedParts = m.RequiredParts.Count(p => p.QuantityCollected >= p.QuantityNeeded);
+        // v0.1.24-beta.8 Phase 3: effektiv-komplett (physisch + BL-reserviert).
+        CompletedParts = m.RequiredParts.Count(p => p.IsEffectivelyComplete);
 
         Parts.Clear();
         foreach (var p in m.RequiredParts.OrderBy(x => x.PartName))
@@ -113,6 +118,13 @@ public partial class MinifigSummaryViewModel : ObservableObject
         if (_imageProvider != null && _catalog != null)
         {
             _ = LoadPartImagesAndSwatchesAsync();
+        }
+
+        // v0.1.24-beta.8 Phase 3: BL-Inventar-Verfuegbarkeit pro fehlendem
+        // Teil im Hintergrund laden. Best-effort, blocking nicht den Dialog.
+        if (_blInventory != null)
+        {
+            _ = LoadBlAvailabilitiesAsync();
         }
 
         // Fallback: wenn LocalImagePath leer ist (alte Figuren oder beim
@@ -233,6 +245,301 @@ public partial class MinifigSummaryViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// v0.1.24-beta.8 Phase 3: Background-Load der BL-Inventar-Verfuegbarkeit
+    /// pro fehlendem Required-Part. Best-effort - Fehler werden geloggt aber
+    /// schluessen den Dialog nicht.
+    /// </summary>
+    private async Task LoadBlAvailabilitiesAsync()
+    {
+        if (_blInventory == null) return;
+        try
+        {
+            // Erst pruefen ob ueberhaupt BL-Inventar synchronisiert ist -
+            // ohne Sync sparen wir uns die per-Part-Queries komplett.
+            if (!await _blInventory.HasAnyInventoryAsync()) return;
+
+            // Snapshot der Parts-Liste damit wir nicht in eine Collection-
+            // Modification-Race kommen falls LoadAsync nochmal laeuft.
+            var snapshot = Parts.ToList();
+            foreach (var partVm in snapshot)
+            {
+                if (!partVm.IsMissing) continue;
+                try
+                {
+                    var lots = await _blInventory.FindLotsForPartAsync(
+                        partVm.PartNumber, partVm.ColorId);
+                    if (lots.Count == 0) continue;
+
+                    var newLots = lots.Where(l => l.Condition == "N").ToList();
+                    var usedLots = lots.Where(l => l.Condition == "U").ToList();
+                    var info = new BlAvailabilityInfo
+                    {
+                        NewQty = newLots.Sum(l => l.Quantity - l.ReservedQuantity),
+                        UsedQty = usedLots.Sum(l => l.Quantity - l.ReservedQuantity),
+                        NewLots = newLots,
+                        UsedLots = usedLots
+                    };
+
+                    var disp = Application.Current?.Dispatcher;
+                    if (disp != null)
+                        await disp.InvokeAsync(() => partVm.BlAvailability = info);
+                    else
+                        partVm.BlAvailability = info;
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug(ex,
+                        "BL-Availability fuer {Part}/{Color} nicht ladbar",
+                        partVm.PartNumber, partVm.ColorId);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "LoadBlAvailabilities geworfen");
+        }
+    }
+
+    /// <summary>
+    /// v0.1.24-beta.8 Phase 3: schliesst die Reservierungs-Schleife.
+    /// Schritte (best-effort transactional via SaveChanges in einem Context):
+    /// <list type="number">
+    ///   <item>BL-Lot reservieren (<see cref="IBlInventoryService.ReserveAsync"/>) - kann
+    ///   fehlschlagen wenn das Lot inzwischen weg / leer ist.</item>
+    ///   <item>TrackedMinifigPart.QuantityReservedFromBl += 1.</item>
+    ///   <item>ScanEvent (BlInventoryReservation) fuer Audit-Trail + Undo.</item>
+    ///   <item>Komplett-Check ueber Effective (analog AssignPartToMinifig).</item>
+    ///   <item>SummaryPartViewModel auf neuen Wert updaten.</item>
+    /// </list>
+    /// Liefert true wenn erfolgreich, false wenn das Lot nicht (mehr) reservierbar war.
+    /// </summary>
+    public async Task<bool> ApplyBlReservationAsync(SummaryPartViewModel partVm, BlInventoryLot lot)
+    {
+        if (_blInventory == null) return false;
+
+        // 1) BL-Lot reservieren. Lock + ReservedQuantity++.
+        var reserved = await _blInventory.ReserveAsync(lot.LotId, 1);
+        if (!reserved) return false;
+
+        // 2/3/4) Atomare Update der wartenden Figur + ScanEvent + Komplett-Check.
+        try
+        {
+            await using var ctx = await _ctxFactory.CreateDbContextAsync();
+            var dbPart = await ctx.TrackedMinifigParts
+                .Include(p => p.TrackedMinifig)
+                    .ThenInclude(m => m.RequiredParts)
+                .FirstOrDefaultAsync(p => p.Id == partVm.Id);
+            if (dbPart == null)
+            {
+                // Race-Edge: Teil existiert nicht mehr. Reservierung wieder freigeben.
+                await _blInventory.ReleaseAsync(lot.LotId, 1);
+                return false;
+            }
+
+            dbPart.QuantityReservedFromBl += 1;
+
+            // Komplett-Check ueber Effective (physisch + BL).
+            bool minifigCompleted = false;
+            var allComplete = dbPart.TrackedMinifig.RequiredParts.All(p =>
+                (p.Id == dbPart.Id
+                    ? dbPart.QuantityCollected + dbPart.QuantityReservedFromBl
+                    : p.QuantityCollected + p.QuantityReservedFromBl) >= p.QuantityNeeded);
+            if (allComplete && dbPart.TrackedMinifig.Status != TrackedMinifigStatus.Complete)
+            {
+                dbPart.TrackedMinifig.Status = TrackedMinifigStatus.Complete;
+                dbPart.TrackedMinifig.CompletedAt = DateTime.UtcNow;
+                minifigCompleted = true;
+            }
+
+            var conditionLabel = lot.Condition == "N" ? "Neu" : "Gebraucht";
+            // UndoData traegt die Verbindung (Part, Lot) damit der spaetere
+            // Release weiss welches Lot zurueckzugeben ist.
+            var undoSnapshot = new HBSort.Core.Services.UndoSnapshotBlReservation
+            {
+                TrackedMinifigPartId = dbPart.Id,
+                LotId = lot.LotId
+            };
+            ctx.ScanEvents.Add(new ScanEvent
+            {
+                Timestamp = DateTime.UtcNow,
+                Type = ScanType.BlInventoryReservation,
+                RecognizedId = lot.LotId.ToString(),
+                ResultDescription = minifigCompleted
+                    ? $"BL-Reservierung: {dbPart.PartName} ({conditionLabel}) fuer '{dbPart.TrackedMinifig.Name}' - Figur komplett"
+                    : $"BL-Reservierung: {dbPart.PartName} ({conditionLabel}) fuer '{dbPart.TrackedMinifig.Name}'",
+                UndoData = System.Text.Json.JsonSerializer.Serialize(undoSnapshot),
+                WasUndone = false
+            });
+
+            await ctx.SaveChangesAsync();
+
+            // 5) UI auf neuen Stand.
+            partVm.QuantityReservedFromBl = dbPart.QuantityReservedFromBl;
+            if (minifigCompleted)
+            {
+                Status = TrackedMinifigStatus.Complete;
+                CompletedParts = dbPart.TrackedMinifig.RequiredParts.Count(p => p.IsEffectivelyComplete);
+                OnPropertyChanged(nameof(Status));
+                OnPropertyChanged(nameof(IsWaiting));
+                OnPropertyChanged(nameof(IsComplete));
+                OnPropertyChanged(nameof(CompletedParts));
+                OnPropertyChanged(nameof(ProgressLabel));
+                OnPropertyChanged(nameof(ProgressFraction));
+            }
+            _persistence?.RaiseDataChanged();
+
+            Log.Information(
+                "BL-Reserve angewendet: Lot {LotId} -> Part {PartId} ({Reserved}/{Need}){Done}",
+                lot.LotId, dbPart.Id, dbPart.QuantityReservedFromBl, dbPart.QuantityNeeded,
+                minifigCompleted ? " => FIGUR KOMPLETT" : "");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "ApplyBlReservation: DB-Update fehlgeschlagen - releasing Lot {LotId}", lot.LotId);
+            // Bei DB-Fehler: BL-Reservierung wieder freigeben damit kein Geist-Lock bleibt.
+            try { await _blInventory.ReleaseAsync(lot.LotId, 1); }
+            catch (Exception relEx) { Log.Warning(relEx, "Release nach DB-Fehler ebenfalls geworfen"); }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// v0.1.24-beta.8 Phase 3 (Fix 4): Alle BL-Reservierungen fuer ein Teil
+    /// zuruecknehmen (LIFO ueber die ScanEvents). Wird vom Uncheck-Pfad
+    /// aufgerufen wenn das Teil <c>QuantityReservedFromBl &gt; 0</c> hat.
+    /// Schritte pro Reservierung:
+    /// <list type="number">
+    ///   <item><see cref="IBlInventoryService.ReleaseAsync"/>(lotId) - Shop-Bestand wieder freigeben.</item>
+    ///   <item>Originalen ScanEvent als WasUndone+UndoneAt markieren.</item>
+    ///   <item>Neuen BlInventoryRelease-ScanEvent fuer Audit-Trail.</item>
+    /// </list>
+    /// Am Ende: <c>part.QuantityReservedFromBl = 0</c>; falls die Figur
+    /// vorher als Complete markiert war und es jetzt nicht mehr ist:
+    /// zurueck auf Waiting + CompletedAt=null.
+    /// </summary>
+    public async Task<int> ReleaseAllBlReservationsAsync(SummaryPartViewModel partVm)
+    {
+        if (_blInventory == null || partVm.QuantityReservedFromBl <= 0) return 0;
+
+        await using var ctx = await _ctxFactory.CreateDbContextAsync();
+        var dbPart = await ctx.TrackedMinifigParts
+            .Include(p => p.TrackedMinifig)
+                .ThenInclude(m => m.RequiredParts)
+            .FirstOrDefaultAsync(p => p.Id == partVm.Id);
+        if (dbPart == null) return 0;
+
+        // ScanEvents fuer Reservierungen dieses Teils (nicht-undone) finden.
+        // Materialisierung in-memory weil UndoData JSON ist und SQLite das
+        // nicht effizient filtern kann. Typisch sind < 5 Reservierungen pro Teil.
+        var reservations = await ctx.ScanEvents
+            .Where(e => e.Type == ScanType.BlInventoryReservation && !e.WasUndone)
+            .ToListAsync();
+
+        var matching = new List<(ScanEvent Event, HBSort.Core.Services.UndoSnapshotBlReservation Snap)>();
+        foreach (var ev in reservations)
+        {
+            if (string.IsNullOrEmpty(ev.UndoData)) continue;
+            try
+            {
+                var snap = System.Text.Json.JsonSerializer
+                    .Deserialize<HBSort.Core.Services.UndoSnapshotBlReservation>(ev.UndoData);
+                if (snap != null && snap.TrackedMinifigPartId == dbPart.Id)
+                    matching.Add((ev, snap));
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "ScanEvent {Id} UndoData unparsable - skipping", ev.Id);
+            }
+        }
+
+        if (matching.Count == 0)
+        {
+            // Dateninkonsistenz: Part sagt "X reserviert", aber kein passender
+            // ScanEvent. Defensiv: einfach das Feld zuruecksetzen ohne Lot-
+            // Release, sonst bleibt der User in einem nicht-aufloesbaren
+            // Zustand stecken.
+            Log.Warning("ReleaseAllBlReservations: Part {Id} hat QuantityReservedFromBl={Q} aber keine passenden ScanEvents - setze Feld auf 0",
+                dbPart.Id, dbPart.QuantityReservedFromBl);
+            dbPart.QuantityReservedFromBl = 0;
+            await ctx.SaveChangesAsync();
+            partVm.QuantityReservedFromBl = 0;
+            return 0;
+        }
+
+        // LIFO: neueste Reservierung zuerst freigeben (intuitive Undo-Reihenfolge).
+        int released = 0;
+        bool wasComplete = dbPart.TrackedMinifig.Status == TrackedMinifigStatus.Complete;
+        var now = DateTime.UtcNow;
+
+        foreach (var (ev, snap) in matching.OrderByDescending(m => m.Event.Timestamp))
+        {
+            try
+            {
+                var ok = await _blInventory.ReleaseAsync(snap.LotId, 1);
+                if (!ok)
+                {
+                    Log.Warning("ReleaseAllBlReservations: Lot {LotId} konnte nicht released werden - ScanEvent bleibt offen",
+                        snap.LotId);
+                    continue;
+                }
+                ev.WasUndone = true;
+                ev.UndoneAt = now;
+
+                ctx.ScanEvents.Add(new ScanEvent
+                {
+                    Timestamp = now,
+                    Type = ScanType.BlInventoryRelease,
+                    RecognizedId = snap.LotId.ToString(),
+                    ResultDescription = $"BL-Reservierung aufgehoben: {dbPart.PartName} (Lot {snap.LotId}) " +
+                                        $"fuer '{dbPart.TrackedMinifig.Name}'",
+                    WasUndone = false
+                });
+                released++;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Release fuer Lot {LotId} geworfen", snap.LotId);
+            }
+        }
+
+        // Part- und Figur-Stand anpassen.
+        dbPart.QuantityReservedFromBl = Math.Max(0, dbPart.QuantityReservedFromBl - released);
+
+        // Status zurueckrollen wenn die Figur durch das Release nicht mehr komplett ist.
+        bool isStillComplete = dbPart.TrackedMinifig.RequiredParts.All(p =>
+            (p.Id == dbPart.Id
+                ? dbPart.QuantityCollected + dbPart.QuantityReservedFromBl
+                : p.QuantityCollected + p.QuantityReservedFromBl) >= p.QuantityNeeded);
+        if (wasComplete && !isStillComplete)
+        {
+            dbPart.TrackedMinifig.Status = TrackedMinifigStatus.Waiting;
+            dbPart.TrackedMinifig.CompletedAt = null;
+        }
+
+        await ctx.SaveChangesAsync();
+
+        // UI-Stand spiegeln.
+        partVm.QuantityReservedFromBl = dbPart.QuantityReservedFromBl;
+        if (wasComplete && !isStillComplete)
+        {
+            Status = TrackedMinifigStatus.Waiting;
+            OnPropertyChanged(nameof(Status));
+            OnPropertyChanged(nameof(IsWaiting));
+            OnPropertyChanged(nameof(IsComplete));
+        }
+        CompletedParts = dbPart.TrackedMinifig.RequiredParts.Count(p => p.IsEffectivelyComplete);
+        OnPropertyChanged(nameof(CompletedParts));
+        OnPropertyChanged(nameof(ProgressLabel));
+        OnPropertyChanged(nameof(ProgressFraction));
+
+        _persistence?.RaiseDataChanged();
+        Log.Information("ReleaseAllBlReservations: Part {Id} - {Count} Reservierungen freigegeben", dbPart.Id, released);
+        return released;
+    }
+
     private static Brush ParseRgbBrush(string? hex)
     {
         if (string.IsNullOrWhiteSpace(hex)) return Brushes.Gray;
@@ -333,7 +640,23 @@ public partial class SummaryPartViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsCompleted))]
     [NotifyPropertyChangedFor(nameof(QuantityLabel))]
+    [NotifyPropertyChangedFor(nameof(EffectiveCollected))]
+    [NotifyPropertyChangedFor(nameof(IsMissing))]
+    [NotifyPropertyChangedFor(nameof(ShowBlBadge))]
     private int _quantityCollected;
+
+    /// <summary>
+    /// v0.1.24-beta.8 Phase 3: Menge die im BL-Shop reserviert wurde
+    /// (liegt physisch noch im Store). Wird beim Reserve-Klick erhoeht.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsCompleted))]
+    [NotifyPropertyChangedFor(nameof(QuantityLabel))]
+    [NotifyPropertyChangedFor(nameof(EffectiveCollected))]
+    [NotifyPropertyChangedFor(nameof(IsMissing))]
+    [NotifyPropertyChangedFor(nameof(HasBlReservation))]
+    [NotifyPropertyChangedFor(nameof(ShowBlBadge))]
+    private int _quantityReservedFromBl;
 
     /// <summary>BL-Bild des Teils (URL/Pfad) - wird vom Parent-VM async befuellt.</summary>
     [ObservableProperty]
@@ -343,8 +666,31 @@ public partial class SummaryPartViewModel : ObservableObject
     [ObservableProperty]
     private Brush _swatchBrush = Brushes.Gray;
 
-    public bool IsCompleted => QuantityCollected >= QuantityNeeded;
-    public string QuantityLabel => $"{QuantityCollected}/{QuantityNeeded}";
+    /// <summary>
+    /// v0.1.24-beta.8 Phase 3: BL-Inventar-Verfuegbarkeit fuer dieses Teil.
+    /// Wird async vom Parent-VM nach Load befuellt. Null = noch nicht
+    /// geprueft. Empty (HasAny=false) = geprueft, nichts gefunden.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowBlBadge))]
+    private BlAvailabilityInfo? _blAvailability;
+
+    /// <summary>Badge nur sichtbar wenn Teil effektiv fehlt UND BL was anbietet.</summary>
+    public bool ShowBlBadge => IsMissing && BlAvailability != null && BlAvailability.HasAny;
+
+    /// <summary>
+    /// Effektiv beschafft (physisch + BL-reserviert) — Basis fuer
+    /// IsCompleted und QuantityLabel-Darstellung.
+    /// </summary>
+    public int EffectiveCollected => QuantityCollected + QuantityReservedFromBl;
+    public bool IsCompleted => EffectiveCollected >= QuantityNeeded;
+    public bool IsMissing => EffectiveCollected < QuantityNeeded;
+    public bool HasBlReservation => QuantityReservedFromBl > 0;
+
+    /// <summary>"3/5" oder "3 (+1 BL)/5" wenn Reservierung vorhanden.</summary>
+    public string QuantityLabel => QuantityReservedFromBl > 0
+        ? $"{QuantityCollected} (+{QuantityReservedFromBl} BL)/{QuantityNeeded}"
+        : $"{QuantityCollected}/{QuantityNeeded}";
 
     public SummaryPartViewModel(TrackedMinifigPart p)
     {
@@ -355,5 +701,27 @@ public partial class SummaryPartViewModel : ObservableObject
         ColorName = p.ColorName;
         QuantityNeeded = p.QuantityNeeded;
         _quantityCollected = p.QuantityCollected;
+        _quantityReservedFromBl = p.QuantityReservedFromBl;
     }
+}
+
+/// <summary>
+/// v0.1.24-beta.8 Phase 3: BL-Inventar-Verfuegbarkeit pro Teil.
+/// Wird async vom MinifigSummaryViewModel berechnet (FindLotsForPartAsync
+/// liefert die Lots). Aufgeteilt nach Condition damit der Reservierungs-
+/// Dialog "Neu/Gebraucht"-Buttons getrennt anbieten kann.
+/// </summary>
+public sealed class BlAvailabilityInfo
+{
+    public int NewQty { get; init; }
+    public int UsedQty { get; init; }
+    public IReadOnlyList<BlInventoryLot> NewLots { get; init; } = Array.Empty<BlInventoryLot>();
+    public IReadOnlyList<BlInventoryLot> UsedLots { get; init; } = Array.Empty<BlInventoryLot>();
+
+    public bool HasAny => NewQty + UsedQty > 0;
+    public bool HasNew => NewQty > 0;
+    public bool HasUsed => UsedQty > 0;
+
+    public string BadgeText => "BL-Shop";
+    public string BadgeTooltip => $"Im BL-Shop verfuegbar: {NewQty}× Neu, {UsedQty}× Gebraucht. Klicken um zu reservieren.";
 }

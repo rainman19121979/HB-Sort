@@ -99,6 +99,7 @@ public class BlInventoryService : IBlInventoryService
                 ColorId = dto.ColorId,
                 ColorName = dto.ColorName,
                 Description = dto.Description,
+                Remarks = dto.Remarks,
                 Quantity = dto.Quantity,
                 UnitPrice = dto.UnitPrice,
                 Condition = dto.Condition,
@@ -131,5 +132,91 @@ public class BlInventoryService : IBlInventoryService
             .ThenBy(l => l.ItemNo)
             .ThenBy(l => l.ColorId)
             .ToListAsync(ct);
+    }
+
+    // ====================================================================
+    // v0.1.24-beta.8 Phase 3: Komplettieren-Integration
+    // ====================================================================
+
+    public async Task<bool> HasAnyInventoryAsync(CancellationToken ct = default)
+    {
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+        return await ctx.BlInventoryLots.AsNoTracking().AnyAsync(ct);
+    }
+
+    public async Task<List<BlInventoryLot>> FindLotsForPartAsync(
+        string blPartNo, int? colorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(blPartNo)) return new List<BlInventoryLot>();
+
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+        var query = ctx.BlInventoryLots
+            .AsNoTracking()
+            .Where(l => l.ItemNo == blPartNo);
+        // Farblos-Lots (Minifig/Set) haben ColorId=null. Wenn der Aufrufer
+        // colorId=null mitgibt, matched das auf null in der DB.
+        if (colorId.HasValue)
+            query = query.Where(l => l.ColorId == colorId.Value);
+        else
+            query = query.Where(l => l.ColorId == null);
+
+        var lots = await query.ToListAsync(ct);
+        // Verfuegbarkeit-Filter + Sortierung in-memory (Available ist
+        // computed, kein DB-Spalte). Bei sehr grossen Stores immer noch
+        // schnell (Pre-Filter ueber Index IX_BlInventoryLots_ItemType_ItemNo_ColorId).
+        return lots
+            .Where(l => l.Quantity - l.ReservedQuantity > 0)
+            .OrderBy(l => l.Condition == "N" ? 0 : 1) // Neu vor Gebraucht
+            .ThenByDescending(l => l.Quantity - l.ReservedQuantity)
+            .ToList();
+    }
+
+    public async Task<bool> ReserveAsync(int lotId, int qty = 1, CancellationToken ct = default)
+    {
+        if (qty <= 0) return false;
+
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+        var lot = await ctx.BlInventoryLots.FirstOrDefaultAsync(l => l.LotId == lotId, ct);
+        if (lot == null) return false;
+        var available = lot.Quantity - lot.ReservedQuantity;
+        if (available < qty)
+        {
+            Log.Warning(
+                "BL-Reserve abgewiesen: Lot {LotId} hat nur {Available} verfuegbar (angefragt {Qty})",
+                lotId, available, qty);
+            return false;
+        }
+
+        lot.ReservedQuantity += qty;
+        await ctx.SaveChangesAsync(ct);
+        Log.Information("BL-Reserve: Lot {LotId} +{Qty} -> Reserviert {Reserved}/{Total}",
+            lotId, qty, lot.ReservedQuantity, lot.Quantity);
+
+        InventoryChanged?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
+
+    public async Task<bool> ReleaseAsync(int lotId, int qty = 1, CancellationToken ct = default)
+    {
+        if (qty <= 0) return false;
+
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+        var lot = await ctx.BlInventoryLots.FirstOrDefaultAsync(l => l.LotId == lotId, ct);
+        if (lot == null) return false;
+        if (lot.ReservedQuantity < qty)
+        {
+            Log.Warning(
+                "BL-Release abgewiesen: Lot {LotId} hat nur {Reserved} reserviert (angefragt {Qty})",
+                lotId, lot.ReservedQuantity, qty);
+            return false;
+        }
+
+        lot.ReservedQuantity -= qty;
+        await ctx.SaveChangesAsync(ct);
+        Log.Information("BL-Release: Lot {LotId} -{Qty} -> Reserviert {Reserved}/{Total}",
+            lotId, qty, lot.ReservedQuantity, lot.Quantity);
+
+        InventoryChanged?.Invoke(this, EventArgs.Empty);
+        return true;
     }
 }

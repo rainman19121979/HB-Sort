@@ -59,7 +59,10 @@ public class WantedListExportService : IWantedListExportService
             {
                 p.PartNumber,
                 p.ColorId,
-                Missing = Math.Max(0, p.QuantityNeeded - p.QuantityCollected)
+                // v0.1.24-beta.8 Phase 3: BL-reservierte Teile NICHT mehr
+                // exportieren (User hat sie schon im Shop, will sie nicht
+                // doppelt kaufen).
+                Missing = p.EffectivelyMissing
             })
             .Where(x => x.Missing > 0)
             .GroupBy(x => new { x.PartNumber, x.ColorId })
@@ -95,7 +98,7 @@ public class WantedListExportService : IWantedListExportService
                 .Select(p => new WantedItem(
                     p.PartNumber,
                     p.ColorId,
-                    Math.Max(0, p.QuantityNeeded - p.QuantityCollected)))
+                    p.EffectivelyMissing))
                 .Where(x => x.Quantity > 0)
                 .OrderBy(x => x.PartNo).ThenBy(x => x.ColorId)
                 .ToList();

@@ -88,3 +88,15 @@ public sealed record UndoSnapshotComplete
     public string OldStatus { get; init; } = string.Empty;
     public DateTime? OldCompletedAt { get; init; }
 }
+
+/// <summary>
+/// v0.1.24-beta.8 Phase 3: Snapshot fuer eine einzelne BL-Reservierung.
+/// Wird in <see cref="HBSort.Core.Models.ScanEvent.UndoData"/> serialisiert
+/// damit das spaetere Release das passende Lot kennt. Pro Reservierung ein
+/// ScanEvent (Type=BlInventoryReservation) mit diesem Snapshot.
+/// </summary>
+public sealed record UndoSnapshotBlReservation
+{
+    public int TrackedMinifigPartId { get; init; }
+    public int LotId { get; init; }
+}
