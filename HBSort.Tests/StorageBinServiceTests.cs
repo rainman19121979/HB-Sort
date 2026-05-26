@@ -604,6 +604,46 @@ public class StorageBinServiceTests : IDisposable
         Assert.Null(suggestion);
     }
 
+    // ===== Bug-Fix v0.1.24-beta.9: Waiting-Bin-Symmetrie =====
+    // Repro: zu zerlegende Figur liegt ALLEIN in einem Pure-Waiting-Bin
+    // (Box 01 = Kind=Waiting). Box 02 ist Empty. Service muss Box 02
+    // vorschlagen, NICHT Box 01 - Box 01 ist in AvailableBins
+    // (FloatingTarget ohne partNo) nicht sichtbar, wuerde sonst wieder zum
+    // "Kein Fach frei"-Bug fuehren.
+
+    [Fact]
+    public async Task SuggestBinForFloatingPart_excludeMinifigId_skips_waiting_bin_with_only_excluded_minifig()
+    {
+        // Box 01: Waiting-Bin mit nur der zu zerlegenden Figur (aqu019-Szenario).
+        // Box 02: Empty, verfuegbar.
+        // Erwartet: Box 02 als Vorschlag, NICHT Box 01 (waere Kind=Waiting).
+        await _sut.CreateBulkAsync(new[] { "Box 01", "Box 02" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        var minifigId = await SeedMinifigInBinAsync(b1!.Id, "aqu019", TrackedMinifigStatus.Waiting);
+
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync(
+            "3024", 11, "", excludeMinifigId: minifigId);
+
+        Assert.NotNull(suggestion);
+        Assert.Equal("Box 02", suggestion!.Label);
+    }
+
+    [Fact]
+    public async Task SuggestBinForFloatingPart_excludeMinifigId_returns_null_when_only_waiting_bin_with_excluded_minifig()
+    {
+        // Pendant zum Complete-Edge-Case: einziges Bin ist das Waiting-Bin
+        // der excluded-Figur. Service liefert null (Symmetrie-Vertrag zu
+        // AvailableBins, die Waiting-Bins ohne partNo/colorId nicht zeigt).
+        await _sut.CreateBulkAsync(new[] { "Box 01" });
+        var b1 = await _sut.GetByLabelAsync("Box 01");
+        var minifigId = await SeedMinifigInBinAsync(b1!.Id, "aqu019", TrackedMinifigStatus.Waiting);
+
+        var suggestion = await _sut.SuggestBinForFloatingPartAsync(
+            "3024", 11, "", excludeMinifigId: minifigId);
+
+        Assert.Null(suggestion);
+    }
+
     [Fact]
     public async Task SuggestBinForFloatingPart_without_excludeMinifigId_skips_bin_with_complete()
     {

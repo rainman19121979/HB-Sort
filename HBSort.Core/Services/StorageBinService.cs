@@ -197,48 +197,45 @@ public class StorageBinService : IStorageBinService
             // Mapping zeigt auf geloeschtes Bin -> Fall-through auf Default-Regel.
         }
 
-        var hasExclude = excludeMinifigId.HasValue;
-
         // ============================================================
-        // 3) Default-Regel: erstes Bin OHNE Minifigs (ausser excluded)
-        //    UND OHNE einen FloatingPart der gleichen Brickognize-
-        //    Kategorie aber anderer PartNo. Verschiedene Kategorien
-        //    duerfen sich ein Bin teilen, gleiche Kategorie nicht
-        //    (sonst landen Helm-A + Helm-B zusammen -> doppelter Stapel).
-        //    Sortiert nach Label fuer Stabilitaet.
+        // 3) Default-Regel: erstes Bin OHNE einen FloatingPart der gleichen
+        //    Brickognize-Kategorie aber anderer PartNo. Verschiedene
+        //    Kategorien duerfen sich ein Bin teilen, gleiche Kategorie
+        //    nicht (sonst landen Helm-A + Helm-B zusammen -> doppelter
+        //    Stapel). Sortiert nach Label fuer Stabilitaet.
+        // ============================================================
+        // v0.1.24-beta.9 Hotfix: allowedKinds ist strikt [Empty, Floating] -
+        // unabhaengig von excludeMinifigId. Damit ist Suggest exakt
+        // symmetrisch zu GetEligibleBinsWithCountsAsync(FloatingTarget,
+        // partNo=null) - die UI-Combobox (AvailableBins) zeigt ohnehin
+        // weder Complete- noch Waiting-Bins ohne Reverse-Match-Bypass.
         //
-        // v0.1.23: Pre-Filter ueber bin.Kind (Index IX_StorageBins_Kind):
-        // Floating darf in Empty oder Floating. NICHT Complete (Strict-Mode).
-        // Waiting-Bin mit Reverse-Match-Bypass laeuft NICHT ueber diesen Pfad -
-        // dafuer ist GetEligibleBinsAsync zustaendig (UI-Combobox), die
-        // Pending-Persist-Logik konsumiert FloatingParts ueber den Reverse-
-        // Match in MinifigPersistenceService.PersistAndStoreAsync.
-        // ============================================================
-        // v0.1.24-beta.4 Bugfix: allowedKinds ist jetzt unabhaengig von
-        // excludeMinifigId immer [Empty, Floating, Waiting] - symmetrisch
-        // zu GetEligibleBinsWithCountsAsync(FloatingTarget). Vorher: wenn
-        // excludeMinifigId gesetzt war (Dismantle-Pfad), wurde auch Complete
-        // erlaubt mit der Annahme "Bin der zu zerlegenden Figur wird gleich
-        // frei". Das fuehrte zum Bug: Suggest lieferte ein Complete-Bin
-        // zurueck, das PickPerPartBinAsync in AvailableBins nicht findet
-        // (Combobox filtert Complete kategorisch raus) -> null ->
-        // "Kein Fach frei" obwohl leere Bins frei waeren. Complete-Bin wird
-        // erst NACH dem Confirm via RecalculateKindAsync zum Empty/Floating-
-        // Bin; der Vorschlags-Service darf das nicht antizipieren. Die
-        // zweite Where-Klausel (TrackedMinifigs.Any) filtert weiterhin Bins
-        // mit fremden Minifigs raus - die excluded-Figur in einem Waiting-
-        // Bin (Misch-Pfad) bleibt damit als Kandidat moeglich.
+        // <para>Historie:</para>
+        // <list type="bullet">
+        //   <item>v0.1.23: Pre-Filter ueber bin.Kind eingefuehrt; mit
+        //   excludeMinifigId wurden [Empty, Floating, Waiting, Complete]
+        //   zugelassen mit der Annahme "Bin der zu zerlegenden Figur wird
+        //   gleich frei". -&gt; Discrepancy zu AvailableBins.</item>
+        //   <item>v0.1.24-beta.4: Complete aus der Liste raus, Waiting blieb
+        //   drin mit dem Argument "excluded-Figur in einem Waiting-Bin
+        //   bleibt als Kandidat moeglich". -&gt; Bug blieb fuer den
+        //   Pure-Waiting-Bin-Fall (zu zerlegende Figur allein im Bin).</item>
+        //   <item>v0.1.24-beta.9: jetzt strikt [Empty, Floating]. Empty/
+        //   Floating-Bins haben per definition keine TrackedMinifigs, daher
+        //   ist die alte "TrackedMinifigs.Any"-Where-Klausel redundant
+        //   und entfaellt. Reifungspfad (Mix-Bin mit Floating-Stapel im
+        //   Waiting-Bin) wird ueber den Stapel-Match (Schritt 1, kein
+        //   Kind-Filter) abgedeckt.</item>
+        // </list>
         StorageBinKind[] allowedKinds = new[]
         {
-            StorageBinKind.Empty, StorageBinKind.Floating, StorageBinKind.Waiting
+            StorageBinKind.Empty, StorageBinKind.Floating
         };
 
         var candidates = await ctx.StorageBins
             .AsNoTracking()
             .Include(b => b.FloatingParts)
             .Where(b => allowedKinds.Contains(b.Kind))
-            .Where(b => !b.TrackedMinifigs.Any(m =>
-                !hasExclude || m.Id != excludeMinifigId!.Value))
             .OrderBy(b => b.Label)
             .ToListAsync(ct);
 
@@ -882,7 +879,9 @@ public class StorageBinService : IStorageBinService
                     && m.RequiredParts.Any(rp =>
                         rp.PartNumber == partNo
                         && rp.ColorId == colorId.Value
-                        && rp.QuantityCollected < rp.QuantityNeeded));
+                        // v0.1.24-beta.8 Phase 3: effektive Restmenge
+                        // (physisch + BL-reserviert).
+                        && (rp.QuantityCollected + rp.QuantityReservedFromBl) < rp.QuantityNeeded));
                 if (matchFound) eligible.Add(bin);
             }
             return eligible;
@@ -987,7 +986,9 @@ public class StorageBinService : IStorageBinService
                     && m.RequiredParts.Any(rp =>
                         rp.PartNumber == partNo
                         && rp.ColorId == colorId.Value
-                        && rp.QuantityCollected < rp.QuantityNeeded));
+                        // v0.1.24-beta.8 Phase 3: effektive Restmenge
+                        // (physisch + BL-reserviert).
+                        && (rp.QuantityCollected + rp.QuantityReservedFromBl) < rp.QuantityNeeded));
                 if (matchFound) eligible.Add(bin);
             }
         }
