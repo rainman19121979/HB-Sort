@@ -12,36 +12,50 @@ namespace HBSort.Core.Services;
 /// auf den Sync-Zeitpunkt gesetzt.
 ///
 /// <para>
-/// <b>ReservedQuantity-Lebenszyklus</b> (Phase 1 legt die Spalte an;
-/// schreibender Code kommt erst in Phasen 2-4):
+/// <b>ReservedQuantity-Lebenszyklus</b> — Stand v0.1.24-beta.10:
 /// </para>
 /// <list type="number">
 ///   <item>
-///     <b>Reservieren</b> (Phase 2/3): wenn HBSort ein Teil aus dem BL-
-///     Inventar fuer eine wartende Figur einplant, wird
-///     <c>ReservedQuantity</c> des passenden Lots um die geplante Menge
-///     erhoeht. Verfuegbar zum Verkauf = <c>Quantity - ReservedQuantity</c>.
+///     <b>Reservieren</b> (Phase 3, implementiert): User klickt im
+///     Summary-Dialog auf das BL-Shop-Badge eines fehlenden Required-Parts;
+///     <see cref="ReserveAsync"/> erhoeht <c>BlInventoryLot.ReservedQuantity</c>
+///     und <c>TrackedMinifigPart.QuantityReservedFromBl</c>. Verfuegbar zum
+///     Verkauf = <c>Quantity - ReservedQuantity</c>.
 ///   </item>
 ///   <item>
-///     <b>Export</b> (Phase 4): der Export-Dialog erzeugt eine BL-
-///     Mass-Update-XML mit den Adjustments (geplante Mengen pro Lot).
-///     Nach erfolgreichem Hochladen / Bestaetigen setzt der Dialog
-///     <c>ReservedQuantity = 0</c> fuer alle exportierten Lots zurueck.
+///     <b>Manuelles Release</b> (Phase 3, implementiert): User entfernt den
+///     Haken am Required-Part im Summary-Dialog;
+///     <c>MinifigSummaryViewModel.ReleaseAllBlReservationsAsync</c> findet
+///     die zugehoerigen ScanEvents per <see cref="UndoSnapshotBlReservation"/>-
+///     JSON und ruft pro Reservierung <see cref="ReleaseAsync"/> (LIFO).
 ///   </item>
 ///   <item>
-///     <b>Sync nach Export</b>: der naechste <see cref="SyncInventoryAsync"/>-
-///     Lauf holt die bereits reduzierten <c>Quantity</c>-Werte direkt von
-///     BL. Da <c>ReservedQuantity=0</c> ist, stimmt der Stand wieder
-///     ueberein - kein Doppel-Zaehlen.
+///     <b>Release bei Figur-Entfernung</b> (Phase V1 / beta.10, implementiert):
+///     <see cref="ReleaseAllForMinifigsAsync"/> wird vom
+///     <c>IMinifigPersistenceService</c> VOR jedem Loesch-/Zerlegungs-/
+///     Cleanup-Pfad aufgerufen. Damit bleiben keine Geist-Reservierungen
+///     zurueck wenn die Figur weg ist.
+///   </item>
+///   <item>
+///     <b>Snapshot-Replace mit Reservierungs-Erhalt</b> (Phase 1, implementiert):
+///     <see cref="SyncInventoryAsync"/> merkt sich vor dem Snapshot-Replace
+///     <c>(LotId, ReservedQuantity)</c> und stellt den Wert nach dem Insert
+///     fuer jedes weiterhin existierende Lot wieder her — gecappt auf die
+///     neue <c>Quantity</c> (V6 / beta.10). Lots die in der neuen BL-Antwort
+///     nicht mehr vorkommen verlieren ihre Reservierung; das ist beabsichtigt
+///     (Phase-1-Trade-off, dokumentiert).
+///   </item>
+///   <item>
+///     <b>Export / Mass-Update</b> (Phase 4, NOCH NICHT IMPLEMENTIERT):
+///     vorgesehen ist ein BSX/Mass-Update-Dialog der die Reservierungen
+///     auf BL-Seite reduziert (<c>Quantity</c> sinkt) und danach
+///     <c>ReservedQuantity = 0</c> setzt. Der naechste Sync holt dann den
+///     reduzierten <c>Quantity</c>-Wert direkt von BL. Bis Phase 4 fehlt
+///     dieser Pfad — User muss aktuell die Reservierungen entweder manuell
+///     im Summary-Dialog aufheben oder die Figur aufgeben (was V1 jetzt
+///     korrekt freigibt).
 ///   </item>
 /// </list>
-/// <para>
-/// <b>Snapshot-Replace mit Reservierungs-Erhalt:</b> Vor dem Loeschen
-/// wird (LotId, ReservedQuantity) gemerkt; nach dem Insert wird der Wert
-/// fuer jedes weiterhin existierende Lot wiederhergestellt. Lots die in
-/// der neuen BL-Antwort nicht mehr vorkommen (ausverkauft / geloescht im
-/// Store) verlieren ihre Reservierung - das ist Phase-1-akzeptabel.
-/// </para>
 /// </summary>
 public class BlInventoryService : IBlInventoryService
 {
@@ -86,10 +100,26 @@ public class BlInventoryService : IBlInventoryService
         // 4) Neuen Stand einfuegen. Pro Lot: ReservedQuantity aus dem
         //    Snapshot wiederherstellen (0 wenn das Lot neu ist oder vorher
         //    keine Reservierung hatte).
+        //
+        // V6 (beta.10 / Audit H4): Reserved wird auf die neue Quantity
+        // gecappt. Szenario: User reserviert 5 von 10, verkauft im BL-Shop
+        // 7 Stueck (Quantity auf 3), Sync laeuft. Ohne Cap waere
+        // ReservedQuantity=5 > Quantity=3 -> Available=-2, das Lot wird
+        // von FindLotsForPartAsync ausgefiltert und die Buchhaltung ist
+        // korrupt. Cap auf Quantity verhindert das; Diff wird geloggt.
         int restoredReservations = 0;
+        int cappedReservations = 0;
         foreach (var dto in lots)
         {
-            var reserved = reservedByLot.TryGetValue(dto.LotId, out var r) ? r : 0;
+            var rawReserved = reservedByLot.TryGetValue(dto.LotId, out var r) ? r : 0;
+            var reserved = Math.Min(rawReserved, dto.Quantity);
+            if (reserved < rawReserved)
+            {
+                Log.Warning(
+                    "BL-Inventar-Sync: Lot {LotId} ReservedQuantity gecappt {Old} -> {New} (neue Quantity={Q})",
+                    dto.LotId, rawReserved, reserved, dto.Quantity);
+                cappedReservations++;
+            }
             if (reserved > 0) restoredReservations++;
             ctx.BlInventoryLots.Add(new BlInventoryLot
             {
@@ -111,9 +141,9 @@ public class BlInventoryService : IBlInventoryService
 
         Log.Information(
             "BL-Inventar-Sync: {Old} alte Eintraege geloescht, {New} neue gespeichert, " +
-            "{Restored} Reservierungen erhalten, {Lost} Reservierungen verloren " +
-            "(Lots nicht mehr im BL-Store) (UTC {When:O})",
-            deletedCount, lots.Count, restoredReservations,
+            "{Restored} Reservierungen erhalten, {Capped} gecappt, " +
+            "{Lost} Reservierungen verloren (Lots nicht mehr im BL-Store) (UTC {When:O})",
+            deletedCount, lots.Count, restoredReservations, cappedReservations,
             reservedByLot.Count - restoredReservations,
             syncedAt);
 
@@ -218,5 +248,116 @@ public class BlInventoryService : IBlInventoryService
 
         InventoryChanged?.Invoke(this, EventArgs.Empty);
         return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<int> ReleaseAllForMinifigsAsync(
+        IEnumerable<int> trackedMinifigIds, CancellationToken ct = default)
+    {
+        var ids = trackedMinifigIds?.Where(id => id > 0).Distinct().ToList()
+                  ?? new List<int>();
+        if (ids.Count == 0) return 0;
+
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+
+        // 1) Welche Required-Parts der Minifigs haben offene Reservierungen?
+        var partsWithReservations = await ctx.TrackedMinifigParts
+            .Where(p => ids.Contains(p.TrackedMinifigId)
+                     && p.QuantityReservedFromBl > 0)
+            .ToListAsync(ct);
+        if (partsWithReservations.Count == 0) return 0;
+
+        var partIdsLookup = partsWithReservations.Select(p => p.Id).ToHashSet();
+
+        // 2) Reservierungs-ScanEvents materialisieren und in-memory ueber
+        //    UndoSnapshotBlReservation.TrackedMinifigPartId matchen.
+        var reservations = await ctx.ScanEvents
+            .Where(e => e.Type == ScanType.BlInventoryReservation && !e.WasUndone)
+            .ToListAsync(ct);
+
+        var matching = new List<(ScanEvent Event, UndoSnapshotBlReservation Snap)>();
+        foreach (var ev in reservations)
+        {
+            if (string.IsNullOrEmpty(ev.UndoData)) continue;
+            try
+            {
+                var snap = System.Text.Json.JsonSerializer
+                    .Deserialize<UndoSnapshotBlReservation>(ev.UndoData);
+                if (snap != null && partIdsLookup.Contains(snap.TrackedMinifigPartId))
+                    matching.Add((ev, snap));
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "ReleaseAllForMinifigs: ScanEvent {Id} UndoData unparsable - skipping", ev.Id);
+            }
+        }
+
+        if (matching.Count == 0)
+        {
+            // Dateninkonsistenz: Parts sagen "X reserviert" aber keine matching
+            // ScanEvents. Defensiv: trotzdem die Felder zuruecksetzen damit der
+            // Cascade-Delete im Aufrufer-Context konsistent ist.
+            Log.Warning(
+                "ReleaseAllForMinifigs({Ids}): {PartCount} Parts haben Reservierungen aber keine matching ScanEvents - Felder werden ohne Lot-Release zurueckgesetzt",
+                string.Join(",", ids), partsWithReservations.Count);
+            foreach (var p in partsWithReservations) p.QuantityReservedFromBl = 0;
+            await ctx.SaveChangesAsync(ct);
+            return 0;
+        }
+
+        // 3) LIFO Release: neueste Reservierung zuerst freigeben.
+        int released = 0;
+        var now = DateTime.UtcNow;
+
+        foreach (var (ev, snap) in matching.OrderByDescending(m => m.Event.Timestamp))
+        {
+            var lot = await ctx.BlInventoryLots
+                .FirstOrDefaultAsync(l => l.LotId == snap.LotId, ct);
+            if (lot == null)
+            {
+                Log.Warning(
+                    "ReleaseAllForMinifigs: Lot {LotId} nicht mehr in DB (Sync hat es verloren) - ScanEvent {EvId} wird trotzdem als undone markiert",
+                    snap.LotId, ev.Id);
+                ev.WasUndone = true;
+                ev.UndoneAt = now;
+                continue;
+            }
+            if (lot.ReservedQuantity < 1)
+            {
+                Log.Warning(
+                    "ReleaseAllForMinifigs: Lot {LotId} hat ReservedQuantity=0 - ScanEvent {EvId} bleibt offen (Drift)",
+                    snap.LotId, ev.Id);
+                continue;
+            }
+
+            lot.ReservedQuantity -= 1;
+            ev.WasUndone = true;
+            ev.UndoneAt = now;
+
+            // Audit-Release-Event. Beschreibung verraet die Original-Reservierung
+            // (PartName/Condition aus dem alten Event).
+            ctx.ScanEvents.Add(new ScanEvent
+            {
+                Timestamp = now,
+                Type = ScanType.BlInventoryRelease,
+                RecognizedId = snap.LotId.ToString(),
+                ResultDescription = $"BL-Reservierung freigegeben (Lot {snap.LotId}, Auto-Release wegen Figur-Entfernung)",
+                WasUndone = false
+            });
+            released++;
+        }
+
+        // 4) Part-Felder zuruecksetzen (defensiv fuer standalone-Aufrufe).
+        //    Im Aufrufer-Kontext loescht Cascade-Delete die Parts gleich danach.
+        foreach (var p in partsWithReservations) p.QuantityReservedFromBl = 0;
+
+        await ctx.SaveChangesAsync(ct);
+
+        Log.Information(
+            "ReleaseAllForMinifigs({Ids}): {Released} Reservierungen freigegeben (von {Matching} matching ScanEvents)",
+            string.Join(",", ids), released, matching.Count);
+
+        if (released > 0) InventoryChanged?.Invoke(this, EventArgs.Empty);
+        return released;
     }
 }

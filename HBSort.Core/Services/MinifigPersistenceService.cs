@@ -26,6 +26,7 @@ public class MinifigPersistenceService : IMinifigPersistenceService
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
     private readonly ICategoryBinMappingService? _categoryMapping;
     private readonly IStorageBinService? _binService;
+    private readonly IBlInventoryService? _blInventory;
 
     public event EventHandler? DataChanged;
 
@@ -41,15 +42,42 @@ public class MinifigPersistenceService : IMinifigPersistenceService
     /// werden RecalculateKindAsync-Aufrufe nach Schreib-Aktionen
     /// uebersprungen (Test-Backwards-Compat). Production (DI) reicht den
     /// Service durch, damit Bin.Kind nach jeder Aktion korrekt ist.
+    ///
+    /// v0.1.24-beta.10 V1: <paramref name="blInventory"/> ist optional. Wenn
+    /// null, werden BL-Reservierungen vor Loesch-/Zerlegungs-/Cleanup-Pfaden
+    /// NICHT freigegeben (Tests). Production (DI) reicht den Service durch,
+    /// damit Geist-Reservierungen verhindert werden (Audit-Befund H1).
     /// </summary>
     public MinifigPersistenceService(
         IDbContextFactory<UserDataContext> ctxFactory,
         ICategoryBinMappingService? categoryMapping = null,
-        IStorageBinService? binService = null)
+        IStorageBinService? binService = null,
+        IBlInventoryService? blInventory = null)
     {
         _ctxFactory = ctxFactory;
         _categoryMapping = categoryMapping;
         _binService = binService;
+        _blInventory = blInventory;
+    }
+
+    /// <summary>
+    /// v0.1.24-beta.10 V1 (Audit-Befund H1): vor jedem Loesch-/Cleanup-Pfad
+    /// die BL-Reservierungen der betroffenen Minifigs freigeben. No-Op wenn
+    /// kein IBlInventoryService injiziert ist (Test-Pfade) oder die ID-Liste
+    /// leer ist. Fehler werden geloggt aber nicht propagiert - das Loeschen
+    /// darf nie an einer Reservierungs-Buchhaltungs-Stoerung scheitern.
+    /// </summary>
+    private async Task ReleaseBlReservationsForAsync(IEnumerable<int> minifigIds, CancellationToken ct)
+    {
+        if (_blInventory == null) return;
+        try
+        {
+            await _blInventory.ReleaseAllForMinifigsAsync(minifigIds, ct);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "ReleaseAllForMinifigsAsync geworfen - Loesch-Pfad faehrt trotzdem fort");
+        }
     }
 
     /// <summary>
@@ -146,6 +174,13 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         });
 
         var affectedBin = minifig.StorageBinId;
+
+        // v0.1.24-beta.10 V1: BL-Reservierungen freigeben BEVOR die Figur
+        // weg ist - sonst bleiben Geist-Reservierungen im Lot-Spiegel.
+        // Eigener Service-Context; Cascade-Delete im Aufrufer-Context
+        // raeumt die Part-Felder ohnehin weg.
+        await ReleaseBlReservationsForAsync(new[] { trackedMinifigId }, ct);
+
         // RequiredParts werden via Cascade-Delete entfernt (EF Core: Cascade auf TrackedMinifig).
         ctx.TrackedMinifigs.Remove(minifig);
         await ctx.SaveChangesAsync(ct);
@@ -372,6 +407,11 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             affectedBins.AddRange(assignedMinifigBins);
         }
 
+        // v0.1.24-beta.10 V1: BL-Reservierungen freigeben BEVOR die Figur
+        // weg ist (siehe DeleteAsync). Beim Zerlegen besonders relevant:
+        // User-Pfad fuer "wartende Figur aufgeben" geht oft ueber Dismantle.
+        await ReleaseBlReservationsForAsync(new[] { trackedMinifigId }, ct);
+
         // Figur und ihre RequiredParts loeschen (Cascade entfernt RequiredParts).
         ctx.TrackedMinifigs.Remove(minifig);
         await ctx.SaveChangesAsync(ct);
@@ -403,6 +443,11 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             .ToListAsync(ct);
         if (stale.Count == 0) return 0;
 
+        // v0.1.24-beta.10 V1: BL-Reservierungen freigeben. DISMANTLED-Figuren
+        // sollten normal keine offenen Reservierungen mehr haben (Dismantle
+        // ruft Release schon), aber defensiv pro Bulk auch hier.
+        await ReleaseBlReservationsForAsync(stale.Select(m => m.Id), ct);
+
         var affectedBins = stale.Select(m => m.StorageBinId).ToList();
         ctx.TrackedMinifigs.RemoveRange(stale);
         await ctx.SaveChangesAsync(ct);
@@ -421,6 +466,9 @@ public class MinifigPersistenceService : IMinifigPersistenceService
             .ToListAsync(ct);
         var toDelete = pseudo.Where(m => m.RequiredParts.Count == 1).ToList();
         if (toDelete.Count == 0) return 0;
+
+        // v0.1.24-beta.10 V1: BL-Reservierungen freigeben.
+        await ReleaseBlReservationsForAsync(toDelete.Select(m => m.Id), ct);
 
         var affectedBins = toDelete.Select(m => m.StorageBinId).ToList();
         ctx.TrackedMinifigs.RemoveRange(toDelete);
@@ -460,6 +508,15 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         }
 
         var affectedBins = minifigs.Select(m => m.StorageBinId).ToList();
+
+        // v0.1.24-beta.10 V1: BL-Reservierungen freigeben. Beim BSX-Export
+        // ist die Semantik temporaer suboptimal: die Reservierungen wurden
+        // implizit "verkauft" (User packt die Figur fuer den BL-Kunden) —
+        // die Lot.Quantity-Reduktion macht aber erst Phase 4. Aktuell
+        // released V1 nur die ReservedQuantity ohne Quantity zu kuerzen.
+        // Naechster Sync holt den aktuellen Stand frisch von BL.
+        await ReleaseBlReservationsForAsync(ids, ct);
+
         ctx.TrackedMinifigs.RemoveRange(minifigs);
 
         // Audit-Trail (ScanEvent ist die einzige Event-Tabelle die wir haben).
@@ -916,6 +973,12 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         var affectedBins = minifigs.Select(m => m.StorageBinId)
             .Concat(floats.Select(fp => (int?)fp.StorageBinId))
             .ToList();
+
+        // v0.1.24-beta.10 V1: BL-Reservierungen freigeben fuer ALLE
+        // Bulk-Delete-Minifigs. Eigene Service-Transaction, dann hier
+        // weiter mit Remove.
+        if (minifigs.Count > 0)
+            await ReleaseBlReservationsForAsync(minifigs.Select(m => m.Id), ct);
 
         ctx.TrackedMinifigs.RemoveRange(minifigs);
         ctx.FloatingParts.RemoveRange(floats);

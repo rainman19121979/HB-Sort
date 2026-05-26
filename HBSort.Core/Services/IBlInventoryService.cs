@@ -79,4 +79,28 @@ public interface IBlInventoryService
     /// <see cref="InventoryChanged"/> bei Erfolg.
     /// </summary>
     Task<bool> ReleaseAsync(int lotId, int qty = 1, CancellationToken ct = default);
+
+    /// <summary>
+    /// v0.1.24-beta.10 V1 (Audit-Befund H1): gibt ALLE noch offenen BL-
+    /// Reservierungen frei, die zu den angegebenen TrackedMinifigs gehoeren.
+    /// Wird vom <see cref="IMinifigPersistenceService"/> VOR jedem Loesch-/
+    /// Zerlegungs-/Cleanup-Pfad aufgerufen, damit keine Geist-Reservierungen
+    /// im BL-Lot-Spiegel zurueckbleiben.
+    ///
+    /// <para>Algorithmus (analog <c>MinifigSummaryViewModel.ReleaseAllBlReservationsAsync</c>):</para>
+    /// <list type="number">
+    ///   <item>RequiredParts der Minifigs mit <c>QuantityReservedFromBl &gt; 0</c> sammeln.</item>
+    ///   <item>ScanEvents (Type=BlInventoryReservation, !WasUndone) materialisieren
+    ///   und in-memory ueber <see cref="UndoSnapshotBlReservation"/>-JSON gegen die Part-Ids matchen.</item>
+    ///   <item>LIFO: pro Match das Lot via <see cref="ReleaseAsync"/>-Semantik
+    ///   freigeben (ReservedQuantity-- + neuer Release-ScanEvent + altes Event als undone markieren).</item>
+    ///   <item><c>QuantityReservedFromBl</c> auf 0 setzen fuer die betroffenen Parts.
+    ///   Cascade-Delete im Aufrufer-Context entfernt die Parts gleich danach -
+    ///   das Setzen ist defensiv fuer standalone-Aufrufe.</item>
+    /// </list>
+    /// Liefert die Anzahl tatsaechlich freigegebener Reservierungen.
+    /// Feuert <see cref="InventoryChanged"/> wenn mindestens eine Reservierung
+    /// freigegeben wurde.
+    /// </summary>
+    Task<int> ReleaseAllForMinifigsAsync(IEnumerable<int> trackedMinifigIds, CancellationToken ct = default);
 }
