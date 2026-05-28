@@ -13,28 +13,41 @@ Items archiviert werden.
 
 ---
 
-## v0.1.20 - geplant
+## Allgemeine Roadmap-Items (versions-uebergreifend)
+
+> Hinweis: Diese Sektion hiess frueher "v0.1.20 - geplant". v0.1.20 ist
+> laengst stable (2026-05-12); die Items hier sind versions-uebergreifende
+> Kandidaten ohne feste Zuordnung. Erledigte wandern in den Erledigt-
+> Bereich, terminierte in die v0.1.25/v0.2.0-Sektionen.
 
 ### Performance
-- 📋 **Splash-Screen Ladeanzeige reparieren** - aktuell keine sichtbare Anzeige beim Start.
-  Aufwand: ~1h
-- 📋 **Settings öffnen/schließen schneller** - User-Befund: zu lange Reaktionszeit.
-  Aufwand: ~1.5h (mit Profiling)
-- 📋 **Popups öffnen schneller** - User-Befund + N+1-Hotspots aus Cleanup-Bericht.
-  Betrifft: CollectMinifigSelectionViewModel (50-200ms), DismantleWizardViewModel
-  (200-500ms), BuildSuggestionDetailViewModel (30-100ms).
-  Aufwand: ~3h
+- ⚠️ **Splash-Screen Ladeanzeige reparieren** - Status zu verifizieren.
+  Mehrere Splash-Fixes liefen seither (v0.1.20-beta.3 Lifecycle, v0.1.22
+  Init-Phasen-Status), aber ob die urspruengliche "keine sichtbare
+  Anzeige"-Beobachtung damit erledigt ist, wurde nicht gezielt geprueft.
+  Beim naechsten Praxis-Test mit-beobachten. Aufwand: ~1h falls noch offen.
+- ✅ **Settings oeffnen/schliessen schneller** - gefuehlt erledigt
+  (2026-05-28). Die Performance-Quick-Wins (v0.1.23-beta.2) + Camera-Lazy-
+  Enumeration (v0.1.22) haben die Reaktionszeit spuerbar verbessert; User
+  empfindet die Settings-Latenz nicht mehr als Problem. Kein gezielter
+  Fix noetig.
+- ✅ **Popups oeffnen schneller** - gefuehlt erledigt (2026-05-28). Die
+  DataChanged-Storm-Quick-Wins (v0.1.23-beta.2: Dispatcher.InvokeAsync +
+  CancellationToken) haben die Popup-Latenz spuerbar reduziert. Strukturelle
+  Wurzel-Fixes (B+E) bleiben als v0.1.25-Material gelistet, aber der
+  akute Schmerz ist weg.
 - ✅ **ScanViewModel : IDisposable** - erledigt in v0.1.20-beta.5 (2026-05-12).
   FrameReceived + PendingMinifig.PropertyChanged + BinInstructionTimer + LookupCts
   werden im Dispose freigegeben; (Services as IDisposable)?.Dispose() in
   App.OnExit ruft den Pfad automatisch beim Shutdown.
 
 ### Features
-- 📋 **Vollständiges Undo-System für alle DB-Mutationen**
-  Aktuell undo-fähig: Move (Minifig + Floating), Delete (Minifig).
-  Fehlt: FloatingPart anlegen, Direkt-Zerlegen, Reverse-Match-Konsumieren,
-  BuildSuggestion-Anlegen, Bin-Operationen, Pending-Persist mit Reverse-Match.
-  Aufwand: ~6-8h (eigene Sub-Iteration)
+- ➡️ **Vollständiges Undo-System für alle DB-Mutationen** — VERSCHOBEN
+  nach v0.1.25 (siehe dortige Sektion). Aktuell undo-fähig: Move (Minifig
+  + Floating), Delete (Minifig). Fehlt: FloatingPart anlegen, Direkt-
+  Zerlegen, Reverse-Match-Konsumieren, BuildSuggestion-Anlegen, Bin-
+  Operationen, Pending-Persist mit Reverse-Match, BL-Reservierung.
+  Aufwand: ~6-8h (eigene Sub-Iteration).
 - 📋 **Bulk-Bin-Aktionen im Settings-Tab Lagerfächer**
   - Markierte löschen (nur leere Bins)
   - Markierte leeren (Inhalt raus, mit Vorschau)
@@ -65,37 +78,35 @@ Items archiviert werden.
 ### Cleanup (aus Cleanup-Bericht)
 - 📋 **DismantleWizard.LoadAsync vs LoadFromPendingAsync** - Helper extrahieren (~50-60 dupl. Zeilen)
   Aufwand: ~1.5h
-- 📋 **BinInstructionOverlay + BinInstructionGroupOverlay** zu einem UserControl mit Mode-Switch
-  Aufwand: ~2h
+- ✅ **BinInstructionOverlay + BinInstructionGroupOverlay** zu einem
+  UserControl mit Mode-Switch — erledigt in v0.1.22-beta.1
+  (`refactor: BinInstruction-Overlay konsolidiert`, `e40ff4aa`).
 
 ### Konsistenz-Drifts
-- 📋 **CollectMinifigSelectionViewModel Volle-Fächer-Banner**
-  Block K wurde dort nicht ergänzt (nicht user-gemeldet, aber Konsistenz-Lücke).
-  Aufwand: ~30min
+- ✅ **CollectMinifigSelectionViewModel Volle-Faecher-Banner** — erledigt
+  in v0.1.22 (`feat: CollectMinifigSelection Volle-Faecher-Banner`,
+  `4b209b51`). Block-K-Konsistenz hergestellt.
 
 ---
 
 ## v0.2.0 (oder später) - größere Features
 
 ### BL-Inventar-Integration
-- 💭 **Konzept-Dokument: BL-Inventar einlesen + komplettieren + Mass-Update-Export**
-
-  Workflow:
-  - Inventar via BL-API holen (BricklinkSharp ist schon integriert)
-  - Tab "Mein BL-Inventar" mit Liste aller Lots
-  - Wartende Figuren komplettieren aus HBSort-Lager ODER BL-Inventar
-  - User wählt Quelle pro Teil
-  - Korrektur-Tracking: Adjustments werden in DB gesammelt
-  - Export im BL-Mass-Update-Format (XML mit LOTID + QTY-Delta)
-  - User uploaded XML manuell auf https://www.bricklink.com/inventoryUpdate.asp
-
-  Phasen:
-  - Phase 1: BSX-Import + Inventar-Tab (kein API)
-  - Phase 2: API-Sync (BL OAuth - schon konfiguriert)
-  - Phase 3: Komplettieren-Integration + Adjustment-Tracking
-  - Phase 4: Mass-Update-Export
-
-  Aufwand: ~11-13h (mit existierender BL-API-Infrastruktur)
+- ✅ **BL-Inventar einlesen + komplettieren + Mass-Update-Export** —
+  KOMPLETT umgesetzt in v0.1.24-beta.6 bis beta.14 (2026-05-28). Lief
+  als eigene Strecke statt als v0.2.0-Feature. Alle vier Phasen fertig:
+  - Phase 1 (beta.6): BlInventoryLot-Entity + EF-Migration +
+    IBlInventoryService + Settings-Sync (Snapshot-Replace,
+    ReservedQuantity-Erhalt)
+  - Phase 2 (beta.7): Tab "BrickLink Inventar" mit DataGrid, Filter,
+    Detail-Panel, Lazy-Thumbnails, CatalogName/ColorName-Enrichment
+  - Phase 3 (beta.8): Komplettieren-Integration
+    (QuantityReservedFromBl, BlReserveDialog, Baubar-Tab-BL-Erweiterung,
+    BL-Badge, Sortier-Tab-Toast)
+  - Phase 4 (beta.12 + beta.14): Mass-Update-Export
+    (GenerateMassUpdateXmlAsync, PendingExport-Entity, VerifyExportAsync
+    mit Reserved→Collected-Konvertierung, Auto-Sync vor Export)
+  Details im Erledigt-Bereich unten.
 
 ### BL-CategoryId-Refactor (Variante B)
 - 💭 **BL-CategoryId statt Brickognize-Heuristik beim Zerlegen**
@@ -110,7 +121,7 @@ Items archiviert werden.
 
 ### UI/UX
 - 📋 **Wertabschätzung Statistik-Dashboard** - BL-Cache-Aggregation pro Bin/Figur
-- 📋 **Spalten-Persistenz Lagerliste** - Sortierung + Spaltenbreite merken
+- 📋 **Spalten-Persistenz Temporäres Inventar** - Sortierung + Spaltenbreite merken
 - 📋 **Notiz-Feld auch für FloatingParts** - aktuell nur für TrackedMinifigs
 - 📋 **Statistik mit Charts/Diagrammen** - Zeitverlauf, Top-Kategorien
 - 📋 **Layout-Verhältnisse Sortier-Tab tunen** - Splitter-Defaults
@@ -171,6 +182,37 @@ Items archiviert werden.
 - 📋 **Klick-Optimierung Anlege-Workflow** (Design-Schema D9) — wartet
   auf User-Praxis-Erfahrung mit v0.1.24-beta.1. Aufwand: ~1-2h, je nach
   Befunden.
+
+#### Aus Audit + Arbeit der beta.11-14-Strecke (2026-05-28)
+
+- 📋 **B1: Dialog-VMs ohne DI** — `ManageIgnoredViewModel` +
+  `MassUpdateExportViewModel` werden per `new` erzeugt statt via
+  `App.xaml.cs::ConfigureServices` (`BuildSuggestionsView.xaml.cs:35`,
+  `BlInventoryView.xaml.cs:35`). Konvention: Dialog-VMs `AddTransient`.
+  Schwere: M. Aufwand: ~30min.
+- 📋 **B2: Footer-Layout in zwei neuen Dialogen** — in
+  `ManageIgnoredDialog.xaml` + `MassUpdateExportDialog.xaml` steht der
+  Schliessen-Button rechts statt links (Konvention: links Abbrechen/
+  Schliessen, rechts primaer). Bei ManageIgnored ist "Schliessen"
+  faelschlich mit `AccentButtonStyle`. Schwere: L-M. Aufwand: ~30min.
+- 📋 **B6/B10: Kosmetik in ManageIgnored/MassUpdate-VMs** — Silent-Catch
+  ohne `Log.Debug`; `Close_Click` setzt `DialogResult=true` statt
+  `false`/`null` (`MassUpdateExportDialog.xaml.cs`). Schwere: L.
+  Aufwand: ~20min.
+- 📋 **BL-Inventar-Sync: UPSERT statt DELETE+INSERT** — Snapshot-Replace
+  loescht + schreibt aktuell alle ~9.4k Lots neu. UPSERT der geaenderten
+  Lots waere schneller, spart aber nur ~15% der 2,7s Sync-Zeit (85% sind
+  API-Antwortzeit). Geringer Nutzen — nur mitnehmen wenn der BL-Sync-Code
+  ohnehin angefasst wird. Quelle: Auditor 2026-05-28. Aufwand: ~1-2h.
+- 📋 **Vollständiges Undo-System für alle DB-Mutationen** — verschoben aus
+  der allgemeinen Roadmap. Aktuell undo-faehig: Move (Minifig + Floating),
+  Delete (Minifig). Fehlt: FloatingPart anlegen, Direkt-Zerlegen, Reverse-
+  Match-Konsumieren, BuildSuggestion-Anlegen, Bin-Operationen, BL-
+  Reservierung. WICHTIG: vor dem Bau eine Reversibilitaets-Klassifikation
+  (gruen/gelb/rot) machen — ROTE Aktionen (BSX-Export, Mass-Update an BL)
+  sind NICHT per Undo umkehrbar (haben die App verlassen), dafuer nur
+  Warnung-vorher statt Undo-nachher. Aufwand: ~6-8h (eigene Sub-Iteration,
+  Auditor-Vorlauf empfohlen).
 
 ### Konzept-Items für spätere Iterationen (v0.1.25+)
 
@@ -300,6 +342,69 @@ nach 2-3 dokumentierten Praxis-Vorfaellen.
 ---
 
 ## Erledigt ✅
+
+### v0.1.24-beta.15 (2026-05-28) - UI-Politur: Tab-Umbenennung + Reihenfolge
+
+- ✅ **Tab "Lagerliste" → "Temporäres Inventar" umbenannt** (`97a53c63`) —
+  klare Abgrenzung zum "BrickLink Inventar"-Tab. Sichtbare UI-Texte,
+  Tooltips, View-Überschrift, Hotkey-Hinweise, Hilfe-Dateien (03/04/06/
+  07/09/10), README. Interne Code-Namen (InventoryListView etc.) +
+  "Lagerfach"-Begriffe bewusst unverändert.
+- ✅ **Tab-Reihenfolge** auf Workflow-Logik: Sortieren | Temporäres
+  Inventar | BrickLink Inventar | Verlauf | Hilfe. Index-Referenzen
+  (F1→Hilfe, Strg+S/L/H) angepasst, Hotkeys praxisgetestet.
+
+### v0.1.24-beta.11 bis beta.14 (2026-05-28) - BL-Inventar Phase 3-4 + Dialog-Vereinheitlichung
+
+Gemeinsamer Commit `c060c4b3` (beta.11-13, 47 Files) + `b3a8e044`
+(beta.14). Verwoben entwickelt, daher als Sammel-Commit (siehe
+Engineering-Lehre unten). 616/616 Tests grün.
+
+**beta.11 — Dialog-Vereinheitlichung + Baubar-Erweiterungen:**
+- ✅ Figur-Dialoge auf einheitliche Optik (MinifigSummary als Referenz).
+- ✅ BuildSuggestions: zwei Anzeige-Modi (HBSort / mit BL-Shop),
+  persistenter Ignorieren-Button (`IgnoredBuildSuggestion`-Entity +
+  Migration), ManageIgnored-Dialog, "Alle Preise holen".
+- ✅ BuildSuggestionDetailDialog: Quellen-Auswahl pro Teil (Lager/Shop),
+  Anlegen mit BL-Reservierung in einem Rutsch + SortInstruction.
+- ✅ `ReleaseSingleReservationAsync` + `GetReservationsForLotAsync`
+  (Reservierungs-Sektion im BL-Inventar-Detail-Panel).
+
+**beta.12 — BL-Inventar Phase 4 Mass-Update-Export:**
+- ✅ `GenerateMassUpdateXmlAsync` (DELETE / QTY -N), `PendingExport`-
+  Entity + Migration, MassUpdateExportDialog.
+- ✅ `VerifyExportAsync`: Erfolg/Fehlschlag pro Lot,
+  Reserved→Collected-Konvertierung, Auto-Resync nach vollem Erfolg.
+- ✅ `ScanType.BlReservationConvertedToCollected`.
+
+**beta.13 — Kandidaten-Filter + V5-Auflösung:**
+- ✅ Kandidaten-Filter von Effective auf physische Lücke
+  (`QuantityCollected < QuantityNeeded`) umgestellt — Figuren mit
+  BL-Reservierung erscheinen wieder als Scan-Kandidaten, V5 erreichbar.
+- ✅ V5 Reverse-Match-Auflösung: physisches Teil ersetzt BL-Reservierung
+  mit Anweisung (U-Lot: loses Teil zurück in BL-Shop-Fach; N-Lot: Tausch).
+- ✅ `Status != Dismantled` defensiv an 4 Filter-Stellen
+  (PartLookupService.cs:84, StorageBinService.cs:887/998,
+  InvalidBinKindException.cs:104) + 4 neue Tests.
+
+**beta.14 — Auto-Sync vor Export** (`b3a8e044`):
+- ✅ MassUpdateExportDialog synct beim Öffnen automatisch das Inventar
+  bevor das XML erzeugt wird (gegen aktuelle BL-Mengen).
+- ✅ `SyncInventoryAsync` liefert `BlInventorySyncResult` (LotCount,
+  Restored, Capped, Lost, SyncedAt) statt int. Loading-State, 3 Stale-
+  Fallback-Pfade (Auth/RateLimit/Generic), Cap-Hinweis im SyncInfoText.
+
+**beta.10 — Stable-Blocker** (`ce65bf75`, war schon getaggt):
+- ✅ `ReleaseAllForMinifigsAsync` vor allen 6 Lösch-/Zerlegungs-/Cleanup-
+  Pfaden (Audit-Befund H1) — keine Geist-Reservierungen.
+- ✅ Quantity-Cap im Snapshot-Restore (H4).
+
+**Engineering-Lehre (2026-05-28):** beta.11-13 wurden verwoben
+entwickelt und erst spaet committet — die nachtraegliche Trennung in
+saubere Einzel-Commits scheiterte an Cross-Iteration-Build-
+Abhaengigkeiten (gemeinsame Service-Files). Konsequenz fuer die
+Zukunft: nach jedem gruenen Praxis-Test sofort committen, nicht
+mehrere Iterationen aufstauen (verstaerkt Prinzip 3.1).
 
 ### v0.1.24-beta.1 (2026-05-17) - UX-Konsistenz-Iteration (Modal-Pattern + Wizard + Cleanup)
 
@@ -644,10 +749,16 @@ Aenderungen am Cache-Schema + Provider-Logik.
 | **v0.1.23-beta.1** | ✅ released (2026-05-14) | Bin-Typ-Spalte (StorageBin.Kind als persistierte Enum), Strict-Mode, Migration, ScanViewModel-Pending-Filter. Tag auf bfd03728. |
 | **v0.1.23-beta.2** | ✅ released (2026-05-14) | Performance-Hotfix: Quick-Wins D+C aus Diagnoser-Bericht (Dispatcher.Invoke→InvokeAsync + CancellationToken in 5 LoadImagesAsync-Pfaden + InventoryListViewModel BeginInvoke-Konsistenz, IDisposable-Pattern). Tag auf ac7e77ee. |
 | **v0.1.23** | ✅ released (Stable, 2026-05-14) | beta.1 + beta.2 konsolidiert. Tag auf ac7e77ee (identisch mit beta.2). Pipeline grün, isPrerelease=false. |
-| **v0.1.24-beta.1** | ✅ released (Phase 1+1.5+2a+2a-Polish+2b+2b-Hotfix+3, 2026-05-15..17) | Modal-Pattern + Wizard 2-stufig + IsManuallyClaimed + Combobox-Suffix + tote Dialoge entfernt + Audit. 589 Tests grün. Tag folgt nach finalem Praxis-Test. |
-| **v0.1.24-beta.2** | 📋 geplant | BL-Inventar Beta 2 (Komplettierungs-Integration) + Klick-Optimierung Anlege-Workflow (wartet auf Praxis-Befund). |
-| **v0.1.24-beta.3** | 📋 geplant | BL-Inventar Beta 3 (Mass-Update-Export) + Dark-Mode-Status-Brushes + Polish + Praxis-Audit. |
-| **v0.1.25** | 💭 Brainstorming | Performance-Wurzel-Fixes (B+E aus Diagnoser-Bericht: RaiseDataChanged aus Service-Layer raus, RecalcBinKindAsync-Context-Piggyback, ~4-5h) + OPEN-18 Single-Mode-Cleanup + Kategorie-Sperre + Bauteile-Bin-Konzept. Voraussetzung Kategorie-Track: 2-3 protokollierte Praxis-Vorfaelle aus Diagnose-Track (Befund 3). |
+| **v0.1.24-beta.1** | ✅ released (Phase 1+1.5+2a+2a-Polish+2b+2b-Hotfix+3, 2026-05-15..17) | Modal-Pattern + Wizard 2-stufig + IsManuallyClaimed + Combobox-Suffix + tote Dialoge entfernt + Audit. 589 Tests grün. |
+| **v0.1.24-beta.6** | ✅ gemerged (2026-05-28) | BL-Inventar Phase 1: BlInventoryLot-Entity + Migration + IBlInventoryService + Settings-Sync. |
+| **v0.1.24-beta.7** | ✅ gemerged (2026-05-28) | BL-Inventar Phase 2: Tab "BrickLink Inventar" (DataGrid, Filter, Detail-Panel, Lazy-Thumbnails). |
+| **v0.1.24-beta.8** | ✅ gemerged (2026-05-28) | BL-Inventar Phase 3: Komplettieren-Integration (QuantityReservedFromBl, BlReserveDialog, Baubar-BL, Badge, Toast). |
+| **v0.1.24-beta.10** | ✅ getaggt (`ce65bf75`) | Stable-Blocker: ReleaseAllForMinifigsAsync vor 6 Lösch-Pfaden (H1) + Quantity-Cap (H4). |
+| **v0.1.24-beta.11-13** | ✅ gemerged (`c060c4b3`, 2026-05-28) | Dialog-Vereinheitlichung + Ignorieren + BL-Inventar Phase 4 Export + V5-Filter-Fix + Dismantled-Defensive. 604→616 Tests. |
+| **v0.1.24-beta.14** | ✅ gemerged (`b3a8e044`, 2026-05-28) | Auto-Sync vor Mass-Update-Export (BlInventorySyncResult, Stale-Fallbacks, Cap-Hinweis). 616 Tests grün. |
+| **v0.1.24-beta.15** | ✅ gemerged (`97a53c63`, 2026-05-28) | UI-Politur: Tab "Temporäres Inventar" + Tab-Reihenfolge + Endanwender-Doku-Update. |
+| **v0.1.24** | 📋 ausstehend | Stable-Promote nach finalem Praxis-Test + ux-analyst-Durchlauf. |
+| **v0.1.25** | 💭 Brainstorming | Performance-Wurzel-Fixes (B+E aus Diagnoser-Bericht, ~4-5h) + OPEN-18 Single-Mode-Cleanup + Kategorie-Sperre + Bauteile-Bin-Konzept + Audit-Befunde B1/B2/B6/B10 + UPSERT-Sync-Optimierung + vollständiges Undo-System. |
 | **v0.2.0** | 💭 Brainstorming | grosse Features aus Backlog (siehe oben) |
 
 Konvention:
@@ -656,4 +767,4 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-17 nach v0.1.24-beta.1 Phase 3 (Cleanup + Dialog-Audit + Doku). Naechster Schritt: finaler Praxis-Test, dann Tag `v0.1.24-beta.1`. Danach v0.1.24-beta.2 (BL-Inventar Beta 2 + Klick-Optimierung).*
+*Zuletzt aktualisiert: 2026-05-28 — BL-Inventar Phase 1-4 (beta.6-14) + UI-Politur (beta.15) nachgetragen, Audit-Befunde B1/B2/B6/B10 + UPSERT-Optimierung als v0.1.25-Material eingetragen. Naechster Schritt: ux-analyst-Durchlauf, finaler Praxis-Test, dann Stable-Tag v0.1.24.*
