@@ -113,13 +113,45 @@ Nach der Reservierung:
 
 ### Reservierung rueckgaengig
 
-Im Figur-Detail-Dialog: den **Haken** am Teil entfernen. Das macht:
+Es gibt zwei Wege, eine Reservierung wieder freizugeben:
 
-- Alle BL-Reservierungen fuer dieses Teil zurueck (LIFO — neueste
-  zuerst).
-- Setzt `QuantityCollected` zurueck auf 0 (wie bisher beim Haken-
-  Entfernen).
-- Loggt einen Release-ScanEvent pro freigegebener Reservierung.
+**1. Im Figur-Detail-Dialog**: den **Haken** am Teil entfernen. Das macht
+alle BL-Reservierungen fuer dieses eine Teil zurueck (LIFO — die
+neueste zuerst) und setzt den gesammelt-Stand zurueck.
+
+**2. Aus dem BrickLink-Inventar-Tab — Reservierungs-Liste**: klick im
+Tab **BrickLink Inventar** ein Lot an, das eine Reservierung hat (siehst
+du an der "Reserviert"-Spalte). Im Detail-Panel rechts erscheint die
+Sektion **Reservierungen** mit einer Zeile pro reserviertem Stueck,
+inklusive der zugehoerigen Figur. Pro Zeile gibt es einen Knopf
+**"Aufheben"** — damit kannst du **eine einzelne Reservierung** gezielt
+freigeben, ohne alles auf einmal zuruecknehmen zu muessen. Praktisch
+auch um Altlasten ("verwaiste Reservierung — keine Figur") aufzuraeumen,
+die noch aus Zeiten vor v0.1.24-beta.10 stammen.
+
+### Reserviertes Teil doch gescannt
+
+Du hattest ein Teil im BL-Shop fuer eine Figur reserviert, aber dann
+ploetzlich liegt das gleiche Teil bei dir auf dem Tisch und du scannst
+es ein? HB-Sort erkennt das und **ersetzt die Reservierung
+automatisch durchs physische Teil** — die Figur bleibt komplett, du
+hast aber wieder eine Einheit mehr im BL-Shop zum Verkauf.
+
+Du bekommst dann eine Anweisung, je nach Zustand des reservierten Lots:
+
+- **Bei einem gebrauchten Teil im Shop**: Leg das gerade gescannte Teil
+  in dein BL-Shop-Fach. Erklaerung im Dialog: *"Reservierung
+  aufgeloest. Figur behaelt ihr Teil, BL-Shop wieder vollstaendig."*
+- **Bei einem neuen Teil im Shop** (das du eigentlich nicht in eine
+  gebrauchte Figur stecken willst): HB-Sort schlaegt einen Tausch vor —
+  nimm das neue Teil aus dem Figur-Fach, leg es zurueck in den Shop, und
+  leg dafuer das gerade gescannte (gebrauchte) Teil zur Figur. So bleibt
+  dein Shop-Bestand "Neu", die Figur bekommt das passende gebrauchte
+  Teil.
+
+Im Sortier-Tab erscheinen wartende Figuren mit BL-Reservierung mit
+einem blauen Hinweis-Badge **"Reservierung — zuordnen loest auf"**, damit
+du gleich siehst was beim "Zuordnen" passiert.
 
 ### Beim Aufgeben/Zerlegen einer Figur
 
@@ -145,6 +177,19 @@ als wartende Figur an. Die fehlenden Teile zeigen automatisch den
 **BL-Shop**-Badge im Detail-Dialog — du kannst sie dann einzeln aus
 dem Shop reservieren.
 
+### Vorschlaege ausblenden
+
+Bei jedem Vorschlag in der Liste gibt es rechts ein kleines **X** —
+damit blendest du eine Figur dauerhaft aus den Vorschlaegen aus.
+Praktisch fuer Figuren die du explizit nicht sammeln willst, oder bei
+denen du weisst dass das fehlende Teil aktuell nicht beschaffbar ist.
+
+Unten in der Fusszeile erscheint dann ein Link **"Ignorierte verwalten
+(N)"**. Klick darauf oeffnet einen Dialog **Ignorierte Bauvorschlaege
+verwalten** mit allen ignorierten Figuren — pro Eintrag ein
+**"Wiederherstellen"**-Knopf um eine einzelne wieder freizuschalten,
+plus **"Alle wiederherstellen"** wenn du die Liste komplett leerst.
+
 ## Tab "Sortieren" — BL-Toast
 
 Wenn du ein Einzelteil scannst und es **keiner wartenden Figur** in
@@ -157,16 +202,68 @@ liegt, kommt ein informativer Toast:
 Das ist **nur ein Hinweis** — es wird nichts automatisch reserviert.
 Das gescannte Teil wird ganz normal als Floating-Part eingelagert.
 
-## Was Phase 4 bringt (noch nicht implementiert)
+## Reservierte Teile aus dem BL-Shop ausbuchen (Mass-Update-Export)
 
-Aktuell endet der BL-Inventar-Workflow beim Reservieren. **Phase 4
-(geplant fuer v0.1.25 oder spaeter)** soll:
+Wenn du Teile fuer eine Figur reserviert hast und sie physisch aus deinem
+BL-Shop entnimmst, muss BrickLink natuerlich auch wissen dass diese
+Mengen nicht mehr verkaufbar sind. Dafuer gibt es den Mass-Update-Export.
 
-- BSX/Mass-Update-Export der Reservierungen nach BL: `Quantity` im
-  Lot wird reduziert, `ReservedQuantity` zurueckgesetzt.
-- Der naechste Sync holt dann den reduzierten BL-Stand und alles
-  passt wieder zusammen.
+Im Tab **BrickLink Inventar** oben rechts: Knopf **"BL aktualisieren"**.
 
-Bis Phase 4 muss der User Reservierungen entweder manuell im Summary-
-Dialog aufheben oder die Figur aufgeben (was v0.1.24-beta.10 korrekt
-freigibt).
+### Was passiert beim Oeffnen
+
+1. **Auto-Sync**: HB-Sort holt zuerst dein aktuelles BL-Inventar
+   (kurze Ladezeit, je nach Store-Groesse 2-5 Sekunden). So wird das
+   Update gegen die *aktuellen* BL-Mengen erzeugt — nicht gegen einen
+   alten Stand.
+2. Aus deinen offenen Reservierungen entsteht ein XML im BrickLink-
+   Mass-Update-Format: pro Lot entweder eine Reduktion der Menge
+   (`<QTY>-N</QTY>`) oder ein kompletter Loescheintrag (`<DELETE/>`),
+   falls die ganze Lot-Menge reserviert war.
+3. Du siehst das XML im Dialog plus eine Zeile *"X Lot(s) betroffen
+   (Y werden geloescht, Z reduziert)"*.
+
+### So uebertraegst du es
+
+1. Klick auf **"In Zwischenablage kopieren"** — das XML liegt jetzt in
+   deiner Zwischenablage.
+2. Klick auf **"BrickLink oeffnen"** — der Standard-Browser springt auf
+   die BrickLink-Mass-Update-Seite. Dort das XML einfuegen und das
+   Update ausfuehren.
+3. Zurueck in HB-Sort → Klick auf **"Verifizieren"**.
+
+### Was Verifizieren macht
+
+HB-Sort holt noch einmal das frische BL-Inventar und prueft pro
+betroffenem Lot, ob die Aenderung dort wirklich angekommen ist:
+
+- Mengen stimmen? → Erfolg.
+- Lot wurde geloescht (war komplett reserviert)? → Erfolg.
+- Mengen passen nicht? → Eintrag bleibt offen, du kannst noch einmal
+  versuchen.
+
+Bei erfolgreich verifizierten Lots werden die Reservierungen
+**umgebucht**: das Teil zaehlt jetzt als physisch gesammelt fuer die
+Figur (vorher: "im BL-Shop reserviert" — jetzt: "fest im Bestand").
+Die Figur sieht das gleich aus wie vorher (effektiv komplett bleibt
+komplett), aber die Buchhaltung ist sauber.
+
+Bei vollstaendigem Erfolg synchronisiert HB-Sort am Schluss automatisch
+noch einmal, damit dein lokaler Spiegel zur BL-Realitaet passt.
+
+### Wenn etwas schief geht
+
+- **Auto-Sync beim Oeffnen schlaegt fehl** (BrickLink offline, Tokens
+  abgelaufen, Limit erreicht): der Dialog zeigt einen Hinweis dass mit
+  dem zuletzt bekannten Stand exportiert wird. Pruefe in dem Fall am
+  besten kurz bei BL ob deine Mengen noch passen, bevor du das XML
+  hochlaedst.
+- **Reservierung wurde wegen gesunkener BL-Menge angepasst**: wenn
+  zwischenzeitlich jemand bei dir gekauft hat und deine Reservierung
+  groesser als die neue Restmenge war, kappt HB-Sort die Reservierung
+  und zeigt einen Hinweis im Dialog ("X Reservierung(en) angepasst").
+  Das XML beruecksichtigt das.
+- **Verifizieren schlaegt fehl** (Lot hat noch alte Menge bei BL): du
+  hast wahrscheinlich vergessen das XML hochzuladen oder das Update bei
+  BL nicht ausgefuehrt. Einfach den Schritt nachholen und nochmal
+  klicken.

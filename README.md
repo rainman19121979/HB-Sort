@@ -55,7 +55,9 @@ BrickStore- und BrickLink-Export.
   blauer **BL-Shop**-Badge welche fehlenden Teile du noch in deinem
   Shop hast - per Klick einzelne Lots reservieren (mit Shop-Position).
   Der Baubar-Tab kann zusaetzlich Figuren vorschlagen die nur mit
-  BL-Ergaenzung komplett baubar waeren.
+  BL-Ergaenzung komplett baubar waeren. Reservierte Teile lassen sich
+  per **Mass-Update-Export** wieder aus dem Shop ausbuchen (XML, Upload
+  bei BrickLink, dann Verifizieren in HB-Sort).
 
 ## Was ist neu in v0.1.24
 
@@ -72,28 +74,62 @@ und **BL-Inventar-Integration**.
 - **Wizard 2-stufig** beim Anlegen einer Figur aus dem Collect-Pfad.
 - **Combobox-Suffix mit Belegungs-Counts** ("Box 005 (3 wartende)").
 
-### BL-Inventar (beta.6-10)
+### BL-Inventar
 
-- **Phase 1 — Sync-Infrastruktur**: `BlInventoryLot`-Entity, EF-
-  Migration, `IBlInventoryService` mit Snapshot-Replace + Erhalt der
-  HBSort-Reservierungen. Sync-Button in Einstellungen.
-- **Phase 2 — Inventar-Tab**: durchsuchbares DataGrid mit Filter
-  (Typ, Zustand, Suche), Detail-Panel rechts mit Grossbild und allen
-  Feldern, Lazy-Thumbnail-Loading (max 3 parallele Downloads), Spalte
-  **Shop-Position** (BL-Remarks).
-- **Phase 3 — Komplettieren-Integration**:
-  - `QuantityReservedFromBl` auf TrackedMinifigPart (effektive
-    Vollstaendigkeit = physisch + BL-reserviert)
-  - `BlReserveDialog`: pro fehlendem Teil eine Liste der verfuegbaren
-    Lots (mit Shop-Position), Klick reserviert genau ein Lot
-  - **Baubar-Tab** bekommt Checkbox **"BL-Inventar beruecksichtigen"** —
-    aktiv zeigt die Liste zusaetzlich Figuren die nur mit BL-Ergaenzung
-    komplett baubar waeren, mit Badge "X Teile aus Shop"
-  - **Sortier-Tab Toast** wenn ein gescanntes Teil keiner wartenden
-    Figur passt, aber in deinem BL-Shop liegt
-- **beta.10 Stable-Fix**: BL-Reservierungen werden bei Figur-Loeschen/
-  Zerlegen/Cleanup automatisch freigegeben — keine Geist-Reservierungen
-  im Inventar-Tab.
+Das BrickLink-Store-Inventar wird komplett in HB-Sort integriert. In
+mehreren Wellen ueber v0.1.24 entstanden — der Workflow ist jetzt
+durchgaengig vom Sync bis zum Ausbuchen.
+
+- **Sync-Infrastruktur**: dein kompletter BrickLink-Store-Bestand wird
+  in einem API-Call lokal gespiegelt (Snapshot-Replace, deine
+  Reservierungen bleiben erhalten). Sync-Knopf in den Einstellungen
+  und im Inventar-Tab.
+- **Tab "BrickLink Inventar"**: durchsuchbares DataGrid mit Filter
+  (Typ, Zustand, Suche), Detail-Panel rechts mit Grossbild,
+  Lazy-Thumbnails (max 3 parallele Downloads), Spalte
+  **Shop-Position** (deine BrickLink-Remarks).
+- **Komplettieren mit BL-Reservierung**: pro fehlendem Teil einer
+  wartenden Figur zeigt ein blauer **BL-Shop**-Badge welche Lots du
+  noch hast (mit Shop-Position) — Klick reserviert genau ein Lot.
+- **Baubar-Tab — BL-Erweiterung**: Checkbox **"BL-Inventar
+  beruecksichtigen"** zeigt zusaetzlich Figuren die nur mit
+  BL-Ergaenzung komplett baubar waeren, mit Badge "X Teile aus Shop".
+- **Sortier-Tab Toast**: gescanntes Teil keiner wartenden Figur
+  zuordbar aber im BL-Shop verfuegbar → Hinweis-Toast.
+- **Auto-Release bei Figur-Entfernung**: BL-Reservierungen werden bei
+  Figur-Loeschen/Zerlegen/Cleanup automatisch freigegeben — keine
+  Geist-Reservierungen im Inventar-Tab.
+- **Reservierungen einzeln verwalten**: im BL-Inventar-Detail-Panel
+  pro Lot eine Sektion "Reservierungen" mit zugehoeriger Figur pro
+  reserviertem Stueck und **"Aufheben"**-Knopf — einzelne Eintraege
+  freigeben statt alles auf einmal.
+- **Mass-Update-Export**: Knopf **"BL aktualisieren"** im
+  Inventar-Tab. Erzeugt ein BrickLink-Mass-Update-XML aus deinen
+  Reservierungen, beim Oeffnen wird automatisch zuerst synchronisiert
+  damit das XML gegen aktuelle Mengen gebaut wird. Ablauf:
+  Zwischenablage → BrickLink Mass-Update einfuegen+ausfuehren →
+  zurueck → **"Verifizieren"** wandelt die Reservierungen in fest
+  gesammelt um.
+- **Reserviertes Teil doch gescannt**: wenn du ein Teil das du im
+  BL-Shop reserviert hattest spaeter physisch scannst, ersetzt das
+  echte Teil die Reservierung automatisch — HB-Sort zeigt eine
+  passende Anweisung (loses Teil zurueck in den Shop, oder Tausch
+  Neu/Gebraucht).
+
+### Baubar-Vorschlaege ausblenden
+
+Bauvorschlaege die du dauerhaft nicht mehr sehen willst, blendest du
+ueber das **X** am Vorschlag aus. Ueber den Link **"Ignorierte
+verwalten"** unten in der Liste oeffnet sich ein Dialog mit allen
+ausgeblendeten Figuren — einzeln oder gesammelt wiederherstellbar.
+
+### Figur-Dialoge einheitlicher
+
+Die Figur-Dialoge (Wartende-Detail, Komplettieren-Wizard,
+Bauvorschlag-Detail) sind optisch auf einen einheitlichen Stil
+gebracht (gleicher Header-Block, gleiche Teile-Zeile, gleiche
+Footer-Buttons) — egal aus welchem Tab du eine Figur oeffnest, der
+Dialog sieht gleich aus.
 
 ### Bin-Vorschlags-Bugfixes (beta.4 + beta.9)
 
