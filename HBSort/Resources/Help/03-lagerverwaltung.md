@@ -43,7 +43,7 @@ willst, einfach `Box ` mit Leerzeichen am Ende ins Praefix-Feld tippen.
 | **Wartend** | Mindestens ein Teil fehlt noch. Du sammelst, bis alle Teile da sind. |
 | **Komplett** | Alle Teile vorhanden. Wird mit gruenem Haken markiert. Kannst du via BSX-Export weitergeben. |
 
-Komplette Figuren werden in der **Lagerliste** in der gruenen
+Komplette Figuren werden im **Temporären Inventar** in der gruenen
 Sektion pro Fach angezeigt. Wartende Figuren stehen darueber mit
 Fortschrittsbalken (z.B. "3/7 Teile vorhanden").
 
@@ -81,10 +81,10 @@ Klick **Figur anlegen** und HB-Sort:
 
 So machst du aus deinem Floating-Pool effizient neue Figuren.
 
-## Lagerliste-Tab
+## Tab "Temporäres Inventar"
 
-Der Tab **Lagerliste** (oben in der Header-Leiste) zeigt deinen
-gesamten Bestand:
+Der Tab **Temporäres Inventar** (oben in der Header-Leiste) zeigt
+deinen temporären Sortier-Bestand:
 
 - **Suchfeld** oben - Filter nach Name, BL-ID, Farbe oder Lagerfach-
   Label (ab v0.1.16 auch Lagerfach-Suche).

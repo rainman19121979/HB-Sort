@@ -73,7 +73,7 @@ physischen Shop sofort wieder.
 
 ### Im Detail-Dialog einer wartenden Figur
 
-Beim Klick auf eine wartende Figur (Tab *Lagerliste* oder
+Beim Klick auf eine wartende Figur (Tab *Temporäres Inventar* oder
 *Wartende-Detail*) oeffnet sich der Detail-Dialog. Pro fehlendem
 Teil siehst du jetzt:
 

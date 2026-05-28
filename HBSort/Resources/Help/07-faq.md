@@ -36,7 +36,7 @@ In der Status-Leiste siehst du den BL-Counter. Mogliche Probleme:
 
 ## Eine Figur wurde versehentlich als komplett markiert
 
-1. Auf die Figur klicken (Lagerliste oder Tab *Wartende-Detail*).
+1. Auf die Figur klicken (Temporäres Inventar oder Tab *Wartende-Detail*).
 2. Im Summary-Dialog auf **Wieder oeffnen**.
 3. Die Figur ist wieder *Wartend*; DailyStats werden absichtlich
    nicht zurueckgerechnet.
@@ -45,8 +45,8 @@ In der Status-Leiste siehst du den BL-Counter. Mogliche Probleme:
 
 Wartende und komplette Figuren werden beim **Fach leeren** *nicht*
 geloescht - sie werden nur vom Fach abgekoppelt (StorageBinId=null).
-Du findest sie weiter in der Lagerliste und kannst sie einem neuen
-Fach zuweisen.
+Du findest sie weiter im Temporären Inventar und kannst sie einem
+neuen Fach zuweisen.
 
 Floating-Parts werden allerdings beim Cleanup-Block nach BSX-Export
 **geloescht**. Wenn du einen davon zurueckhaben willst: scanne das

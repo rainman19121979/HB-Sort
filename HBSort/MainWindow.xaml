@@ -135,15 +135,19 @@
                              Style="{StaticResource MainTabRadioStyle}"
                              IsChecked="{Binding IsMainTabInventory, Mode=OneWay}"
                              Click="MainTabInventory_Click"
-                             Content="Lagerliste"
-                             ToolTip="Zeigt deinen kompletten Bestand: wartende Figuren, komplette Figuren, Einzelteile."
+                             Content="Temporäres Inventar"
+                             ToolTip="Zeigt deinen temporären Sortier-Bestand: wartende Figuren, komplette Figuren, Einzelteile."
                              Margin="0,0,8,0"/>
-                <RadioButton x:Name="TabHelpButton" GroupName="MainTabs"
+                <!-- v0.1.24-beta.7 Phase 2: BrickLink-Inventar-Tab (Lese-Sicht
+                     auf den lokalen Spiegel von BlInventoryLots).
+                     beta.15: ans 3. Position verschoben, direkt hinter dem
+                     temporaeren Inventar. -->
+                <RadioButton x:Name="TabBlInventoryButton" GroupName="MainTabs"
                              Style="{StaticResource MainTabRadioStyle}"
-                             IsChecked="{Binding IsMainTabHelp, Mode=OneWay}"
-                             Click="MainTabHelp_Click"
-                             Content="Hilfe"
-                             ToolTip="Integrierte Doku zu Workflow, Lagerverwaltung, Export. (F1)"
+                             IsChecked="{Binding IsMainTabBlInventory, Mode=OneWay}"
+                             Click="MainTabBlInventory_Click"
+                             Content="BrickLink Inventar"
+                             ToolTip="Zeigt deine BrickLink-Store-Lots (Quantity, Reservierungen, Preise). Sync ueber den Knopf im Tab."
                              Margin="0,0,8,0"/>
                 <RadioButton x:Name="TabHistoryButton" GroupName="MainTabs"
                              Style="{StaticResource MainTabRadioStyle}"
@@ -152,14 +156,12 @@
                              Content="Verlauf"
                              ToolTip="Letzte Aktionen + Rueckgaengig-Funktion. Strg+Z macht die letzte Aktion rueckgaengig."
                              Margin="0,0,8,0"/>
-                <!-- v0.1.24-beta.7 Phase 2: BrickLink-Inventar-Tab (Lese-Sicht
-                     auf den lokalen Spiegel von BlInventoryLots). -->
-                <RadioButton x:Name="TabBlInventoryButton" GroupName="MainTabs"
+                <RadioButton x:Name="TabHelpButton" GroupName="MainTabs"
                              Style="{StaticResource MainTabRadioStyle}"
-                             IsChecked="{Binding IsMainTabBlInventory, Mode=OneWay}"
-                             Click="MainTabBlInventory_Click"
-                             Content="BrickLink Inventar"
-                             ToolTip="Zeigt deine BrickLink-Store-Lots (Quantity, Reservierungen, Preise). Sync ueber den Knopf im Tab."/>
+                             IsChecked="{Binding IsMainTabHelp, Mode=OneWay}"
+                             Click="MainTabHelp_Click"
+                             Content="Hilfe"
+                             ToolTip="Integrierte Doku zu Workflow, Lagerverwaltung, Export. (F1)"/>
             </StackPanel>
 
             <!-- Rechts: Settings + Beenden. UX X.26 (v0.1.13): Update-Badge

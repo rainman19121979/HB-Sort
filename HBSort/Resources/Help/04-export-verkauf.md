@@ -11,7 +11,7 @@ und in BrickStore aufnehmen, um z.B. einen Verkauf vorzubereiten.
 
 ### So gehts
 
-1. Tab **Lagerliste** oeffnen.
+1. Tab **Temporäres Inventar** oeffnen.
 2. Rechts neben jedem Eintrag ist eine **Checkbox** (nur bei
    kompletten Figuren und Einzelteilen, nicht bei wartenden).
 3. Markiere die gewuenschten Eintraege oder klick **Alle Komplette
@@ -73,7 +73,7 @@ sammeln.
 
 ### So gehts
 
-1. Tab **Lagerliste** oeffnen.
+1. Tab **Temporäres Inventar** oeffnen.
 2. Klick **Wanted-List exportieren** in der Header-Leiste.
 3. Im Dialog:
    - **Modus** waehlen:

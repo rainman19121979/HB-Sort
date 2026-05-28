@@ -10,7 +10,7 @@
 | `F1` | Hilfe-Tab oeffnen *(diese Ansicht hier)* |
 | `Esc` | Modal-Dialog / Bild-Vergroesserung schliessen |
 | `Strg + S` | Sortieren-Tab aktivieren |
-| `Strg + L` | Lagerliste-Tab aktivieren |
+| `Strg + L` | Tab Temporäres Inventar aktivieren |
 | `Strg + H` | Verlauf-Tab aktivieren (Hilfe ist auf F1) |
 | `Strg + ,` | Einstellungen oeffnen |
 | `Strg + B` | Backup jetzt erstellen |
@@ -28,14 +28,14 @@
 > ein normales Zeichen.
 >
 > Bewusst NICHT belegt (Konflikt mit Standard-WPF in TextBoxen/Lists):
-> +/- fuer Anzahl-Felder, Pfeiltasten/Pos1/Ende, Entf-Taste in
-> Lagerlisten.
+> +/- fuer Anzahl-Felder, Pfeiltasten/Pos1/Ende, Entf-Taste im
+> Temporären Inventar.
 
-## Lagerliste effizient nutzen
+## Temporäres Inventar effizient nutzen
 
 ### Suchfeld
 
-Im Tab **Lagerliste** oben gibts ein Suchfeld. Es filtert live nach:
+Im Tab **Temporäres Inventar** oben gibts ein Suchfeld. Es filtert live nach:
 
 - Name (z.B. "arctic")
 - BL-ID (z.B. "arc007")

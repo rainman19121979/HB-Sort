@@ -320,7 +320,7 @@
                                     Click="DirectDismantle_Click"
                                     Visibility="{Binding HasAnyCollected, Converter={StaticResource BoolToVisibility}}"
                                     Margin="0,0,8,0"
-                                    ToolTip="Statt die Figur als Ganzes einzulagern: nur die markierten Teile direkt als Einzelteile in die jeweils passenden Faecher legen. Die Figur wird NICHT in die Lagerliste aufgenommen."/>
+                                    ToolTip="Statt die Figur als Ganzes einzulagern: nur die markierten Teile direkt als Einzelteile in die jeweils passenden Faecher legen. Die Figur wird NICHT ins Temporäre Inventar aufgenommen."/>
                             <Button Content="{Binding PersistButtonText}" MinWidth="100" MinHeight="34"
                                     Style="{StaticResource AccentButtonStyle}"
                                     IsEnabled="{Binding CanPersist}"

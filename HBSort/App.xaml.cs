@@ -791,7 +791,7 @@ public partial class App : Application
                 var suffix = mixBins.Count > 3 ? $" (+{mixBins.Count - 3} weitere)" : "";
                 notify.ShowInfo(
                     $"Es wurden {mixBins.Count} Mix-Lagerfaecher gefunden: {labels}{suffix}. " +
-                    "Pruefe die Lagerliste in den Einstellungen.");
+                    "Pruefe die Lagerfaecher in den Einstellungen.");
             }
             catch { /* ignore - Hauptzweck ist das WRN-Log im Service */ }
         }

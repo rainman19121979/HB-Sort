@@ -45,9 +45,10 @@ BrickStore- und BrickLink-Export.
 - **Verlauf + Rueckgaengig** (ab v0.1.16) - Tab "Verlauf" zeigt alle
   Aktionen (Loeschen, Verschieben, Komplettieren, Fach-Aenderungen).
   Strg+Z macht die letzte Aktion rueckgaengig.
-- **Bulk-Operationen** (ab v0.1.16) - mehrere Items in der Lagerliste
-  markieren und gemeinsam loeschen oder verschieben (mit Undo-Support).
-  Doppelklick auf Zeile oeffnet Details, Entf-Taste loescht Selektion.
+- **Bulk-Operationen** (ab v0.1.16) - mehrere Items im Temporären
+  Inventar markieren und gemeinsam loeschen oder verschieben (mit Undo-
+  Support). Doppelklick auf Zeile oeffnet Details, Entf-Taste loescht
+  Selektion.
 - **BrickLink-Inventar-Integration** (ab v0.1.24, optional) - dein
   kompletter BL-Store-Bestand wird lokal gespiegelt (Sync per Knopf-
   druck, ein API-Call). Eigener Tab "BrickLink Inventar" mit Filter,
@@ -227,7 +228,7 @@ Grosse UX-Iteration mit Fokus auf Sortier-Logik und Konsistenz.
 - **Backup-System** mit Pending-Restore-Pattern (App startet nach
   Wiederherstellung automatisch neu).
 - **Verlauf-Tab + Strg+Z** fuer Undo aller wichtigen Aktionen.
-- **Bulk-Loeschen + Bulk-Verschieben** in der Lagerliste, inkl.
+- **Bulk-Loeschen + Bulk-Verschieben** im Temporären Inventar, inkl.
   wartender Figuren.
 - **EmptyAsync-Warnung**: beim "Fach leeren" wird gewarnt wenn
   komplette Figuren im Bin sind (sie verlieren ihr Lagerfach).
@@ -248,9 +249,9 @@ Gescannte Einzelteile werden automatisch wartenden Figuren zugeordnet
 (Reverse-Match). Die rechte Seite zeigt mit welchen wartenden Figuren
 das Teil kombinierbar ist.
 
-### Lagerliste mit Bulk-Aktionen
+### Temporäres Inventar mit Bulk-Aktionen
 
-![Lagerliste mit Filter, Such-Feld und Bulk-Action-Bar (Loeschen/Verschieben/Exportieren)](docs/screenshots/04-lagerliste.png)
+![Temporäres Inventar mit Filter, Such-Feld und Bulk-Action-Bar (Loeschen/Verschieben/Exportieren)](docs/screenshots/04-lagerliste.png)
 
 Komplette Bestandsuebersicht mit Filtern (Status, Lagerfach,
 Volltext-Suche), Multi-Select-Checkboxen und Bulk-Operationen

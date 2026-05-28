@@ -24,7 +24,7 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Text="LAGERLISTE"
+            <TextBlock Text="TEMPORÄRES INVENTAR"
                        FontSize="18" FontWeight="SemiBold"/>
             <Button Grid.Column="1" Content="Wanted-List exportieren"
                     Click="WantedListExport_Click"
@@ -32,7 +32,7 @@
                     ToolTip="BrickLink-Wanted-List-XML aus den fehlenden Teilen aller wartenden Figuren erzeugen"/>
             <Button Grid.Column="2" Content="Aktualisieren"
                     Command="{Binding LoadCommand}" Padding="8,2"
-                    ToolTip="Liest Lagerliste aus der DB neu ein."/>
+                    ToolTip="Liest das Temporäre Inventar aus der DB neu ein."/>
         </Grid>
 
         <!-- Filter -->

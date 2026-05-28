@@ -319,20 +319,20 @@ public partial class MainWindow : Window
     private void MainTabSorting_Click(object sender, RoutedEventArgs e)
         => _viewModel.MainTabIndex = 0;
 
-    /// <summary>Header-Tab "Lagerliste" geklickt -> MainTabIndex=1.</summary>
+    /// <summary>Header-Tab "Temporäres Inventar" geklickt -> MainTabIndex=1.</summary>
     private void MainTabInventory_Click(object sender, RoutedEventArgs e)
         => _viewModel.MainTabIndex = 1;
 
-    /// <summary>Header-Tab "Hilfe" geklickt -> MainTabIndex=2.</summary>
-    private void MainTabHelp_Click(object sender, RoutedEventArgs e)
+    /// <summary>v0.1.24-beta.15: Header-Tab "BrickLink Inventar" geklickt -> MainTabIndex=2.</summary>
+    private void MainTabBlInventory_Click(object sender, RoutedEventArgs e)
         => _viewModel.MainTabIndex = 2;
 
     /// <summary>UX X.29 (v0.1.16): Header-Tab "Verlauf" geklickt -> MainTabIndex=3.</summary>
     private void MainTabHistory_Click(object sender, RoutedEventArgs e)
         => _viewModel.SwitchToHistoryTabCommand.Execute(null);
 
-    /// <summary>v0.1.24-beta.7 Phase 2: Header-Tab "BrickLink Inventar" geklickt -> MainTabIndex=4.</summary>
-    private void MainTabBlInventory_Click(object sender, RoutedEventArgs e)
+    /// <summary>v0.1.24-beta.15: Header-Tab "Hilfe" geklickt -> MainTabIndex=4 (ans Ende verschoben).</summary>
+    private void MainTabHelp_Click(object sender, RoutedEventArgs e)
         => _viewModel.MainTabIndex = 4;
 
     private void OpenSettings_Click(object sender, RoutedEventArgs e)

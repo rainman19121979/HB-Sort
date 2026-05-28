@@ -429,13 +429,13 @@ public partial class SettingsViewModel : ObservableObject
         new("F1",            "Hilfe-Tab oeffnen"),
         new("Strg+Z",        "Letzte Aktion rueckgaengig (Verlauf-Tab)"),
         new("Strg+S",        "Sortieren-Tab"),
-        new("Strg+L",        "Lagerliste-Tab"),
+        new("Strg+L",        "Tab Temporäres Inventar"),
         new("Strg+H",        "Verlauf-Tab"),
         new("Strg+,",        "Einstellungen oeffnen"),
         new("Strg+B",        "Backup jetzt erstellen"),
         new("Strg+Q",        "App beenden"),
-        new("Doppelklick",   "Detail-Dialog oeffnen (Lagerliste)"),
-        new("Entf",          "Markierte Items loeschen (Lagerliste)"),
+        new("Doppelklick",   "Detail-Dialog oeffnen (Temporäres Inventar)"),
+        new("Entf",          "Markierte Items loeschen (Temporäres Inventar)"),
         new("Esc",           "Dialog/Modal-Overlay schliessen"),
         new("Enter",         "Primaeren Button ausloesen (OK / Speichern)")
     };

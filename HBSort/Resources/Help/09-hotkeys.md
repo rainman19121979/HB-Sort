@@ -10,7 +10,7 @@ Alle festen Tastatur-Shortcuts in HB-Sort (Stand v0.1.18).
 | **F1** | Hilfe-Tab oeffnen |
 | **Strg+Z** | Letzte Aktion rueckgaengig (siehe Kapitel *Verlauf*) |
 | **Strg+S** | Sortieren-Tab |
-| **Strg+L** | Lagerliste-Tab |
+| **Strg+L** | Tab Temporäres Inventar |
 | **Strg+H** | Verlauf-Tab |
 | **Strg+,** | Einstellungen oeffnen |
 | **Strg+B** | Backup jetzt erstellen |
@@ -27,9 +27,9 @@ Sobald die Top-3-Karten unter dem Webcam-Bild stehen:
 | **2** | Brickognize-Vorschlag #2 uebernehmen |
 | **3** | Brickognize-Vorschlag #3 uebernehmen |
 
-Die Tasten reagieren nur im Sortier-Tab (nicht in Lagerliste / Hilfe /
-Verlauf) und nicht in Eingabe-Feldern - du kannst weiter "1 Riss" in
-die Beschreibung tippen.
+Die Tasten reagieren nur im Sortier-Tab (nicht im Temporären Inventar /
+Hilfe / Verlauf) und nicht in Eingabe-Feldern - du kannst weiter
+"1 Riss" in die Beschreibung tippen.
 
 ### Pending-Figur-Aktionen (ab v0.1.18)
 
@@ -40,7 +40,7 @@ Sobald die Pending-Figur sichtbar ist (mit Lagerfach-Dropdown):
 | **Enter** | "In Fach legen" / "Direkt als Complete speichern" |
 | **Enter** / **Leertaste** / **Esc** | Anweisungs-Popup nach Persist schliessen |
 
-## Lagerliste-Shortcuts
+## Shortcuts im Temporären Inventar
 
 | Hotkey | Aktion |
 |---|---|

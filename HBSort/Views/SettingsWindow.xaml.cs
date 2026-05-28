@@ -240,7 +240,7 @@ public partial class SettingsWindow : Window
             msg = $"ACHTUNG: Fach '{preview.Label}' enthaelt " +
                   $"{preview.CompleteMinifigsCount} KOMPLETT zusammengebaute Figur(en)!\n\n" +
                   $"Diese verlieren beim Leeren ihr Lagerfach (StorageBinId=null) und " +
-                  $"erscheinen in der Lagerliste ohne Fach-Zuordnung. " +
+                  $"erscheinen im Temporären Inventar ohne Fach-Zuordnung. " +
                   $"Strg+Z (Verlauf-Tab) macht jede Entkopplung einzeln rueckgaengig.\n\n" +
                   $"Inhalt:\n" +
                   $"  - {preview.WaitingMinifigsCount} wartende Figur(en)\n" +

@@ -78,10 +78,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private int _bottomRightSelectedTabIndex;
 
     /// <summary>
-    /// Aktuell gewaehlter Haupt-Tab-Index: 0=Sortieren, 1=Lagerliste, 2=Hilfe
-    /// (UX-Iteration X.4 + X.9). Wird vom modernisierten Header (RadioButton-
-    /// Pivot) gesteuert. Nicht persistiert - beim App-Start beginnen wir immer
-    /// auf "Sortieren".
+    /// Aktuell gewaehlter Haupt-Tab-Index. Reihenfolge seit v0.1.24-beta.15:
+    /// 0=Sortieren, 1=Temporaeres Inventar, 2=BrickLink Inventar, 3=Verlauf,
+    /// 4=Hilfe. Wird vom modernisierten Header (RadioButton-Pivot) gesteuert.
+    /// Nicht persistiert - beim App-Start beginnen wir immer auf "Sortieren".
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsMainTabSorting))]
@@ -93,10 +93,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public bool IsMainTabSorting     => MainTabIndex == 0;
     public bool IsMainTabInventory   => MainTabIndex == 1;
-    public bool IsMainTabHelp        => MainTabIndex == 2;
+    // v0.1.24-beta.15: BrickLink Inventar auf Index 2 (vorher 4), Hilfe ans Ende.
+    public bool IsMainTabBlInventory => MainTabIndex == 2;
     public bool IsMainTabHistory     => MainTabIndex == 3;
-    // v0.1.24-beta.7 Phase 2: BrickLink-Inventar-Tab (Index 4, hinter Verlauf).
-    public bool IsMainTabBlInventory => MainTabIndex == 4;
+    public bool IsMainTabHelp        => MainTabIndex == 4;
 
     /// <summary>Toast-Liste fuer das XAML-Binding (ItemsControl).</summary>
     public ObservableCollection<ToastItem> ActiveToasts => _notificationService.ActiveToasts;
@@ -386,7 +386,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void OpenHelp()
     {
-        MainTabIndex = 2;
+        MainTabIndex = 4;
     }
 
     // UX X.20 Teil 6: zusaetzliche globale Shortcuts.
@@ -399,9 +399,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Strg+L: Lagerliste-Tab.</summary>
     [RelayCommand] public void SwitchToInventoryTab() => MainTabIndex = 1;
 
-    /// <summary>Strg+H: Hilfe-Tab (gleiche Aktion wie OpenHelp/F1, aber
-    /// eigener Command-Name fuer den Strg+H-Shortcut).</summary>
-    [RelayCommand] public void SwitchToHelpTab()      => MainTabIndex = 2;
+    /// <summary>Fallback-Command fuer Tab-Wechsel zur Hilfe (analog F1/OpenHelp).
+    /// Aktuell an keinem Hotkey gebunden — Strg+H ist seit v0.1.16 fuer den
+    /// Verlauf-Tab reserviert.</summary>
+    [RelayCommand] public void SwitchToHelpTab()      => MainTabIndex = 4;
 
     /// <summary>
     /// UX X.29 Block F (v0.1.16): Strg+B - sofortiges manuelles Backup ueber
