@@ -7,114 +7,69 @@
         Title="Bauvorschlag - Figur anlegen"
         ToolTipService.IsEnabled="{DynamicResource TooltipsEnabled}"
         Icon="../Resources/app.ico"
-        Width="720" Height="700"
-        MinWidth="600" MinHeight="500"
+        Width="600" Height="640"
         WindowStartupLocation="CenterOwner">
     <!--
-        Detail-Dialog fuer einen Bauvorschlag aus dem "Was kann ich bauen?"-Tab.
-        Zeigt die Minifig + Required-Parts + Vorhanden-Status + Lagerfach-Auswahl.
-        Beim "Figur anlegen"-Klick wird IMinifigPersistenceService.PersistAndStoreAsync
-        aufgerufen, der den Reverse-Match selbst macht (Floating-Parts werden konsumiert
-        und Quantity verbucht).
+        v0.1.24-beta.11 Optik-Vereinheitlichung: gleicher Header/Karten/Footer
+        wie MinifigSummaryDialog. Logik (Reverse-Match beim Anlegen, Bin-
+        Vorschlag, Volle-Faecher-Banner) bleibt unveraendert.
     -->
     <Grid Margin="16">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>  <!-- 0: Header (Bild + Name) -->
-            <RowDefinition Height="Auto"/>  <!-- 1: Verfuegbarkeits-Hint -->
-            <RowDefinition Height="*"/>     <!-- 2: Teile-Liste -->
-            <RowDefinition Height="Auto"/>  <!-- 3: Volle-Faecher-Banner (O.5) -->
-            <RowDefinition Height="Auto"/>  <!-- 4: Bin-Auswahl + Notizen -->
-            <RowDefinition Height="Auto"/>  <!-- 5: Buttons -->
+            <RowDefinition Height="Auto"/>     <!-- 0: Header -->
+            <RowDefinition Height="Auto"/>     <!-- 1: Volle-Faecher-Banner -->
+            <RowDefinition Height="*"/>        <!-- 2: Teile-Liste -->
+            <RowDefinition Height="Auto"/>     <!-- 3: Beschreibung -->
+            <RowDefinition Height="Auto"/>     <!-- 4: Bin-Combo -->
+            <RowDefinition Height="Auto"/>     <!-- 5: Buttons -->
         </Grid.RowDefinitions>
 
-        <!-- Header: Bild links, Titel + Meta rechts -->
-        <Grid Grid.Row="0" Margin="0,0,0,12">
+        <!-- Header: Bild + Name + BL-ID + Bin + Fortschritt + Status-Badge -->
+        <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            <Border Grid.Column="0"
-                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                    BorderThickness="1" CornerRadius="4"
-                    Width="110" Height="110"
-                    HorizontalAlignment="Left">
-                <Image Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}" Stretch="Uniform" Margin="4"
-                       b:ImageZoom.IsEnabled="True"/>
-            </Border>
+
+            <Image Grid.Column="0" Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
+                   Width="100" Height="100" Stretch="Uniform"
+                   VerticalAlignment="Top"
+                   b:ImageZoom.IsEnabled="True"
+                   ToolTip="Vergroessern"/>
+
             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                 <TextBlock Text="{Binding Name}"
-                           FontSize="{StaticResource DialogHeaderFontSize}"
-                           FontWeight="SemiBold"
-                           TextWrapping="Wrap"/>
-                <TextBlock FontSize="12" Foreground="Gray" Margin="0,4,0,0">
-                    <Run Text="BL:"/>
+                           FontSize="{StaticResource DialogHeaderFontSize}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                <TextBlock Margin="0,4,0,0" FontSize="12">
+                    <Run Text="BL:" Foreground="Gray"/>
                     <Run Text="{Binding BricklinkId, Mode=OneWay}" FontFamily="Consolas"/>
-                    <Run Text="  -  Jahr:"/>
-                    <Run Text="{Binding YearReleased, Mode=OneWay, TargetNullValue=?}"/>
                 </TextBlock>
+                <TextBlock Margin="0,2,0,0" FontSize="12">
+                    <Run Text="Fach:" Foreground="Gray"/>
+                    <Run Text="{Binding BinLabel, Mode=OneWay}" FontWeight="SemiBold"/>
+                </TextBlock>
+                <TextBlock Margin="0,2,0,0" FontSize="12">
+                    <Run Text="Fortschritt:" Foreground="Gray"/>
+                    <Run Text="{Binding ProgressLabel, Mode=OneWay}"/>
+                </TextBlock>
+                <ProgressBar Margin="0,4,0,0" Height="8"
+                             Minimum="0" Maximum="1"
+                             Value="{Binding ProgressFraction, Mode=OneWay}"/>
+
+                <!-- Status-Badge: BAUVORSCHLAG (blau analog Info-Stil) -->
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock Text="BAUVORSCHLAG"
+                               Foreground="{StaticResource StatusInfoBrush}"
+                               FontWeight="Bold" FontSize="14"/>
+                </StackPanel>
             </StackPanel>
         </Grid>
 
-        <!-- Verfuegbarkeits-Banner -->
-        <Border Grid.Row="1"
-                Background="{StaticResource InfoBoxBackground}" BorderBrush="{StaticResource StatusInfoBrush}"
-                BorderThickness="1" CornerRadius="4"
-                Padding="10" Margin="0,0,0,12">
-            <TextBlock Text="{Binding AvailabilityLabel}" FontSize="13"/>
-        </Border>
-
-        <!-- Teile-Liste -->
-        <Border Grid.Row="2"
-                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                BorderThickness="1" CornerRadius="4">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding Parts}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                                    BorderThickness="0,0,0,1" Padding="8,6">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
-                                               Text="{Binding DisplayLine}"
-                                               TextWrapping="Wrap"
-                                               VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1"
-                                               Text="{Binding StatusLabel}"
-                                               VerticalAlignment="Center"
-                                               Margin="12,0,0,0"
-                                               FontWeight="SemiBold">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Foreground" Value="{StaticResource StatusWarningBrush}"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsFullyAvailable}" Value="True">
-                                                        <Setter Property="Foreground" Value="{StaticResource StatusSuccessBrush}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
-        </Border>
-
         <!--
-            UX X.33 v0.1.19-beta.7 Block O.5 (Pre-Tag): Volle-Faecher-
-            Warnung. Sichtbar wenn der Suggest-Service kein Fach
-            findet (NoFreeBinWarning != null). Klick auf den Button
-            schliesst den Dialog (DialogResult=false) und oeffnet die
-            Settings - User kann dort ein neues Fach anlegen oder eines
-            leeren und den Bauvorschlag erneut anwaehlen.
+            UX X.33 v0.1.19-beta.7 Block O.5: Volle-Faecher-Warnung.
+            Sichtbar wenn der Suggest-Service kein Fach findet.
         -->
-        <Border Grid.Row="3"
+        <Border Grid.Row="1"
                 Background="#FFF4E5" BorderBrush="#E65100"
                 BorderThickness="1" CornerRadius="4" Padding="10"
                 Margin="0,12,0,0"
@@ -132,40 +87,150 @@
             </DockPanel>
         </Border>
 
-        <!-- Bin-Auswahl + Notizen -->
-        <Grid Grid.Row="4" Margin="0,12,0,0">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+        <!-- Teile-Liste exakt im MinifigSummaryDialog-Stil:
+             [Checkbox|Thumbnail|Swatch|Name+BL/Color|Menge + optional Status/Shop-Element]
+             - Checkbox read-only (IsHitTestVisible=False): zeigt visuell
+               ob das Teil beim Anlegen gedeckt ist (intern ODER reserviert).
+             - Rechtes Element ist EINS von:
+                 a) Status-Text "Vorhanden (Xx in Box)" - wenn intern verfuegbar
+                 b) BL-Shop-Badge (kompakt) - wenn intern leer + Shop hat es
+                 c) "✓ Shop"-Pill - nach gewaehltem Lot (Reset per Klick)
+                 d) "Fehlt"-Text - nirgends verfuegbar
+        -->
+        <Border Grid.Row="2" Margin="0,8,0,0"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="1" CornerRadius="4">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Parts}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                    BorderThickness="0,0,0,1" Padding="8,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <CheckBox Grid.Column="0"
+                                              IsChecked="{Binding IsResolved, Mode=OneWay}"
+                                              IsHitTestVisible="False"
+                                              VerticalAlignment="Center"
+                                              ToolTip="Wird beim Anlegen gedeckt (aus Lager oder BL-Shop-Reservierung)."/>
+                                    <Image Grid.Column="1" Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
+                                           Width="40" Height="40" Stretch="Uniform"
+                                           Margin="8,0,0,0"
+                                           b:ImageZoom.IsEnabled="True"/>
+                                    <Border Grid.Column="2" Width="16" Height="16"
+                                            Background="{Binding SwatchBrush}"
+                                            BorderBrush="Black" BorderThickness="1"
+                                            Margin="8,0" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="3" Margin="6,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding PartName}"
+                                                   FontSize="13" FontWeight="SemiBold"
+                                                   TextWrapping="Wrap"/>
+                                        <TextBlock FontSize="11" Foreground="Gray">
+                                            <Run Text="BL:"/>
+                                            <Run Text="{Binding BlPartNo, Mode=OneWay}" FontFamily="Consolas"/>
+                                            <Run Text=" • "/>
+                                            <Run Text="{Binding ColorName, Mode=OneWay}"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4" Orientation="Horizontal"
+                                                VerticalAlignment="Center" Margin="6,0">
+                                        <TextBlock Text="{Binding QuantityLabel}"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"/>
+
+                                        <!-- a) Status "Vorhanden in Box" wenn intern verfuegbar -->
+                                        <TextBlock Margin="8,0,0,0"
+                                                   Text="{Binding StatusLabel}"
+                                                   Foreground="{StaticResource StatusSuccessBrush}"
+                                                   FontSize="11" FontStyle="Italic"
+                                                   VerticalAlignment="Center"
+                                                   Visibility="{Binding HasInternal, Converter={StaticResource BoolToVisibility}}"/>
+
+                                        <!-- b) BL-Shop-Badge kompakt (analog Referenz-Dialog).
+                                             Klick oeffnet Lot-Picker. -->
+                                        <Border Margin="8,0,0,0"
+                                                Background="#0277BD"
+                                                CornerRadius="3" Padding="6,2"
+                                                Cursor="Hand"
+                                                Tag="{Binding}"
+                                                MouseLeftButtonUp="BlBadge_Click"
+                                                ToolTip="{Binding BlAvailability.BadgeTooltip}"
+                                                Visibility="{Binding ShowBlBadge, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="BL-Shop"
+                                                       Foreground="White" FontWeight="SemiBold"
+                                                       FontSize="10"/>
+                                        </Border>
+
+                                        <!-- c) Nach Auswahl: ✓ Shop-Pill (Klick = Reset) -->
+                                        <Border Margin="8,0,0,0"
+                                                Background="#2E7D32"
+                                                CornerRadius="3" Padding="6,2"
+                                                Cursor="Hand"
+                                                Tag="{Binding}"
+                                                MouseLeftButtonUp="ClearReservation_Click"
+                                                ToolTip="BL-Reservierung fuer dieses Teil zuruecknehmen (Klick)"
+                                                Visibility="{Binding ShowReservedPill, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="✓ Shop"
+                                                       Foreground="White" FontWeight="SemiBold"
+                                                       FontSize="10"/>
+                                        </Border>
+
+                                        <!-- d) Fehlt-Hinweis -->
+                                        <TextBlock Margin="8,0,0,0"
+                                                   Text="Fehlt"
+                                                   Foreground="{StaticResource StatusWarningBrush}"
+                                                   FontSize="11" FontStyle="Italic"
+                                                   VerticalAlignment="Center"
+                                                   Visibility="{Binding ShowMissingLabel, Converter={StaticResource BoolToVisibility}}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Beschreibung (oeffentlicher BSX-Comment) -->
+        <Grid Grid.Row="3" Margin="0,12,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="170"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="Beschreibung (optional):"
+                       VerticalAlignment="Center"/>
+            <TextBox Grid.Column="1"
+                     Text="{Binding UserNotes, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Oeffentliche Beschreibung fuer den BrickLink-Verkauf - wird beim BSX-Export ins Comments-Feld geschrieben und ist fuer Kaeufer sichtbar."/>
+        </Grid>
 
-            <TextBlock Grid.Row="0" Grid.Column="0"
-                       Text="Neues Lagerfach:" VerticalAlignment="Center"/>
-            <ComboBox Grid.Row="0" Grid.Column="1"
+        <!-- Bin-Auswahl: gleiches Layout wie 'Verschieben nach' im Referenz-Dialog -->
+        <Grid Grid.Row="4" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="170"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="Lagerfach:"
+                       VerticalAlignment="Center"/>
+            <ComboBox Grid.Column="1"
                       ItemsSource="{Binding AvailableBins}"
                       SelectedItem="{Binding SelectedBin}"
-                      DisplayMemberPath="DisplayText"/>
-
-            <!-- UX X.30 (v0.1.17): "Notizen" -> "Beschreibung", landet beim
-                 BSX-Export im oeffentlichen Comments-Feld. -->
-            <TextBlock Grid.Row="1" Grid.Column="0"
-                       Text="Beschreibung (optional):" VerticalAlignment="Center"
-                       Margin="0,8,0,0"/>
-            <TextBox Grid.Row="1" Grid.Column="1"
-                     Text="{Binding UserNotes, UpdateSourceTrigger=PropertyChanged}"
-                     Margin="0,8,0,0"
-                     ToolTip="Oeffentliche Beschreibung fuer den BrickLink-Verkauf - wird beim BSX-Export ins Comments-Feld geschrieben und ist fuer Kaeufer sichtbar."/>
+                      DisplayMemberPath="DisplayText"
+                      ToolTip="Fach in das die neue Figur gelegt wird. Suffix '(2 wartend, 3 fertig)' zeigt die aktuelle Belegung."/>
         </Grid>
 
         <!-- Buttons -->
         <StackPanel Grid.Row="5" Orientation="Horizontal"
-                    HorizontalAlignment="Right" Margin="0,16,0,0">
+                    HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button Content="Abbrechen" IsCancel="True"
-                    Width="100" Margin="0,0,8,0"
+                    Width="120" Margin="0,0,8,0"
                     Click="Cancel_Click"/>
             <Button Content="Figur anlegen"
                     IsEnabled="{Binding CanCreate}"

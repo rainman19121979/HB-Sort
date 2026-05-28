@@ -48,6 +48,59 @@ BrickStore- und BrickLink-Export.
 - **Bulk-Operationen** (ab v0.1.16) - mehrere Items in der Lagerliste
   markieren und gemeinsam loeschen oder verschieben (mit Undo-Support).
   Doppelklick auf Zeile oeffnet Details, Entf-Taste loescht Selektion.
+- **BrickLink-Inventar-Integration** (ab v0.1.24, optional) - dein
+  kompletter BL-Store-Bestand wird lokal gespiegelt (Sync per Knopf-
+  druck, ein API-Call). Eigener Tab "BrickLink Inventar" mit Filter,
+  Suche und Detail-Panel. Beim Sammeln einer wartenden Figur zeigt ein
+  blauer **BL-Shop**-Badge welche fehlenden Teile du noch in deinem
+  Shop hast - per Klick einzelne Lots reservieren (mit Shop-Position).
+  Der Baubar-Tab kann zusaetzlich Figuren vorschlagen die nur mit
+  BL-Ergaenzung komplett baubar waeren.
+
+## Was ist neu in v0.1.24
+
+Grosse Iteration in zwei Strecken: **SortInstruction-Konsolidierung**
+und **BL-Inventar-Integration**.
+
+### SortInstruction-Modal (beta.1-3)
+
+- **Ein einheitliches Take/Put/Plus-Modal** fuer alle 6 Sortier-Triggers
+  (Bulk-Move, DismantleWizard, Single-Move, StoreFloating, Reverse-Match-
+  Konsum, Wizard-Stufe-2-Save). Vorher: drei Layout-Varianten je nach
+  Pfad. Jetzt: konsistente "Nimm aus X, Lege in Y, Plus optionaler
+  Hinweis"-Struktur ueberall.
+- **Wizard 2-stufig** beim Anlegen einer Figur aus dem Collect-Pfad.
+- **Combobox-Suffix mit Belegungs-Counts** ("Box 005 (3 wartende)").
+
+### BL-Inventar (beta.6-10)
+
+- **Phase 1 — Sync-Infrastruktur**: `BlInventoryLot`-Entity, EF-
+  Migration, `IBlInventoryService` mit Snapshot-Replace + Erhalt der
+  HBSort-Reservierungen. Sync-Button in Einstellungen.
+- **Phase 2 — Inventar-Tab**: durchsuchbares DataGrid mit Filter
+  (Typ, Zustand, Suche), Detail-Panel rechts mit Grossbild und allen
+  Feldern, Lazy-Thumbnail-Loading (max 3 parallele Downloads), Spalte
+  **Shop-Position** (BL-Remarks).
+- **Phase 3 — Komplettieren-Integration**:
+  - `QuantityReservedFromBl` auf TrackedMinifigPart (effektive
+    Vollstaendigkeit = physisch + BL-reserviert)
+  - `BlReserveDialog`: pro fehlendem Teil eine Liste der verfuegbaren
+    Lots (mit Shop-Position), Klick reserviert genau ein Lot
+  - **Baubar-Tab** bekommt Checkbox **"BL-Inventar beruecksichtigen"** —
+    aktiv zeigt die Liste zusaetzlich Figuren die nur mit BL-Ergaenzung
+    komplett baubar waeren, mit Badge "X Teile aus Shop"
+  - **Sortier-Tab Toast** wenn ein gescanntes Teil keiner wartenden
+    Figur passt, aber in deinem BL-Shop liegt
+- **beta.10 Stable-Fix**: BL-Reservierungen werden bei Figur-Loeschen/
+  Zerlegen/Cleanup automatisch freigegeben — keine Geist-Reservierungen
+  im Inventar-Tab.
+
+### Bin-Vorschlags-Bugfixes (beta.4 + beta.9)
+
+- **Symmetrie-Vertrag** zwischen `SuggestBinForFloatingPartAsync` und
+  der UI-Combobox: Floating-Parts werden nie mehr in Bins vorgeschlagen
+  die in der Combobox gar nicht angezeigt sind. Behebt zwei "Kein Fach
+  frei"-Bugs (Complete-Bin der excluded-Figur, Pure-Waiting-Bin).
 
 ## Was ist neu in v0.1.19
 

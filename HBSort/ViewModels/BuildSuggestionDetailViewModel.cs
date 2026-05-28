@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Globalization;
+using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using HBSort.Core.Database;
 using HBSort.Core.Models;
@@ -30,6 +32,7 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
     private readonly IBlCacheRepository _cache;
     private readonly IDbContextFactory<UserDataContext> _ctxFactory;
     private readonly IPartImageProvider _imageProvider;
+    private readonly IBlInventoryService? _blInventory;
 
     public string BricklinkId { get; }
     public string Name { get; }
@@ -93,6 +96,29 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// v0.1.24-beta.11 Optik-Vereinheitlichung: Fortschritts-Anzeige im
+    /// Header (analog MinifigSummaryDialog). Wert 0.0-1.0, fuer ProgressBar.
+    /// </summary>
+    public double ProgressFraction
+    {
+        get
+        {
+            var need = TotalQuantityNeeded;
+            if (need <= 0) return 0;
+            var have = TotalQuantityHave;
+            return Math.Min(1.0, (double)have / need);
+        }
+    }
+
+    /// <summary>"X von Y direkt verfuegbar" - Header-Text neben dem Fortschritt.</summary>
+    public string ProgressLabel => $"{TotalQuantityHave} von {TotalQuantityNeeded} direkt verfuegbar";
+
+    /// <summary>Bin-Label fuer den Header (SelectedBin oder "(noch nicht gewaehlt)").</summary>
+    public string BinLabel => SelectedBin?.Bin.Label ?? "(noch nicht gewaehlt)";
+
+    partial void OnSelectedBinChanged(BinDisplayItem? value) => OnPropertyChanged(nameof(BinLabel));
+
     public bool CanCreate => SelectedBin != null && !IsCreating;
 
     public BuildSuggestionDetailViewModel(
@@ -102,7 +128,8 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
         string? imageUrl,
         IBlCacheRepository cache,
         IDbContextFactory<UserDataContext> ctxFactory,
-        IPartImageProvider imageProvider)
+        IPartImageProvider imageProvider,
+        IBlInventoryService? blInventory = null)
     {
         BricklinkId = bricklinkId;
         Name = name;
@@ -111,6 +138,7 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
         _cache = cache;
         _ctxFactory = ctxFactory;
         _imageProvider = imageProvider;
+        _blInventory = blInventory;
     }
 
     /// <summary>
@@ -181,6 +209,7 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
                 statusLabel = "Fehlt";
             }
 
+            var hbHave = Math.Min(totalAvail, s.Quantity);
             Parts.Add(new BuildSuggestionPartViewModel
             {
                 BlPartNo = s.ItemNo,
@@ -189,7 +218,7 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
                 ColorName = color?.Name ?? $"Color {s.ColorId}",
                 ColorRgb = color?.Rgb,
                 QuantityNeeded = s.Quantity,
-                QuantityHave = Math.Min(totalAvail, s.Quantity),
+                QuantityHave = hbHave,
                 StatusLabel = statusLabel,
                 IsFullyAvailable = totalAvail >= s.Quantity
             });
@@ -198,6 +227,8 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
         OnPropertyChanged(nameof(TotalQuantityNeeded));
         OnPropertyChanged(nameof(TotalQuantityHave));
         OnPropertyChanged(nameof(AvailabilityLabel));
+        OnPropertyChanged(nameof(ProgressFraction));
+        OnPropertyChanged(nameof(ProgressLabel));
 
         // UX X.33 v0.1.19-beta.7 Block L: wenn schon alle Required-Parts
         // im Floating-Pool liegen, wird die Figur durch den Reverse-Match
@@ -277,6 +308,92 @@ public partial class BuildSuggestionDetailViewModel : ObservableObject
             "partNames={Pn}ms ueber {PnCalls}, parts={Parts}",
             BricklinkId, swTotal.ElapsedMilliseconds,
             swPartNames.ElapsedMilliseconds, partNameCalls, Parts.Count);
+
+        // v0.1.24-beta.11: Lazy Thumbnails + BL-Availability pro Part.
+        // Fire-and-forget — UI rendert die Karten sofort, Bilder + Badges
+        // erscheinen wenn fertig.
+        _ = LoadPartImagesAsync();
+        if (_blInventory != null) _ = LoadBlAvailabilitiesAsync();
+    }
+
+    /// <summary>
+    /// v0.1.24-beta.11: pro Part Thumbnail via IPartImageProvider holen
+    /// und auf ImageUrl setzen. Sequenziell — bei typisch &lt;20 Required-
+    /// Parts ist Parallelisierung overkill.
+    /// </summary>
+    private async Task LoadPartImagesAsync()
+    {
+        try
+        {
+            var disp = System.Windows.Application.Current?.Dispatcher;
+            foreach (var p in Parts.ToList())
+            {
+                if (!string.IsNullOrEmpty(p.ImageUrl)) continue;
+                try
+                {
+                    var url = await _imageProvider.GetImageFileByBlAsync("P", p.BlPartNo, p.ColorId);
+                    if (string.IsNullOrEmpty(url)) continue;
+                    if (disp != null)
+                        await disp.InvokeAsync(() => p.ImageUrl = url);
+                    else
+                        p.ImageUrl = url;
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug(ex, "BuildSuggestionDetail Image-Load fuer {Part}/{Color} fehlgeschlagen",
+                        p.BlPartNo, p.ColorId);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "LoadPartImages geworfen");
+        }
+    }
+
+    /// <summary>
+    /// v0.1.24-beta.11: pro Part BL-Lot-Availability lookup via
+    /// IBlInventoryService. Best-effort.
+    /// </summary>
+    private async Task LoadBlAvailabilitiesAsync()
+    {
+        if (_blInventory == null) return;
+        try
+        {
+            if (!await _blInventory.HasAnyInventoryAsync()) return;
+            var disp = System.Windows.Application.Current?.Dispatcher;
+            foreach (var p in Parts.ToList())
+            {
+                try
+                {
+                    var lots = await _blInventory.FindLotsForPartAsync(p.BlPartNo, p.ColorId);
+                    if (lots.Count == 0) continue;
+
+                    var newLots = lots.Where(l => l.Condition == "N").ToList();
+                    var usedLots = lots.Where(l => l.Condition == "U").ToList();
+                    var info = new BlAvailabilityInfo
+                    {
+                        NewQty = newLots.Sum(l => l.Quantity - l.ReservedQuantity),
+                        UsedQty = usedLots.Sum(l => l.Quantity - l.ReservedQuantity),
+                        NewLots = newLots,
+                        UsedLots = usedLots
+                    };
+                    if (disp != null)
+                        await disp.InvokeAsync(() => p.BlAvailability = info);
+                    else
+                        p.BlAvailability = info;
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug(ex, "BuildSuggestionDetail BL-Availability fuer {Part}/{Color} fehlgeschlagen",
+                        p.BlPartNo, p.ColorId);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "LoadBlAvailabilities geworfen");
+        }
     }
 }
 
@@ -293,6 +410,95 @@ public partial class BuildSuggestionPartViewModel : ObservableObject
     public string StatusLabel { get; init; } = string.Empty;
     public bool IsFullyAvailable { get; init; }
 
+    /// <summary>Legacy-Label fuer alte Render-Pfade; in beta.11 nicht mehr verwendet.</summary>
     public string DisplayLine =>
         $"{QuantityNeeded}x {PartName} ({ColorName}) [BL:{BlPartNo}]";
+
+    /// <summary>"X/Y" - kompakter Quantity-Indikator analog SummaryPartViewModel.QuantityLabel.</summary>
+    public string QuantityLabel => $"{QuantityHave}/{QuantityNeeded}";
+
+    // ============================================================
+    // v0.1.24-beta.11: Lazy Thumbnail + Quellen-Auswahl pro Teil
+    // ============================================================
+
+    /// <summary>Lokal gecachter Bild-Pfad. Wird vom Parent-VM async befuellt.</summary>
+    [ObservableProperty]
+    private string? _imageUrl;
+
+    /// <summary>True wenn FloatingParts &gt;= 1 fuer dieses (PartNo, ColorId) existieren.</summary>
+    public bool HasInternal => QuantityHave > 0;
+
+    /// <summary>
+    /// BL-Inventar-Verfuegbarkeit fuer dieses Teil. Wird vom Parent-VM async
+    /// gefuellt (FindLotsForPartAsync). Null = noch nicht geprueft.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasBlShop))]
+    [NotifyPropertyChangedFor(nameof(ShowBlBadge))]
+    [NotifyPropertyChangedFor(nameof(ShowMissingLabel))]
+    private BlAvailabilityInfo? _blAvailability;
+
+    public bool HasBlShop => BlAvailability != null && BlAvailability.HasAny;
+
+    /// <summary>
+    /// Vom User gewaehltes BL-Lot fuer dieses Teil. Null = nicht aus BL.
+    /// Wird ueber den BlReserveDialog gesetzt.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsResolved))]
+    [NotifyPropertyChangedFor(nameof(ShowBlBadge))]
+    [NotifyPropertyChangedFor(nameof(ShowReservedPill))]
+    [NotifyPropertyChangedFor(nameof(ShowMissingLabel))]
+    [NotifyPropertyChangedFor(nameof(ReservedLotDisplay))]
+    [NotifyPropertyChangedFor(nameof(HasReservation))]
+    private HBSort.Core.Models.BlInventoryLot? _reservedLot;
+
+    /// <summary>True wenn ein BL-Lot fuer dieses Teil reserviert wurde.</summary>
+    public bool HasReservation => ReservedLot != null;
+
+    /// <summary>
+    /// v0.1.24-beta.11 (Spec-Anpassung): Quelle wird automatisch bestimmt -
+    /// HasInternal hat Vorrang, sonst BL-Shop wenn reserviert, sonst Fehlt.
+    /// Kein User-Toggle mehr (vor dem Refactor war hier eine UseInternal-
+    /// Checkbox; sie wurde entfernt weil der Shop-Button ohnehin nur ohne
+    /// internen Bestand sichtbar ist).
+    /// </summary>
+    public bool IsResolved => HasInternal || ReservedLot != null;
+
+    /// <summary>
+    /// BL-Shop-Badge sichtbar: intern KEIN Bestand, im Shop verfuegbar, noch nicht reserviert.
+    /// </summary>
+    public bool ShowBlBadge => !HasInternal && HasBlShop && ReservedLot == null;
+
+    /// <summary>Nach Klick auf BL-Badge wurde ein Lot reserviert: kompakte "Shop"-Pill mit Reset.</summary>
+    public bool ShowReservedPill => ReservedLot != null;
+
+    /// <summary>"Fehlt"-Label sichtbar: weder intern noch im Shop verfuegbar.</summary>
+    public bool ShowMissingLabel => !HasInternal && !HasBlShop && ReservedLot == null;
+
+    /// <summary>Kompakte Anzeige des reservierten Lots fuer den Karten-Fuss.</summary>
+    public string ReservedLotDisplay => ReservedLot == null
+        ? string.Empty
+        : (string.IsNullOrWhiteSpace(ReservedLot.Remarks) ? "(kein Lagerplatz)" : ReservedLot.Remarks!);
+
+    /// <summary>v0.1.24-beta.11: Farb-Swatch (16x16) im Karten-Stil — direkt aus ColorRgb hergeleitet.</summary>
+    public Brush SwatchBrush
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(ColorRgb)) return Brushes.Gray;
+            var clean = ColorRgb.TrimStart('#');
+            if (clean.Length != 6) return Brushes.Gray;
+            try
+            {
+                var r = byte.Parse(clean.Substring(0, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+                var g = byte.Parse(clean.Substring(2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+                var b = byte.Parse(clean.Substring(4, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+                var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+                brush.Freeze();
+                return brush;
+            }
+            catch { return Brushes.Gray; }
+        }
+    }
 }

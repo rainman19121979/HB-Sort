@@ -19,6 +19,42 @@ public partial class BuildSuggestionsView : UserControl
     }
 
     /// <summary>
+    /// v0.1.24-beta.11: Footer-Link "Ignorierte verwalten (N)" -> Dialog.
+    /// Nach Schliessen wird die Vorschlagsliste refresht wenn der User
+    /// mind. eine Aenderung gemacht hat (HasChanges).
+    /// </summary>
+    private async void ManageIgnored_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not BuildSuggestionsViewModel vm) return;
+
+        var sp = App.Services;
+        var ctxFactory = sp.GetRequiredService<IDbContextFactory<UserDataContext>>();
+        var blCache = sp.GetRequiredService<IBlCacheRepository>();
+        var imageProvider = sp.GetRequiredService<IPartImageProvider>();
+
+        var dialogVm = new ManageIgnoredViewModel(ctxFactory, blCache, imageProvider);
+        try
+        {
+            await dialogVm.LoadAsync();
+        }
+        catch (System.Exception ex)
+        {
+            Log.Warning(ex, "ManageIgnored: Initial-Load fehlgeschlagen");
+        }
+
+        var dialog = new ManageIgnoredDialog(dialogVm)
+        {
+            Owner = Window.GetWindow(this)
+        };
+        dialog.ShowDialog();
+
+        if (dialogVm.HasChanges)
+        {
+            await vm.RefreshAsync();
+        }
+    }
+
+    /// <summary>
     /// Klick auf eine Bauvorschlag-Zeile: Detail-Dialog oeffnen.
     /// Bei "Figur anlegen" konsumiert IMinifigPersistenceService die FloatingParts
     /// per Reverse-Match und triggert ein DataChanged - die Liste hier
@@ -37,13 +73,14 @@ public partial class BuildSuggestionsView : UserControl
         var binService = sp.GetRequiredService<IStorageBinService>();
         var persistence = sp.GetRequiredService<IMinifigPersistenceService>();
         var notifications = sp.GetRequiredService<INotificationService>();
+        var blInventory = sp.GetRequiredService<IBlInventoryService>();
 
         var dialogVm = new BuildSuggestionDetailViewModel(
             item.BricklinkId,
             item.Name,
             yearReleased: null, // BL-Item liefert YearReleased separat - wir holen es im Load
             imageUrl: item.ImageUrl,
-            cache, ctxFactory, imageProvider);
+            cache, ctxFactory, imageProvider, blInventory);
 
         // Subset-Liste + Bin-Liste asynchron laden bevor der Dialog gezeigt wird,
         // damit der User keine leere Maske sieht. Bei Fehler trotzdem oeffnen.

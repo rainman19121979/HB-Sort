@@ -80,6 +80,14 @@ public class ScanEvent
 ///                            ResultDescription = "Reserviert: {PartName}
 ///                            ({Condition}) fuer {MinifigName}".
 ///   BlInventoryRelease     - Reservierung wieder aufgehoben (Undo).
+///
+/// v0.1.24-beta.12 Phase 4: Mass-Update-Export-Verifikation.
+///   BlReservationConvertedToCollected - User hat das BL-Update durchgefuehrt
+///                            und verifiziert; die reservierten Teile sind
+///                            physisch entnommen worden, die QuantityReservedFromBl-
+///                            Buchung wird in QuantityCollected umgewandelt.
+///                            Die Figur bleibt in EffectiveCollected unveraendert,
+///                            nur die Quelle wechselt.
 /// </summary>
 public enum ScanType
 {
@@ -95,5 +103,6 @@ public enum ScanType
     Import,
     UndoApplied,
     BlInventoryReservation,
-    BlInventoryRelease
+    BlInventoryRelease,
+    BlReservationConvertedToCollected
 }

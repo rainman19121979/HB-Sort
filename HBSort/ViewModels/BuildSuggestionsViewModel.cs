@@ -1,11 +1,15 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Threading;
 using System.Windows;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HBSort.Core.Database;
+using HBSort.Core.Models;
+using HBSort.Core.Models.Pricing;
 using HBSort.Core.Services;
+using HBSort.Services;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -33,6 +37,12 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
     // v0.1.24-beta.8 Phase 3: BL-Inventar-Zugriff fuer die optionale
     // "Mit BL-Shop vervollstaendigbar"-Sektion.
     private readonly IBlInventoryService _blInventory;
+    // v0.1.24-beta.10 Hotfix: Mindest-Schwellwert fuer Teilmatches aus
+    // ScoreThresholdMin (0.0-1.0) lesen.
+    private readonly ISettingsService _settings;
+    // v0.1.24-beta.11: Bulk-Preise-Holen + Toast-Notify.
+    private readonly IPriceProviderFactory _priceFactory;
+    private readonly INotificationService _notify;
 
     // Audit K-2: Wir merken uns die DataChanged-Subscription (als Field), damit
     // wir sie in Dispose() sauber abmelden koennen. Ohne das Unsubscribe wuerde
@@ -57,6 +67,7 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
     public ObservableCollection<BuildSuggestionItem> Suggestions { get; } = new();
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanFetchPrices))]
     private bool _isLoading;
 
     [ObservableProperty]
@@ -76,18 +87,47 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
 
     partial void OnIncludeBlInventoryChanged(bool value) => _ = RefreshAsync();
 
+    // ============================================================
+    // v0.1.24-beta.11: Persistente Ignorier-Liste
+    // ============================================================
+    /// <summary>Anzahl persistent ignorierter Figuren (fuer Footer-Reset-Link).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasIgnored))]
+    [NotifyPropertyChangedFor(nameof(IgnoredCountLabel))]
+    private int _ignoredCount;
+
+    public bool HasIgnored => IgnoredCount > 0;
+    public string IgnoredCountLabel => $"Ignorierte verwalten ({IgnoredCount})";
+
+    // ============================================================
+    // v0.1.24-beta.11: Preise-Holen-Feature
+    // ============================================================
+    /// <summary>True waehrend FetchAllPricesAsync laeuft (Button disabled, Spinner).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanFetchPrices))]
+    private bool _isFetchingPrices;
+
+    /// <summary>Button-Enable: nicht waehrend Refresh, nicht waehrend Fetch, mind. 1 Vorschlag.</summary>
+    public bool CanFetchPrices => !IsLoading && !IsFetchingPrices && Suggestions.Count > 0;
+
     public BuildSuggestionsViewModel(
         IDbContextFactory<UserDataContext> ctxFactory,
         IBlCacheRepository blCache,
         IPartImageProvider imageProvider,
         IMinifigPersistenceService persistence,
-        IBlInventoryService blInventory)
+        IBlInventoryService blInventory,
+        ISettingsService settings,
+        IPriceProviderFactory priceFactory,
+        INotificationService notify)
     {
         _ctxFactory = ctxFactory;
         _blCache = blCache;
         _imageProvider = imageProvider;
         _persistence = persistence;
         _blInventory = blInventory;
+        _settings = settings;
+        _priceFactory = priceFactory;
+        _notify = notify;
 
         _onDataChanged = (_, _) =>
         {
@@ -113,6 +153,151 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
         _imageLoadCts?.Dispose();
         GC.SuppressFinalize(this);
     }
+
+    // ============================================================
+    // v0.1.24-beta.11: Ignorier-Commands (persistent)
+    // ============================================================
+    [RelayCommand]
+    public async Task IgnoreSuggestionAsync(BuildSuggestionItem? item)
+    {
+        if (item == null) return;
+        try
+        {
+            await using (var ctx = await _ctxFactory.CreateDbContextAsync())
+            {
+                var exists = await ctx.IgnoredBuildSuggestions
+                    .AsNoTracking()
+                    .AnyAsync(i => i.BricklinkId == item.BricklinkId);
+                if (!exists)
+                {
+                    ctx.IgnoredBuildSuggestions.Add(new IgnoredBuildSuggestion
+                    {
+                        BricklinkId = item.BricklinkId,
+                        IgnoredAt = DateTime.UtcNow
+                    });
+                    await ctx.SaveChangesAsync();
+                }
+            }
+            // beta.11 Fix 1: voller Refresh statt Suggestions.Remove(item).
+            // Damit rueckt der naechstbeste nicht-ignorierte Kandidat (z.B.
+            // der vorher auf Position 21+ war und damit unter dem MaxSuggestions-
+            // Cap lag) automatisch nach.
+            await RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "BuildSuggestions: Ignorieren fehlgeschlagen ({Bl})", item.BricklinkId);
+            _notify.ShowError($"Konnte '{item.Name}' nicht ignorieren: {ex.Message}");
+        }
+    }
+
+    // ============================================================
+    // v0.1.24-beta.11: Alle Preise holen (Bulk, gedrosselt)
+    // ============================================================
+    [RelayCommand]
+    public async Task FetchAllPricesAsync()
+    {
+        // Snapshot der aktuellen Vorschlaege - waehrend des Holens kann ein
+        // Refresh den Suggestions-Stream tauschen, dann wuerden wir auf
+        // freigegebene Items schreiben.
+        var snapshot = Suggestions.ToList();
+        if (snapshot.Count == 0) return;
+
+        var provider = _priceFactory.GetActiveProvider();
+        if (!await provider.IsConfiguredAsync())
+        {
+            _notify.ShowWarning("Preis-Provider nicht konfiguriert (BL-Tokens fehlen oder Provider = None).");
+            return;
+        }
+
+        IsFetchingPrices = true;
+        var priceColumn = _settings.Current.Prices.PriceColumn;
+
+        // Drosseln: max 3 parallel. Rate-Limit-Gate ist im Provider selbst,
+        // hier limitieren wir nur die Netzwerk-Concurrency.
+        using var sem = new SemaphoreSlim(3, 3);
+        int fresh = 0, fromCache = 0, failed = 0;
+
+        try
+        {
+            var tasks = snapshot.Select(async item =>
+            {
+                await sem.WaitAsync();
+                try
+                {
+                    var result = await provider.GetMinifigPriceAsync(item.BricklinkId);
+                    if (result == null || !result.HasAnyPrice)
+                    {
+                        await SetPriceFailedOnUiAsync(item);
+                        Interlocked.Increment(ref failed);
+                        return;
+                    }
+                    var pick = PriceMath.PickValue(result, priceColumn);
+                    if (!pick.HasValue)
+                    {
+                        await SetPriceFailedOnUiAsync(item);
+                        Interlocked.Increment(ref failed);
+                        return;
+                    }
+                    await SetPriceOnUiAsync(item, pick.Value, result.Currency);
+                    if (result.FromCache) Interlocked.Increment(ref fromCache);
+                    else Interlocked.Increment(ref fresh);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "FetchAllPrices: Lookup fehlgeschlagen ({Bl})", item.BricklinkId);
+                    await SetPriceFailedOnUiAsync(item);
+                    Interlocked.Increment(ref failed);
+                }
+                finally
+                {
+                    sem.Release();
+                }
+            });
+            await Task.WhenAll(tasks);
+
+            _notify.ShowInfo($"Preise: {fresh} geholt, {fromCache} aus Cache, {failed} fehlgeschlagen.");
+        }
+        finally
+        {
+            IsFetchingPrices = false;
+        }
+    }
+
+    /// <summary>UI-Thread-Wrapper - Item-Property-Set immer auf dem Dispatcher.</summary>
+    private async Task SetPriceOnUiAsync(BuildSuggestionItem item, decimal value, string currency)
+    {
+        var disp = Application.Current?.Dispatcher;
+        if (disp != null && !disp.CheckAccess())
+        {
+            await disp.InvokeAsync(() =>
+            {
+                item.PriceValue = value;
+                item.PriceCurrency = currency;
+                item.PriceLookupFailed = false;
+            });
+        }
+        else
+        {
+            item.PriceValue = value;
+            item.PriceCurrency = currency;
+            item.PriceLookupFailed = false;
+        }
+    }
+
+    private async Task SetPriceFailedOnUiAsync(BuildSuggestionItem item)
+    {
+        var disp = Application.Current?.Dispatcher;
+        if (disp != null && !disp.CheckAccess())
+        {
+            await disp.InvokeAsync(() => item.PriceLookupFailed = true);
+        }
+        else
+        {
+            item.PriceLookupFailed = true;
+        }
+    }
+
 
     [RelayCommand]
     public async Task RefreshAsync()
@@ -201,34 +386,139 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
                 });
             }
 
-            // 5) v0.1.24-beta.8 Phase 3 (Fix 5): einheitliche Liste statt
-            //    zwei Sektionen. Toggle-off zeigt nur HBSort-100%, Toggle-on
-            //    ergaenzt um Figuren die mit BL-Shop auf 100% kommen.
+            // 5) v0.1.24-beta.11: drei Kategorien in einer Liste, mit
+            //    persistenter Ignorier-Filterung + sauberer Modus-Trennung.
+            //
+            //    Modus 1 (Toggle AUS):  Kat.1 (HBSort 100%) + Kat.3 (Teilmatch
+            //                            oberhalb Schwellwert), je nur Match-Badge.
+            //    Modus 2 (Toggle AN):   Kat.1 + Kat.2 (Shop-completable, 100%
+            //                            + Shop-Badge) + Kat.3 (Teilmatch, ggf.
+            //                            mit "X Teil(e) aus Shop"-Badge).
+            //
+            //    Sortierung: Kat.1 (Name asc) -> Kat.2 (wenig Shop-Teile zuerst)
+            //                -> Kat.3 (Match-% absteigend).
             HasAnyBlInventory = await _blInventory.HasAnyInventoryAsync();
-            var hbsortComplete = suggestions
-                .Where(s => s.MatchPercent >= 100)
-                .OrderBy(s => s.Name)
-                .Take(MaxSuggestions)
+
+            // Persistente Ignorier-Liste laden + sofort filtern.
+            var ignoredSet = await ctx.IgnoredBuildSuggestions
+                .AsNoTracking()
+                .Select(i => i.BricklinkId)
+                .ToListAsync();
+            var ignoredHash = new HashSet<string>(ignoredSet, StringComparer.OrdinalIgnoreCase);
+            IgnoredCount = ignoredHash.Count;
+
+            suggestions = suggestions
+                .Where(s => !ignoredHash.Contains(s.BricklinkId))
                 .ToList();
 
-            var blCompletable = new List<BuildSuggestionItem>();
+            // Schwellwert: ScoreThresholdMin (0.0-1.0) auf Prozent (0-100) skalieren.
+            // Default 0.5 → 50%. Items unter dem Schwellwert verschwinden komplett.
+            var thresholdPercent = (int)(_settings.Current.ScoreThresholdMin * 100);
+
+            // BL-Shop-Analyse fuer alle <100%-Kandidaten (canComplete-Flag +
+            // helpCount). Nur ausfuehren wenn der Toggle aktiv ist - sonst
+            // verschwendete DB-Queries.
+            var shopHelp = new Dictionary<string, (int helpCount, bool canComplete)>(StringComparer.OrdinalIgnoreCase);
             if (IncludeBlInventory && HasAnyBlInventory)
             {
-                blCompletable = await BuildBlCompletableAsync(suggestions, haveMap);
+                shopHelp = await AnalyzeBlShopHelpAsync(suggestions, haveMap);
             }
 
-            Suggestions.Clear();
-            // Erst HBSort-100% (alphabetisch), dann BL-Erweiterungen
-            // (nach Aufwand: wenig BL-Teile zuerst).
-            foreach (var s in hbsortComplete) Suggestions.Add(s);
-            foreach (var s in blCompletable.OrderBy(s => s.BlShopPartCount).ThenBy(s => s.Name))
-                Suggestions.Add(s);
+            // Kat.2-IDs (Shop-completable). Nur in Modus 2 relevant.
+            var cat2Ids = shopHelp
+                .Where(kv => kv.Value.canComplete)
+                .Select(kv => kv.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            SummaryText = Suggestions.Count == 0
-                ? "Keine Bauvorschlaege - keine deiner losen Teile reicht fuer eine ungetrackte Minifig."
+            // Kat.1: HBSort 100% (nicht durch Shop-Pool ersetzt).
+            var cat1 = suggestions
+                .Where(s => s.MatchPercent >= 100 && !cat2Ids.Contains(s.BricklinkId))
+                .OrderBy(s => s.Name)
+                .ToList();
+
+            // Kat.2: Shop-completable (nur in Modus 2). Wir bauen frische
+            // Items mit IsBlShopAddition=true + BlShopPartCount=helpCount.
+            var cat2 = new List<BuildSuggestionItem>();
+            if (IncludeBlInventory && HasAnyBlInventory)
+            {
+                foreach (var c in suggestions.Where(s => s.MatchPercent < 100 && cat2Ids.Contains(s.BricklinkId)))
+                {
+                    var (helpCount, _) = shopHelp[c.BricklinkId];
+                    cat2.Add(new BuildSuggestionItem
+                    {
+                        BricklinkId = c.BricklinkId,
+                        Name = c.Name,
+                        MatchPercent = 100,
+                        TotalParts = c.TotalParts,
+                        MissingPartsCount = 0,
+                        TotalQtyNeeded = c.TotalQtyNeeded,
+                        TotalQtyHave = c.TotalQtyNeeded,
+                        IsBlShopAddition = true,
+                        BlShopPartCount = helpCount
+                    });
+                }
+                cat2 = cat2
+                    .OrderBy(s => s.BlShopPartCount)
+                    .ThenBy(s => s.Name)
+                    .ToList();
+            }
+
+            // Kat.3: Teilmatches oberhalb Schwellwert, NICHT bereits in Kat.2.
+            // In Modus 2 annotieren wir mit Shop-Help-Count (=> orange Badge wird
+            // durch BL-Badge ersetzt; siehe BuildSuggestionItem.HasBlShopContribution).
+            var cat3 = new List<BuildSuggestionItem>();
+            foreach (var s in suggestions
+                .Where(s => s.MatchPercent < 100
+                         && s.MatchPercent >= thresholdPercent
+                         && !cat2Ids.Contains(s.BricklinkId)))
+            {
+                int helpCount = 0;
+                if (IncludeBlInventory && HasAnyBlInventory
+                    && shopHelp.TryGetValue(s.BricklinkId, out var info))
+                {
+                    helpCount = info.helpCount;
+                }
+                cat3.Add(new BuildSuggestionItem
+                {
+                    BricklinkId = s.BricklinkId,
+                    Name = s.Name,
+                    MatchPercent = s.MatchPercent,
+                    TotalParts = s.TotalParts,
+                    MissingPartsCount = s.MissingPartsCount,
+                    TotalQtyNeeded = s.TotalQtyNeeded,
+                    TotalQtyHave = s.TotalQtyHave,
+                    IsBlShopAddition = false,
+                    BlShopPartCount = helpCount
+                });
+            }
+            cat3 = cat3
+                .OrderByDescending(s => s.MatchPercent)
+                .ThenBy(s => s.MissingPartsCount)
+                .ToList();
+
+            // Top-N greift auf die Gesamt-Liste. Damit Kat.1/2 bevorzugt sichtbar
+            // bleiben: zuerst konkatenieren, dann Take.
+            var top = cat1.Concat(cat2).Concat(cat3).Take(MaxSuggestions).ToList();
+
+            Suggestions.Clear();
+            foreach (var s in top) Suggestions.Add(s);
+
+            int shownCat1 = 0, shownCat2 = 0, shownCat3 = 0;
+            foreach (var s in top)
+            {
+                if (s.IsBlShopAddition) shownCat2++;
+                else if (s.MatchPercent >= 100) shownCat1++;
+                else shownCat3++;
+            }
+
+            SummaryText = top.Count == 0
+                ? (thresholdPercent > 0
+                    ? $"Keine Bauvorschlaege ueber {thresholdPercent}% Match - Schwellwert in Einstellungen pruefen."
+                    : "Keine Bauvorschlaege - keine deiner losen Teile passt zu einer ungetrackten Minifig.")
                 : (IncludeBlInventory && HasAnyBlInventory
-                    ? $"{hbsortComplete.Count} aus HBSort + {blCompletable.Count} mit BL-Shop-Ergaenzung"
-                    : $"{hbsortComplete.Count} Vorschlaege (komplett aus HBSort baubar)");
+                    ? $"{top.Count} Vorschlaege ({shownCat1} aus HBSort, {shownCat2} mit BL-Shop, {shownCat3} Teilmatches)"
+                    : $"{top.Count} Vorschlaege ({shownCat1} aus HBSort, {shownCat3} Teilmatches)");
+            OnPropertyChanged(nameof(CanFetchPrices));
 
             // v0.1.23-beta.2 Fix C: vorigen Image-Load abbrechen + neue CTS.
             _imageLoadCts?.Cancel();
@@ -272,19 +562,21 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// v0.1.24-beta.8 Phase 3 (Fix 5): aus den nicht-HBSort-100%-Kandidaten
-    /// die heraussuchen, die mit BL-Shop-Ergaenzung auf 100% kommen. Diese
-    /// werden als zusaetzliche BuildSuggestionItems (mit
-    /// <see cref="BuildSuggestionItem.IsBlShopAddition"/>=true) in die eine
-    /// gemeinsame Liste eingefuegt.
+    /// v0.1.24-beta.11: einheitliche BL-Shop-Analyse fuer alle Kandidaten mit
+    /// MatchPercent &lt; 100. Liefert pro BricklinkId zurueck wieviele Teile
+    /// vom BL-Shop benoetigt waeren und ob das die Figur komplettieren wuerde.
+    ///
+    /// Vorher (beta.8 - beta.10) war das nur die "kann komplettieren"-Liste -
+    /// fuer Kat.3 Teilmatches mit teilweiser Shop-Hilfe gab es keinen Wert.
+    /// Jetzt unified: Caller entscheidet ob er nur canComplete=true (Kat.2)
+    /// oder auch helpCount &gt; 0 (Kat.3-Annotation) nutzt.
     /// </summary>
-    private async Task<List<BuildSuggestionItem>> BuildBlCompletableAsync(
+    private async Task<Dictionary<string, (int helpCount, bool canComplete)>> AnalyzeBlShopHelpAsync(
         List<BuildSuggestionItem> allCandidates,
         Dictionary<(string PartNo, int ColorId), int> haveMap)
     {
-        const int maxBlAdditions = 20;
+        var result = new Dictionary<string, (int helpCount, bool canComplete)>(StringComparer.OrdinalIgnoreCase);
         var teilbare = allCandidates.Where(s => s.MatchPercent < 100).ToList();
-        var result = new List<BuildSuggestionItem>();
 
         // Verfuegbarkeits-Map fuer BL-Inventar - eine Query pro (Part, Color)
         // gecached, damit wir bei vielen Kandidaten mit gleichen Parts nicht
@@ -293,13 +585,11 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
 
         foreach (var c in teilbare)
         {
-            if (result.Count >= maxBlAdditions) break;
-
             var subsets = await _blCache.GetSubsetsAsync("M", c.BricklinkId);
             subsets = subsets.Where(s => !s.IsFromSupersets && s.ItemType == "P").ToList();
             if (subsets.Count == 0) continue;
 
-            int blShopCount = 0;
+            int blHelp = 0;
             bool canComplete = true;
 
             foreach (var s in subsets)
@@ -318,31 +608,18 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
                 }
 
                 var blTaken = Math.Min(stillNeeded, blAvail);
+                blHelp += blTaken;
                 if (blTaken < stillNeeded)
                 {
                     canComplete = false;
-                    break;
+                    // Hier KEIN break - wir wollen die volle helpCount-Summe
+                    // auch wenn ein einzelnes Teil nicht reicht (fuer
+                    // Kat.3-Annotation "X Teil(e) aus Shop").
                 }
-                blShopCount += blTaken;
             }
 
-            if (!canComplete || blShopCount == 0) continue;
-
-            // Effektiv-100%-Vorschlag mit BL-Badge. Reuse von c (gleiches
-            // ImageUrl-Loading) waere riskant - eigenes Item, Match-% auf
-            // 100, MissingLabel auf passenden Hinweis.
-            result.Add(new BuildSuggestionItem
-            {
-                BricklinkId = c.BricklinkId,
-                Name = c.Name,
-                MatchPercent = 100,
-                TotalParts = c.TotalParts,
-                MissingPartsCount = 0,
-                TotalQtyNeeded = c.TotalQtyNeeded,
-                TotalQtyHave = c.TotalQtyNeeded, // alles gedeckt (HBSort + BL)
-                IsBlShopAddition = true,
-                BlShopPartCount = blShopCount
-            });
+            if (blHelp > 0)
+                result[c.BricklinkId] = (blHelp, canComplete);
         }
 
         return result;
@@ -363,16 +640,28 @@ public partial class BuildSuggestionItem : ObservableObject
     /// <summary>
     /// v0.1.24-beta.8 Phase 3 (Fix 5): true wenn diese Figur nur mit
     /// BL-Shop-Ergaenzung auf 100% kommt (nicht allein aus HBSort).
-    /// Steuert den BL-Badge in der UI.
+    /// Steuert die "100% (X/Y)" + BL-Badge-Kombo in der UI.
     /// </summary>
     public bool IsBlShopAddition { get; init; }
 
-    /// <summary>Anzahl Teile die aus dem BL-Shop kommen muessten (Badge-Text).</summary>
+    /// <summary>
+    /// Anzahl Teile-Stueck die aus dem BL-Shop genutzt werden koennten.
+    /// Bei IsBlShopAddition: deckt zusammen mit HBSort die ganze Figur ab.
+    /// Bei Kat.3 (beta.11): Teilbeitrag des Shops (kann fuer 100% nicht reichen).
+    /// </summary>
     public int BlShopPartCount { get; init; }
+
+    /// <summary>
+    /// v0.1.24-beta.11: True wenn der BL-Shop irgendwie helfen wuerde -
+    /// entweder komplettiert (Kat.2) oder partial (Kat.3-Annotation).
+    /// Steuert die Sichtbarkeit des blauen "X Teil(e) aus Shop"-Badges.
+    /// </summary>
+    public bool HasBlShopContribution => BlShopPartCount > 0;
 
     [ObservableProperty]
     private string? _imageUrl;
 
+    /// <summary>"60% (3/5)" - der einzige Match-Badge in der Vorschlags-Zeile.</summary>
     public string MatchLabel => $"{MatchPercent}% ({TotalQtyHave}/{TotalQtyNeeded})";
 
     public string MissingLabel
@@ -387,7 +676,45 @@ public partial class BuildSuggestionItem : ObservableObject
         }
     }
 
-    public string BlShopBadgeLabel => $"{BlShopPartCount} Teile aus Shop";
+    /// <summary>"3 Teile aus Shop" / "1 Teil aus Shop" - korrekt pluralisiert.</summary>
+    public string BlShopBadgeLabel =>
+        BlShopPartCount == 1 ? "1 Teil aus Shop" : $"{BlShopPartCount} Teile aus Shop";
+
+    // ============================================================
+    // v0.1.24-beta.11: Preis-Anzeige (FetchAllPricesCommand)
+    // ============================================================
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPrice))]
+    [NotifyPropertyChangedFor(nameof(PriceLabel))]
+    private decimal? _priceValue;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPrice))]
+    [NotifyPropertyChangedFor(nameof(PriceLabel))]
+    private string? _priceCurrency;
+
+    /// <summary>True wenn der Preis tatsaechlich geholt wurde und einen Wert hat.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPrice))]
+    [NotifyPropertyChangedFor(nameof(PriceLabel))]
+    private bool _priceLookupFailed;
+
+    public bool HasPrice => PriceValue.HasValue || PriceLookupFailed;
+
+    /// <summary>"4,75 EUR" / "Preis n/v" je nach Lookup-Ergebnis.</summary>
+    public string PriceLabel
+    {
+        get
+        {
+            if (PriceLookupFailed) return "Preis n/v";
+            if (PriceValue.HasValue)
+            {
+                var cur = string.IsNullOrWhiteSpace(PriceCurrency) ? "EUR" : PriceCurrency;
+                return $"{PriceValue.Value.ToString("0.00", System.Globalization.CultureInfo.GetCultureInfo("de-DE"))} {cur}";
+            }
+            return string.Empty;
+        }
+    }
 
     public Brush MatchBrush
     {

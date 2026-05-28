@@ -24,6 +24,7 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock Text="BRICKLINK INVENTAR"
                        FontSize="18" FontWeight="SemiBold"
@@ -33,7 +34,14 @@
                        Foreground="Gray" FontStyle="Italic"
                        Margin="0,0,8,0"
                        Visibility="{Binding IsSyncing, Converter={StaticResource BoolToVisibility}}"/>
+            <!-- v0.1.24-beta.12: Mass-Update-Export-Dialog oeffnen. -->
             <Button Grid.Column="2"
+                    Content="BL aktualisieren"
+                    Click="OpenMassUpdate_Click"
+                    Padding="12,4"
+                    Margin="0,0,8,0"
+                    ToolTip="Generiert ein Mass-Update-XML aus deinen offenen Reservierungen. Das XML laedst du bei BrickLink hoch und verifizierst hier zurueck - die Reservierungen werden danach in 'physisch entnommen' umgebucht."/>
+            <Button Grid.Column="3"
                     Content="Inventar synchronisieren"
                     Command="{Binding SyncCommand}"
                     Padding="12,4"
@@ -316,6 +324,88 @@
                                    Margin="0,16,0,0"/>
                         <TextBlock Text="{Binding LastSyncedAtDisplay}"
                                    FontSize="11" Margin="0,2,0,0"/>
+
+                        <!-- v0.1.24-beta.11: Reservierungen-Sektion.
+                             DataContext-Bruch zurueck auf die VM (nicht
+                             SelectedRow), damit das ItemsControl gegen
+                             VM.Reservations bindet und der Aufheben-Befehl
+                             gegen VM.ReleaseReservationCommand. -->
+                        <StackPanel DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    Visibility="{Binding HasReservations, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Reservierungen:"
+                                       Foreground="Gray" FontSize="11"
+                                       Margin="0,16,0,4"/>
+                            <ItemsControl ItemsSource="{Binding Reservations}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                                BorderThickness="1" CornerRadius="4"
+                                                Padding="6" Margin="0,2,0,0">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="36"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Thumbnail oder Orphan-Platzhalter. Lazy-Load aus dem VM. -->
+                                                <Grid Grid.Column="0" Width="32" Height="32"
+                                                      VerticalAlignment="Center">
+                                                    <!-- Figur-Bild (nicht-Orphan) -->
+                                                    <Image Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
+                                                           Stretch="Uniform"
+                                                           Visibility="{Binding IsOrphan, Converter={StaticResource InverseBoolToVisibility}}"/>
+                                                    <!-- Orphan-Platzhalter -->
+                                                    <Border Background="#FFF3E0"
+                                                            BorderBrush="#E65100"
+                                                            BorderThickness="1"
+                                                            CornerRadius="4"
+                                                            Visibility="{Binding IsOrphan, Converter={StaticResource BoolToVisibility}}">
+                                                        <TextBlock Text="!"
+                                                                   Foreground="#E65100"
+                                                                   FontWeight="Bold" FontSize="18"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </Grid>
+
+                                                <StackPanel Grid.Column="1" Margin="6,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding FigureName}"
+                                                               FontSize="11"
+                                                               TextTrimming="CharacterEllipsis">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="FontStyle" Value="Normal"/>
+                                                                <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsOrphan}" Value="True">
+                                                                        <Setter Property="FontStyle" Value="Italic"/>
+                                                                        <Setter Property="Foreground" Value="#E65100"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <TextBlock Text="{Binding FigureBricklinkLabel}"
+                                                               FontSize="10" Foreground="Gray"
+                                                               FontFamily="Consolas"
+                                                               Visibility="{Binding HasFigureBricklinkId, Converter={StaticResource BoolToVisibility}}"/>
+                                                </StackPanel>
+
+                                                <Button Grid.Column="2"
+                                                        Content="Aufheben"
+                                                        Command="{Binding DataContext.ReleaseReservationCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Padding="6,2"
+                                                        FontSize="11"
+                                                        VerticalAlignment="Center"
+                                                        ToolTip="Diese Reservierung freigeben (das Teil ist danach wieder verkaufbar)."/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </StackPanel>
                     </ScrollViewer>
                 </Grid>

@@ -92,6 +92,157 @@ internal static class SortInstructionBuilder
     }
 
     /// <summary>
+    /// v0.1.24-beta.11: BL-Shop-Take-Sektionen. Pro Reservierung eine
+    /// <see cref="SortSection"/> gruppiert nach BL-Lagerplatz (Remarks).
+    /// Sections werden NACH den internen Take-Sektionen angehaengt damit
+    /// der User erst sein Lager abklappert und dann an seinen BL-Shop geht.
+    /// Reihenfolge erhaelt die Aufruf-Reihenfolge der <paramref name="lots"/>.
+    /// </summary>
+    public static void AddBlShopTakeSections(
+        SortInstruction instruction,
+        IEnumerable<BlShopTake> lots)
+    {
+        if (lots == null) return;
+        foreach (var byShopBin in lots.GroupBy(l => string.IsNullOrWhiteSpace(l.Remarks) ? "(kein Lagerplatz)" : l.Remarks))
+        {
+            var section = new SortSection { BinLabel = $"BL-Shop: {byShopBin.Key}" };
+            foreach (var t in byShopBin)
+            {
+                var cond = t.Condition == "N" ? "Neu" : "Gebraucht";
+                section.Items.Add(new SortItemLine
+                {
+                    Label = t.PartName,
+                    Detail = $"{t.BlPartNo} - {t.ColorName} ({cond})",
+                    QuantityText = $"{t.Quantity}x",
+                    ImageUrl = t.ImageUrl
+                });
+            }
+            instruction.Take.Add(section);
+        }
+    }
+
+    /// <summary>
+    /// v0.1.24-beta.13 (V5): Fall A (U-Lot / Gebraucht). Eine Put-Sektion
+    /// "BL-Shop: {Remarks}" mit dem gescannten Teil — das physische Teil
+    /// fuellt den BL-Shop wieder auf (das Reservierte ist mental schon bei
+    /// der Figur). Keine Take-Sektion notwendig (User hat Teil in der Hand).
+    /// PlusHint setzt den Erklaerungs-Text.
+    /// </summary>
+    public static SortInstruction BuildV5ShopReturn(
+        string partName,
+        string blPartNo,
+        string colorName,
+        string? lotRemarks,
+        string? partImageUrl)
+    {
+        var instr = new SortInstruction
+        {
+            HeaderText = "Teil zugeordnet — Reservierung aufgeloest",
+            PlusHint = "Reservierung aufgeloest. Figur behaelt ihr Teil, " +
+                       "BL-Shop wieder vollstaendig."
+        };
+        var shopLabel = string.IsNullOrWhiteSpace(lotRemarks)
+            ? "(kein Lagerplatz)"
+            : lotRemarks!;
+        instr.Put.Add(new SortSection
+        {
+            BinLabel = $"BL-Shop: {shopLabel}",
+            Items = new List<SortItemLine>
+            {
+                new()
+                {
+                    Label = partName,
+                    Detail = $"{blPartNo} - {colorName} (Gebraucht)",
+                    QuantityText = "1x",
+                    ImageUrl = partImageUrl
+                }
+            }
+        });
+        return instr;
+    }
+
+    /// <summary>
+    /// v0.1.24-beta.13 (V5): Fall B (N-Lot / Neu). Tausch zwischen Figur-Fach
+    /// und BL-Shop-Fach:
+    /// <list type="number">
+    ///   <item>Take: das neue Teil aus dem Figur-Fach (das hatte der User
+    ///   beim Reservieren mental aus dem Shop in die Figur gelegt).</item>
+    ///   <item>Put: das neue Teil zurueck in den BL-Shop (am Lagerplatz
+    ///   <c>lotRemarks</c>).</item>
+    ///   <item>Put: das gescannte (gebrauchte) Teil in das Figur-Fach.</item>
+    /// </list>
+    /// PlusHint setzt die Erklaerung.
+    /// </summary>
+    public static SortInstruction BuildV5ShopExchange(
+        string partName,
+        string blPartNo,
+        string colorName,
+        string? lotRemarks,
+        string? minifigBinLabel,
+        string? partImageUrl)
+    {
+        var instr = new SortInstruction
+        {
+            HeaderText = "Teil zugeordnet — Reservierung aufgeloest (Tausch)",
+            PlusHint = "Reservierung aufgeloest. Das neue Teil geht zurueck in " +
+                       "den Shop, dein gescanntes Teil zur Figur."
+        };
+        var shopLabel = string.IsNullOrWhiteSpace(lotRemarks)
+            ? "(kein Lagerplatz)"
+            : lotRemarks!;
+        var figBin = string.IsNullOrWhiteSpace(minifigBinLabel)
+            ? "(kein Fach)"
+            : minifigBinLabel!;
+
+        // 1) Take aus dem Figur-Fach: das neue Teil rausnehmen.
+        instr.Take.Add(new SortSection
+        {
+            BinLabel = figBin,
+            Items = new List<SortItemLine>
+            {
+                new()
+                {
+                    Label = partName,
+                    Detail = $"{blPartNo} - {colorName} (Neu, das aus dem Shop)",
+                    QuantityText = "1x",
+                    ImageUrl = partImageUrl
+                }
+            }
+        });
+        // 2) Put: das neue Teil zurueck in den BL-Shop.
+        instr.Put.Add(new SortSection
+        {
+            BinLabel = $"BL-Shop: {shopLabel}",
+            Items = new List<SortItemLine>
+            {
+                new()
+                {
+                    Label = partName,
+                    Detail = $"{blPartNo} - {colorName} (Neu)",
+                    QuantityText = "1x",
+                    ImageUrl = partImageUrl
+                }
+            }
+        });
+        // 3) Put: das gescannte (gebrauchte) Teil in die Figur.
+        instr.Put.Add(new SortSection
+        {
+            BinLabel = figBin,
+            Items = new List<SortItemLine>
+            {
+                new()
+                {
+                    Label = partName,
+                    Detail = $"{blPartNo} - {colorName} (gescanntes Teil)",
+                    QuantityText = "1x",
+                    ImageUrl = partImageUrl
+                }
+            }
+        });
+        return instr;
+    }
+
+    /// <summary>
     /// Haengt eine Put-Sektion fuer eine fertige Figur an. Erzeugt eine
     /// neue <see cref="SortSection"/> mit dem Ziel-Bin und genau einer
     /// Item-Zeile fuer die Figur ("Figur '{name}'" + BL-ID + Bild).
@@ -118,4 +269,21 @@ internal static class SortInstructionBuilder
             }
         });
     }
+}
+
+/// <summary>
+/// v0.1.24-beta.11: DTO fuer eine BL-Shop-Entnahme im SortInstruction-Modal.
+/// Wird vom BuildSuggestionDetailDialog beim Anlegen pro reserviertem Lot
+/// gefuellt — Pfad zum Lagerplatz (Remarks), Zustand (Neu/Gebraucht),
+/// Menge und optionales Teile-Bild.
+/// </summary>
+public sealed class BlShopTake
+{
+    public string BlPartNo { get; init; } = string.Empty;
+    public string PartName { get; init; } = string.Empty;
+    public string ColorName { get; init; } = string.Empty;
+    public string? Remarks { get; init; }
+    public string Condition { get; init; } = "U"; // "N" / "U"
+    public int Quantity { get; init; } = 1;
+    public string? ImageUrl { get; init; }
 }

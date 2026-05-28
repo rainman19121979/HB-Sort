@@ -261,6 +261,17 @@ public class PersistMinifigPart
     /// Match weiter aufgefuellt; final cap auf QuantityNeeded.
     /// </summary>
     public int QuantityCollected { get; init; }
+
+    /// <summary>
+    /// v0.1.24-beta.11: wenn true, ueberspringt der Reverse-Match diesen
+    /// Required-Part — selbst wenn FloatingParts mit gleichem (PartNo,
+    /// ColorId) existieren werden sie NICHT konsumiert. Genutzt vom
+    /// BuildSuggestionDetail-Pfad: User hat explizit "BL-Shop" gewaehlt,
+    /// statt das interne Lager anzutasten. Die BL-Reservierung kommt
+    /// dann vom Aufrufer NACH dem PersistAndStoreAsync via
+    /// <see cref="IBlInventoryService.ReserveForPartAsync"/>.
+    /// </summary>
+    public bool SkipReverseMatch { get; init; } = false;
 }
 
 /// <summary>Ergebnis von PersistAndStoreAsync.</summary>

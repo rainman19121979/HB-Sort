@@ -81,6 +81,66 @@ public interface IBlInventoryService
     Task<bool> ReleaseAsync(int lotId, int qty = 1, CancellationToken ct = default);
 
     /// <summary>
+    /// v0.1.24-beta.11: konsolidierte Reservierungs-Aktion fuer einen
+    /// einzelnen TrackedMinifigPart. Atomar:
+    /// <list type="number">
+    ///   <item><see cref="ReserveAsync"/>(lotId, 1) - BL-Lot reservieren.</item>
+    ///   <item><c>TrackedMinifigPart.QuantityReservedFromBl += 1</c>.</item>
+    ///   <item>ScanEvent (Type=BlInventoryReservation) mit UndoData
+    ///   (<see cref="UndoSnapshotBlReservation"/>) fuer Audit/Release.</item>
+    /// </list>
+    /// Bei DB-Fehler nach erfolgreichem Lot-Reserve wird via
+    /// <see cref="ReleaseAsync"/> kompensiert (kein Geist-Lock).
+    ///
+    /// <para>Liefert <c>true</c> wenn die ganze Aktion durchlief; <c>false</c>
+    /// wenn das Lot nicht reservierbar war oder das Teil nicht existiert.</para>
+    /// </summary>
+    Task<bool> ReserveForPartAsync(int trackedMinifigPartId, int lotId, CancellationToken ct = default);
+
+    /// <summary>
+    /// v0.1.24-beta.11: liefert pro reservierten Stueck eines Lots eine
+    /// Detail-Zeile fuer das BL-Inventar-Tab Detail-Panel. Eine Zeile pro
+    /// ScanEvent (Type=BlInventoryReservation, !WasUndone) mit LotId-Match;
+    /// zusaetzlich pro Lot-Drift-Stueck (Lot.ReservedQuantity &gt; Anzahl
+    /// matching ScanEvents) eine "Verwaiste Reservierung"-Zeile ohne
+    /// ScanEvent-Bezug.
+    ///
+    /// <para>Sortierung: ScanEvent-Zeilen nach Timestamp absteigend (juengste
+    /// zuerst), Drift-Zeilen am Ende.</para>
+    /// </summary>
+    Task<List<BlReservationDetail>> GetReservationsForLotAsync(int lotId, CancellationToken ct = default);
+
+    /// <summary>
+    /// v0.1.24-beta.13: Liefert den juengsten offenen BL-Reservierungs-
+    /// ScanEvent fuer ein TrackedMinifigPart (LIFO). Wird vom Reverse-Match-
+    /// Pfad in <c>AssignPartToMinifigAsync</c> genutzt um ein "physisches
+    /// Teil ersetzt Reservierung"-Verhalten umzusetzen: vor dem
+    /// QuantityCollected-Inkrement wird ueber den hier gelieferten ScanEvent
+    /// eine Reservierung freigegeben (siehe
+    /// <see cref="ReleaseSingleReservationAsync"/>).
+    ///
+    /// <para>Liefert (null, 0) wenn keine offene Reservierung fuer das Part
+    /// existiert.</para>
+    /// </summary>
+    Task<(int? ScanEventId, int LotId)> FindLatestReservationScanEventAsync(
+        int trackedMinifigPartId, CancellationToken ct = default);
+
+    /// <summary>
+    /// v0.1.24-beta.11: hebt eine einzelne Reservierung auf - entweder
+    /// via ScanEvent (alle Buchungsschritte: Lot-Release, Event als undone
+    /// markieren, Audit-Release-Event, ggf. TrackedMinifigPart.QuantityReservedFromBl
+    /// dekrementieren und Figur-Status zurueck auf Waiting wenn sie dadurch
+    /// nicht mehr komplett ist) oder als reine Drift-Bereinigung
+    /// (<paramref name="scanEventId"/>=null: nur Lot.ReservedQuantity -1 +
+    /// Audit-Event).
+    ///
+    /// <para>Liefert true bei Erfolg, false wenn das Lot oder der ScanEvent
+    /// nicht (mehr) existiert / passt. Feuert <see cref="InventoryChanged"/>
+    /// bei Erfolg.</para>
+    /// </summary>
+    Task<bool> ReleaseSingleReservationAsync(int? scanEventId, int lotId, CancellationToken ct = default);
+
+    /// <summary>
     /// v0.1.24-beta.10 V1 (Audit-Befund H1): gibt ALLE noch offenen BL-
     /// Reservierungen frei, die zu den angegebenen TrackedMinifigs gehoeren.
     /// Wird vom <see cref="IMinifigPersistenceService"/> VOR jedem Loesch-/
@@ -103,4 +163,116 @@ public interface IBlInventoryService
     /// freigegeben wurde.
     /// </summary>
     Task<int> ReleaseAllForMinifigsAsync(IEnumerable<int> trackedMinifigIds, CancellationToken ct = default);
+
+    // ====================================================================
+    // v0.1.24-beta.12 Phase 4: Mass-Update-Export
+    // ====================================================================
+
+    /// <summary>
+    /// Generiert das BL-Mass-Update-XML fuer alle aktuell reservierten Mengen
+    /// und schreibt einen Snapshot in <c>PendingExports</c>:
+    /// <list type="bullet">
+    ///   <item><c>ReservedQuantity &gt;= Quantity</c> → <c>&lt;ITEM&gt;&lt;LOTID&gt;x&lt;/LOTID&gt;&lt;DELETE/&gt;&lt;/ITEM&gt;</c>,
+    ///   PendingExport.ShouldDelete=true</item>
+    ///   <item>sonst → <c>&lt;ITEM&gt;&lt;LOTID&gt;x&lt;/LOTID&gt;&lt;QTY&gt;-{Reserved}&lt;/QTY&gt;&lt;/ITEM&gt;</c>,
+    ///   PendingExport.ExpectedQuantity=Quantity-Reserved</item>
+    /// </list>
+    ///
+    /// <para>Re-Generate: alte PendingExports werden komplett geloescht und
+    /// durch den aktuellen Stand ersetzt. Liefert den fertigen XML-String
+    /// zurueck (ggf. leeres Inventory wenn keine Reservierungen offen sind).</para>
+    /// </summary>
+    Task<MassUpdateExportResult> GenerateMassUpdateXmlAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Verifiziert den letzten Mass-Update-Export gegen das frische BL-Inventar.
+    /// Pro PendingExport:
+    /// <list type="bullet">
+    ///   <item>ShouldDelete=true + Lot fehlt im frischen Inventar → Erfolg</item>
+    ///   <item>ShouldDelete=false + Ist-Menge == ExpectedQuantity → Erfolg</item>
+    ///   <item>sonst → Fehler (Eintrag bleibt)</item>
+    /// </list>
+    ///
+    /// <para>Pro erfolgreichem Eintrag werden die zugehoerigen BL-Reservierungen
+    /// (offene <c>BlInventoryReservation</c>-ScanEvents zum LotId) in
+    /// <c>QuantityCollected</c> umgewandelt: <c>QuantityCollected += 1</c>,
+    /// <c>QuantityReservedFromBl -= 1</c>, ScanEvent als WasUndone markieren,
+    /// neuer <c>BlReservationConvertedToCollected</c>-Audit-Event. Das Lot
+    /// selbst bekommt <c>ReservedQuantity = 0</c>.</para>
+    ///
+    /// <para>Wenn ALLE PendingExports erfolgreich sind, wird abschliessend
+    /// <see cref="SyncInventoryAsync"/> automatisch ausgefuehrt, damit
+    /// Mengen + ggf. weggefallene Lots vom BL-Server frisch eingelesen werden.</para>
+    /// </summary>
+    Task<MassUpdateVerifyResult> VerifyExportAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Liefert die Anzahl aktuell offener Mass-Update-Eintraege. UI nutzt das
+    /// fuer den "Verifizieren"-Button (disabled wenn 0).
+    /// </summary>
+    Task<int> GetPendingExportCountAsync(CancellationToken ct = default);
+}
+
+/// <summary>
+/// v0.1.24-beta.12: Result von <see cref="IBlInventoryService.GenerateMassUpdateXmlAsync"/>.
+/// </summary>
+public sealed class MassUpdateExportResult
+{
+    public string Xml { get; init; } = string.Empty;
+    public int TotalLots { get; init; }
+    public int DeletedLots { get; init; }
+    public int ReducedLots { get; init; }
+}
+
+/// <summary>
+/// v0.1.24-beta.12: Result von <see cref="IBlInventoryService.VerifyExportAsync"/>.
+/// </summary>
+public sealed class MassUpdateVerifyResult
+{
+    public int SuccessCount { get; init; }
+    public int FailedCount { get; init; }
+    public int RemainingCount { get; init; }
+    public bool AllVerified => FailedCount == 0 && RemainingCount == 0;
+    /// <summary>Detail-Liste pro PendingExport (fuer Toast/Log).</summary>
+    public List<MassUpdateVerifyDetail> Details { get; init; } = new();
+}
+
+public sealed class MassUpdateVerifyDetail
+{
+    public int LotId { get; init; }
+    public bool Success { get; init; }
+    public string Reason { get; init; } = string.Empty;
+}
+
+/// <summary>
+/// v0.1.24-beta.11: Eine Detail-Zeile fuer "Reservierungen" im Lot-Detail-
+/// Panel. Eine Zeile = 1 Stueck reservierte Menge. Bei Standard-Reservierungen
+/// existiert ein ScanEvent + (meist) eine lebende Figur; bei Altlasten
+/// (Geist-Reservierungen ohne lebende Figur oder reine Lot-Drift) ist
+/// <see cref="IsOrphan"/> true.
+/// </summary>
+public sealed class BlReservationDetail
+{
+    /// <summary>ScanEvent-Id der ursprünglichen Reservierung; null bei reiner Lot-Drift ohne ScanEvent-Bezug.</summary>
+    public int? ScanEventId { get; init; }
+
+    public int LotId { get; init; }
+
+    /// <summary>Immer 1 - eine Detail-Zeile pro reserviertem Stueck.</summary>
+    public int Quantity { get; init; } = 1;
+
+    /// <summary>Lebende Figur die die Reservierung haelt; null bei Orphan.</summary>
+    public int? TrackedMinifigId { get; init; }
+
+    /// <summary>Anzeige-Name der Figur (leer bei Orphan).</summary>
+    public string FigureName { get; init; } = string.Empty;
+
+    /// <summary>BL-ID der Figur fuer Anzeige + Bild-Lookup; null bei Orphan.</summary>
+    public string? FigureBricklinkId { get; init; }
+
+    /// <summary>True wenn keine lebende Figur dazu existiert (zerlegt/geloescht oder reine Lot-Drift).</summary>
+    public bool IsOrphan { get; init; }
+
+    /// <summary>Zeitpunkt der ursprünglichen Reservierung; null bei reiner Drift.</summary>
+    public DateTime? ReservedAt { get; init; }
 }

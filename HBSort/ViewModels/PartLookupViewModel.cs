@@ -225,11 +225,31 @@ public partial class WaitingMinifigMatchViewModel : ObservableObject
     public int QuantityNeeded { get; }
     public int QuantityCollected { get; }
     public bool IsAlternate { get; }
+    // v0.1.24-beta.13 (V5 Fortsetzung): UI-Felder fuer Reservierungs-Anzeige.
+    public int QuantityReservedFromBl { get; }
+    public bool IsMinifigComplete { get; }
 
     [ObservableProperty]
     private string? _imageUrl;
 
-    public string ProgressLabel => $"braucht {QuantityNeeded - QuantityCollected}x  -  schon {QuantityCollected}/{QuantityNeeded}";
+    /// <summary>True wenn das Teil im BL-Shop reserviert ist - Badge wird angezeigt.</summary>
+    public bool HasBlReservation => QuantityReservedFromBl > 0;
+
+    /// <summary>
+    /// Status-Text fuer die Zeile:
+    ///   * Complete via Reservierung: "komplett (via BL-Shop)"
+    ///   * Waiting normal: "braucht 2x  -  schon 1/3"
+    /// </summary>
+    public string ProgressLabel
+    {
+        get
+        {
+            if (IsMinifigComplete)
+                return "komplett (via BL-Shop)";
+            return $"braucht {QuantityNeeded - QuantityCollected}x  -  schon {QuantityCollected}/{QuantityNeeded}";
+        }
+    }
+
     public string BinLabel => string.IsNullOrEmpty(StorageBinLabel) ? "(kein Fach)" : $"({StorageBinLabel})";
 
     public WaitingMinifigMatchViewModel(WaitingMinifigMatch m)
@@ -243,6 +263,8 @@ public partial class WaitingMinifigMatchViewModel : ObservableObject
         QuantityNeeded = m.QuantityNeeded;
         QuantityCollected = m.QuantityCollected;
         IsAlternate = m.IsAlternate;
+        QuantityReservedFromBl = m.QuantityReservedFromBl;
+        IsMinifigComplete = m.IsMinifigComplete;
         _imageUrl = m.MinifigImageUrl;
     }
 }

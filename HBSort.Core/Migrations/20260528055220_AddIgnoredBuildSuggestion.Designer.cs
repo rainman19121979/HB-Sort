@@ -3,6 +3,7 @@ using System;
 using HBSort.Core.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HBSort.Core.Migrations
 {
     [DbContext(typeof(UserDataContext))]
-    partial class UserDataContextModelSnapshot : ModelSnapshot
+    [Migration("20260528055220_AddIgnoredBuildSuggestion")]
+    partial class AddIgnoredBuildSuggestion
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.26");
@@ -157,32 +160,6 @@ namespace HBSort.Core.Migrations
                         .IsUnique();
 
                     b.ToTable("IgnoredBuildSuggestions");
-                });
-
-            modelBuilder.Entity("HBSort.Core.Models.PendingExport", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("ExpectedQuantity")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("ExportedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("LotId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("ShouldDelete")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LotId")
-                        .IsUnique();
-
-                    b.ToTable("PendingExports");
                 });
 
             modelBuilder.Entity("HBSort.Core.Models.ScanEvent", b =>

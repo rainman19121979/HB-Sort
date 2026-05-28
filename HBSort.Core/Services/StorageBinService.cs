@@ -873,15 +873,22 @@ public class StorageBinService : IStorageBinService
                 // Waiting-Bin: pruefen ob (partNo, colorId) zu einer wartenden Figur passt.
                 if (string.IsNullOrEmpty(partNo) || !colorId.HasValue) continue;
 
+                // v0.1.24-beta.13 (V5 Fortsetzung): Status=Waiting-Filter
+                // ersetzt durch Status != Dismantled. Damit zaehlen sowohl
+                // Waiting- als auch Complete-via-Reservierung-Figuren als
+                // Reverse-Match-Treffer (symmetrisch zum FindWaiting-Fix).
+                // Dismantled bleibt defensiv ausgeschlossen (Schutz gegen
+                // DB-Manipulation / Soft-Delete-Refactor / Legacy-Pfad
+                // CleanupOldDismantledMinifigsAsync).
+                // Part-Filter auf PHYSISCHE Luecke (Coll < Need), damit der
+                // V5-Pfad spaeter die Reservierung aufloesen kann.
                 var matchFound = bin.TrackedMinifigs.Any(m =>
-                    m.Status == TrackedMinifigStatus.Waiting
+                    m.Status != TrackedMinifigStatus.Dismantled
                     && (!excludeMinifigId.HasValue || m.Id != excludeMinifigId.Value)
                     && m.RequiredParts.Any(rp =>
                         rp.PartNumber == partNo
                         && rp.ColorId == colorId.Value
-                        // v0.1.24-beta.8 Phase 3: effektive Restmenge
-                        // (physisch + BL-reserviert).
-                        && (rp.QuantityCollected + rp.QuantityReservedFromBl) < rp.QuantityNeeded));
+                        && rp.QuantityCollected < rp.QuantityNeeded));
                 if (matchFound) eligible.Add(bin);
             }
             return eligible;
@@ -980,15 +987,18 @@ public class StorageBinService : IStorageBinService
                 }
                 if (string.IsNullOrEmpty(partNo) || !colorId.HasValue) continue;
 
+                // v0.1.24-beta.13 (V5 Fortsetzung): Symmetrisch zu
+                // GetEligibleBinsAsync. Status=Waiting-Filter weg, statt-
+                // dessen defensives Status != Dismantled. Part-Filter auf
+                // physische Luecke; Dismantled-Defensive siehe Schwester-
+                // Stelle oben.
                 var matchFound = bin.TrackedMinifigs.Any(m =>
-                    m.Status == TrackedMinifigStatus.Waiting
+                    m.Status != TrackedMinifigStatus.Dismantled
                     && (!excludeMinifigId.HasValue || m.Id != excludeMinifigId.Value)
                     && m.RequiredParts.Any(rp =>
                         rp.PartNumber == partNo
                         && rp.ColorId == colorId.Value
-                        // v0.1.24-beta.8 Phase 3: effektive Restmenge
-                        // (physisch + BL-reserviert).
-                        && (rp.QuantityCollected + rp.QuantityReservedFromBl) < rp.QuantityNeeded));
+                        && rp.QuantityCollected < rp.QuantityNeeded));
                 if (matchFound) eligible.Add(bin);
             }
         }

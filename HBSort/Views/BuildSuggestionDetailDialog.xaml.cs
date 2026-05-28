@@ -1,7 +1,10 @@
 using System.Windows;
+using HBSort.Core.Database;
+using HBSort.Core.Models;
 using HBSort.Core.Services;
 using HBSort.Services;
 using HBSort.ViewModels;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 
@@ -9,10 +12,16 @@ namespace HBSort.Views;
 
 /// <summary>
 /// Code-Behind fuer den BuildSuggestionDetailDialog.
-/// Wird vom BuildSuggestionsView aufgerufen wenn der User auf einen Bauvorschlag
-/// klickt. Beim "Figur anlegen"-Klick mappen wir das ViewModel auf einen
-/// PersistMinifigInput und uebergeben es an IMinifigPersistenceService -
-/// der Reverse-Match (FloatingParts konsumieren) passiert dort.
+///
+/// <para>v0.1.24-beta.11: Quellen-Auswahl pro Teil (Intern/BL-Shop) und
+/// einheitliche Anlege-Aktion. Beim Klick auf "Figur anlegen":</para>
+/// <list type="number">
+///   <item>PersistAndStoreAsync mit Per-Part-SkipReverseMatch (true fuer
+///   BL-Wahl) — Service konsumiert Floats nur fuer User-gewaehlte Internal-Parts.</item>
+///   <item>Pro ReservedLot: <see cref="IBlInventoryService.ReserveForPartAsync"/>
+///   reserviert Lot + erhoeht QuantityReservedFromBl + legt ScanEvent an.</item>
+///   <item>SortInstruction mit drei Sektion-Typen (Internal Take, BL-Shop Take, Put).</item>
+/// </list>
 /// </summary>
 public partial class BuildSuggestionDetailDialog : Window
 {
@@ -32,6 +41,43 @@ public partial class BuildSuggestionDetailDialog : Window
         DataContext = _vm;
     }
 
+    /// <summary>
+    /// v0.1.24-beta.11: Klick auf das "Aus Shop"-Badge eines Teils — oeffnet
+    /// den bestehenden BlReserveDialog (Lot-Picker), nach Auswahl wird das
+    /// Lot in <see cref="BuildSuggestionPartViewModel.ReservedLot"/> gemerkt
+    /// (noch NICHT in der DB, das passiert erst beim Anlegen).
+    /// </summary>
+    private void BlBadge_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement el
+            || el.Tag is not BuildSuggestionPartViewModel partVm) return;
+        if (partVm.BlAvailability is not { HasAny: true } availability) return;
+
+        var dialog = new BlReserveDialog(partVm.PartName, _vm.Name, availability)
+        {
+            Owner = this
+        };
+        var ok = dialog.ShowDialog();
+        if (ok != true || dialog.SelectedLot == null) return;
+
+        // Lot vormerken; Reservierung im BL-Service passiert erst beim Anlegen.
+        // (Quelle wird automatisch ueber HasInternal/ReservedLot bestimmt -
+        //  Spec v0.1.24-beta.11 Anpassung: kein UseInternal-Toggle mehr.)
+        partVm.ReservedLot = dialog.SelectedLot;
+    }
+
+    /// <summary>
+    /// v0.1.24-beta.11: Klick auf "✓ Shop"-Pill entfernt die Vor-Merkung.
+    /// Wenn intern verfuegbar ist, faellt die Anzeige automatisch wieder
+    /// auf den "Vorhanden in Box X"-Status zurueck.
+    /// </summary>
+    private void ClearReservation_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement el
+            || el.Tag is not BuildSuggestionPartViewModel partVm) return;
+        partVm.ReservedLot = null;
+    }
+
     private async void Create_Click(object sender, RoutedEventArgs e)
     {
         if (_vm.SelectedBin == null) return;
@@ -39,10 +85,11 @@ public partial class BuildSuggestionDetailDialog : Window
         _vm.IsCreating = true;
         try
         {
-            // PersistMinifigInput aus dem VM aufbauen. Wichtig: QuantityCollected = 0
-            // pro Teil, weil der Reverse-Match im Service die Quantities aus dem
-            // FloatingPool aufaddiert. Wenn wir die "Have"-Werte hier vorab setzen
-            // wuerden, wuerden sie bei voll-vorhandenen Teilen doppelt zaehlen.
+            // 1) PersistMinifigInput aus dem VM aufbauen.
+            //    SkipReverseMatch=true fuer Teile die der User auf BL-Shop
+            //    umgeschaltet hat — der Service tastet diese FloatingParts
+            //    nicht an. Andere Teile (UseInternal=true || gar nicht
+            //    verfuegbar): Service macht seinen normalen Reverse-Match.
             var input = new PersistMinifigInput
             {
                 BricklinkId = _vm.BricklinkId,
@@ -51,7 +98,7 @@ public partial class BuildSuggestionDetailDialog : Window
                 LocalImagePath = _vm.ImageUrl,
                 UserNotes = _vm.UserNotes,
                 StorageBinId = _vm.SelectedBin.Bin.Id,
-                Confidence = null,           // Bauvorschlag hat keine Brickognize-Konfidenz
+                Confidence = null,
                 ScanImagePath = null,
                 RequiredParts = _vm.Parts.Select(p => new PersistMinifigPart
                 {
@@ -60,59 +107,97 @@ public partial class BuildSuggestionDetailDialog : Window
                     PartName = p.PartName,
                     ColorName = p.ColorName,
                     QuantityNeeded = p.QuantityNeeded,
-                    QuantityCollected = 0
+                    QuantityCollected = 0,
+                    // v0.1.24-beta.11 (Spec-Anpassung): ReservedLot impliziert
+                    // bereits Skip — der Shop-Picker ist nur sichtbar wenn
+                    // intern leer ist (HasInternal=false).
+                    SkipReverseMatch = p.ReservedLot != null
                 }).ToList()
             };
 
             var result = await _persistence.PersistAndStoreAsync(input);
 
-            // Toast-Meldung mit Vorhanden/Komplett-Info.
-            if (result.IsFullyComplete)
+            // 2) BL-Reservierungen anwenden (post-persist). Pro VM-Part mit
+            //    gewaehltem Lot: ReserveForPartAsync ueber den Service — der
+            //    reserviert das Lot, erhoeht QuantityReservedFromBl und legt
+            //    den ScanEvent an. TrackedMinifigPart-Id aus result.SavedMinifig
+            //    matchen per (PartNo, ColorId).
+            var blInventory = App.Services.GetRequiredService<IBlInventoryService>();
+            var blShopTakes = new List<HBSort.ViewModels.BlShopTake>();
+            var partLookup = result.SavedMinifig.RequiredParts
+                .ToDictionary(rp => (rp.PartNumber, rp.ColorId), rp => rp);
+            foreach (var p in _vm.Parts)
             {
-                _notifications.ShowSuccess(
-                    $"Figur '{_vm.Name}' direkt KOMPLETT angelegt im Fach '{_vm.SelectedBin.Bin.Label}' " +
-                    $"({result.ReverseMatchedFloating} Teile aus dem Pool uebernommen).");
+                if (p.ReservedLot == null) continue;
+                if (!partLookup.TryGetValue((p.BlPartNo, p.ColorId), out var dbPart))
+                {
+                    Log.Warning(
+                        "BuildSuggestion-Reserve: TrackedMinifigPart fuer {Part}/{Color} nicht gefunden — Lot {Lot} bleibt frei",
+                        p.BlPartNo, p.ColorId, p.ReservedLot.LotId);
+                    continue;
+                }
+                var ok = await blInventory.ReserveForPartAsync(dbPart.Id, p.ReservedLot.LotId);
+                if (!ok)
+                {
+                    _notifications.ShowError(
+                        $"BL-Reservierung fuer '{p.PartName}' (Lot {p.ReservedLot.LotId}) fehlgeschlagen — eventuell inzwischen verbraucht. Bitte BL-Inventar synchronisieren.");
+                    continue;
+                }
+                // Take-Section fuer die SortInstruction sammeln.
+                blShopTakes.Add(new HBSort.ViewModels.BlShopTake
+                {
+                    BlPartNo = p.BlPartNo,
+                    PartName = p.PartName,
+                    ColorName = p.ColorName,
+                    Remarks = p.ReservedLot.Remarks,
+                    Condition = p.ReservedLot.Condition,
+                    Quantity = 1,
+                    ImageUrl = p.ImageUrl
+                });
             }
+
+            // 3) Toast-Meldung mit Vorhanden/Komplett-Info.
+            var internalCount = result.ReverseMatchedFloating;
+            var shopCount = blShopTakes.Count;
+            // Komplett-Status nach Reserve neu pruefen (Effective-Formel):
+            // result.IsFullyComplete bezieht sich auf physisch+InitialReserved,
+            // unsere Reserve passiert NACHHER — pruefen ob mit unseren Adds
+            // alle Required-Parts effektiv gedeckt sind.
+            var nowComplete = await IsEffectivelyCompleteAsync(result.SavedMinifig.Id);
+            if (nowComplete)
+                _notifications.ShowSuccess(
+                    $"Figur '{_vm.Name}' komplett angelegt im Fach '{_vm.SelectedBin.Bin.Label}' " +
+                    $"({internalCount} aus Lager, {shopCount} aus BL-Shop reserviert).");
             else
-            {
                 _notifications.ShowSuccess(
-                    $"Figur '{_vm.Name}' im Fach '{_vm.SelectedBin.Bin.Label}' angelegt " +
-                    $"({result.ReverseMatchedFloating} Teile bereits vorhanden).");
-            }
+                    $"Figur '{_vm.Name}' angelegt im Fach '{_vm.SelectedBin.Bin.Label}' " +
+                    $"({internalCount} aus Lager, {shopCount} aus BL-Shop reserviert).");
 
-            // v0.1.24-beta.3 (V10): Migration von Legacy-Group-Mode auf
-            // SortInstruction. Pre-fetch der Quell-Bilder VOR dem DTO-Bau,
-            // weil SortItemLine kein ObservableObject ist - Late-Binding
-            // wuerde die Bilder im Modal nicht refreshen. Identisch zum
-            // DismantleWizardDialog-Pattern (await ImageLoadTask vor
-            // BuildSortInstructionFromState).
+            // 4) SortInstruction aufbauen: Pre-Fetch Quell-Bilder, dann
+            //    Take (Internal) + Take (BL-Shop) + Put (Ziel-Fach).
             await LoadConsumedImagesAsync(result.ConsumedFloatingParts);
-
-            var binLabel = _vm.SelectedBin.Bin.Label;
-            var minifigImage = _vm.ImageUrl;
             var instruction = new HBSort.ViewModels.SortInstruction
             {
-                HeaderText = result.IsFullyComplete
+                HeaderText = nowComplete
                     ? $"Figur '{_vm.Name}' komplett angelegt"
                     : "Operation erfolgreich"
             };
             HBSort.ViewModels.SortInstructionBuilder.AddTakeSections(
                 instruction, result.ConsumedFloatingParts);
+            HBSort.ViewModels.SortInstructionBuilder.AddBlShopTakeSections(
+                instruction, blShopTakes);
             HBSort.ViewModels.SortInstructionBuilder.AddMinifigPut(
-                instruction, binLabel, _vm.Name, _vm.BricklinkId, minifigImage);
+                instruction, _vm.SelectedBin.Bin.Label, _vm.Name,
+                _vm.BricklinkId, _vm.ImageUrl);
 
             DialogResult = true;
             Close();
 
-            // ISortInstructionPresenter loest den Owner.DataContext-Walk ab
-            // (Phase 1.5-Pattern). App.Services-Service-Locator weil dieser
-            // Dialog kein DI-Konstruktor-Parameter dafuer hat.
             var presenter = App.Services.GetRequiredService<ISortInstructionPresenter>();
             presenter.Show(instruction);
         }
         catch (HBSort.Core.Services.InvalidBinKindException strict)
         {
-            // v0.1.23 Strict-Mode: Ziel-Bin akzeptiert die Figur nicht.
             Log.Warning(strict, "BuildSuggestion: Strict-Mode-Verletzung");
             _notifications.ShowError(strict.Message);
             _vm.IsCreating = false;
@@ -125,6 +210,33 @@ public partial class BuildSuggestionDetailDialog : Window
         }
     }
 
+    /// <summary>
+    /// v0.1.24-beta.11: nach der BL-Reservierung pruefen ob die Figur jetzt
+    /// effektiv komplett ist (physisch + BL-reserviert >= QuantityNeeded).
+    /// Frische DB-Query — Service-Status wurde nach unserer Reservierung
+    /// nicht neu berechnet.
+    /// </summary>
+    private static async Task<bool> IsEffectivelyCompleteAsync(int minifigId)
+    {
+        try
+        {
+            var ctxFactory = App.Services
+                .GetRequiredService<IDbContextFactory<UserDataContext>>();
+            await using var ctx = await ctxFactory.CreateDbContextAsync();
+            var minifig = await ctx.TrackedMinifigs
+                .AsNoTracking()
+                .Include(m => m.RequiredParts)
+                .FirstOrDefaultAsync(m => m.Id == minifigId);
+            if (minifig == null || minifig.RequiredParts.Count == 0) return false;
+            return minifig.RequiredParts.All(p => p.IsEffectivelyComplete);
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "IsEffectivelyCompleteAsync({Id}) geworfen", minifigId);
+            return false;
+        }
+    }
+
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
         DialogResult = false;
@@ -132,14 +244,8 @@ public partial class BuildSuggestionDetailDialog : Window
     }
 
     /// <summary>
-    /// UX X.33 v0.1.19-beta.7 Block O.5 (Pre-Tag): schliesst diesen modalen
-    /// Dialog (DialogResult=false, kein Datenverlust - User hat noch nichts
-    /// angelegt) und oeffnet die Settings ueber das MainWindow. Konsistent
-    /// zum OpenBinManagement-Pattern in MinifigDetailView/PartLookupView,
-    /// aber mit vorherigem Close weil hier ein modaler Dialog ueber dem
-    /// MainWindow liegt - Settings-Dialog kann sonst nicht ohne Konflikt
-    /// erscheinen. User waehlt den Bauvorschlag nach dem Settings-Schliessen
-    /// einfach erneut aus dem "Was kann ich bauen?"-Tab.
+    /// UX X.33 v0.1.19-beta.7 Block O.5: schliesst den modalen Dialog
+    /// und oeffnet die Settings (Lagerfaecher-Tab).
     /// </summary>
     private void OpenBinManagement_Click(object sender, RoutedEventArgs e)
     {
@@ -149,7 +255,6 @@ public partial class BuildSuggestionDetailDialog : Window
 
         if (owner?.DataContext is HBSort.ViewModels.MainViewModel main)
         {
-            // v0.1.22-beta.3: direkt auf Lagerfaecher-Tab springen
             main.OpenSettingsOnTab(SettingsTab.Lagerfaecher);
         }
     }
@@ -160,11 +265,10 @@ public partial class BuildSuggestionDetailDialog : Window
     /// <c>ConsumedFloatingPartInfo.ImageUrl</c> jedes Eintrags. Wird VOR
     /// dem SortInstruction-DTO-Bau awaited, weil <c>SortItemLine</c> kein
     /// ObservableObject ist und ein nachtraegliches Set die Modal-Bilder
-    /// nicht refreshen wuerde. Cache-Hits sind schnelle Disk-Reads;
-    /// Cache-Miss = kein Bild (Default), kein User-Hinweis noetig.
+    /// nicht refreshen wuerde.
     /// </summary>
     private static async Task LoadConsumedImagesAsync(
-        IReadOnlyList<HBSort.Core.Services.ConsumedFloatingPartInfo> consumed)
+        IReadOnlyList<ConsumedFloatingPartInfo> consumed)
     {
         var imageProvider = App.Services.GetRequiredService<IPartImageProvider>();
 

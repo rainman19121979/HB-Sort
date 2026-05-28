@@ -44,12 +44,22 @@ public partial class BlReserveDialog : Window
     public BlInventoryLot? SelectedLot { get; private set; }
 
     public BlReserveDialog(SummaryPartViewModel partVm, string minifigName, BlAvailabilityInfo availability)
+        : this(partVm.PartName, minifigName, availability)
+    {
+    }
+
+    /// <summary>
+    /// v0.1.24-beta.11: VM-entkoppelter Ctor mit Primitiv-Parametern.
+    /// Wird vom BuildSuggestionDetailDialog genutzt, der einen anderen
+    /// Part-VM-Typ hat.
+    /// </summary>
+    public BlReserveDialog(string partName, string minifigName, BlAvailabilityInfo availability)
     {
         InitializeComponent();
 
         DataContext = new ViewData
         {
-            HeaderLine = $"BL-Lot reservieren fuer '{partVm.PartName}'",
+            HeaderLine = $"BL-Lot reservieren fuer '{partName}'",
             BodyLine = $"Dieses Teil ist nicht im HBSort-Lager, aber {availability.NewQty}× als Neu " +
                        $"und {availability.UsedQty}× als Gebraucht in deinem BrickLink-Shop verfuegbar. " +
                        $"Klicke ein Lot an, um es fuer '{minifigName}' zu reservieren.",

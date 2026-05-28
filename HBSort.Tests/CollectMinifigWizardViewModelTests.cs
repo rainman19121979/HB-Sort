@@ -405,7 +405,7 @@ public class CollectMinifigWizardViewModelTests
 
         public Task<PartLookupResult> LookupPartAsync(string blPartNo, int blColorId, CancellationToken ct = default)
             => throw new NotImplementedException();
-        public Task<bool> AssignPartToMinifigAsync(int trackedMinifigPartId, CancellationToken ct = default)
+        public Task<AssignPartResult> AssignPartToMinifigAsync(int trackedMinifigPartId, CancellationToken ct = default)
             => throw new NotImplementedException();
         public Task<bool> UnassignPartFromMinifigAsync(int trackedMinifigPartId, CancellationToken ct = default)
             => throw new NotImplementedException();

@@ -722,12 +722,27 @@ public class MinifigPersistenceService : IMinifigPersistenceService
         // QuantityCollected schon aus expliziten "Aus Fach"-Klicks vorbefuellt.
         if (input.ConsumeFloatingParts)
         {
+            // v0.1.24-beta.11: Per-Part-Skip-Liste fuer User die explizit
+            // "BL-Shop" gewaehlt haben — interne Floats werden NICHT mehr
+            // angetastet. Vergleich (PartNo, ColorId) als HashSet-Lookup.
+            var skipKeys = input.RequiredParts
+                .Where(p => p.SkipReverseMatch)
+                .Select(p => (p.BricklinkPartNo, p.BricklinkColorId))
+                .ToHashSet();
+
             Log.Information(
-                "PersistAndStore Reverse-Match: Minifig='{Name}' (BL:{Bl}), {Cnt} RequiredParts",
-                minifig.Name, minifig.BricklinkId, minifig.RequiredParts.Count);
+                "PersistAndStore Reverse-Match: Minifig='{Name}' (BL:{Bl}), {Cnt} RequiredParts, {Skip} via Skip-Flag uebersprungen",
+                minifig.Name, minifig.BricklinkId, minifig.RequiredParts.Count, skipKeys.Count);
 
             foreach (var required in minifig.RequiredParts)
             {
+                if (skipKeys.Contains((required.PartNumber, required.ColorId)))
+                {
+                    Log.Information(
+                        "  RequiredPart {Part}/{Color} uebersprungen (SkipReverseMatch=true - User-Wahl BL-Shop)",
+                        required.PartNumber, required.ColorId);
+                    continue;
+                }
                 // Alle passenden FloatingParts (egal in welchem Fach), aelteste zuerst.
                 // Include(StorageBin) damit wir das Fach-Label fuer das Sammel-Popup
                 // ohne Extra-Query haben.

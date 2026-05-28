@@ -23,6 +23,10 @@ public class UserDataContext : DbContext
     public DbSet<DailyStats> DailyStats => Set<DailyStats>();
     // v0.1.24-beta.6 Phase 1: gespiegelter BL-Store-Inventar (Snapshot).
     public DbSet<BlInventoryLot> BlInventoryLots => Set<BlInventoryLot>();
+    // v0.1.24-beta.11: vom User persistent ausgeblendete Bauvorschlaege.
+    public DbSet<IgnoredBuildSuggestion> IgnoredBuildSuggestions => Set<IgnoredBuildSuggestion>();
+    // v0.1.24-beta.12: Mass-Update-Export-Snapshots (Soll-Werte fuer Verify).
+    public DbSet<PendingExport> PendingExports => Set<PendingExport>();
 
     public UserDataContext(DbContextOptions<UserDataContext> options) : base(options)
     {
@@ -135,6 +139,26 @@ public class UserDataContext : DbContext
             entity.Property(e => e.Remarks).HasMaxLength(500);
             entity.Property(e => e.Condition).HasMaxLength(2).IsRequired();
             entity.HasIndex(e => new { e.ItemType, e.ItemNo, e.ColorId });
+        });
+
+        // --- PendingExport (v0.1.24-beta.12) ---
+        // LotId unique - es kann nur ein offener Export pro Lot gleichzeitig
+        // sein (Re-Generate replaced den alten Snapshot).
+        modelBuilder.Entity<PendingExport>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.LotId).IsUnique();
+        });
+
+        // --- IgnoredBuildSuggestion (v0.1.24-beta.11) ---
+        // BricklinkId case-insensitive unique - eine Figur kann nicht doppelt
+        // ignoriert sein. Lookups gehen ueber AsNoTracking + Set<string>-Build,
+        // der Index hilft trotzdem beim Unique-Check.
+        modelBuilder.Entity<IgnoredBuildSuggestion>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.BricklinkId).HasMaxLength(64).IsRequired();
+            entity.HasIndex(e => e.BricklinkId).IsUnique();
         });
     }
 }

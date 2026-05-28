@@ -61,27 +61,57 @@ public partial class PartLookupView : UserControl
         vm.IsBusy = true;
         try
         {
-            var completed = await lookup.AssignPartToMinifigAsync(match.TrackedMinifigPartId);
-            if (completed)
+            var result = await lookup.AssignPartToMinifigAsync(match.TrackedMinifigPartId);
+            var partImage = vm.ImageUrl;
+            var scan = GetScanViewModel();
+
+            if (!result.Assigned)
             {
-                notif.ShowSuccess($"Teil zugeordnet - Figur '{match.MinifigName}' jetzt KOMPLETT!");
+                notif.ShowInfo($"Figur '{match.MinifigName}' ist effektiv schon vollstaendig.");
+            }
+            else if (result.Released != null)
+            {
+                // v0.1.24-beta.13 (V5): Reservierung aufgeloest. SortInstruction
+                // je nach Lot-Condition anzeigen (kein einfacher Toast — der
+                // User braucht eine konkrete Anweisung wo Teile hin sollen).
+                var presenter = Service<ISortInstructionPresenter>();
+                var instr = result.Released.LotCondition == "N"
+                    ? SortInstructionBuilder.BuildV5ShopExchange(
+                        result.Released.PartName,
+                        vm.BlPartNo,
+                        result.Released.ColorName,
+                        result.Released.LotRemarks,
+                        result.Released.MinifigBinLabel,
+                        partImage)
+                    : SortInstructionBuilder.BuildV5ShopReturn(
+                        result.Released.PartName,
+                        vm.BlPartNo,
+                        result.Released.ColorName,
+                        result.Released.LotRemarks,
+                        partImage);
+                presenter.Show(instr);
+                if (result.MinifigCompleted)
+                {
+                    notif.ShowSuccess($"Figur '{match.MinifigName}' jetzt KOMPLETT!");
+                }
             }
             else
             {
-                notif.ShowSuccess($"Teil zu '{match.MinifigName}' zugeordnet.");
-            }
-
-            // UX X.33 v0.1.19-beta.7 Block J: Anweisungs-Popup mit Ziel-Bin
-            // der wartenden Figur. Konsistent zum StoreFloating_Click-Pfad.
-            // Bin-Label ist im WaitingMinifigMatchViewModel direkt verfuegbar
-            // (StorageBinLabel - null wenn die Figur kein Fach hat, dann
-            // wird kein Popup gezeigt).
-            var targetBinLabel = match.StorageBinLabel;
-            var partImage = vm.ImageUrl;
-            var scan = GetScanViewModel();
-            if (scan != null && !string.IsNullOrWhiteSpace(targetBinLabel))
-            {
-                scan.ShowBinInstruction(targetBinLabel!, partImage);
+                // Normaler Konsum-Pfad (keine Reservierungs-Interaktion):
+                // Toast + Single-Mode-Anweisung "lege in Figur-Fach" wie bisher.
+                if (result.MinifigCompleted)
+                {
+                    notif.ShowSuccess($"Teil zugeordnet - Figur '{match.MinifigName}' jetzt KOMPLETT!");
+                }
+                else
+                {
+                    notif.ShowSuccess($"Teil zu '{match.MinifigName}' zugeordnet.");
+                }
+                var targetBinLabel = match.StorageBinLabel;
+                if (scan != null && !string.IsNullOrWhiteSpace(targetBinLabel))
+                {
+                    scan.ShowBinInstruction(targetBinLabel!, partImage);
+                }
             }
 
             // Nach erfolgreichem Assign: PartLookup neu, damit ggf. weitere Mengen

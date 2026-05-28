@@ -92,13 +92,19 @@ public static class BinKindGuard
         }
 
         // Waiting: Reverse-Match-Bypass.
-        // v0.1.24-beta.8 Phase 3: effektive Restmenge (physisch + BL-reserviert).
+        // v0.1.24-beta.13 (V5 Fortsetzung): symmetrisch zu StorageBinService
+        // Z.876/985. Status=Waiting-Filter entfaellt (Complete-via-Reservierung-
+        // Figuren sollen auch hier durchgelassen werden); defensiv bleibt
+        // Status != Dismantled gefiltert (Schutz gegen DB-Manipulation und
+        // Legacy-CleanupOldDismantledMinifigsAsync-Pfad). Part auf physische
+        // Luecke — V5-Aufloesung im AssignPart-Pfad bringt Buchhaltung
+        // wieder konsistent.
         var hasMatch = bin.TrackedMinifigs.Any(m =>
-            m.Status == TrackedMinifigStatus.Waiting
+            m.Status != TrackedMinifigStatus.Dismantled
             && m.RequiredParts.Any(rp =>
                 rp.PartNumber == blPartNo
                 && rp.ColorId == blColorId
-                && (rp.QuantityCollected + rp.QuantityReservedFromBl) < rp.QuantityNeeded));
+                && rp.QuantityCollected < rp.QuantityNeeded));
         if (!hasMatch)
         {
             throw new InvalidBinKindException(

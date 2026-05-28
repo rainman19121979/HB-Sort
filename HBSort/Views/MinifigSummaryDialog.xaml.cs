@@ -123,14 +123,54 @@ public partial class MinifigSummaryDialog : Window
         {
             if (nowChecked)
             {
-                // Assign: increment um 1, ggf. mehrfach bis QuantityNeeded.
+                // Assign: increment bis Effective-Bedarf gedeckt ist.
+                // v0.1.24-beta.13 (V5): AssignPart liefert bei aufgeloester
+                // Reservierung ein ReleaseInfo - wir merken uns das erste
+                // (typisch genau eins pro Klick) und zeigen am Ende eine
+                // SortInstruction statt Toast.
+                BlReservationReleaseInfo? firstRelease = null;
+                int releaseCount = 0;
                 while (partVm.QuantityCollected < partVm.QuantityNeeded)
                 {
-                    var done = await lookup.AssignPartToMinifigAsync(partVm.Id);
+                    var result = await lookup.AssignPartToMinifigAsync(partVm.Id);
+                    if (!result.Assigned) break;
                     partVm.QuantityCollected = Math.Min(partVm.QuantityCollected + 1, partVm.QuantityNeeded);
-                    if (done) break; // Figur komplett -> Schleife endet
+                    if (result.Released != null)
+                    {
+                        if (firstRelease == null) firstRelease = result.Released;
+                        releaseCount++;
+                        partVm.QuantityReservedFromBl = Math.Max(0, partVm.QuantityReservedFromBl - 1);
+                    }
+                    if (result.MinifigCompleted) break;
                 }
-                _notifications.ShowSuccess($"'{partVm.PartName}' als gefunden markiert.");
+
+                if (firstRelease != null)
+                {
+                    // V5: SortInstruction (kein Toast). Bei mehrfachem Release
+                    // im Header die Stueckzahl andeuten.
+                    var presenter = App.Services.GetRequiredService<ISortInstructionPresenter>();
+                    var instr = firstRelease.LotCondition == "N"
+                        ? HBSort.ViewModels.SortInstructionBuilder.BuildV5ShopExchange(
+                            firstRelease.PartName,
+                            partVm.PartNumber,
+                            firstRelease.ColorName,
+                            firstRelease.LotRemarks,
+                            firstRelease.MinifigBinLabel,
+                            partVm.ImageUrl)
+                        : HBSort.ViewModels.SortInstructionBuilder.BuildV5ShopReturn(
+                            firstRelease.PartName,
+                            partVm.PartNumber,
+                            firstRelease.ColorName,
+                            firstRelease.LotRemarks,
+                            partVm.ImageUrl);
+                    if (releaseCount > 1)
+                        instr.HeaderText = $"Teil zugeordnet — {releaseCount} Reservierungen aufgeloest";
+                    presenter.Show(instr);
+                }
+                else
+                {
+                    _notifications.ShowSuccess($"'{partVm.PartName}' als gefunden markiert.");
+                }
             }
             else
             {

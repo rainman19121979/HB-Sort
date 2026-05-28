@@ -1308,4 +1308,322 @@ public class StorageBinServiceTests : IDisposable
         Assert.Equal(0, item.CompleteCount);
         Assert.Equal(0, item.FloatingCount);
     }
+
+    // ========================================================================
+    // v0.1.24-beta.13 (V5 Fortsetzung) - Symmetrie zwischen FindWaiting im
+    // PartLookupService und FloatingTarget-Reverse-Match in StorageBinService.
+    //
+    // Der Filter wurde von "Effective-Luecke + Status=Waiting" auf "physische
+    // Luecke (Coll < Need) + Status != Dismantled" umgestellt. Damit erscheinen
+    // Complete-via-Reservierung-Figuren (Status=Complete, RequiredPart mit
+    // QuantityCollected < QuantityNeeded und QuantityReservedFromBl > 0 sodass
+    // Effective >= Need) wieder als Reverse-Match-Treffer in der Bin-Eligible-
+    // Liste. Vor dem Fix waeren diese Bins ausgefiltert worden.
+    //
+    // Test pinnt das gewuenschte Pattern fest: Mix-Bin (Waiting-Figur + Complete-
+    // via-Reservierung-Figur) wird fuer FloatingTarget mit (partNo, colorId)
+    // der Complete-Figur als eligible erkannt. Die Waiting-Figur im Bin braucht
+    // das Teil NICHT — der Match darf ausschliesslich ueber die Complete-via-
+    // Reservierung-Figur kommen (sonst waere der Test nicht aussagekraeftig).
+    // ========================================================================
+
+    [Fact]
+    public async Task GetEligibleBinsAsync_floating_target_includes_waiting_bin_with_complete_via_reservation_minifig()
+    {
+        await _sut.CreateSingleAsync("MixBin");
+        var bin = await _sut.GetByLabelAsync("MixBin");
+
+        // 1) Waiting-Figur die das Test-Teil NICHT braucht (RequiredPart fuer
+        //    ein anderes Teil). Sie sichert nur dass Bin.Kind=Waiting bleibt
+        //    (Reifungspfad Wartend+Complete).
+        var waitingId = await SeedMinifigInBinAsync(
+            bin!.Id, "wait-other", TrackedMinifigStatus.Waiting);
+
+        // 2) Complete-via-Reservierung-Figur: Status=Complete, RequiredPart
+        //    mit Coll<Need und Res>0 sodass Eff=Need.
+        await using (var ctx = await _factory.CreateDbContextAsync())
+        {
+            // RequiredPart fuer die Waiting-Figur — ein ANDERES Teil
+            // (3002/14), damit die Waiting-Figur den Test-Match nicht
+            // triggert.
+            ctx.TrackedMinifigParts.Add(new TrackedMinifigPart
+            {
+                TrackedMinifigId = waitingId,
+                PartNumber = "3002",
+                ColorId = 14,
+                PartName = "Brick 2x3",
+                ColorName = "DarkGray",
+                QuantityNeeded = 1,
+                QuantityCollected = 0,
+                QuantityReservedFromBl = 0
+            });
+
+            // Complete-via-Res-Figur
+            var completeViaRes = new TrackedMinifig
+            {
+                BricklinkId = "cmpl-via-res",
+                FigNum = "cmpl-via-res",
+                Name = "Complete via Reservation",
+                CreatedAt = DateTime.UtcNow,
+                CompletedAt = DateTime.UtcNow,
+                Status = TrackedMinifigStatus.Complete,
+                StorageBinId = bin.Id,
+                RequiredParts = new List<TrackedMinifigPart>
+                {
+                    new()
+                    {
+                        PartNumber = "3001",
+                        ColorId = 11,
+                        PartName = "Brick 2x4",
+                        ColorName = "Black",
+                        QuantityNeeded = 1,
+                        QuantityCollected = 0,
+                        QuantityReservedFromBl = 1
+                    }
+                }
+            };
+            ctx.TrackedMinifigs.Add(completeViaRes);
+            await ctx.SaveChangesAsync();
+        }
+
+        // Kind nochmal neu berechnen — durch den zweiten Minifig hat sich der
+        // Inhalt geaendert (jetzt waiting+complete -> Reifungspfad Waiting).
+        await _sut.RecalculateKindAsync(bin.Id);
+        await using (var verify = await _factory.CreateDbContextAsync())
+        {
+            var refreshed = await verify.StorageBins.SingleAsync(b => b.Id == bin.Id);
+            // Sanity: Mix-Bin landet im Reifungspfad als Waiting (sonst greift
+            // der Reverse-Match-Pfad gar nicht — er ist nur fuer Waiting-Bins
+            // aktiv).
+            Assert.Equal(StorageBinKind.Waiting, refreshed.Kind);
+        }
+
+        // Reverse-Match auf (3001, 11). Vor dem Fix (Status==Waiting + Effective-
+        // Luecke) waere das Bin rausgefallen weil die Complete-Figur Eff>=Need
+        // hatte und die Waiting-Figur das Teil nicht braucht.
+        var eligible = await _sut.GetEligibleBinsAsync(
+            BinTargetKind.FloatingTarget, partNo: "3001", colorId: 11);
+
+        Assert.Contains(eligible, b => b.Id == bin.Id);
+    }
+
+    [Fact]
+    public async Task GetEligibleBinsWithCountsAsync_floating_target_includes_waiting_bin_with_complete_via_reservation_minifig()
+    {
+        // Schwester-Test zu obigem - GetEligibleBinsWithCountsAsync hat
+        // dieselbe Filter-Logik (Z.987-1004) wie GetEligibleBinsAsync.
+        // Symmetrie-Vertrag (CLAUDE.md Bin-Vorschlag Abschnitt 5) verlangt
+        // identisches Verhalten beider Methoden.
+        await _sut.CreateSingleAsync("MixBin2");
+        var bin = await _sut.GetByLabelAsync("MixBin2");
+
+        var waitingId = await SeedMinifigInBinAsync(
+            bin!.Id, "wait-other-2", TrackedMinifigStatus.Waiting);
+
+        await using (var ctx = await _factory.CreateDbContextAsync())
+        {
+            ctx.TrackedMinifigParts.Add(new TrackedMinifigPart
+            {
+                TrackedMinifigId = waitingId,
+                PartNumber = "3002",
+                ColorId = 14,
+                PartName = "Brick 2x3",
+                ColorName = "DarkGray",
+                QuantityNeeded = 1,
+                QuantityCollected = 0
+            });
+
+            ctx.TrackedMinifigs.Add(new TrackedMinifig
+            {
+                BricklinkId = "cmpl-via-res-2",
+                FigNum = "cmpl-via-res-2",
+                Name = "Complete via Reservation 2",
+                CreatedAt = DateTime.UtcNow,
+                CompletedAt = DateTime.UtcNow,
+                Status = TrackedMinifigStatus.Complete,
+                StorageBinId = bin.Id,
+                RequiredParts = new List<TrackedMinifigPart>
+                {
+                    new()
+                    {
+                        PartNumber = "3001",
+                        ColorId = 11,
+                        PartName = "Brick 2x4",
+                        ColorName = "Black",
+                        QuantityNeeded = 2,
+                        QuantityCollected = 0,
+                        QuantityReservedFromBl = 2
+                    }
+                }
+            });
+            await ctx.SaveChangesAsync();
+        }
+        await _sut.RecalculateKindAsync(bin.Id);
+
+        var withCounts = await _sut.GetEligibleBinsWithCountsAsync(
+            BinTargetKind.FloatingTarget, partNo: "3001", colorId: 11);
+
+        Assert.Contains(withCounts, x => x.Bin.Id == bin.Id);
+    }
+
+    // ========================================================================
+    // v0.1.24-beta.13 (V5 Fortsetzung) - BinKindGuard.EnsureBinAcceptsFloatingPart
+    // Reverse-Match-Bypass bei Bin.Kind=Waiting: eine Complete-via-Reservierung-
+    // Figur (Status=Complete, RequiredPart Coll<Need, Res>0) darf den Bypass
+    // ausloesen. Vor dem Fix (Status==Waiting-Klausel + Effective-Check) waere
+    // hier eine InvalidBinKindException geflogen.
+    //
+    // Wir bauen das StorageBin-Objekt manuell im Speicher auf — BinKindGuard
+    // ist statisch und arbeitet rein auf dem uebergebenen Aggregat, kein
+    // DB-Zugriff. Damit ist der Test schlank und unabhaengig vom EF-Setup.
+    // ========================================================================
+
+    [Fact]
+    public void BinKindGuard_accepts_floating_part_in_waiting_bin_with_complete_via_reservation_minifig()
+    {
+        // Waiting-Bin (Reifungspfad) mit:
+        // - 1x Waiting-Figur die das Test-Teil NICHT braucht (sichert nur
+        //   Bin.Kind=Waiting)
+        // - 1x Complete-via-Reservierung-Figur die das Test-Teil 3001/11
+        //   mit Coll<Need und Res>0 hat (Effective>=Need).
+        // Erwartung: KEINE Exception — Bypass greift via Complete-Figur.
+        var bin = new StorageBin
+        {
+            Id = 42,
+            Label = "MixBin-Guard",
+            Kind = StorageBinKind.Waiting,
+            CreatedAt = DateTime.UtcNow,
+            TrackedMinifigs = new List<TrackedMinifig>
+            {
+                new()
+                {
+                    Id = 1,
+                    BricklinkId = "wait-other",
+                    FigNum = "wait-other",
+                    Name = "Waiting (other part)",
+                    CreatedAt = DateTime.UtcNow,
+                    Status = TrackedMinifigStatus.Waiting,
+                    StorageBinId = 42,
+                    RequiredParts = new List<TrackedMinifigPart>
+                    {
+                        new()
+                        {
+                            Id = 100,
+                            PartNumber = "3002",
+                            ColorId = 14,
+                            PartName = "Brick 2x3",
+                            ColorName = "DarkGray",
+                            QuantityNeeded = 1,
+                            QuantityCollected = 0
+                        }
+                    }
+                },
+                new()
+                {
+                    Id = 2,
+                    BricklinkId = "cmpl-via-res",
+                    FigNum = "cmpl-via-res",
+                    Name = "Complete via Reservation",
+                    CreatedAt = DateTime.UtcNow,
+                    CompletedAt = DateTime.UtcNow,
+                    Status = TrackedMinifigStatus.Complete,
+                    StorageBinId = 42,
+                    RequiredParts = new List<TrackedMinifigPart>
+                    {
+                        new()
+                        {
+                            Id = 200,
+                            PartNumber = "3001",
+                            ColorId = 11,
+                            PartName = "Brick 2x4",
+                            ColorName = "Black",
+                            QuantityNeeded = 1,
+                            QuantityCollected = 0,
+                            QuantityReservedFromBl = 1
+                        }
+                    }
+                }
+            }
+        };
+
+        // Darf NICHT werfen — Reverse-Match-Bypass greift ueber die Complete-
+        // via-Reservierung-Figur (Coll<Need + Status!=Dismantled).
+        var ex = Record.Exception(() =>
+            BinKindGuard.EnsureBinAcceptsFloatingPart(
+                bin, blPartNo: "3001", blColorId: 11,
+                actionDescription: "Test: FloatingPart in MixBin"));
+
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void BinKindGuard_rejects_floating_part_when_only_complete_minifig_has_no_physical_gap()
+    {
+        // Negativ-Pfad / Kontrast-Test: gleiche Bin-Struktur, aber die
+        // Complete-Figur hat Coll=Need (kein physical gap — Figur ist real
+        // komplett, NICHT via Reservierung). Bypass MUSS verweigern.
+        var bin = new StorageBin
+        {
+            Id = 43,
+            Label = "NoMatchBin",
+            Kind = StorageBinKind.Waiting,
+            CreatedAt = DateTime.UtcNow,
+            TrackedMinifigs = new List<TrackedMinifig>
+            {
+                new()
+                {
+                    Id = 3,
+                    BricklinkId = "wait-other",
+                    FigNum = "wait-other",
+                    Name = "Waiting (other part)",
+                    CreatedAt = DateTime.UtcNow,
+                    Status = TrackedMinifigStatus.Waiting,
+                    StorageBinId = 43,
+                    RequiredParts = new List<TrackedMinifigPart>
+                    {
+                        new()
+                        {
+                            Id = 300,
+                            PartNumber = "3002",
+                            ColorId = 14,
+                            PartName = "Brick 2x3",
+                            ColorName = "DarkGray",
+                            QuantityNeeded = 1,
+                            QuantityCollected = 0
+                        }
+                    }
+                },
+                new()
+                {
+                    Id = 4,
+                    BricklinkId = "fully-complete",
+                    FigNum = "fully-complete",
+                    Name = "Real Complete",
+                    CreatedAt = DateTime.UtcNow,
+                    CompletedAt = DateTime.UtcNow,
+                    Status = TrackedMinifigStatus.Complete,
+                    StorageBinId = 43,
+                    RequiredParts = new List<TrackedMinifigPart>
+                    {
+                        new()
+                        {
+                            Id = 400,
+                            PartNumber = "3001",
+                            ColorId = 11,
+                            PartName = "Brick 2x4",
+                            ColorName = "Black",
+                            QuantityNeeded = 1,
+                            QuantityCollected = 1, // KEIN physical gap
+                            QuantityReservedFromBl = 0
+                        }
+                    }
+                }
+            }
+        };
+
+        Assert.Throws<InvalidBinKindException>(() =>
+            BinKindGuard.EnsureBinAcceptsFloatingPart(
+                bin, blPartNo: "3001", blColorId: 11,
+                actionDescription: "Test: FloatingPart in NoMatchBin"));
+    }
 }

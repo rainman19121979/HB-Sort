@@ -5,32 +5,49 @@
     <!--
         Bauvorschlaege auf Basis der Floating-Parts.
         DataContext = BuildSuggestionsViewModel.
-        Kein Mindest-Match-Schwellenwert mehr - alle baubaren Vorschlaege werden
-        angezeigt, sortiert nach Match-% absteigend. Top-N-Limit greift weiterhin
-        (siehe BuildSuggestionsViewModel.MaxSuggestions).
+
+        v0.1.24-beta.11:
+        - zwei Anzeige-Modi (BL-Toggle aus = nur HBSort + Teilmatches,
+          BL-Toggle an = zusaetzlich Shop-completable + Shop-Help-Annotation),
+        - persistente Ignorier-Liste (X pro Zeile + Reset-Link unten),
+        - "Alle Preise holen"-Button oben.
     -->
     <Grid Margin="8">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>   <!-- 0: Header + Checkbox -->
-            <RowDefinition Height="*"/>      <!-- 1: ScrollViewer mit beiden Sektionen -->
-            <RowDefinition Height="Auto"/>   <!-- 2: SummaryText -->
+            <RowDefinition Height="Auto"/>   <!-- 0: Header + Buttons -->
+            <RowDefinition Height="*"/>      <!-- 1: ScrollViewer -->
+            <RowDefinition Height="Auto"/>   <!-- 2: SummaryText + Reset-Link -->
         </Grid.RowDefinitions>
 
         <Grid Grid.Row="0" Margin="0,0,0,8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock Text="WAS KANN ICH BAUEN?"
                        FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+
+            <!-- v0.1.24-beta.11: Alle Preise holen. Spinner-Disable
+                 ueber CanFetchPrices (= !IsLoading &amp;&amp; !IsFetchingPrices
+                 &amp;&amp; Suggestions.Count > 0). -->
+            <Button Grid.Column="1"
+                    Content="Alle Preise holen"
+                    Command="{Binding FetchAllPricesCommand}"
+                    IsEnabled="{Binding CanFetchPrices}"
+                    Margin="0,0,12,0"
+                    Padding="10,4"
+                    ToolTip="Holt fuer alle sichtbaren Vorschlaege den BL-Preis (max 3 parallel)."/>
+
             <!-- v0.1.24-beta.8 Phase 3: BL-Inventar-Toggle. Sichtbar nur wenn
                  der User ueberhaupt synchronisiert hat (HasAnyBlInventory).
                  Default aus (IncludeBlInventory=false) -> Standardverhalten
                  unveraendert. -->
-            <CheckBox Grid.Column="1"
+            <CheckBox Grid.Column="2"
                       Content="BL-Inventar beruecksichtigen"
                       IsChecked="{Binding IncludeBlInventory, Mode=TwoWay}"
                       Visibility="{Binding HasAnyBlInventory, Converter={StaticResource BoolToVisibility}}"
+                      VerticalAlignment="Center"
                       ToolTip="Zeigt zusaetzlich Figuren die mit deinem BrickLink-Shop-Bestand vervollstaendigt werden koennen."/>
         </Grid>
 
@@ -50,8 +67,10 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="48"/>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/> <!-- Preis -->
+                                    <ColumnDefinition Width="Auto"/> <!-- Shop-Badge -->
+                                    <ColumnDefinition Width="Auto"/> <!-- Match-Badge -->
+                                    <ColumnDefinition Width="Auto"/> <!-- Ignorieren-X -->
                                 </Grid.ColumnDefinitions>
                                 <Image Grid.Column="0" Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
                                        Width="44" Height="44" Stretch="Uniform"
@@ -66,28 +85,58 @@
                                     <TextBlock Text="{Binding MissingLabel}" FontSize="10"
                                                Foreground="Gray"/>
                                 </StackPanel>
-                                <!-- v0.1.24-beta.8 Phase 3 (Fix 5): BL-Shop-Badge
-                                     fuer Erweiterungen. Nur sichtbar wenn das Item
-                                     ueber den BL-Pfad kommt (IsBlShopAddition). -->
-                                <Border Grid.Column="2"
+
+                                <!-- Preis (beta.11): nur sichtbar wenn FetchAllPrices
+                                     einen Wert oder eine Fehlschlag-Marke gesetzt hat. -->
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding PriceLabel}"
+                                           Visibility="{Binding HasPrice, Converter={StaticResource BoolToVisibility}}"
+                                           FontSize="11" FontWeight="SemiBold"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0"/>
+
+                                <!-- Shop-Help-Badge (beta.11): vereinheitlicht
+                                     ueber HasBlShopContribution (= BlShopPartCount > 0).
+                                     Greift sowohl fuer Kat.2 (komplettiert) als
+                                     auch fuer Kat.3 (partielle Hilfe).
+                                     Das alte orange "X% erreichbar"-Badge entfaellt. -->
+                                <Border Grid.Column="3"
                                         Background="#0277BD"
                                         CornerRadius="4" Padding="6,2"
                                         Margin="0,0,6,0"
                                         VerticalAlignment="Center"
-                                        ToolTip="Diese Figur ist nur mit Teilen aus deinem BrickLink-Shop komplett baubar."
-                                        Visibility="{Binding IsBlShopAddition, Converter={StaticResource BoolToVisibility}}">
+                                        ToolTip="Anzahl Teile aus deinem BrickLink-Shop die hier eingehen wuerden."
+                                        Visibility="{Binding HasBlShopContribution, Converter={StaticResource BoolToVisibility}}">
                                     <TextBlock Text="{Binding BlShopBadgeLabel}"
                                                Foreground="White" FontWeight="SemiBold"
                                                FontSize="10"/>
                                 </Border>
-                                <Border Grid.Column="3"
+
+                                <Border Grid.Column="4"
                                         Background="{Binding MatchBrush}"
                                         CornerRadius="4" Padding="6,2"
-                                        VerticalAlignment="Center">
+                                        VerticalAlignment="Center"
+                                        Margin="0,0,6,0">
                                     <TextBlock Text="{Binding MatchLabel}"
                                                Foreground="White" FontWeight="SemiBold"
                                                FontSize="11"/>
                                 </Border>
+
+                                <!-- Ignorieren-X (beta.11): persistiert in
+                                     IgnoredBuildSuggestions-Tabelle. Klick
+                                     bubbelt nicht in Suggestion_MouseDown
+                                     weil der Button es konsumiert. -->
+                                <Button Grid.Column="5"
+                                        Content="✕"
+                                        Command="{Binding DataContext.IgnoreSuggestionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}"
+                                        Width="24" Height="24"
+                                        Padding="0"
+                                        VerticalAlignment="Center"
+                                        FontWeight="SemiBold"
+                                        Background="Transparent"
+                                        BorderBrush="Transparent"
+                                        ToolTip="Diese Figur dauerhaft aus den Vorschlaegen ausblenden."/>
                             </Grid>
                         </Border>
                     </DataTemplate>
@@ -95,7 +144,29 @@
             </ItemsControl>
         </ScrollViewer>
 
-        <TextBlock Grid.Row="2" Text="{Binding SummaryText}"
-                   Foreground="Gray" FontSize="11" Margin="0,4,0,0"/>
+        <Grid Grid.Row="2" Margin="0,4,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0"
+                       Text="{Binding SummaryText}"
+                       Foreground="Gray" FontSize="11"
+                       VerticalAlignment="Center"/>
+
+            <!-- v0.1.24-beta.11: Verwaltungs-Link (statt direktes Reset).
+                 Oeffnet ManageIgnoredDialog. Hyperlink-Optik per Foreground. -->
+            <Button Grid.Column="1"
+                    Content="{Binding IgnoredCountLabel}"
+                    Click="ManageIgnored_Click"
+                    Visibility="{Binding HasIgnored, Converter={StaticResource BoolToVisibility}}"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    Foreground="#1976D2"
+                    Cursor="Hand"
+                    Padding="4,0"
+                    FontSize="11"
+                    ToolTip="Oeffnet die Verwaltung der ignorierten Bauvorschlaege - dort kannst du einzelne oder alle wiederherstellen."/>
+        </Grid>
     </Grid>
 </UserControl>

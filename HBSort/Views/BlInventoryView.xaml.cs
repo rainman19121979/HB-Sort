@@ -1,6 +1,10 @@
 using System.Windows;
 using System.Windows.Controls;
+using HBSort.Core.Services;
+using HBSort.Services;
 using HBSort.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 
 namespace HBSort.Views;
 
@@ -15,6 +19,34 @@ public partial class BlInventoryView : UserControl
     public BlInventoryView()
     {
         InitializeComponent();
+    }
+
+    /// <summary>
+    /// v0.1.24-beta.12: oeffnet den Mass-Update-Export-Dialog. VM erst
+    /// generieren, dann Dialog zeigen. Bei keinen Reservierungen erscheint
+    /// der Dialog mit Empty-State-Hinweis.
+    /// </summary>
+    private async void OpenMassUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        var sp = App.Services;
+        var inv = sp.GetRequiredService<IBlInventoryService>();
+        var notify = sp.GetRequiredService<INotificationService>();
+
+        var vm = new MassUpdateExportViewModel(inv, notify);
+        try
+        {
+            await vm.GenerateAsync();
+        }
+        catch (System.Exception ex)
+        {
+            Log.Warning(ex, "MassUpdateExport: GenerateAsync (initial) fehlgeschlagen");
+        }
+
+        var dialog = new MassUpdateExportDialog(vm)
+        {
+            Owner = Window.GetWindow(this)
+        };
+        dialog.ShowDialog();
     }
 
     /// <summary>

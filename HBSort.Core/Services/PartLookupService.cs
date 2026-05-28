@@ -18,6 +18,11 @@ public class PartLookupService : IPartLookupService
     private readonly IPartImageProvider _imageProvider;
     private readonly IBlCacheRepository? _cache;
     private readonly IStorageBinService? _binService;
+    // v0.1.24-beta.13 (V5): optional fuer Auto-Release einer BL-Reservierung
+    // wenn ein physisches Teil zugeordnet wird das die Reservierung
+    // ersetzt. Bei Tests ohne BL-Inventar bleibt das Feld null, der
+    // Reverse-Match-Pfad ueberspringt die Release-Logik dann elegant.
+    private readonly IBlInventoryService? _blInventory;
 
     public PartLookupService(
         IDbContextFactory<UserDataContext> ctxFactory,
@@ -25,7 +30,8 @@ public class PartLookupService : IPartLookupService
         IMinifigPersistenceService persistence,
         IPartImageProvider imageProvider,
         IBlCacheRepository? cache = null,
-        IStorageBinService? binService = null)
+        IStorageBinService? binService = null,
+        IBlInventoryService? blInventory = null)
     {
         _ctxFactory = ctxFactory;
         _catalog = catalog;
@@ -40,6 +46,7 @@ public class PartLookupService : IPartLookupService
         // v0.1.23: binService optional fuer Tests. Production reicht den Service
         // durch, damit Bin.Kind nach jeder Schreib-Aktion neu berechnet wird.
         _binService = binService;
+        _blInventory = blInventory;
     }
 
     private async Task RecalcBinKindAsync(int? binId, CancellationToken ct)
@@ -60,21 +67,37 @@ public class PartLookupService : IPartLookupService
         var colorName = color?.Name ?? $"Color {blColorId}";
         var colorRgb = color?.Rgb;
 
-        // Reverse-Match in userdata.db. v0.1.24-beta.8 Phase 3: nur Teile
-        // die effektiv (physisch + BL-reserviert) noch nicht gedeckt sind
-        // werden gematched. Bereits via BL reservierte Teile verschwinden
-        // damit aus dem "noch fehlend"-Set.
+        // v0.1.24-beta.13 (V5 Fortsetzung): Kandidaten-Regel umgestellt.
+        // Vorher (beta.8 Phase 3): "(Coll + Res) < Need + Status=Waiting".
+        // Das hatte zwei Probleme:
+        //   1. Figuren mit Effective=Need (komplett durch Reservierung)
+        //      sind NICHT in der Liste - V5-Aufloesungs-Logik wird nie
+        //      erreicht.
+        //   2. Complete-Figuren die nur via Reservierung complete sind
+        //      werden ebenfalls verfehlt.
+        // Neue Regel: Part hat physische Luecke (Coll < Need). Der Status
+        // der Figur ist irrelevant fuer den Match - AssignPart-Cap blockt
+        // Doppelscans, V5 loest Reservierungen sauber auf.
+        //
+        // DEFENSIV: Status != Dismantled wird trotzdem mitgefiltert. Heute
+        // existieren Dismantled-Figuren nicht in der DB (DismantleAsync
+        // ruft Remove, kein Code-Pfad setzt Status=Dismantled). Der Filter
+        // schuetzt aber gegen DB-Manipulation, kuenftige Soft-Delete-
+        // Refactors und den noch existierenden Legacy-Pfad
+        // CleanupOldDismantledMinifigsAsync (sucht genau diesen Status).
         await using var dbCtx = await _ctxFactory.CreateDbContextAsync(ct);
         var query = dbCtx.TrackedMinifigParts.AsNoTracking()
             .Where(p => p.PartNumber == blPartNo
                      && p.ColorId == blColorId
-                     && (p.QuantityCollected + p.QuantityReservedFromBl) < p.QuantityNeeded
-                     && p.TrackedMinifig.Status == TrackedMinifigStatus.Waiting)
+                     && p.QuantityCollected < p.QuantityNeeded
+                     && p.TrackedMinifig.Status != TrackedMinifigStatus.Dismantled)
             .Include(p => p.TrackedMinifig)
                 .ThenInclude(m => m.StorageBin)
-            // Sortierung: zuerst Figuren denen am meisten zum Komplett fehlt,
-            // dann nach Bin-Label.
-            .OrderByDescending(p => p.QuantityNeeded - (p.QuantityCollected + p.QuantityReservedFromBl))
+            // Sortierung: Waiting vor Complete (echter Bedarf zuerst,
+            // Reservierungs-Aufloesungen unten), innerhalb der Status-
+            // Gruppe nach groesstem Effective-Defizit, dann Bin-Label.
+            .OrderBy(p => p.TrackedMinifig.Status == TrackedMinifigStatus.Waiting ? 0 : 1)
+            .ThenByDescending(p => p.QuantityNeeded - (p.QuantityCollected + p.QuantityReservedFromBl))
             .ThenBy(p => p.TrackedMinifig.StorageBin!.Label);
 
         var matches = new List<WaitingMinifigMatch>();
@@ -90,7 +113,9 @@ public class PartLookupService : IPartLookupService
                 StorageBinId: p.TrackedMinifig.StorageBinId ?? 0,
                 QuantityNeeded: p.QuantityNeeded,
                 QuantityCollected: p.QuantityCollected,
-                IsAlternate: false /* TrackedMinifigPart kennt das nicht; zukuenftig mappen */));
+                IsAlternate: false, /* TrackedMinifigPart kennt das nicht; zukuenftig mappen */
+                QuantityReservedFromBl: p.QuantityReservedFromBl,
+                IsMinifigComplete: p.TrackedMinifig.Status == TrackedMinifigStatus.Complete));
         }
 
         // Zusaetzlich: Reverse-Match im BL-Catalog-Cache. Filtert die Wartenden raus,
@@ -110,29 +135,105 @@ public class PartLookupService : IPartLookupService
             matches, blMatches);
     }
 
-    public async Task<bool> AssignPartToMinifigAsync(int trackedMinifigPartId, CancellationToken ct = default)
+    public async Task<AssignPartResult> AssignPartToMinifigAsync(int trackedMinifigPartId, CancellationToken ct = default)
     {
         await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
         var part = await ctx.TrackedMinifigParts
             .Include(p => p.TrackedMinifig)
                 .ThenInclude(m => m.RequiredParts)
+            .Include(p => p.TrackedMinifig)
+                .ThenInclude(m => m.StorageBin)
             .FirstOrDefaultAsync(p => p.Id == trackedMinifigPartId, ct);
-        if (part == null) return false;
+        if (part == null) return new AssignPartResult(false, false, null);
 
-        // v0.1.24-beta.8 Phase 3: physisches Cap auf QuantityCollected
-        // (Reservierungen werden hier nicht beruehrt).
+        // v0.1.24-beta.13 (V5): Cap-Logik ist symmetrisch zum Complete-Check
+        // (beide Effective-aware). Physisch schon voll → ablehnen; effektiv
+        // schon voll UND keine Reservierung zum Aufloesen → ablehnen.
+        // Effektiv voll + Reservierung vorhanden → Release-Pfad weiter unten
+        // (physisches Teil "verdraengt" eine Reservierung; siehe ReleaseInfo).
         if (part.QuantityCollected >= part.QuantityNeeded)
         {
-            // Schon komplett; nichts zu tun.
-            return false;
+            return new AssignPartResult(false, false, null);
+        }
+        var effectiveBefore = part.QuantityCollected + part.QuantityReservedFromBl;
+        if (effectiveBefore >= part.QuantityNeeded && part.QuantityReservedFromBl == 0)
+        {
+            // Eff schon voll und keine Reservierung → nichts zu tun.
+            return new AssignPartResult(false, false, null);
+        }
+
+        // V5: Bedingung "(Coll+1)+Res > Need UND Res > 0" loest eine
+        // Reservierung auf - das gescannte Teil ist Auffuellung des BL-Shops
+        // (U-Lot) bzw. wird mit dem dort liegenden neuen Teil getauscht
+        // (N-Lot). KEIN FloatingPart, kein BL-Export.
+        BlReservationReleaseInfo? releaseInfo = null;
+        if (_blInventory != null
+            && part.QuantityReservedFromBl > 0
+            && (part.QuantityCollected + 1) + part.QuantityReservedFromBl > part.QuantityNeeded)
+        {
+            var (scanEventId, lotId) = await _blInventory.FindLatestReservationScanEventAsync(
+                trackedMinifigPartId, ct);
+            if (scanEventId.HasValue)
+            {
+                // PendingExport-Drift-Warning: bei offenem Mass-Update-Export
+                // wird der Snapshot durch diesen Release veraltet (Verify
+                // erkennt das automatisch via Diff, aber Log hilft Diagnose).
+                var hasPendingExport = await ctx.PendingExports
+                    .AsNoTracking()
+                    .AnyAsync(p => p.LotId == lotId, ct);
+                if (hasPendingExport)
+                {
+                    Log.Warning(
+                        "V5 Aufloesung fuer Lot {LotId} (Part {PartId}): offener PendingExport - " +
+                        "Snapshot veraltet, Re-Generate empfohlen.",
+                        lotId, trackedMinifigPartId);
+                }
+
+                // Lot-Daten VOR dem Release-Aufruf auslesen (Condition + Remarks
+                // bleiben gleich; Release dekrementiert nur ReservedQuantity).
+                var lot = await ctx.BlInventoryLots
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(l => l.LotId == lotId, ct);
+
+                var released = await _blInventory.ReleaseSingleReservationAsync(scanEventId, lotId, ct);
+                if (released && lot != null)
+                {
+                    releaseInfo = new BlReservationReleaseInfo(
+                        LotId: lotId,
+                        LotCondition: lot.Condition ?? "U",
+                        LotRemarks: lot.Remarks,
+                        MinifigBinLabel: part.TrackedMinifig.StorageBin?.Label,
+                        PartName: part.PartName,
+                        ColorName: part.ColorName);
+                    Log.Information(
+                        "V5 Aufloesung: Part {PartId} - Reservierung (ScanEvent {Ev}, Lot {Lot}, Condition {C}) " +
+                        "aufgeloest; gescanntes Teil dient als BL-Shop-Auffuellung",
+                        trackedMinifigPartId, scanEventId, lotId, lot.Condition);
+                }
+                else
+                {
+                    Log.Warning(
+                        "V5 Aufloesung: ReleaseSingleReservationAsync lieferte false oder Lot fehlt (ScanEvent {Ev}, Lot {Lot}) - " +
+                        "Konsum laeuft als Normalfall weiter",
+                        scanEventId, lotId);
+                }
+
+                // Release-Service hatte einen eigenen DbContext - lokalen part
+                // neu laden damit QuantityReservedFromBl synchron ist und der
+                // Complete-Check unten nicht auf alten Werten basiert.
+                await ctx.Entry(part).ReloadAsync(ct);
+                foreach (var p in part.TrackedMinifig.RequiredParts)
+                {
+                    if (p.Id != part.Id) await ctx.Entry(p).ReloadAsync(ct);
+                }
+                await ctx.Entry(part.TrackedMinifig).ReloadAsync(ct);
+            }
         }
 
         part.QuantityCollected++;
         bool minifigCompleted = false;
 
-        // Komplett-Check ueber EFFECTIVE (physisch + BL-reserviert). Damit
-        // gilt die Figur als komplett wenn alle Teile entweder physisch da
-        // sind ODER im BL-Shop reserviert.
+        // Komplett-Check ueber EFFECTIVE (physisch + BL-reserviert).
         var allComplete = part.TrackedMinifig.RequiredParts.All(p =>
             (p.Id == part.Id ? part.QuantityCollected : p.QuantityCollected)
             + p.QuantityReservedFromBl >= p.QuantityNeeded);
@@ -157,18 +258,18 @@ public class PartLookupService : IPartLookupService
 
         await ctx.SaveChangesAsync(ct);
 
-        // v0.1.23: bei Status-Wechsel Waiting->Complete kann Bin.Kind kippen.
         if (minifigCompleted)
             await RecalcBinKindAsync(part.TrackedMinifig.StorageBinId, ct);
 
         _persistence.RaiseDataChanged();
 
-        Log.Information("Part {Part}/{Color} zu Minifig '{Name}' zugeordnet ({Q}/{N}){Done}",
+        Log.Information("Part {Part}/{Color} zu Minifig '{Name}' zugeordnet ({Q}/{N}, Reserved={R}, Released={Rel}){Done}",
             part.PartNumber, part.ColorId, part.TrackedMinifig.Name,
             part.QuantityCollected, part.QuantityNeeded,
+            part.QuantityReservedFromBl, releaseInfo != null ? "1" : "0",
             minifigCompleted ? " => COMPLETE" : "");
 
-        return minifigCompleted;
+        return new AssignPartResult(true, minifigCompleted, releaseInfo);
     }
 
     public async Task<bool> UnassignPartFromMinifigAsync(int trackedMinifigPartId, CancellationToken ct = default)

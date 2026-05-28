@@ -26,6 +26,15 @@ public record PriceResult
     /// <summary>UTC-Zeitpunkt des Lookups.</summary>
     public DateTime FetchedAt { get; init; } = DateTime.UtcNow;
 
+    /// <summary>
+    /// v0.1.24-beta.11: True wenn dieses Resultat aus dem Cache kam (kein
+    /// frischer API-Call). Wird vom <see cref="HBSort.Core.Services.BricklinkApiPriceProvider"/>
+    /// in den Cache-Pfaden auf true gesetzt; die Bulk-"Alle Preise holen"-
+    /// Funktion im Bauvorschlags-Tab nutzt die Flag fuer das Toast-Summary
+    /// (z.B. "5 geholt, 12 aus Cache, 1 fehlgeschlagen").
+    /// </summary>
+    public bool FromCache { get; init; }
+
     /// <summary>True wenn ueberhaupt Daten vorhanden sind (mind. ein Preis-Wert != null).</summary>
     public bool HasAnyPrice =>
         MinPrice.HasValue || AvgPrice.HasValue || QtyAvgPrice.HasValue || MaxPrice.HasValue;

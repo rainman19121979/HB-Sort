@@ -36,7 +36,14 @@ public partial class BlInventoryViewModel : ObservableObject, IDisposable
     private readonly IBlCacheRepository _blCache;
     private readonly IPartImageProvider _imageProvider;
     private readonly INotificationService _notifications;
+    private readonly IDialogService _dialogs;
     private readonly EventHandler _onInventoryChanged;
+
+    // beta.11: separate Semaphore fuer die Figur-Thumbnails in der
+    // Reservierungs-Sektion. Damit blockieren wir nicht die Lot-Thumbnail-
+    // Pipeline beim Scrollen.
+    private readonly SemaphoreSlim _figureThumbnailSemaphore = new(3);
+    private CancellationTokenSource? _reservationImageCts;
 
     // Lazy-Image-Loading: nur sichtbare Zeilen triggern ueber den
     // Thumbnail_DataContextChanged-Handler im Code-Behind. Concurrency-Drossel
@@ -115,12 +122,14 @@ public partial class BlInventoryViewModel : ObservableObject, IDisposable
         IBlInventoryService inventory,
         IBlCacheRepository blCache,
         IPartImageProvider imageProvider,
-        INotificationService notifications)
+        INotificationService notifications,
+        IDialogService dialogs)
     {
         _inventory = inventory;
         _blCache = blCache;
         _imageProvider = imageProvider;
         _notifications = notifications;
+        _dialogs = dialogs;
 
         ItemsView = CollectionViewSource.GetDefaultView(Items);
         ItemsView.Filter = FilterPredicate;
@@ -146,9 +155,26 @@ public partial class BlInventoryViewModel : ObservableObject, IDisposable
         _inventory.InventoryChanged -= _onInventoryChanged;
         _imageLoadCts?.Cancel();
         _imageLoadCts?.Dispose();
+        _reservationImageCts?.Cancel();
+        _reservationImageCts?.Dispose();
         _thumbnailSemaphore.Dispose();
+        _figureThumbnailSemaphore.Dispose();
         GC.SuppressFinalize(this);
     }
+
+    // ====================================================================
+    // v0.1.24-beta.11: Reservierungen-Sektion im Detail-Panel
+    // ====================================================================
+
+    /// <summary>Reservierungen die das aktuell selektierte Lot belegen.</summary>
+    public ObservableCollection<BlReservationRow> Reservations { get; } = new();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasReservations))]
+    private bool _isLoadingReservations;
+
+    /// <summary>True wenn die Reservierungs-Sektion ueberhaupt etwas zeigen soll.</summary>
+    public bool HasReservations => Reservations.Count > 0;
 
     /// <summary>
     /// Liest Inventar aus DB, reichert mit Catalog-Name + Color-Name aus
@@ -158,6 +184,11 @@ public partial class BlInventoryViewModel : ObservableObject, IDisposable
     public async Task LoadAsync()
     {
         IsLoading = true;
+        // beta.11: aktuelles SelectedRow.LotId merken damit wir nach dem
+        // Items.Clear() das Detail-Panel auf der gleichen Zeile wieder
+        // oeffnen koennen. Ohne diesen Restore wuerde das Panel nach jedem
+        // InventoryChanged-Event zumachen.
+        var previousSelectedLotId = SelectedRow?.LotId;
         try
         {
             var lots = await _inventory.GetInventoryAsync();
@@ -189,7 +220,16 @@ public partial class BlInventoryViewModel : ObservableObject, IDisposable
             ItemsView.Refresh();
             UpdateFooter(lots);
 
-            // 4) Lazy-Image-Loading: alten in-flight-CTS canceln damit Loads
+            // 4) SelectedRow restoren: gleiches Lot in der neuen Items-Snapshot
+            //    suchen + setzen. OnSelectedRowChanged laedt die Reservierungen
+            //    automatisch neu. Lot kann verschwunden sein (Sync verlor es) -
+            //    dann bleibt das Detail-Panel zu, was korrekt ist.
+            if (previousSelectedLotId.HasValue)
+            {
+                SelectedRow = Items.FirstOrDefault(r => r.LotId == previousSelectedLotId.Value);
+            }
+
+            // 5) Lazy-Image-Loading: alten in-flight-CTS canceln damit Loads
             //    fuer die VORHERIGE Items-Snapshot nicht mehr auf das neue
             //    Item schreiben. Thumbnails fuer sichtbare Zeilen werden
             //    durch den Thumbnail_DataContextChanged-Handler getriggert
@@ -276,11 +316,143 @@ public partial class BlInventoryViewModel : ObservableObject, IDisposable
     /// <summary>
     /// Wenn der User eine Zeile selektiert, deren Thumbnail noch nicht
     /// geladen wurde (z.B. Detail-Panel-Bild bei einer noch nicht
-    /// gerenderten Row), erzwingen wir den Lazy-Load explizit.
+    /// gerenderten Row), erzwingen wir den Lazy-Load explizit. Plus:
+    /// Reservierungs-Sektion fuer das neue Lot nachladen.
     /// </summary>
     partial void OnSelectedRowChanged(BlInventoryRow? value)
     {
         if (value != null) _ = EnsureThumbnailAsync(value);
+        _ = LoadReservationsForSelectedRowAsync();
+    }
+
+    /// <summary>
+    /// beta.11: Reservierungs-Detail-Liste fuer das aktuell selektierte
+    /// Lot frisch laden. Wird beim Selection-Wechsel und nach jedem
+    /// Release ausgeloest.
+    /// </summary>
+    private async Task LoadReservationsForSelectedRowAsync()
+    {
+        // Alte in-flight Image-Loads stoppen damit sie nicht auf eine alte
+        // Reservations-Snapshot schreiben.
+        _reservationImageCts?.Cancel();
+        _reservationImageCts?.Dispose();
+        _reservationImageCts = new CancellationTokenSource();
+        var ct = _reservationImageCts.Token;
+
+        Reservations.Clear();
+        OnPropertyChanged(nameof(HasReservations));
+
+        var row = SelectedRow;
+        if (row == null || row.ReservedQuantity <= 0) return;
+
+        IsLoadingReservations = true;
+        try
+        {
+            var details = await _inventory.GetReservationsForLotAsync(row.LotId, ct);
+            foreach (var d in details)
+            {
+                Reservations.Add(new BlReservationRow
+                {
+                    ScanEventId = d.ScanEventId,
+                    LotId = d.LotId,
+                    TrackedMinifigId = d.TrackedMinifigId,
+                    FigureName = string.IsNullOrEmpty(d.FigureName)
+                        ? "Verwaiste Reservierung (keine Figur)"
+                        : d.FigureName,
+                    FigureBricklinkId = d.FigureBricklinkId,
+                    IsOrphan = d.IsOrphan,
+                    ReservedAt = d.ReservedAt
+                });
+            }
+            OnPropertyChanged(nameof(HasReservations));
+
+            // Thumbnails der lebenden Figuren lazy laden.
+            _ = LoadFigureThumbnailsAsync(ct);
+        }
+        catch (OperationCanceledException) { /* Selection wechselte */ }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "BlInventory: LoadReservationsForSelectedRowAsync fehlgeschlagen");
+        }
+        finally
+        {
+            IsLoadingReservations = false;
+        }
+    }
+
+    private async Task LoadFigureThumbnailsAsync(CancellationToken ct)
+    {
+        // Snapshot kopieren - Reservations kann waehrend des Loops
+        // veraendert werden (Release).
+        var snapshot = Reservations.ToList();
+        foreach (var r in snapshot)
+        {
+            if (ct.IsCancellationRequested) return;
+            if (r.IsOrphan || string.IsNullOrEmpty(r.FigureBricklinkId)) continue;
+            if (!string.IsNullOrEmpty(r.ImageUrl)) continue;
+
+            try
+            {
+                await _figureThumbnailSemaphore.WaitAsync(ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) { return; }
+            try
+            {
+                if (ct.IsCancellationRequested) return;
+                var url = await _imageProvider.GetImageFileByBlAsync(
+                    "M", r.FigureBricklinkId!, null, ct).ConfigureAwait(false);
+                if (ct.IsCancellationRequested || string.IsNullOrEmpty(url)) continue;
+
+                var disp = Application.Current?.Dispatcher;
+                if (disp != null)
+                    await disp.InvokeAsync(() => r.ImageUrl = url);
+                else
+                    r.ImageUrl = url;
+            }
+            catch (OperationCanceledException) { return; }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "BlInventory: Figur-Thumbnail {Bl} nicht ladbar", r.FigureBricklinkId);
+            }
+            finally
+            {
+                _figureThumbnailSemaphore.Release();
+            }
+        }
+    }
+
+    /// <summary>
+    /// beta.11: einzelne Reservierung aufheben. IDialogService-Confirmation
+    /// VOR dem Aufruf. Auto-Refresh haengt am InventoryChanged-Event
+    /// (siehe Konstruktor) - das ruft LoadAsync + Restore von SelectedRow.
+    /// </summary>
+    [RelayCommand]
+    public async Task ReleaseReservationAsync(BlReservationRow? row)
+    {
+        if (row == null) return;
+
+        string question = row.IsOrphan
+            ? "Diese verwaiste Reservierung wirklich aufheben?\n\n" +
+              "Es gibt keine zugeordnete Figur (Altlast oder Drift). " +
+              "Die Lot-Reservierung wird um 1 reduziert."
+            : $"Reservierung fuer '{row.FigureName}' wirklich aufheben?\n\n" +
+              "Die Reservierung wird freigegeben und das Teil ist wieder " +
+              "verkaufbar. Falls die Figur dadurch nicht mehr komplett ist, " +
+              "wechselt ihr Status zurueck auf 'wartend'.";
+
+        var ok = await _dialogs.ShowQuestionAsync("BL-Reservierung aufheben", question);
+        if (!ok) return;
+
+        var released = await _inventory.ReleaseSingleReservationAsync(row.ScanEventId, row.LotId);
+        if (released)
+        {
+            _notifications.ShowSuccess("Reservierung aufgehoben.");
+            // InventoryChanged feuerte bereits -> LoadAsync laeuft async.
+        }
+        else
+        {
+            _notifications.ShowError("Konnte die Reservierung nicht aufheben (Lot oder Eintrag nicht gefunden).");
+        }
     }
 
     private async Task<List<BlColor>> TryGetColorsAsync()
@@ -507,4 +679,30 @@ public partial class BlInventoryRow : ObservableObject
         "U" => "Gebraucht",
         _   => c
     };
+}
+
+/// <summary>
+/// v0.1.24-beta.11: Eine Zeile in der Reservierungs-Sektion des Detail-
+/// Panels. Eine Zeile pro reserviertem Stueck. ObservableObject damit der
+/// lazy nachgeladene Figur-Thumbnail die UI aktualisieren kann.
+/// </summary>
+public partial class BlReservationRow : ObservableObject
+{
+    /// <summary>ScanEvent-Id; null bei reiner Lot-Drift ohne ScanEvent.</summary>
+    public int? ScanEventId { get; init; }
+    public int LotId { get; init; }
+    public int? TrackedMinifigId { get; init; }
+    public string FigureName { get; init; } = string.Empty;
+    public string? FigureBricklinkId { get; init; }
+    public bool IsOrphan { get; init; }
+    public DateTime? ReservedAt { get; init; }
+
+    /// <summary>Anzeige im UI: "BL: arc007" oder Leerstring bei Orphan.</summary>
+    public string FigureBricklinkLabel =>
+        string.IsNullOrEmpty(FigureBricklinkId) ? string.Empty : $"BL: {FigureBricklinkId}";
+    public bool HasFigureBricklinkId => !string.IsNullOrEmpty(FigureBricklinkId);
+
+    /// <summary>Lazy-geladenes Figur-Thumbnail. Nur fuer Nicht-Orphan-Zeilen.</summary>
+    [ObservableProperty]
+    private string? _imageUrl;
 }

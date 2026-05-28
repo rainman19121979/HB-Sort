@@ -106,7 +106,8 @@ public class BricklinkApiPriceProvider : IPriceProvider
                 effectiveRegion, currency, staleDays, ct, vatCode, effectiveCountry);
             if (cached != null)
             {
-                return cached with { ProviderLabel = BuildProviderLabel(cfg) };
+                // beta.11: explizit als Cache-Treffer markieren.
+                return cached with { ProviderLabel = BuildProviderLabel(cfg), FromCache = true };
             }
         }
         catch (Exception ex)
@@ -176,7 +177,8 @@ public class BricklinkApiPriceProvider : IPriceProvider
                 UnitQuantity = pg.UnitQuantity,
                 TotalQuantity = pg.TotalQuantity,
                 Currency = string.IsNullOrWhiteSpace(pg.CurrencyCode) ? currency : pg.CurrencyCode,
-                FetchedAt = DateTime.UtcNow
+                FetchedAt = DateTime.UtcNow,
+                FromCache = false // frischer API-Call
             };
 
             // 4) In Cache schreiben (best-effort).
@@ -272,7 +274,7 @@ public class BricklinkApiPriceProvider : IPriceProvider
             {
                 Log.Information("Preis-Lookup: stale Cache-Wert geliefert ({Type}/{No}/{Color}, fetched {Days}d ago)",
                     itemType, itemNo, colorId, (DateTime.UtcNow - stale.FetchedAt).TotalDays);
-                return stale with { ProviderLabel = BuildProviderLabel(cfg) + " (Cache)" };
+                return stale with { ProviderLabel = BuildProviderLabel(cfg) + " (Cache)", FromCache = true };
             }
         }
         catch { /* ignore */ }

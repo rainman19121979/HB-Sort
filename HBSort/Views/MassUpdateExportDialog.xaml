@@ -1,0 +1,87 @@
+<Window x:Class="HBSort.Views.MassUpdateExportDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.modernwpf.com/2019"
+        ui:WindowHelper.UseModernWindowStyle="True"
+        Title="BL Mass-Update Export"
+        ToolTipService.IsEnabled="{DynamicResource TooltipsEnabled}"
+        Icon="../Resources/app.ico"
+        Width="720" Height="640"
+        MinWidth="600" MinHeight="480"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>   <!-- 0: Erklaerung + Info -->
+            <RowDefinition Height="*"/>      <!-- 1: XML-Anzeige -->
+            <RowDefinition Height="Auto"/>   <!-- 2: Footer -->
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="Mass-Update XML fuer BrickLink"
+                       FontSize="16" FontWeight="SemiBold"
+                       Margin="0,0,0,6"/>
+            <TextBlock TextWrapping="Wrap" FontSize="12"
+                       Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}">
+                <Run Text="Kopiere das XML in die Zwischenablage, oeffne BrickLink Mass-Update und fuege das XML dort ein. Nach dem Upload bei BrickLink kommt zurueck und klicke 'Verifizieren' - HBSort holt das frische Inventar und uebernimmt die Reservierungen als 'physisch gesammelt'."/>
+            </TextBlock>
+            <TextBlock Text="{Binding InfoText}"
+                       FontSize="12" FontWeight="SemiBold"
+                       Margin="0,8,0,0"/>
+        </StackPanel>
+
+        <!-- XML-Anzeige: monospace, scrollbar, read-only -->
+        <Border Grid.Row="1"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="1" CornerRadius="4">
+            <TextBox Text="{Binding XmlText, Mode=OneWay}"
+                     IsReadOnly="True"
+                     FontFamily="Consolas"
+                     FontSize="11"
+                     VerticalScrollBarVisibility="Auto"
+                     HorizontalScrollBarVisibility="Auto"
+                     AcceptsReturn="True"
+                     TextWrapping="NoWrap"
+                     BorderThickness="0"
+                     Padding="6"/>
+        </Border>
+
+        <!-- Footer: Aktionen -->
+        <Grid Grid.Row="2" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0"
+                    Content="In Zwischenablage kopieren"
+                    Command="{Binding CopyXmlCommand}"
+                    Padding="12,4"
+                    Margin="0,0,8,0"
+                    ToolTip="XML in die Zwischenablage legen damit du es bei BrickLink Mass-Update einfuegen kannst."/>
+
+            <Button Grid.Column="1"
+                    Content="BrickLink oeffnen"
+                    Command="{Binding OpenBrickLinkCommand}"
+                    Padding="12,4"
+                    ToolTip="Oeffnet die BL-Mass-Update-Seite im Standard-Browser."/>
+
+            <Button Grid.Column="3"
+                    Content="Verifizieren"
+                    Command="{Binding VerifyCommand}"
+                    Style="{StaticResource AccentButtonStyle}"
+                    Padding="12,4"
+                    Margin="0,0,8,0"
+                    ToolTip="Holt das frische BL-Inventar und prueft, ob das Update angekommen ist. Bei Erfolg werden die Reservierungen in physisch gesammelt umgebucht."/>
+
+            <Button Grid.Column="4"
+                    Content="Schliessen"
+                    IsCancel="True"
+                    Click="Close_Click"
+                    Padding="12,4"
+                    Width="100"/>
+        </Grid>
+    </Grid>
+</Window>
