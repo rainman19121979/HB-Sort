@@ -78,7 +78,7 @@ public class BlInventoryService : IBlInventoryService
     /// <inheritdoc />
     public event EventHandler? InventoryChanged;
 
-    public async Task<int> SyncInventoryAsync(CancellationToken ct = default)
+    public async Task<BlInventorySyncResult> SyncInventoryAsync(CancellationToken ct = default)
     {
         // 1) Frischen Snapshot von der BL-API ziehen. Auth/RateLimit-Errors
         //    propagieren - der UI-Layer macht den User-freundlichen Toast.
@@ -144,18 +144,28 @@ public class BlInventoryService : IBlInventoryService
         }
         await ctx.SaveChangesAsync(ct);
 
+        var lostReservations = reservedByLot.Count - restoredReservations;
         Log.Information(
             "BL-Inventar-Sync: {Old} alte Eintraege geloescht, {New} neue gespeichert, " +
             "{Restored} Reservierungen erhalten, {Capped} gecappt, " +
             "{Lost} Reservierungen verloren (Lots nicht mehr im BL-Store) (UTC {When:O})",
             deletedCount, lots.Count, restoredReservations, cappedReservations,
-            reservedByLot.Count - restoredReservations,
-            syncedAt);
+            lostReservations, syncedAt);
 
         // v0.1.24-beta.7 Phase 2: alle Konsumenten informieren (Inventar-Tab
         // refreshed seine Liste, auch wenn der Sync aus dem Settings-Tab kam).
         InventoryChanged?.Invoke(this, EventArgs.Empty);
-        return lots.Count;
+
+        // v0.1.24-beta.13: Result-Record statt nacktem int - der MassUpdate-
+        // Dialog zeigt CappedReservations als dezenten Hinweis an.
+        return new BlInventorySyncResult
+        {
+            LotCount = lots.Count,
+            RestoredReservations = restoredReservations,
+            CappedReservations = cappedReservations,
+            LostReservations = lostReservations,
+            SyncedAt = syncedAt
+        };
     }
 
     public async Task<List<BlInventoryLot>> GetInventoryAsync(CancellationToken ct = default)

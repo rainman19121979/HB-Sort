@@ -4,7 +4,6 @@ using HBSort.Core.Services;
 using HBSort.Services;
 using HBSort.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
-using Serilog;
 
 namespace HBSort.Views;
 
@@ -22,25 +21,27 @@ public partial class BlInventoryView : UserControl
     }
 
     /// <summary>
-    /// v0.1.24-beta.12: oeffnet den Mass-Update-Export-Dialog. VM erst
-    /// generieren, dann Dialog zeigen. Bei keinen Reservierungen erscheint
-    /// der Dialog mit Empty-State-Hinweis.
+    /// v0.1.24-beta.12: oeffnet den Mass-Update-Export-Dialog.
+    /// <para>v0.1.24-beta.13: Dialog wird SOFORT mit Loading-State angezeigt;
+    /// der initiale BL-Sync + XML-Generate laeuft als Hintergrund-Task im VM
+    /// (<see cref="MassUpdateExportViewModel.InitializeAsync"/>). Damit sieht
+    /// der User waehrend des Syncs den Lade-Hinweis statt eines blockierten
+    /// Buttons. Fehlerbehandlung (Auth/Rate-Limit/Netz) ist im VM gekapselt.</para>
     /// </summary>
-    private async void OpenMassUpdate_Click(object sender, RoutedEventArgs e)
+    private void OpenMassUpdate_Click(object sender, RoutedEventArgs e)
     {
         var sp = App.Services;
         var inv = sp.GetRequiredService<IBlInventoryService>();
         var notify = sp.GetRequiredService<INotificationService>();
 
         var vm = new MassUpdateExportViewModel(inv, notify);
-        try
-        {
-            await vm.GenerateAsync();
-        }
-        catch (System.Exception ex)
-        {
-            Log.Warning(ex, "MassUpdateExport: GenerateAsync (initial) fehlgeschlagen");
-        }
+
+        // InitializeAsync feuern OHNE await: der Dialog kommt sofort hoch
+        // und zeigt seinen Loading-State; sobald Sync+Generate fertig sind,
+        // updaten die ObservableProperties die UI per Binding.
+        // Fire-and-forget ist hier OK weil Fehler im VM via Try/Catch +
+        // SyncInfoText/InfoText behandelt werden (kein Throw nach aussen).
+        _ = vm.InitializeAsync();
 
         var dialog = new MassUpdateExportDialog(vm)
         {

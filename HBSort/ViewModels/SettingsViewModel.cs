@@ -1078,8 +1078,11 @@ public partial class SettingsViewModel : ObservableObject
         BlInventoryStatusText = "Synchronisiere...";
         try
         {
-            var count = await _blInventory.SyncInventoryAsync();
-            var msg = $"{count} Lots aus dem BrickLink-Store synchronisiert.";
+            // v0.1.24-beta.13: SyncInventoryAsync liefert jetzt einen
+            // Result-Record (LotCount, RestoredReservations, ...). Hier
+            // brauchen wir nur die Lot-Anzahl fuer den Settings-Status-Text.
+            var result = await _blInventory.SyncInventoryAsync();
+            var msg = $"{result.LotCount} Lots aus dem BrickLink-Store synchronisiert.";
             BlInventoryStatusText = $"{msg} (UTC {DateTime.UtcNow:HH:mm:ss})";
             _notifications.ShowSuccess(msg);
         }

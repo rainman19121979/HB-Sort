@@ -480,9 +480,13 @@ public partial class BlInventoryViewModel : ObservableObject, IDisposable
         SyncStatusText = "Synchronisiere...";
         try
         {
-            var count = await _inventory.SyncInventoryAsync();
-            SyncStatusText = $"{count} Lots synchronisiert (UTC {DateTime.UtcNow:HH:mm:ss})";
-            _notifications.ShowSuccess($"{count} Lots aus dem BrickLink-Store synchronisiert.");
+            // v0.1.24-beta.13: SyncInventoryAsync liefert jetzt einen
+            // Result-Record. Im Inventar-Tab brauchen wir nur LotCount fuer
+            // den Status-Text - der MassUpdateExport-Dialog nutzt die
+            // restlichen Felder (CappedReservations etc.).
+            var result = await _inventory.SyncInventoryAsync();
+            SyncStatusText = $"{result.LotCount} Lots synchronisiert (UTC {DateTime.UtcNow:HH:mm:ss})";
+            _notifications.ShowSuccess($"{result.LotCount} Lots aus dem BrickLink-Store synchronisiert.");
         }
         catch (BricklinkAuthException auth)
         {

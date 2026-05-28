@@ -24,6 +24,14 @@
                        Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}">
                 <Run Text="Kopiere das XML in die Zwischenablage, oeffne BrickLink Mass-Update und fuege das XML dort ein. Nach dem Upload bei BrickLink kommt zurueck und klicke 'Verifizieren' - HBSort holt das frische Inventar und uebernimmt die Reservierungen als 'physisch gesammelt'."/>
             </TextBlock>
+            <!-- v0.1.24-beta.13: Sync-Status (Initial-Sync beim Oeffnen).
+                 Wird beim Open zuerst "Inventar wird synchronisiert..." und
+                 danach Erfolgs- oder Stale-Fallback-Hinweis. -->
+            <TextBlock Text="{Binding SyncInfoText}"
+                       TextWrapping="Wrap"
+                       FontSize="12" FontStyle="Italic"
+                       Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                       Margin="0,8,0,0"/>
             <TextBlock Text="{Binding InfoText}"
                        FontSize="12" FontWeight="SemiBold"
                        Margin="0,8,0,0"/>

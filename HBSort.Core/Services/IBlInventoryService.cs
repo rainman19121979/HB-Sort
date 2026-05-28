@@ -12,15 +12,21 @@ public interface IBlInventoryService
     /// <summary>
     /// Holt das komplette BL-Store-Inventar via <see cref="IBricklinkClient.GetInventoryAsync"/>,
     /// loescht den lokalen Snapshot und speichert die neuen Lots. Liefert
-    /// die Anzahl der nun gespeicherten Eintraege zurueck. Idempotent -
-    /// wiederholtes Aufrufen produziert denselben Stand.
+    /// ein <see cref="BlInventorySyncResult"/> mit Zahl der Lots,
+    /// erhaltenen/gecappten/verlorenen Reservierungen und Sync-Zeitpunkt.
+    /// Idempotent - wiederholtes Aufrufen produziert denselben Stand.
     ///
     /// Wirft <see cref="BricklinkExceptions.BricklinkAuthException"/> wenn
     /// Tokens fehlen / falsch sind, und
     /// <see cref="BricklinkExceptions.BricklinkRateLimitException"/> wenn der
     /// eigene Hard-Threshold erreicht ist.
+    ///
+    /// <para>v0.1.24-beta.13: Rueckgabetyp von <c>int</c> auf
+    /// <see cref="BlInventorySyncResult"/> erweitert, damit Aufrufer (z.B.
+    /// MassUpdateExport-Dialog) sehen koennen ob/wie viele Reservierungen
+    /// wegen geaenderter BL-Mengen gecappt wurden (V6-Cap, Audit H4).</para>
     /// </summary>
-    Task<int> SyncInventoryAsync(CancellationToken ct = default);
+    Task<BlInventorySyncResult> SyncInventoryAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Liest den aktuellen lokalen Inventar-Stand aus userdata.db. Kein
@@ -211,6 +217,42 @@ public interface IBlInventoryService
     /// fuer den "Verifizieren"-Button (disabled wenn 0).
     /// </summary>
     Task<int> GetPendingExportCountAsync(CancellationToken ct = default);
+}
+
+/// <summary>
+/// v0.1.24-beta.13: Result von <see cref="IBlInventoryService.SyncInventoryAsync"/>.
+/// Vorher war der Rueckgabetyp <c>int</c> (nur LotCount); fuer den
+/// MassUpdateExport-Dialog wird zusaetzlich gebraucht, ob beim Snapshot-
+/// Replace Reservierungen wegen geaenderter BL-Mengen gecappt wurden
+/// (V6-Cap, Audit H4) — der User soll sehen, dass HBSort etwas angepasst
+/// hat, bevor er das Mass-Update-XML hochlaedt.
+/// </summary>
+public sealed class BlInventorySyncResult
+{
+    /// <summary>Anzahl der Lots nach dem Sync (frisch aus der BL-Antwort).</summary>
+    public int LotCount { get; init; }
+
+    /// <summary>
+    /// Lots fuer die eine vorherige Reservierung &gt; 0 wiederhergestellt
+    /// werden konnte (in der neuen BL-Antwort noch enthalten).
+    /// </summary>
+    public int RestoredReservations { get; init; }
+
+    /// <summary>
+    /// Lots fuer die die Reservierung wegen gesunkener BL-Quantity nach
+    /// unten gecappt wurde. Wenn &gt; 0 hat HBSort die Buchhaltung
+    /// nachgezogen — sichtbar als Hinweis im MassUpdateExport-Dialog.
+    /// </summary>
+    public int CappedReservations { get; init; }
+
+    /// <summary>
+    /// Reservierungen die komplett verloren gingen, weil das Lot nicht
+    /// mehr in der BL-Antwort vorkam (ausverkauft / manuell geloescht).
+    /// </summary>
+    public int LostReservations { get; init; }
+
+    /// <summary>UTC-Zeitpunkt des Syncs (= LastSyncedAt aller Lots).</summary>
+    public DateTime SyncedAt { get; init; }
 }
 
 /// <summary>
