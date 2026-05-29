@@ -240,8 +240,13 @@ war STABLE-READY fuer v0.1.24.
   vergessener Lagerliste-Rest in Log-Ausgabe (`DataHealService.cs:68`).
   User-unsichtbar (Log-only), trotzdem konsistent ziehen. Schwere: L.
   Aufwand: ~2min. Quelle: ux-analyst 2026-05-28.
-- 📋 **UX-6: Code-Kommentar-Drift "Lagerliste-Tab"** — vergessener Rest
-  im Kommentar (`MainViewModel.cs:399`). Schwere: L. Aufwand: ~2min.
+- 📋 **UX-6: Code-Kommentar-Drift "Lagerliste-Tab"** — vergessener Rest 
+im Kommentar (`MainViewModel.cs:399`). Schwere: L. Aufwand: ~2min.
+- 📋 **UX-7: Button "Alle Preise holen" überlappt Überschrift** — im
+  Baubar-Tab (Was kann ich bauen) verdeckt der Button die Überschrift
+  bzw. nimmt zu viel Platz im engen rechten Panel. Layout anpassen:
+  kleinerer Button, anders positionieren oder in eine Symbolleiste
+  legen. Praxis-Test 2026-05-28. Schwere: L. Aufwand: ~15-30min.
   Quelle: ux-analyst 2026-05-28.
 - 💭 **docs/ux-patterns.md als zentraler UX-Pattern-Katalog** — Buendelt
   etablierte Patterns (SortInstruction-Modal, BL-Shop-Badge, Reserve-
