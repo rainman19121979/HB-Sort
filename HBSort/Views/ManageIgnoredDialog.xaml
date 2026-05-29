@@ -76,18 +76,24 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
+            <!-- Footer-Regel: Sekundaer (Schliessen) links/grau, Primaer-Aktion
+                 ("Alle wiederherstellen") rechts mit AccentButtonStyle.
+                 Schliessen traegt nur IsCancel (kein IsDefault zusammen mit
+                 IsCancel - sonst loesten ENTER und ESC denselben Button aus). -->
             <Button Grid.Column="0"
+                    Content="Schliessen"
+                    IsCancel="True"
+                    Width="120"
+                    HorizontalAlignment="Left"
+                    Click="Close_Click"/>
+            <Button Grid.Column="1"
                     Content="Alle wiederherstellen"
                     Command="{Binding RestoreAllCommand}"
                     IsEnabled="{Binding HasItems}"
-                    Padding="10,4"
-                    HorizontalAlignment="Left"
-                    ToolTip="Loescht die komplette Ignorier-Liste."/>
-            <Button Grid.Column="1"
-                    Content="Schliessen"
-                    IsDefault="True" IsCancel="True"
                     Style="{StaticResource AccentButtonStyle}"
-                    Width="120" Click="Close_Click"/>
+                    IsDefault="True"
+                    Padding="10,4"
+                    ToolTip="Loescht die komplette Ignorier-Liste."/>
         </Grid>
     </Grid>
 </Window>

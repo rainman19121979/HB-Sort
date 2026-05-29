@@ -117,10 +117,14 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Button Grid.Column="1"
+            <!-- Abbrechen ist der einzige Button und gehoert laut Footer-Regel
+                 nach links (Grid-Spalte 0). Die Reservierung selbst erfolgt per
+                 Klick auf eine Lot-Karte oben, daher kein Primaer-Button hier. -->
+            <Button Grid.Column="0"
                     Content="Abbrechen"
                     Click="Cancel_Click"
                     IsCancel="True"
+                    HorizontalAlignment="Left"
                     MinWidth="100"/>
         </Grid>
     </Grid>

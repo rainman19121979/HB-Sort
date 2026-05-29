@@ -16,9 +16,10 @@ Verbindlich heisst: neue Dialoge orientieren sich am hier benannten Vorbild,
 nicht an einem zufaellig gewaehlten Nachbar-Dialog. Wo unten ein Drift steht, ist
 die als **richtig** markierte Variante das Ziel — nicht der Ist-Zustand.
 
-Dieses Dokument ist die direkte Arbeitsgrundlage fuer **v0.1.25 Welle 3**
-(Kosmetik-Sweep, Backlog-Items B2 / UX-1 / UX-2 / UX-4). Die Drift-Inventur am
-Ende (Abschnitt 11) ist die Abarbeitungs-Checkliste.
+Dieses Dokument war die Arbeitsgrundlage fuer den **v0.1.25-Kosmetik-Sweep**
+(Wellen 1-3, Backlog-Items B1/B2/B6/B10 + UX-1..UX-4/UX-7). Die Drift-Inventur
+am Ende (Abschnitt 12) listet alle damaligen Drifts — inzwischen alle behoben;
+sie dient kuenftig als Vorlage fuer neue UX-Checks.
 
 ---
 
@@ -191,9 +192,19 @@ var vm = App.Services.GetRequiredService<MassUpdateExportViewModel>();
   (`Visibility` via `ShowBlBadge`).
 - **Klick** (`MouseLeftButtonUp="BlBadge_Click"`, `Tag="{Binding}"`) oeffnet den
   Reserve-/Lot-Picker.
-- **Beschriftung:** der informative Mengen-/Zustands-Text aus
-  `BlAvailability.BadgeText` (z.B. "3x Neu"), **nicht** ein hartkodiertes
-  "BL-Shop". Tooltip aus `BlAvailability.BadgeTooltip`.
+- **Beschriftung — Progressive Disclosure (Zwei-Stufen-Pattern):**
+  Der Badge selbst ist bewusst knapp und zeigt nur die *Anwesenheit* im
+  Shop (`BlAvailability.BadgeText`, liefert by-design `"BL-Shop"`). Die
+  *Mengen-/Zustands-Details* tragen den **Tooltip** (`BadgeTooltip`,
+  z.B. "Im BL-Shop verfuegbar: 3x Neu, 2x Gebraucht. Klicken um zu
+  reservieren."). Stufe 1 = Badge (gibt es das im Shop?), Stufe 2 =
+  Hover/Klick (wie viel, welcher Zustand). Das hält den Badge in den
+  engen Teile-Zeilen kompakt, ohne Info zu verlieren.
+- **Konsistenz-Regel:** alle Dialoge binden den Badge-Text auf
+  `BlAvailability.BadgeText` (nicht hartkodiert) und den Tooltip auf
+  `BlAvailability.BadgeTooltip`. So wirkt eine künftige Änderung an
+  `BadgeText`/`BadgeTooltip` (`BlAvailabilityInfo` in
+  `MinifigSummaryViewModel.cs`) automatisch in allen Dialogen gleich.
 - Vorkommen: `MinifigSummaryDialog`, `BuildSuggestionDetailDialog`,
   `PartLookupView` (Reservierungs-Badge).
 
@@ -211,20 +222,23 @@ var vm = App.Services.GetRequiredService<MassUpdateExportViewModel>();
 
 ### Vorbild-Datei
 
-`HBSort/Views/MinifigSummaryDialog.xaml:139-150` (Mengen-Variante via
-`BadgeText`).
+`HBSort/Views/MinifigSummaryDialog.xaml:139-150` (bindet `BadgeText` +
+`BadgeTooltip`).
 
-### Aktuelle Drift
+### Drift behoben (UX-4, v0.1.25 Welle 3)
 
-| Dialog | Problem | Soll | Backlog |
-|---|---|---|---|
-| `BuildSuggestionDetailDialog.xaml:166` | Badge-Text hartkodiert `Text="BL-Shop"`, obwohl dasselbe `BlAvailability`-Objekt ein `BadgeText` traegt | `Text="{Binding BlAvailability.BadgeText}"` (informative Mengen-Variante) | **UX-4** |
+`BuildSuggestionDetailDialog.xaml:166` hatte den Badge-Text hartkodiert
+(`Text="BL-Shop"`) statt auf `BlAvailability.BadgeText` zu binden —
+obwohl der Dialog dasselbe `BlAvailability`-Objekt bereits an anderer
+Stelle band. Behoben durch reinen Binding-Tausch: jetzt überall
+`Text="{Binding BlAvailability.BadgeText}"`. Damit ist die Binding-
+Konsistenz hergestellt (alle Dialoge greifen auf dieselbe Property zu).
 
-**Begruendung fuer die Mengen-Variante als Soll:** der User sieht direkt am
-Badge, *wie viel* und *in welchem Zustand* (Neu/Gebraucht) im Shop liegt, ohne
-erst den Reserve-Dialog oeffnen zu muessen. "BL-Shop" allein wiederholt nur die
-ohnehin erkennbare Badge-Farbe. Beide Dialoge binden bereits dasselbe
-`BlAvailability`-Objekt — der Fix ist ein reiner Binding-Tausch.
+**Hinweis:** `BadgeText` liefert aktuell by-design `"BL-Shop"` (die
+Mengen-Info steckt im Tooltip, siehe Progressive-Disclosure-Regel oben).
+Falls der Badge künftig informativer werden soll, ist das eine reine
+VM-Änderung an `BlAvailabilityInfo.BadgeText` — die XAML-Bindings müssen
+dann nicht mehr angefasst werden.
 
 ---
 
@@ -374,31 +388,82 @@ Durchgaengig gelebt — 28 Vorkommen in 18 Dateien, u.a.
 `HBSort/Views/MassUpdateExportDialog.xaml:85` (sprechende Du-Form-Tooltips).
 Globaler Schalter: `HBSort/ViewModels/SettingsViewModel.cs` + `App.xaml.cs:118`.
 
-### Aktuelle Drift
+### Drift behoben (UX-3, v0.1.25 Welle 3)
 
-| Stelle | Problem | Backlog |
-|---|---|---|
-| `BlInventoryView.xaml:163` | Tooltip sagt noch "aktuell durchgehend leer" — stimmt seit beta.8 nicht mehr | **UX-3** |
+`BlInventoryView.xaml:163` — Tooltip der "Reserviert"-Spalte sagte noch
+"aktuell durchgehend leer" (Pre-beta.8-Stand). Neuer Text: *"Zeigt, wie
+viele Stueck dieses Lots fuer wartende Figuren reserviert sind."*
 
 ---
 
-## 11. Drift-Inventur (Arbeitsgrundlage Welle 3)
+## 11. Panel-Header-Toolbar (Ueberschrift + Aktionen im engen Panel)
 
-Vollstaendige Liste der UI-Drifts, sortiert nach Backlog-Item. Diese Tabelle ist
-die Abarbeitungs-Checkliste fuer den v0.1.25-Kosmetik-Sweep (Welle 3).
+### Regel
 
-| Datei : Zeile | Drift | Soll-Zustand | Backlog | Schwere |
+- Wenn ein Panel-Header aus **Ueberschrift + einem oder mehreren Aktions-
+  Bedienelementen** besteht und das Panel schmal ist (z.B. das rechte
+  Bottom-Right-Panel im Sortier-Tab): **nicht** alles in eine Zeile mit
+  `*`/`Auto`/`Auto`-Spalten quetschen — die `Auto`-Controls verdraengen
+  sonst die `*`-Ueberschrift bis zum Abschneiden.
+- Stattdessen: **Ueberschrift in eine eigene volle Zeile**, darunter eine
+  **Toolbar-Zeile** (eigenes `Grid`) mit den Aktions-Bedienelementen.
+  Aufbau aussen ein `StackPanel`: Zeile 1 = `TextBlock` (Ueberschrift),
+  Zeile 2 = `Grid` mit den Buttons/Toggles.
+- Gilt nur fuer **enge** Panels. Breite Tab-Header (z.B. BL-Inventar-Tab,
+  ganze Fensterbreite) duerfen Ueberschrift + Buttons weiter in einer
+  Zeile haben — dort ist genug Platz.
+
+### Beispiel
+
+```xml
+<StackPanel Grid.Row="0" Margin="0,0,0,8">
+    <TextBlock Text="WAS KANN ICH BAUEN?" FontSize="14" FontWeight="SemiBold"/>
+    <!-- Toolbar-Zeile unter der Ueberschrift -->
+    <Grid Margin="0,6,0,0">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Button Grid.Column="0" Content="Alle Preise holen" .../>
+        <CheckBox Grid.Column="1" Content="BL-Inventar beruecksichtigen" .../>
+    </Grid>
+</StackPanel>
+```
+
+### Vorbild-Datei
+
+`HBSort/Views/BuildSuggestionsView.xaml` (Header-Block, Z.28-61) — entstanden
+aus dem UX-7-Fix (v0.1.25 Welle 3). Vorher quetschten Ueberschrift + Button +
+Toggle in einer `*`/`Auto`/`Auto`-Zeile, der Button verdraengte die
+Ueberschrift; jetzt zweizeilig.
+
+### Abgrenzung
+
+Breiter Tab-Header als Gegenbeispiel (einzeilig erlaubt):
+`HBSort/Views/BlInventoryView.xaml` (Z.22-49) — volle Fensterbreite,
+"BRICKLINK INVENTAR" + zwei Buttons passen problemlos nebeneinander.
+
+---
+
+## 12. Drift-Inventur
+
+Vollstaendige Liste der UI-Drifts aus dem v0.1.24-Stable-Stand, sortiert nach
+Backlog-Item. War die Abarbeitungs-Checkliste fuer den v0.1.25-Kosmetik-Sweep.
+
+**Status: alle Drifts behoben in Wellen 1-3 (v0.1.25, 2026-05-29).**
+
+| Datei : Zeile | Drift | Soll-Zustand | Backlog | Status |
 |---|---|---|---|---|
-| `MinifigSummaryDialog.xaml:199-201` | "Schliessen" mit `AccentButtonStyle`, kein links/rechts-Split | grau, ohne Style | UX-1 | L |
-| `BinDetailDialog.xaml:157-159` | "Schliessen" (Read-Only) mit `AccentButtonStyle` | grau | UX-1 | L |
-| `FloatingPartDetailDialog.xaml:109-110` | "Schliessen" (Read-Only) mit `AccentButtonStyle` | grau | UX-1 | L |
-| `BlReserveDialog.xaml:120-124` | "Abbrechen" rechts (Grid-Spalte 1) statt links | Abbrechen links | UX-2 | L |
-| `ManageIgnoredDialog.xaml:86-90` | "Schliessen" mit `AccentButtonStyle` + `IsDefault`+`IsCancel` (Read-Only-Verletzung) | grau, nur `IsCancel` | B2 | L-M |
-| `MassUpdateExportDialog.xaml:87-92` | "Schliessen" rechts hinter Primaer-Button "Verifizieren" | Schliessen links, primaer rechts | B2 | L-M |
-| `MassUpdateExportDialog.xaml.cs` | `Close_Click` setzt `DialogResult=true` statt `false`/`null` | `false`/`null` | B6/B10 | L |
-| `BuildSuggestionsView.xaml.cs:32`, `BlInventoryView.xaml.cs:35` | Dialog-VMs urspruenglich per `new` statt DI | `AddTransient` + `GetRequiredService` | B1 | M |
-| `BuildSuggestionDetailDialog.xaml:166` | Badge-Text hartkodiert "BL-Shop" | `{Binding BlAvailability.BadgeText}` | UX-4 | L |
-| `BlInventoryView.xaml:163` | Tooltip-Text veraltet ("aktuell durchgehend leer") | aktuellen Text setzen | UX-3 | L |
+| `MinifigSummaryDialog.xaml:199-201` | "Schliessen" mit `AccentButtonStyle`, kein links/rechts-Split | grau, ohne Style | UX-1 | ✅ Welle 3 |
+| `BinDetailDialog.xaml:157-159` | "Schliessen" (Read-Only) mit `AccentButtonStyle` | grau | UX-1 | ✅ Welle 3 |
+| `FloatingPartDetailDialog.xaml:109-110` | "Schliessen" (Read-Only) mit `AccentButtonStyle` | grau | UX-1 | ✅ Welle 3 |
+| `BlReserveDialog.xaml:120-124` | "Abbrechen" rechts (Grid-Spalte 1) statt links | Abbrechen links | UX-2 | ✅ Welle 3 |
+| `ManageIgnoredDialog.xaml:86-90` | "Schliessen" mit `AccentButtonStyle` + `IsDefault`+`IsCancel` (Read-Only-Verletzung) | grau, nur `IsCancel` | B2 | ✅ Welle 3 |
+| `MassUpdateExportDialog.xaml:87-92` | "Schliessen" rechts hinter Primaer-Button "Verifizieren" | Schliessen links, primaer rechts | B2 | ✅ Welle 3 |
+| `MassUpdateExportDialog.xaml.cs` | `Close_Click` setzt `DialogResult=true` statt `false`/`null` | `false`/`null` | B6/B10 | ✅ Welle 2 |
+| `BuildSuggestionsView.xaml.cs:32`, `BlInventoryView.xaml.cs:35` | Dialog-VMs urspruenglich per `new` statt DI | `AddTransient` + `GetRequiredService` | B1 | ✅ Welle 2 |
+| `BuildSuggestionDetailDialog.xaml:166` | Badge-Text hartkodiert "BL-Shop" | `{Binding BlAvailability.BadgeText}` (Binding-Konsistenz) | UX-4 | ✅ Welle 3 |
+| `BlInventoryView.xaml:163` | Tooltip-Text veraltet ("aktuell durchgehend leer") | aktuellen Text setzen | UX-3 | ✅ Welle 3 |
 
 **Korrekte Footer (Referenz, nicht anfassen):** `BsxExportDialog.xaml`,
 `WantedListExportDialog.xaml`, `BinCreateDialog.xaml`,
@@ -407,6 +472,6 @@ die Abarbeitungs-Checkliste fuer den v0.1.25-Kosmetik-Sweep (Welle 3).
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-29 (ux-analyst). Naechste Pflege: nach v0.1.25
-Welle 3, sobald die Drifts gezogen sind — dann die jeweilige Drift-Zeile auf
-"behoben" setzen oder entfernen.*
+*Zuletzt aktualisiert: 2026-05-29 (ux-analyst + Welle-3-Fix). Alle in der
+Drift-Inventur gelisteten Befunde sind behoben (Wellen 1-3, v0.1.25). Neue
+Drifts beim nächsten UX-Check hier ergänzen.*

@@ -53,43 +53,48 @@
                      Padding="6"/>
         </Border>
 
-        <!-- Footer: Aktionen -->
+        <!-- Footer: Aktionen.
+             Footer-Regel: Sekundaer (Schliessen) links/grau, Primaer-Aktion
+             (Verifizieren) rechts mit AccentButtonStyle. Die uebrigen
+             Aktions-Buttons stehen rechts in der Gruppe vor dem Primaer-Button;
+             der *-Spacer in Spalte 1 schiebt die Gruppe nach rechts. -->
         <Grid Grid.Row="2" Margin="0,12,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
             <Button Grid.Column="0"
+                    Content="Schliessen"
+                    IsCancel="True"
+                    Click="Close_Click"
+                    Padding="12,4"
+                    HorizontalAlignment="Left"
+                    Width="100"/>
+
+            <Button Grid.Column="2"
                     Content="In Zwischenablage kopieren"
                     Command="{Binding CopyXmlCommand}"
                     Padding="12,4"
                     Margin="0,0,8,0"
                     ToolTip="XML in die Zwischenablage legen damit du es bei BrickLink Mass-Update einfuegen kannst."/>
 
-            <Button Grid.Column="1"
+            <Button Grid.Column="3"
                     Content="BrickLink oeffnen"
                     Command="{Binding OpenBrickLinkCommand}"
                     Padding="12,4"
+                    Margin="0,0,8,0"
                     ToolTip="Oeffnet die BL-Mass-Update-Seite im Standard-Browser."/>
 
-            <Button Grid.Column="3"
+            <Button Grid.Column="4"
                     Content="Verifizieren"
                     Command="{Binding VerifyCommand}"
                     Style="{StaticResource AccentButtonStyle}"
                     Padding="12,4"
-                    Margin="0,0,8,0"
                     ToolTip="Holt das frische BL-Inventar und prueft, ob das Update angekommen ist. Bei Erfolg werden die Reservierungen in physisch gesammelt umgebucht."/>
-
-            <Button Grid.Column="4"
-                    Content="Schliessen"
-                    IsCancel="True"
-                    Click="Close_Click"
-                    Padding="12,4"
-                    Width="100"/>
         </Grid>
     </Grid>
 </Window>

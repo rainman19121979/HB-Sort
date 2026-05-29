@@ -163,7 +163,7 @@
                                                 MouseLeftButtonUp="BlBadge_Click"
                                                 ToolTip="{Binding BlAvailability.BadgeTooltip}"
                                                 Visibility="{Binding ShowBlBadge, Converter={StaticResource BoolToVisibility}}">
-                                            <TextBlock Text="BL-Shop"
+                                            <TextBlock Text="{Binding BlAvailability.BadgeText}"
                                                        Foreground="White" FontWeight="SemiBold"
                                                        FontSize="10"/>
                                         </Border>

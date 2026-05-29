@@ -154,8 +154,9 @@
                 wuerde mit IsCancel kollidieren - waere widerspruechlich,
                 weil ENTER und ESC denselben Button auslosen wuerden.
             -->
+            <!-- Kein AccentButtonStyle: Schliessen ist in einem Read-Only-Dialog
+                 sekundaer (grau), nicht die primaere Aktion. -->
             <Button Content="Schliessen" IsCancel="True" Width="120"
-                    Style="{StaticResource AccentButtonStyle}"
                     Click="Close_Click"/>
         </StackPanel>
     </Grid>

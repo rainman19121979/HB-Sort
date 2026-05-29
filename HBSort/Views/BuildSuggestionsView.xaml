@@ -19,37 +19,46 @@
             <RowDefinition Height="Auto"/>   <!-- 2: SummaryText + Reset-Link -->
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Margin="0,0,0,8">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
+        <!-- UX-7 (v0.1.25 Welle 3): Im engen rechten Panel hatten Ueberschrift +
+             Button + Checkbox in EINER Zeile keinen Platz - der Button
+             verdraengte die Ueberschrift. Loesung (Option b): Ueberschrift in
+             eigener voller Zeile, darunter eine Toolbar-Zeile mit Button +
+             Toggle. So bleibt die Ueberschrift immer komplett lesbar und beide
+             Bedienelemente erreichbar. -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,8">
             <TextBlock Text="WAS KANN ICH BAUEN?"
-                       FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                       FontSize="14" FontWeight="SemiBold"/>
 
-            <!-- v0.1.24-beta.11: Alle Preise holen. Spinner-Disable
-                 ueber CanFetchPrices (= !IsLoading &amp;&amp; !IsFetchingPrices
-                 &amp;&amp; Suggestions.Count > 0). -->
-            <Button Grid.Column="1"
-                    Content="Alle Preise holen"
-                    Command="{Binding FetchAllPricesCommand}"
-                    IsEnabled="{Binding CanFetchPrices}"
-                    Margin="0,0,12,0"
-                    Padding="10,4"
-                    ToolTip="Holt fuer alle sichtbaren Vorschlaege den BL-Preis (max 3 parallel)."/>
+            <!-- Toolbar-Zeile unter der Ueberschrift -->
+            <Grid Margin="0,6,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-            <!-- v0.1.24-beta.8 Phase 3: BL-Inventar-Toggle. Sichtbar nur wenn
-                 der User ueberhaupt synchronisiert hat (HasAnyBlInventory).
-                 Default aus (IncludeBlInventory=false) -> Standardverhalten
-                 unveraendert. -->
-            <CheckBox Grid.Column="2"
-                      Content="BL-Inventar beruecksichtigen"
-                      IsChecked="{Binding IncludeBlInventory, Mode=TwoWay}"
-                      Visibility="{Binding HasAnyBlInventory, Converter={StaticResource BoolToVisibility}}"
-                      VerticalAlignment="Center"
-                      ToolTip="Zeigt zusaetzlich Figuren die mit deinem BrickLink-Shop-Bestand vervollstaendigt werden koennen."/>
-        </Grid>
+                <!-- v0.1.24-beta.11: Alle Preise holen. Spinner-Disable
+                     ueber CanFetchPrices (= !IsLoading &amp;&amp; !IsFetchingPrices
+                     &amp;&amp; Suggestions.Count > 0). -->
+                <Button Grid.Column="0"
+                        Content="Alle Preise holen"
+                        Command="{Binding FetchAllPricesCommand}"
+                        IsEnabled="{Binding CanFetchPrices}"
+                        Margin="0,0,12,0"
+                        Padding="10,4"
+                        ToolTip="Holt fuer alle sichtbaren Vorschlaege den BL-Preis (max 3 parallel)."/>
+
+                <!-- v0.1.24-beta.8 Phase 3: BL-Inventar-Toggle. Sichtbar nur wenn
+                     der User ueberhaupt synchronisiert hat (HasAnyBlInventory).
+                     Default aus (IncludeBlInventory=false) -> Standardverhalten
+                     unveraendert. -->
+                <CheckBox Grid.Column="1"
+                          Content="BL-Inventar beruecksichtigen"
+                          IsChecked="{Binding IncludeBlInventory, Mode=TwoWay}"
+                          Visibility="{Binding HasAnyBlInventory, Converter={StaticResource BoolToVisibility}}"
+                          VerticalAlignment="Center"
+                          ToolTip="Zeigt zusaetzlich Figuren die mit deinem BrickLink-Shop-Bestand vervollstaendigt werden koennen."/>
+            </Grid>
+        </StackPanel>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <ItemsControl ItemsSource="{Binding Suggestions}">

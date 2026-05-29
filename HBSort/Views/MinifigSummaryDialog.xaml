@@ -195,9 +195,11 @@
                     Click="Move_Click"
                     ToolTip="Figur in das oben gewaehlte Fach verschieben."/>
 
-            <!-- Schliessen: Read-Only-Konvention -> nur IsCancel, kein IsDefault. -->
+            <!-- Schliessen: Read-Only-Konvention -> nur IsCancel, kein IsDefault.
+                 Kein AccentButtonStyle: Schliessen ist sekundaer (grau). Dieser
+                 Dialog hat keinen klassischen Primaer-Button - Loeschen/Zerlegen
+                 sind destruktiv/sekundaer, Verschieben ist sekundaer. -->
             <Button Content="Schliessen" IsCancel="True" Width="120"
-                    Style="{StaticResource AccentButtonStyle}"
                     Click="Close_Click"/>
         </StackPanel>
     </Grid>

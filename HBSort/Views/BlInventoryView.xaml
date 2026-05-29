@@ -160,7 +160,7 @@
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
                         <DataGridTextColumn Header="Reserviert" Binding="{Binding ReservedDisplay}" Width="80"
-                                            ToolTipService.ToolTip="Lokal eingeplante Menge (Phase 3 schreibt das; aktuell durchgehend leer).">
+                                            ToolTipService.ToolTip="Zeigt, wie viele Stueck dieses Lots fuer wartende Figuren reserviert sind.">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="HorizontalAlignment" Value="Right"/>
