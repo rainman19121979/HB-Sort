@@ -96,13 +96,21 @@ public partial class ManageIgnoredViewModel : ObservableObject
                 var item = await _blCache.GetItemAsync("M", i.BricklinkId);
                 if (item != null) name = item.Name;
             }
-            catch { /* Cache-Miss -> Default-Name */ }
+            catch (Exception ex)
+            {
+                // Cache-Miss ist erwartbar (kein API-Call hier) -> Default-Name.
+                Log.Debug(ex, "ManageIgnored: Name aus Cache nicht ladbar ({Bl})", i.BricklinkId);
+            }
 
             try
             {
                 imageUrl = await _imageProvider.GetImageFileByBlAsync("M", i.BricklinkId, null);
             }
-            catch { /* kein Bild -> Default */ }
+            catch (Exception ex)
+            {
+                // Kein Bild verfuegbar -> Default-Bild. Tolerierbar, nur Debug.
+                Log.Debug(ex, "ManageIgnored: Bild nicht ladbar ({Bl})", i.BricklinkId);
+            }
 
             var disp = Application.Current?.Dispatcher;
             if (disp != null && !disp.CheckAccess())

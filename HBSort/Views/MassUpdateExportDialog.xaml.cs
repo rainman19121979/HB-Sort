@@ -20,7 +20,10 @@ public partial class MassUpdateExportDialog : Window
 
     private void Close_Click(object sender, RoutedEventArgs e)
     {
-        DialogResult = true;
+        // v0.1.25 (B10): Schliessen ist kein Erfolg -> false (gleicher Stil
+        // wie BinDetailDialog). Der Caller (BlInventoryView) wertet den
+        // Rueckgabewert ohnehin nicht aus.
+        DialogResult = false;
         Close();
     }
 }

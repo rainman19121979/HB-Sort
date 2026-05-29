@@ -27,12 +27,9 @@ public partial class BuildSuggestionsView : UserControl
     {
         if (DataContext is not BuildSuggestionsViewModel vm) return;
 
-        var sp = App.Services;
-        var ctxFactory = sp.GetRequiredService<IDbContextFactory<UserDataContext>>();
-        var blCache = sp.GetRequiredService<IBlCacheRepository>();
-        var imageProvider = sp.GetRequiredService<IPartImageProvider>();
-
-        var dialogVm = new ManageIgnoredViewModel(ctxFactory, blCache, imageProvider);
+        // v0.1.25 (B1): VM ueber DI aufloesen statt per new - gleicher Stil wie
+        // die uebrigen Service-Aufloesungen in dieser View (App.Services.GetRequiredService).
+        var dialogVm = App.Services.GetRequiredService<ManageIgnoredViewModel>();
         try
         {
             await dialogVm.LoadAsync();

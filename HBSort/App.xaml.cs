@@ -420,6 +420,12 @@ public partial class App : Application
         services.AddTransient<ViewModels.SettingsViewModel>();
         services.AddTransient<ViewModels.BinManagerViewModel>();
         services.AddTransient<ViewModels.BinBulkCreateViewModel>();
+        // v0.1.25 (B1): Dialog-VMs der beta.11/12-Dialoge ueber DI statt per new.
+        // Transient, weil pro Dialog-Oeffnung eine frische Instanz noetig ist
+        // (Lade-Zustand/Reservierungs-Snapshot duerfen nicht zwischen Oeffnungen
+        // ueberleben). Aufloesung im Code-Behind via App.Services.GetRequiredService.
+        services.AddTransient<ViewModels.ManageIgnoredViewModel>();
+        services.AddTransient<ViewModels.MassUpdateExportViewModel>();
         services.AddSingleton<ViewModels.InventoryListViewModel>();
 
         // Variables Feld unten rechts - Singletons damit die VMs auch dann live

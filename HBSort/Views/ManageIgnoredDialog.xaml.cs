@@ -21,7 +21,10 @@ public partial class ManageIgnoredDialog : Window
 
     private void Close_Click(object sender, RoutedEventArgs e)
     {
-        DialogResult = true;
+        // v0.1.25 (B10): Schliessen ist kein Erfolg -> false (stil-konsistent
+        // zu MassUpdateExportDialog + BinDetailDialog). Der Caller wertet
+        // ohnehin dialogVm.HasChanges aus, nicht den DialogResult.
+        DialogResult = false;
         Close();
     }
 }

@@ -30,11 +30,9 @@ public partial class BlInventoryView : UserControl
     /// </summary>
     private void OpenMassUpdate_Click(object sender, RoutedEventArgs e)
     {
-        var sp = App.Services;
-        var inv = sp.GetRequiredService<IBlInventoryService>();
-        var notify = sp.GetRequiredService<INotificationService>();
-
-        var vm = new MassUpdateExportViewModel(inv, notify);
+        // v0.1.25 (B1): VM ueber DI aufloesen statt per new - gleicher Stil wie
+        // die uebrigen Aufloesungen im Code-Behind (App.Services.GetRequiredService).
+        var vm = App.Services.GetRequiredService<MassUpdateExportViewModel>();
 
         // InitializeAsync feuern OHNE await: der Dialog kommt sofort hoch
         // und zeigt seinen Loading-State; sobald Sync+Generate fertig sind,
