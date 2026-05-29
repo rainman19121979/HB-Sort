@@ -65,7 +65,7 @@ public class DataHealService : IDataHealService
         {
             Log.Warning(
                 "DataHeal: {Count} komplette Figuren haben kein Lagerfach zugeordnet und konnten nicht aus der " +
-                "Verlaufs-Historie rekonstruiert werden. Bitte manuell ein Fach zuweisen via Lagerliste -> Details.",
+                "Verlaufs-Historie rekonstruiert werden. Bitte manuell ein Fach zuweisen via Temporäres Inventar -> Details.",
                 unrecoveredCount);
         }
 

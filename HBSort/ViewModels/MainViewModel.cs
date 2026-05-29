@@ -45,7 +45,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public ScanViewModel ScanViewModel { get; }
 
-    /// <summary>Lagerliste-Tab (Phase X).</summary>
+    /// <summary>Temporäres-Inventar-Tab (Phase X).</summary>
     public InventoryListViewModel Inventory { get; }
 
     /// <summary>UX X.29 (v0.1.16): Verlauf-Tab.</summary>
@@ -396,7 +396,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Strg+S: Sortieren-Tab.</summary>
     [RelayCommand] public void SwitchToSortingTab()   => MainTabIndex = 0;
 
-    /// <summary>Strg+L: Lagerliste-Tab.</summary>
+    /// <summary>Strg+L: Temporäres-Inventar-Tab.</summary>
     [RelayCommand] public void SwitchToInventoryTab() => MainTabIndex = 1;
 
     /// <summary>Fallback-Command fuer Tab-Wechsel zur Hilfe (analog F1/OpenHelp).
