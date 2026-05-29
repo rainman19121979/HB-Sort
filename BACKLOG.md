@@ -284,13 +284,20 @@ Vor dem geplanten B+E-Umbau lief eine Standortbestimmung. Ergebnis: B+E
 sind reine Hygiene (oben herabgestuft), der einzige spuerbare Hotspot ist
 ein dritter, separater Befund.
 
-- 📋 **PERF-1: SettingsViewModel-ctor Lazy-Tab-Load** — Konstruktor laeuft
-  synchron ~807-1126ms (`SettingsViewModel.cs:516/519/522` —
-  LoadFromSettings/RefreshCacheStats/InitializeUpdateState). Der einzige
-  spuerbare Performance-Schmerz im aktuellen Code. Vorgesehen seit v0.1.22
-  (Block C), jetzt durch Diagnose bestaetigt. Loesung: Tab-Inhalte lazy
-  laden statt im Konstruktor (Backup-/Cache-/Update-Initialisierung erst
-  bei Tab-Klick). Schwere: M. Aufwand: ~2h. Quelle: Diagnoser 2026-05-29.
+- ✅ **PERF-1: SettingsViewModel-ctor Lazy-Tab-Load** — erledigt 
+  2026-05-29 (`70df47db`). ctor-Zeit von **1012ms auf 15ms** (67×) 
+  durch `Task.Yield()` in 7 Refresh-Methoden (Stil-Vorbild 
+  `BackupService.cs:141`) + Doppel-Call-Konsolidierung (`GetStatsAsync` 
+  wurde aus `RefreshBlCacheStatsAsync` + `RefreshBrickStoreStatsAsync` 
+  doppelt gerufen, jeweils 500ms; jetzt EINMAL via `RefreshStatsAsync` 
+  + `ApplyBlCacheStats` / `ApplyBrickStoreStats`-Helper). Cache-Stats-
+  Felder visuell verifiziert. **Diagnose-Lehre:** erste These 
+  (RefreshCacheStats/GetStats-Verzeichnis-Scan) war plausibel aber 
+  falsch — durch gezielte Per-Call-Messung widerlegt (9ms statt der 
+  vermuteten ~900ms), dann zweite Diagnose-Runde + gezielte Messung an 
+  der richtigen Stelle (`BlCacheRepository.GetStatsAsync:982`) hat die 
+  wahre Wurzel mit Zahlen belegt. Mess-Vorlauf hat ~1h Pflaster-Fix 
+  verhindert.
 - 📋 **PERF-2: RecalcKind-Helper-Exception-Verhalten** — Vorbedingung fuer
   E (Context-Piggyback). Aktuell schlucken die RecalcKind-Helper
   Exceptions in WRN (`MinifigPersistenceService.cs:94`, `PartLookupService
@@ -860,4 +867,8 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-29 — v0.1.24 stable released. Naechste Iteration: v0.1.25 (Audit-Befunde B1/B2/B6/B10 + UX-1..UX-7 + Performance-Wurzeln + Undo-System).*
+*Zuletzt aktualisiert: 2026-05-29 — v0.1.24 stable released, v0.1.25 
+läuft: Kosmetik-Sweep (UX-1..7 + B1/B6/B10) erledigt, UX-Pattern-Katalog 
+angelegt, PERF-1 erledigt (ctor 1012ms → 15ms). Nächste Kandidaten: 
+UX-Pattern-Katalog ist Referenz, B+E auf Hygiene-Status, Bauteile-Bin / 
+Undo-System / B2 / restliche Items im Backlog.*
