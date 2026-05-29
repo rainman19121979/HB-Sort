@@ -214,6 +214,42 @@ Items archiviert werden.
   Warnung-vorher statt Undo-nachher. Aufwand: ~6-8h (eigene Sub-Iteration,
   Auditor-Vorlauf empfohlen).
 
+#### Aus ux-analyst Stable-Readiness-Check (2026-05-28)
+
+Sechs kosmetische Befunde (Severity L) plus ein strategisches Item aus
+dem finalen UX-Konsistenz-Check. Alle nicht stable-blockierend — Verdikt
+war STABLE-READY fuer v0.1.24.
+
+- 📋 **UX-1: MinifigSummaryDialog Footer-Drift** — Schliessen-Button hat
+  faelschlich `AccentButtonStyle`, alle Buttons rechts statt links/rechts-
+  Split (`MinifigSummaryDialog.xaml:198-201`). Konvention: links
+  Schliessen/Abbrechen (IsCancel), rechts primaer. Schwere: L.
+  Aufwand: ~15min. Quelle: ux-analyst 2026-05-28.
+- 📋 **UX-2: BlReserveDialog Footer-Anordnung** — Abbrechen-Button rechts
+  statt links (`BlReserveDialog.xaml:115-125`). Schwere: L. Aufwand:
+  ~10min. Quelle: ux-analyst 2026-05-28.
+- 📋 **UX-3: BL-Inventar Tooltip-Drift** — Tooltip sagt noch "aktuell
+  durchgehend leer", stimmt seit beta.8 nicht mehr
+  (`BlInventoryView.xaml:163`). Schwere: L. Aufwand: ~5min. Quelle:
+  ux-analyst 2026-05-28.
+- 📋 **UX-4: BL-Shop-Badge Beschriftung uneinheitlich** — Mengen-Text
+  vs. "BL-Shop" je nach Dialog (MinifigSummary vs.
+  BuildSuggestionDetail). Schwere: L. Aufwand: ~15min. Quelle:
+  ux-analyst 2026-05-28.
+- 📋 **UX-5: DataHealService Log-Text-Rest "via Lagerliste -> Details"** —
+  vergessener Lagerliste-Rest in Log-Ausgabe (`DataHealService.cs:68`).
+  User-unsichtbar (Log-only), trotzdem konsistent ziehen. Schwere: L.
+  Aufwand: ~2min. Quelle: ux-analyst 2026-05-28.
+- 📋 **UX-6: Code-Kommentar-Drift "Lagerliste-Tab"** — vergessener Rest
+  im Kommentar (`MainViewModel.cs:399`). Schwere: L. Aufwand: ~2min.
+  Quelle: ux-analyst 2026-05-28.
+- 💭 **docs/ux-patterns.md als zentraler UX-Pattern-Katalog** — Buendelt
+  etablierte Patterns (SortInstruction-Modal, BL-Shop-Badge, Reserve-
+  Flow, Strict-Mode-Feedback, Volle-Faecher-Banner, Pending-vs-Detail-
+  Abgrenzung) an einer Stelle. Verhindert Inkonsistenz-Wellen bei
+  kuenftigen Features (Undo-System, Bauteile-Bin, Chart-Statistik).
+  Schwere: M (strategisch). Aufwand: ~2h. Quelle: ux-analyst 2026-05-28.
+
 ### Konzept-Items für spätere Iterationen (v0.1.25+)
 
 - 💭 **Bauteile-Bin als eigenes StorageBinKind** (Konzept-Idee, 2026-05-14)
