@@ -172,10 +172,18 @@ Items archiviert werden.
 - 📋 **OPEN-18: Single-Mode-Cleanup** — Audit-Bedarf welche Service-
   Aufrufe Single-Item vs. Bulk sind, ggf. konsolidieren (aus Phase 2a-
   Polish Diagnose 2026-05-16). Aufwand: ~2h.
-- 📋 **Performance-Wurzelfixes B + E** — `RaiseDataChanged` aus Service-
-  Layer raus, `RecalcBinKindAsync`-Context-Piggyback. Strukturelle
-  Wurzeln aus Diagnoser-Bericht 2026-05-14 (Quick-Wins D+C waren in
-  v0.1.23-beta.2 erledigt). Aufwand: ~4-5h.
+- 💭 **Performance-Wurzelfixes B + E (Hygiene)** — `RaiseDataChanged` aus
+  Service-Layer raus (B, ~20 Call-Sites über 4 Service-Dateien, mittleres
+  Regressions-Risiko), `RecalcBinKindAsync`-Context-Piggyback (E, ~22
+  Aufrufer, alle in offenem Context → Piggyback trivial, ~3-4h).
+  Strukturelle Wurzeln aus Diagnoser-Bericht 2026-05-14.
+  **Diagnose 2026-05-29: reine Architektur-Hygiene ohne erlebbaren
+  User-Mehrwert** — alle Lade-Pfade < 165ms, kein DataChanged-Storm,
+  die zwei Event-Busse (DataChanged/InventoryChanged) haben disjunkte
+  Listener (kein Doppel-Refresh). Sinnvoll nur wenn ein konkreter
+  Refresh-Bug auftaucht (B) oder im Zuge einer anderen Iteration die
+  diese Pfade ohnehin berührt (E). Reihenfolge falls doch: E zuerst
+  (lokal, risikoarm), B nur bei Bedarf. E-Vorbedingung siehe PERF-2.
 - 📋 **Kategorie-Sperre-Diagnose-Track** — wartet auf 2-3 dokumentierte
   Praxis-Vorfaelle (Befund 3 aus v0.1.23-beta.1). Ohne Vorfall-Daten kein
   Konzept-Entscheid (Engineering-Prinzip 1.2).
@@ -269,6 +277,35 @@ im Kommentar (`MainViewModel.cs:399`). Schwere: L. Aufwand: ~2min.
   Drift-Inventur. Konsolidierte Drift-Tabelle (6 driftende vs. 6 korrekte
   Footer) als Arbeitsgrundlage fuer Welle 3. Verhindert Inkonsistenz-
   Wellen bei kuenftigen Features. Quelle: ux-analyst 2026-05-29.
+
+#### Aus Diagnoser-Lauf 2026-05-29 (Performance-Standortbestimmung)
+
+Vor dem geplanten B+E-Umbau lief eine Standortbestimmung. Ergebnis: B+E
+sind reine Hygiene (oben herabgestuft), der einzige spuerbare Hotspot ist
+ein dritter, separater Befund.
+
+- 📋 **PERF-1: SettingsViewModel-ctor Lazy-Tab-Load** — Konstruktor laeuft
+  synchron ~807-1126ms (`SettingsViewModel.cs:516/519/522` —
+  LoadFromSettings/RefreshCacheStats/InitializeUpdateState). Der einzige
+  spuerbare Performance-Schmerz im aktuellen Code. Vorgesehen seit v0.1.22
+  (Block C), jetzt durch Diagnose bestaetigt. Loesung: Tab-Inhalte lazy
+  laden statt im Konstruktor (Backup-/Cache-/Update-Initialisierung erst
+  bei Tab-Klick). Schwere: M. Aufwand: ~2h. Quelle: Diagnoser 2026-05-29.
+- 📋 **PERF-2: RecalcKind-Helper-Exception-Verhalten** — Vorbedingung fuer
+  E (Context-Piggyback). Aktuell schlucken die RecalcKind-Helper
+  Exceptions in WRN (`MinifigPersistenceService.cs:94`, `PartLookupService
+  .cs:56`, `FloatingPartTransferService.cs:166`, `UndoService.cs:121`,
+  `DataHealService.cs:103`). Bei gemeinsamem Context wuerde ein Recalc-
+  Fehler die Haupt-Transaktion mitreissen statt isoliert geloggt zu
+  werden. Bewusste Verhaltensentscheidung noetig bevor E umgesetzt werden
+  kann (weiter schlucken vs. durchreichen, plus Doku im Pattern-Katalog).
+  Schwere: L. Aufwand: Teil von E falls E je kommt. Quelle: Diagnoser
+  2026-05-29.
+- ℹ️ **PERF-3: BL-Sync 2,5-3,2s Latenz** — externe BL-API-Latenz fuer 9361
+  Lots (`app-20260529.log`), kein client-seitiger Storm, kein Codefix
+  moeglich. Nur als Notiz: nicht weiter verfolgen, nicht als Bug
+  behandeln. Die separat gelistete UPSERT-Optimierung wuerde nur ~15%
+  sparen (85% sind API-Antwortzeit). Quelle: Diagnoser 2026-05-29.
 
 ### Konzept-Items für spätere Iterationen (v0.1.25+)
 
