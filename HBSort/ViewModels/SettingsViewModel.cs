@@ -220,17 +220,30 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>Laed Stats fuer den BrickStore-Import-Tab (Items/Subsets/Groesse).</summary>
     public async Task RefreshBrickStoreStatsAsync()
     {
+        // PERF-1: GetCacheStatsAsync -> GetStatsAsync ist Fake-Async und laeuft
+        // sonst synchron im aufrufenden Thread durch. Task.Yield() gibt den
+        // Thread sofort frei, die eigentliche Stats-Arbeit laeuft danach auf
+        // einem Thread-Pool-Thread (Muster wie BackupService.RefreshBackupsAsync).
+        await Task.Yield();
         try
         {
             var stats = await _blCatalogService.GetCacheStatsAsync();
-            BlCacheItemsCount = stats.ItemCount;
-            BlCacheSubsetsCount = stats.SubsetCount;
-            BlCacheSizeLabel = $"{stats.DbFileSizeBytes / 1024.0 / 1024.0:F1} MB";
+            ApplyBrickStoreStats(stats);
         }
         catch (Exception ex)
         {
             Log.Warning(ex, "RefreshBrickStoreStats geworfen");
         }
+    }
+
+    /// <summary>Setzt die BrickStore-Tab-Properties aus einem Stats-Objekt.
+    /// Geteilt zwischen RefreshBrickStoreStatsAsync und dem ctor-Pfad
+    /// RefreshStatsAsync (ein GetStatsAsync, beide Property-Gruppen).</summary>
+    private void ApplyBrickStoreStats(Core.Models.Bricklink.BlCacheStats stats)
+    {
+        BlCacheItemsCount = stats.ItemCount;
+        BlCacheSubsetsCount = stats.SubsetCount;
+        BlCacheSizeLabel = $"{stats.DbFileSizeBytes / 1024.0 / 1024.0:F1} MB";
     }
 
     // --- BL-Rate-Limit (Phase R2.5) ---
@@ -504,8 +517,12 @@ public partial class SettingsViewModel : ObservableObject
         // Vorhandene BL-Tokens beim Oeffnen der Settings laden, damit der User
         // sie sehen / aendern kann ohne neu eingeben zu muessen.
         _ = LoadBricklinkTokensAsync();
-        _ = RefreshBlCacheStatsAsync();
-        _ = RefreshBrickStoreStatsAsync();
+
+        // PERF-1 (Schritt 2): EIN GetCacheStatsAsync fuer beide Property-Gruppen
+        // (BL-Cache-Statistik + BrickStore-Import-Tab) statt zwei separater
+        // Aufrufe. RefreshStatsAsync macht zudem ein Task.Yield() vorweg, gibt
+        // den ctor-Thread also sofort frei.
+        _ = RefreshStatsAsync();
 
         // Rate-Limit-Schwellen aus Settings + aktuellen Counter
         BricklinkSoftThreshold = settingsService.Current.Bricklink.SoftThreshold;
@@ -540,6 +557,8 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>UX#12: Eintragsanzahl aus dem Preis-Cache holen und in der UI anzeigen.</summary>
     public async Task RefreshPriceCacheCountAsync()
     {
+        // Konsistent mit den Stats-Refreshes: ctor-Thread sofort freigeben.
+        await Task.Yield();
         try
         {
             PriceCacheEntryCount = await _priceCache.GetEntryCountAsync();
@@ -960,9 +979,12 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>Laed die gespeicherten BL-Tokens in die UI-Felder.</summary>
     private async Task LoadBricklinkTokensAsync()
     {
+        // Konsistent mit den Stats-Refreshes: ctor-Thread sofort freigeben.
+        await Task.Yield();
         try
         {
-            if (_bricklinkTokenStorage.HasTokens())
+            var hasTokens = _bricklinkTokenStorage.HasTokens();
+            if (hasTokens)
             {
                 var tokens = await _bricklinkTokenStorage.LoadAsync();
                 if (tokens != null)
@@ -1119,21 +1141,58 @@ public partial class SettingsViewModel : ObservableObject
     /// </summary>
     public async Task RefreshBlCacheStatsAsync()
     {
+        // GetCacheStatsAsync -> GetStatsAsync ist Fake-Async und laeuft sonst
+        // synchron im aufrufenden Thread durch. Task.Yield() gibt den Thread
+        // sofort frei, die Stats-Arbeit laeuft danach auf einem Thread-Pool-
+        // Thread (Muster wie BackupService.RefreshBackupsAsync).
+        await Task.Yield();
         try
         {
             var stats = await _blCatalogService.GetCacheStatsAsync();
-            var sizeMb = stats.DbFileSizeBytes / 1024.0 / 1024.0;
-            var oldestText = stats.OldestFetchedAt.HasValue
-                ? $"vor {(int)(DateTime.UtcNow - stats.OldestFetchedAt.Value).TotalDays} Tagen"
-                : "(keine Eintraege)";
-
-            BlCacheStatsText =
-                $"Items: {stats.ItemCount:N0} | Subsets: {stats.SubsetCount:N0} | " +
-                $"Colors: {stats.ColorCount:N0} | DB: {sizeMb:0.#} MB | aelteste: {oldestText}";
+            ApplyBlCacheStats(stats);
         }
         catch (Exception ex)
         {
             Log.Warning(ex, "BL-Cache-Stats laden fehlgeschlagen");
+            BlCacheStatsText = "Stats nicht verfuegbar.";
+        }
+    }
+
+    /// <summary>Setzt die BL-Cache-Statistik-Property aus einem Stats-Objekt.
+    /// Geteilt zwischen RefreshBlCacheStatsAsync und dem ctor-Pfad
+    /// RefreshStatsAsync (ein GetStatsAsync, beide Property-Gruppen).</summary>
+    private void ApplyBlCacheStats(Core.Models.Bricklink.BlCacheStats stats)
+    {
+        var sizeMb = stats.DbFileSizeBytes / 1024.0 / 1024.0;
+        var oldestText = stats.OldestFetchedAt.HasValue
+            ? $"vor {(int)(DateTime.UtcNow - stats.OldestFetchedAt.Value).TotalDays} Tagen"
+            : "(keine Eintraege)";
+
+        BlCacheStatsText =
+            $"Items: {stats.ItemCount:N0} | Subsets: {stats.SubsetCount:N0} | " +
+            $"Colors: {stats.ColorCount:N0} | DB: {sizeMb:0.#} MB | aelteste: {oldestText}";
+    }
+
+    /// <summary>
+    /// PERF-1 (Schritt 2): Konsolidierter Refresh fuer den ctor. Ruft
+    /// GetCacheStatsAsync EINMAL und befuellt aus dem einen Ergebnis BEIDE
+    /// Property-Gruppen (BL-Cache-Statistik + BrickStore-Import-Tab). Vorher
+    /// liefen zwei separate GetStatsAsync-Aufrufe (je ~500ms Fake-Async,
+    /// blockierten den ctor-Thread). Die zwei oeffentlichen Refresh-Methoden
+    /// bleiben fuer externe Aufrufer (Cache-Clear, Import) erhalten.
+    /// </summary>
+    private async Task RefreshStatsAsync()
+    {
+        await Task.Yield();
+        try
+        {
+            var stats = await _blCatalogService.GetCacheStatsAsync();
+            ApplyBlCacheStats(stats);
+            ApplyBrickStoreStats(stats);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Stats laden fehlgeschlagen (ctor-Pfad)");
             BlCacheStatsText = "Stats nicht verfuegbar.";
         }
     }
@@ -1158,6 +1217,8 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>Liest aktuellen Rate-Limit-Status und befuellt die UI-Properties.</summary>
     public async Task RefreshRateLimitStatusAsync()
     {
+        // Konsistent mit den Stats-Refreshes: ctor-Thread sofort freigeben.
+        await Task.Yield();
         try
         {
             var s = await _rateLimiter.GetStatusAsync();
@@ -1552,6 +1613,8 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>Aktualisiert die Backup-Liste + Letztes-Backup-Anzeige.</summary>
     public async Task RefreshBackupsAsync()
     {
+        // Konsistent mit den Stats-Refreshes: ctor-Thread sofort freigeben.
+        await Task.Yield();
         try
         {
             var last = _settingsService.Current.LastBackup;
