@@ -798,7 +798,7 @@ Aenderungen am Cache-Schema + Provider-Logik.
 | **v0.1.24-beta.11-13** | ✅ gemerged (`c060c4b3`, 2026-05-28) | Dialog-Vereinheitlichung + Ignorieren + BL-Inventar Phase 4 Export + V5-Filter-Fix + Dismantled-Defensive. 604→616 Tests. |
 | **v0.1.24-beta.14** | ✅ gemerged (`b3a8e044`, 2026-05-28) | Auto-Sync vor Mass-Update-Export (BlInventorySyncResult, Stale-Fallbacks, Cap-Hinweis). 616 Tests grün. |
 | **v0.1.24-beta.15** | ✅ gemerged (`97a53c63`, 2026-05-28) | UI-Politur: Tab "Temporäres Inventar" + Tab-Reihenfolge + Endanwender-Doku-Update. |
-| **v0.1.24** | 📋 ausstehend | Stable-Promote nach finalem Praxis-Test + ux-analyst-Durchlauf. |
+| **v0.1.24** | ✅ stable (2026-05-29, Tag `e3b8f9ac`) | BL-Shop-Integration: Inventar-Sync, Reservieren beim Komplettieren, Mass-Update-Export, V5-Reservierungs-Aufloesung, Dialog-Vereinheitlichung, "Temporaeres Inventar"-Tab. |
 | **v0.1.25** | 💭 Brainstorming | Performance-Wurzel-Fixes (B+E aus Diagnoser-Bericht, ~4-5h) + OPEN-18 Single-Mode-Cleanup + Kategorie-Sperre + Bauteile-Bin-Konzept + Audit-Befunde B1/B2/B6/B10 + UPSERT-Sync-Optimierung + vollständiges Undo-System. |
 | **v0.2.0** | 💭 Brainstorming | grosse Features aus Backlog (siehe oben) |
 
@@ -808,4 +808,4 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-28 — BL-Inventar Phase 1-4 (beta.6-14) + UI-Politur (beta.15) nachgetragen, Audit-Befunde B1/B2/B6/B10 + UPSERT-Optimierung als v0.1.25-Material eingetragen. Naechster Schritt: ux-analyst-Durchlauf, finaler Praxis-Test, dann Stable-Tag v0.1.24.*
+*Zuletzt aktualisiert: 2026-05-29 — v0.1.24 stable released. Naechste Iteration: v0.1.25 (Audit-Befunde B1/B2/B6/B10 + UX-1..UX-7 + Performance-Wurzeln + Undo-System).*
