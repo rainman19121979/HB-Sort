@@ -190,11 +190,15 @@ Items archiviert werden.
   `App.xaml.cs::ConfigureServices` (`BuildSuggestionsView.xaml.cs:35`,
   `BlInventoryView.xaml.cs:35`). Konvention: Dialog-VMs `AddTransient`.
   Schwere: M. Aufwand: ~30min.
-- 📋 **B2: Footer-Layout in zwei neuen Dialogen** — in
-  `ManageIgnoredDialog.xaml` + `MassUpdateExportDialog.xaml` steht der
-  Schliessen-Button rechts statt links (Konvention: links Abbrechen/
-  Schliessen, rechts primaer). Bei ManageIgnored ist "Schliessen"
-  faelschlich mit `AccentButtonStyle`. Schwere: L-M. Aufwand: ~30min.
+- 📋 **B2: Footer-Layout in zwei neuen Dialogen** — praezisiert durch
+  ux-patterns.md-Drift-Inventur:
+  - `ManageIgnoredDialog.xaml`: "Schliessen" hat `IsDefault="True"` UND
+    `IsCancel="True"` zusammen (Read-Only-Verletzung) + `AccentButtonStyle`
+    faelschlich auf dem Schliessen-Button.
+  - `MassUpdateExportDialog.xaml`: Schliessen-Button steht hinter dem
+    Primaer-Button (Reihenfolge invertiert — Schliessen gehoert links).
+  Konvention: links Abbrechen/Schliessen (IsCancel), rechts primaer
+  (IsDefault + AccentButtonStyle). Schwere: L-M. Aufwand: ~30min.
 - 📋 **B6/B10: Kosmetik in ManageIgnored/MassUpdate-VMs** — Silent-Catch
   ohne `Log.Debug`; `Close_Click` setzt `DialogResult=true` statt
   `false`/`null` (`MassUpdateExportDialog.xaml.cs`). Schwere: L.
@@ -220,22 +224,31 @@ Sechs kosmetische Befunde (Severity L) plus ein strategisches Item aus
 dem finalen UX-Konsistenz-Check. Alle nicht stable-blockierend — Verdikt
 war STABLE-READY fuer v0.1.24.
 
-- 📋 **UX-1: MinifigSummaryDialog Footer-Drift** — Schliessen-Button hat
-  faelschlich `AccentButtonStyle`, alle Buttons rechts statt links/rechts-
-  Split (`MinifigSummaryDialog.xaml:198-201`). Konvention: links
-  Schliessen/Abbrechen (IsCancel), rechts primaer. Schwere: L.
-  Aufwand: ~15min. Quelle: ux-analyst 2026-05-28.
-- 📋 **UX-2: BlReserveDialog Footer-Anordnung** — Abbrechen-Button rechts
-  statt links (`BlReserveDialog.xaml:115-125`). Schwere: L. Aufwand:
-  ~10min. Quelle: ux-analyst 2026-05-28.
+- 📋 **UX-1: Schliessen-Button mit AccentButtonStyle in 3 Dialogen** —
+  praezisiert durch die Drift-Inventur in `docs/ux-patterns.md`: betrifft
+  nicht nur `MinifigSummaryDialog.xaml:198-201`, sondern auch
+  `BinDetailDialog.xaml:157` + `FloatingPartDetailDialog.xaml:109`. Alle
+  drei haben "Schliessen" faelschlich mit `AccentButtonStyle` (Accent
+  gehoert nur auf primaere Aktionen). Bei MinifigSummary zusaetzlich alle
+  Buttons rechts statt links/rechts-Split. In einem Rutsch fixbar.
+  Schwere: L. Aufwand: ~25min. Quelle: ux-analyst 2026-05-28 +
+  ux-patterns.md-Drift-Inventur.
+- 📋 **UX-2: BlReserveDialog Footer-Anordnung** — Abbrechen-Button steht
+  in Grid-Spalte 1 (= rechts) statt links (`BlReserveDialog.xaml:120-124`).
+  Konvention: links Abbrechen/Schliessen (IsCancel). Schwere: L. Aufwand:
+  ~10min. Quelle: ux-analyst 2026-05-28 + ux-patterns.md-Drift-Inventur.
 - 📋 **UX-3: BL-Inventar Tooltip-Drift** — Tooltip sagt noch "aktuell
   durchgehend leer", stimmt seit beta.8 nicht mehr
   (`BlInventoryView.xaml:163`). Schwere: L. Aufwand: ~5min. Quelle:
   ux-analyst 2026-05-28.
-- 📋 **UX-4: BL-Shop-Badge Beschriftung uneinheitlich** — Mengen-Text
-  vs. "BL-Shop" je nach Dialog (MinifigSummary vs.
-  BuildSuggestionDetail). Schwere: L. Aufwand: ~15min. Quelle:
-  ux-analyst 2026-05-28.
+- 📋 **UX-4: BL-Shop-Badge Beschriftung uneinheitlich** — `MinifigSummary
+  Dialog.xaml:147` bindet `BlAvailability.BadgeText` (Mengen-Text, z.B.
+  "3× Neu"), `BuildSuggestionDetailDialog.xaml:166` hat hartkodiert
+  `Text="BL-Shop"` obwohl es dasselbe `BlAvailability`-Objekt bindet.
+  **Soll: Mengen-Variante** (informativer, beide haben das Objekt eh).
+  Fix ist ein reiner Binding-Tausch in BuildSuggestionDetailDialog.
+  Schwere: L. Aufwand: ~10min. Quelle: ux-analyst 2026-05-28 +
+  ux-patterns.md.
 - 📋 **UX-5: DataHealService Log-Text-Rest "via Lagerliste -> Details"** —
   vergessener Lagerliste-Rest in Log-Ausgabe (`DataHealService.cs:68`).
   User-unsichtbar (Log-only), trotzdem konsistent ziehen. Schwere: L.
@@ -248,12 +261,14 @@ im Kommentar (`MainViewModel.cs:399`). Schwere: L. Aufwand: ~2min.
   kleinerer Button, anders positionieren oder in eine Symbolleiste
   legen. Praxis-Test 2026-05-28. Schwere: L. Aufwand: ~15-30min.
   Quelle: ux-analyst 2026-05-28.
-- 💭 **docs/ux-patterns.md als zentraler UX-Pattern-Katalog** — Buendelt
-  etablierte Patterns (SortInstruction-Modal, BL-Shop-Badge, Reserve-
-  Flow, Strict-Mode-Feedback, Volle-Faecher-Banner, Pending-vs-Detail-
-  Abgrenzung) an einer Stelle. Verhindert Inkonsistenz-Wellen bei
-  kuenftigen Features (Undo-System, Bauteile-Bin, Chart-Statistik).
-  Schwere: M (strategisch). Aufwand: ~2h. Quelle: ux-analyst 2026-05-28.
+- ✅ **docs/ux-patterns.md als zentraler UX-Pattern-Katalog** — erledigt
+  2026-05-29 (`63b2af7d`). 10 Patterns (Dialog-Footer, Dialog-VM, Sort
+  Instruction-Modal, BL-Shop-Badge, Reserve-Flow + V5, Strict-Mode-
+  Feedback, Volle-Faecher-Banner, Pending-vs-Detail-Abgrenzung, Klickbare
+  Bilder, Tooltips), jeweils Regel + XAML-Beispiel + Vorbild-Datei +
+  Drift-Inventur. Konsolidierte Drift-Tabelle (6 driftende vs. 6 korrekte
+  Footer) als Arbeitsgrundlage fuer Welle 3. Verhindert Inkonsistenz-
+  Wellen bei kuenftigen Features. Quelle: ux-analyst 2026-05-29.
 
 ### Konzept-Items für spätere Iterationen (v0.1.25+)
 
