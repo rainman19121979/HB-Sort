@@ -17,6 +17,14 @@ public partial class BinRowViewModel : ObservableObject
     [ObservableProperty] private int _floatingPartCount;
     [ObservableProperty] private DateTime _createdAt;
 
+    /// <summary>
+    /// Bulk-Auswahl-Markierung (v0.1.25-beta.1). Reiner UI-State, KEINE
+    /// Persistenz - die Checkbox-Spalte im Lagerfach-DataGrid bindet hierauf.
+    /// Beim ReloadAsync wird die Zeilen-Liste neu aufgebaut, dadurch geht die
+    /// Auswahl ohnehin verloren (kein extra Reset noetig).
+    /// </summary>
+    [ObservableProperty] private bool _isSelected;
+
     /// <summary>"Frei" wenn weder Figuren noch Teile drin sind.</summary>
     public bool IsFree => MinifigCount == 0 && FloatingPartCount == 0;
 

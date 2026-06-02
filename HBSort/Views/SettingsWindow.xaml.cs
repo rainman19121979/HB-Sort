@@ -316,6 +316,255 @@ public partial class SettingsWindow : Window
     }
 
     // ====================================================================
+    // Bulk-Bin-Aktionen (v0.1.25-beta.1)
+    //
+    // Architektur-Entscheidung: Variante (a) aus dem Konzept (Sektion 5) -
+    // SCHLEIFE im Code-Behind ueber die bestehenden Einzel-Methoden
+    // EmptyAsync/DeleteAsync mit try/catch PRO FACH, statt einer neuen
+    // transaktionalen Bulk-Service-Methode. Vorteil: kein neuer DB-Code, die
+    // bestehende ScanEvent-/Kind-/FreedAt-Pflege greift automatisch.
+    // Trade-off: Teil-Erfolg moeglich (jede Einzel-Aktion ist fuer sich
+    // atomar, aber es gibt keinen Gesamt-Transaktions-Rahmen) - der
+    // Ergebnis-Report macht das ehrlich sichtbar.
+    //
+    // Wir uebernehmen damit NUR das UI-Pattern des Inventory-Bulk
+    // (Checkbox-Spalte + Action-Bar + async-void-Disable-Guard im finally),
+    // NICHT dessen transaktionale DeleteSelectionAsync-Methode.
+    // ====================================================================
+
+    /// <summary>Action-Bar-Button "Markierte leeren".</summary>
+    private async void BinBulkEmpty_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button b) return;
+        if (!b.IsEnabled) return;
+        b.IsEnabled = false;
+        try
+        {
+            await BulkEmptyAsync();
+        }
+        finally
+        {
+            b.IsEnabled = true;
+        }
+    }
+
+    /// <summary>Action-Bar-Button "Markierte loeschen".</summary>
+    private async void BinBulkDelete_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button b) return;
+        if (!b.IsEnabled) return;
+        b.IsEnabled = false;
+        try
+        {
+            await BulkDeleteAsync();
+        }
+        finally
+        {
+            b.IsEnabled = true;
+        }
+    }
+
+    /// <summary>
+    /// Bulk-Leeren: leert alle markierten Faecher. Faecher die bereits leer
+    /// sind werden uebersprungen (nichts zu tun). Vorschau zeigt die Summe
+    /// der betroffenen Faecher + die Summe der kompletten Figuren (Achtung-
+    /// Block). Nach der Schleife: Ergebnis-Report-Dialog.
+    /// </summary>
+    private async Task BulkEmptyAsync()
+    {
+        var dialogs = App.Services.GetRequiredService<IDialogService>();
+        var binService = App.Services.GetRequiredService<IStorageBinService>();
+        var notif = App.Services.GetRequiredService<INotificationService>();
+        var binManager = _viewModel.BinManager;
+
+        var selected = binManager.GetSelectedRows();
+        if (selected.Count == 0) return;
+
+        // Pro Fach den aktuellen Inhalt ermitteln (Snapshot fuer die Vorschau).
+        // Bereits leere Faecher werden gar nicht erst geleert (no-op).
+        var report = new BulkBinReport();
+        var emptyableLabels = new List<string>();
+        var emptyableIds = new List<int>();
+        var completeMinifigsTotal = 0;
+
+        foreach (var row in selected)
+        {
+            var preview = await binService.GetEmptyPreviewAsync(row.Id);
+            if (preview == null)
+            {
+                // Fach existiert nicht mehr -> als Fehler vermerken (Race).
+                report.Errors.Add((row.Label, "Fach nicht mehr vorhanden."));
+                continue;
+            }
+
+            var hasContent = preview.WaitingMinifigsCount > 0
+                             || preview.CompleteMinifigsCount > 0
+                             || preview.FloatingPartsCount > 0;
+            if (!hasContent)
+            {
+                report.Skipped.Add((row.Label, "bereits leer"));
+                continue;
+            }
+
+            emptyableLabels.Add(row.Label);
+            emptyableIds.Add(row.Id);
+            completeMinifigsTotal += preview.CompleteMinifigsCount;
+        }
+
+        // Nichts zu leeren? Dann nur der Report (z.B. alle Faecher schon leer).
+        if (emptyableIds.Count == 0)
+        {
+            await dialogs.ShowInfoAsync(
+                "Markierte leeren",
+                BulkBinActionHelper.BuildResultReport(report, "geleert"));
+            return;
+        }
+
+        // Stufe 1: Vorschau-Bestaetigung VOR der Aktion.
+        var previewText = BulkBinActionHelper.BuildEmptyPreview(emptyableLabels, completeMinifigsTotal);
+        if (!await dialogs.ShowQuestionAsync("Markierte Faecher leeren", previewText))
+            return;
+
+        // Schleife: pro Fach EmptyAsync mit try/catch (Race-Schutz).
+        foreach (var (id, label) in emptyableIds.Zip(emptyableLabels))
+        {
+            try
+            {
+                var ok = await binService.EmptyAsync(id);
+                if (ok) report.SuccessfulCount++;
+                else report.Errors.Add((label, "Fach nicht mehr vorhanden."));
+            }
+            catch (System.Exception ex)
+            {
+                Log.Warning(ex, "Bulk-Empty fuer Fach '{Label}' fehlgeschlagen", label);
+                report.Errors.Add((label, ex.Message));
+            }
+        }
+
+        await binManager.ReloadAsync();
+
+        // Stufe 2: Ergebnis-Report. Bei reinem Erfolg (kein Skip/Fehler) reicht
+        // ein Toast; sonst der Dialog (Sicherheitsstufe).
+        if (report.Skipped.Count == 0 && report.Errors.Count == 0)
+        {
+            notif.ShowSuccess($"{report.SuccessfulCount} Fach/Faecher geleert.");
+        }
+        else
+        {
+            await dialogs.ShowInfoAsync(
+                "Markierte leeren - Ergebnis",
+                BulkBinActionHelper.BuildResultReport(report, "geleert"));
+        }
+    }
+
+    /// <summary>
+    /// Bulk-Loeschen: loescht alle markierten Faecher, die WIRKLICH FREI sind
+    /// (keine wartenden Figuren, keine FloatingParts, keine kompletten
+    /// Figuren - strikte IsFree-Semantik). Belegte Faecher werden
+    /// uebersprungen (nicht entkoppelt). Race-Faelle (Fach wurde nach der
+    /// Vorschau befuellt) werden pro Fach gefangen und als Fehler gemeldet.
+    /// </summary>
+    private async Task BulkDeleteAsync()
+    {
+        var dialogs = App.Services.GetRequiredService<IDialogService>();
+        var binService = App.Services.GetRequiredService<IStorageBinService>();
+        var notif = App.Services.GetRequiredService<INotificationService>();
+        var binManager = _viewModel.BinManager;
+
+        var selected = binManager.GetSelectedRows();
+        if (selected.Count == 0) return;
+
+        var report = new BulkBinReport();
+        var deletableLabels = new List<string>();
+        var deletableIds = new List<int>();
+        var skippedLabels = new List<string>();
+
+        // Vorfilter: pro Fach den Inhalt pruefen. Nur wirklich freie Faecher
+        // sind loeschbar; belegte (inkl. Complete-only) werden uebersprungen.
+        foreach (var row in selected)
+        {
+            var preview = await binService.GetEmptyPreviewAsync(row.Id);
+            if (preview == null)
+            {
+                report.Errors.Add((row.Label, "Fach nicht mehr vorhanden."));
+                continue;
+            }
+
+            // "Belegt" fuers Loeschen = NICHT IsFree = Waiting ODER Floating
+            // ODER Complete. Begruendung differenziert (Complete vs. Rest).
+            if (preview.CompleteMinifigsCount > 0)
+            {
+                report.Skipped.Add((row.Label, "enthaelt komplette Figur(en) - erst exportieren/leeren"));
+                skippedLabels.Add(row.Label);
+                continue;
+            }
+            if (preview.WaitingMinifigsCount > 0 || preview.FloatingPartsCount > 0)
+            {
+                report.Skipped.Add((row.Label, "belegt - erst leeren"));
+                skippedLabels.Add(row.Label);
+                continue;
+            }
+
+            deletableLabels.Add(row.Label);
+            deletableIds.Add(row.Id);
+        }
+
+        // Nichts loeschbar? Dann nur der Report (z.B. alle markierten belegt).
+        if (deletableIds.Count == 0)
+        {
+            await dialogs.ShowInfoAsync(
+                "Markierte loeschen",
+                BulkBinActionHelper.BuildResultReport(report, "geloescht"));
+            return;
+        }
+
+        // Stufe 1: Vorschau-Bestaetigung (destruktiv) VOR der Aktion.
+        var previewText = BulkBinActionHelper.BuildDeletePreview(deletableLabels, skippedLabels);
+        if (!await dialogs.ShowQuestionAsync("Markierte Faecher loeschen", previewText))
+            return;
+
+        // Schleife: pro Fach DeleteAsync mit try/catch. Wurde ein Fach zwischen
+        // Vorschau und Klick befuellt (Race), wirft DeleteAsync
+        // InvalidOperationException - wir fangen das pro Fach ab und machen
+        // weiter (die Bulk-Aktion stirbt nicht an einem Fach).
+        foreach (var (id, label) in deletableIds.Zip(deletableLabels))
+        {
+            try
+            {
+                var ok = await binService.DeleteAsync(id);
+                if (ok) report.SuccessfulCount++;
+                else report.Errors.Add((label, "Fach nicht mehr vorhanden."));
+            }
+            catch (System.InvalidOperationException ex)
+            {
+                // Race: Fach wurde nach der Vorschau befuellt.
+                Log.Warning(ex, "Bulk-Delete fuer Fach '{Label}' uebersprungen (zwischenzeitlich befuellt)", label);
+                report.Errors.Add((label, "wurde zwischenzeitlich befuellt"));
+            }
+            catch (System.Exception ex)
+            {
+                Log.Warning(ex, "Bulk-Delete fuer Fach '{Label}' fehlgeschlagen", label);
+                report.Errors.Add((label, ex.Message));
+            }
+        }
+
+        await binManager.ReloadAsync();
+
+        // Stufe 2: Ergebnis-Report. Loeschen hat kein Undo -> bei Skip/Fehler
+        // immer der Dialog (Sicherheitsstufe). Reiner Erfolg -> Toast genuegt.
+        if (report.Skipped.Count == 0 && report.Errors.Count == 0)
+        {
+            notif.ShowSuccess($"{report.SuccessfulCount} Fach/Faecher geloescht.");
+        }
+        else
+        {
+            await dialogs.ShowInfoAsync(
+                "Markierte loeschen - Ergebnis",
+                BulkBinActionHelper.BuildResultReport(report, "geloescht"));
+        }
+    }
+
+    // ====================================================================
     // Tab "BL-Catalog-Daten" (Phase 5.5: BrickStore-Bulk-Import)
     // ====================================================================
 

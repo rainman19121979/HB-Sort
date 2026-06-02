@@ -268,6 +268,78 @@ public class BulkOperationsTests : IDisposable
         Assert.Null(snap.NewStorageBinId);
     }
 
+    // ====================================================================
+    // v0.1.25-beta.1: Bulk-Bin-Aktionen - Skip-Entscheidung am Core-Seam.
+    //
+    // Die Bulk-Schleife selbst lebt im WPF-Code-Behind (nicht unit-testbar).
+    // Was hier getestet wird, ist die VERBINDLICHE Datengrundlage der
+    // Skip-Entscheidung: GetEmptyPreviewAsync muss pro Bin-Kind die richtigen
+    // Counts liefern, damit der Code-Behind strikt "nicht IsFree -> skip"
+    // entscheiden kann. Plus: DeleteAsync wirft bei Race (Waiting/Floating)
+    // die InvalidOperationException, die der Code-Behind pro Fach faengt.
+    // ====================================================================
+
+    [Fact]
+    public async Task BulkSkip_preview_marks_complete_only_bin_as_occupied()
+    {
+        // Strikte Regel (Konzept F1): ein Fach mit NUR einer kompletten Figur
+        // gilt fuers Bulk-Loeschen als "belegt" -> CompleteMinifigsCount > 0.
+        var bin = await SeedBinAsync("Complete-only");
+        await SeedMinifigAsync("c1", bin, TrackedMinifigStatus.Complete);
+
+        var preview = await _binService.GetEmptyPreviewAsync(bin);
+
+        Assert.NotNull(preview);
+        Assert.Equal(0, preview!.WaitingMinifigsCount);
+        Assert.Equal(0, preview.FloatingPartsCount);
+        Assert.Equal(1, preview.CompleteMinifigsCount);
+        // Code-Behind-Predikat "nicht IsFree" = irgendein Count > 0 -> skip.
+        var isOccupied = preview.WaitingMinifigsCount > 0
+                         || preview.CompleteMinifigsCount > 0
+                         || preview.FloatingPartsCount > 0;
+        Assert.True(isOccupied);
+    }
+
+    [Fact]
+    public async Task BulkSkip_preview_marks_truly_empty_bin_as_deletable()
+    {
+        var bin = await SeedBinAsync("Empty-deletable");
+
+        var preview = await _binService.GetEmptyPreviewAsync(bin);
+
+        Assert.NotNull(preview);
+        var isOccupied = preview!.WaitingMinifigsCount > 0
+                         || preview.CompleteMinifigsCount > 0
+                         || preview.FloatingPartsCount > 0;
+        Assert.False(isOccupied);
+    }
+
+    [Fact]
+    public async Task BulkDelete_race_DeleteAsync_throws_on_occupied_bin()
+    {
+        // Simuliert den Race: das Fach galt in der Vorschau als frei, wurde
+        // dann aber befuellt. DeleteAsync muss werfen, damit der Code-Behind
+        // es als "Fehler" in den Report aufnehmen kann (statt die ganze
+        // Bulk-Aktion abzubrechen).
+        var bin = await SeedBinAsync("Race");
+        await SeedFloatingAsync(bin, "3001", 11, 5);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _binService.DeleteAsync(bin));
+    }
+
+    [Fact]
+    public async Task BulkDelete_truly_empty_bin_is_removed()
+    {
+        var bin = await SeedBinAsync("ToDelete");
+
+        var ok = await _binService.DeleteAsync(bin);
+        Assert.True(ok);
+
+        await using var ctx = await _factory.CreateDbContextAsync();
+        Assert.Null(await ctx.StorageBins.FirstOrDefaultAsync(b => b.Id == bin));
+    }
+
     [Fact]
     public async Task EmptyAsync_on_empty_bin_only_writes_BinFreed_event()
     {

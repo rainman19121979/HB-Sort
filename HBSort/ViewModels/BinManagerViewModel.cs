@@ -50,6 +50,28 @@ public partial class BinManagerViewModel : ObservableObject
 
     [ObservableProperty] private bool _isLoading;
 
+    // ----------------------------------------------------------------
+    // Bulk-Auswahl (v0.1.25-beta.1) - Pattern aus InventoryListViewModel.
+    // ----------------------------------------------------------------
+
+    /// <summary>Anzahl aktuell markierter Faecher (ueber alle Zeilen, nicht nur sichtbare).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasAnySelected))]
+    [NotifyPropertyChangedFor(nameof(SelectionCounterText))]
+    private int _selectedCount;
+
+    /// <summary>true sobald mindestens ein Fach markiert ist (steuert Button-Enable).</summary>
+    public bool HasAnySelected => SelectedCount > 0;
+
+    /// <summary>Zaehler-Text fuer die Action-Bar, z.B. "3 markiert".</summary>
+    public string SelectionCounterText => $"{SelectedCount} markiert";
+
+    /// <summary>
+    /// true sobald ueberhaupt Faecher existieren (steuert Sichtbarkeit der
+    /// Action-Bar - leerer Tab zeigt keine Bulk-Leiste).
+    /// </summary>
+    [ObservableProperty] private bool _hasAnyBins;
+
     public BinManagerViewModel(
         IStorageBinService binService,
         IDbContextFactory<UserDataContext> ctxFactory,
@@ -145,13 +167,25 @@ public partial class BinManagerViewModel : ObservableObject
                 .Select(g => new { BinId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.BinId, x => x.Count);
 
+            // Beim Neuaufbau zuerst die PropertyChanged-Abos der alten Zeilen
+            // loesen, damit keine Geister-Handler an verworfenen Zeilen haengen.
+            foreach (var old in Bins)
+                old.PropertyChanged -= OnBinRowPropertyChanged;
             Bins.Clear();
+
             foreach (var bin in bins)
             {
                 var mfg = minifigCounts.TryGetValue(bin.Id, out var m) ? m : 0;
                 var fp = partCounts.TryGetValue(bin.Id, out var p) ? p : 0;
-                Bins.Add(new BinRowViewModel(bin, mfg, fp));
+                var row = new BinRowViewModel(bin, mfg, fp);
+                // Auf IsSelected-Aenderungen lauschen, um den Zaehler aktuell zu halten.
+                row.PropertyChanged += OnBinRowPropertyChanged;
+                Bins.Add(row);
             }
+
+            // Auswahl-Zaehler zuruecksetzen (frische Zeilen sind alle unmarkiert).
+            SelectedCount = 0;
+            HasAnyBins = Bins.Count > 0;
             UpdateSummary();
         }
         catch (Exception ex)
@@ -177,6 +211,51 @@ public partial class BinManagerViewModel : ObservableObject
 
     /// <summary>Filter-Setzer fuer die Radio-Buttons.</summary>
     public void SetFilter(BinFilterMode mode) => FilterMode = mode;
+
+    /// <summary>
+    /// Reagiert auf IsSelected-Aenderungen einer einzelnen Zeile und zaehlt
+    /// die markierten Faecher neu. Wir zaehlen ueber ALLE Zeilen (nicht nur
+    /// sichtbare), damit eine markierte, aber gerade weggefilterte Zeile nicht
+    /// "verschwindet" - SelectAll/DeselectAll wirken bewusst nur auf Sichtbare,
+    /// aber der Zaehler spiegelt den tatsaechlichen Auswahl-Stand.
+    /// </summary>
+    private void OnBinRowPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(BinRowViewModel.IsSelected))
+        {
+            SelectedCount = Bins.Count(b => b.IsSelected);
+        }
+    }
+
+    /// <summary>
+    /// Markiert alle SICHTBAREN Faecher (respektiert den aktiven Filter "Nur
+    /// frei"/"Nur belegt"). Bewusst nur Sichtbare, damit nicht versehentlich
+    /// weggefilterte Faecher mitmarkiert werden (vgl. Konzept Sektion 3.1).
+    /// </summary>
+    [RelayCommand]
+    private void SelectAll()
+    {
+        foreach (var row in BinsView.Cast<BinRowViewModel>())
+            row.IsSelected = true;
+    }
+
+    /// <summary>
+    /// Hebt die Auswahl aller SICHTBAREN Faecher auf (symmetrisch zu SelectAll).
+    /// </summary>
+    [RelayCommand]
+    private void DeselectAll()
+    {
+        foreach (var row in BinsView.Cast<BinRowViewModel>())
+            row.IsSelected = false;
+    }
+
+    /// <summary>
+    /// Liefert die aktuell markierten Zeilen als Snapshot (Liste, damit der
+    /// Code-Behind waehrend der Bulk-Schleife nicht ueber eine sich aendernde
+    /// Collection iteriert).
+    /// </summary>
+    public IReadOnlyList<BinRowViewModel> GetSelectedRows()
+        => Bins.Where(b => b.IsSelected).ToList();
 }
 
 /// <summary>Filter-Modi fuer die Lagerfach-Liste.</summary>

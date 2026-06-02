@@ -913,6 +913,8 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <!-- v0.1.25-beta.1: neue Zeile fuer die Bulk-Action-Bar -->
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
@@ -978,8 +980,53 @@
                         </ComboBox>
                     </Grid>
 
+                    <!-- v0.1.25-beta.1: Bulk-Action-Bar (Pattern aus
+                         InventoryListView.xaml:89-135). Sichtbar sobald
+                         mind. 1 Fach existiert. Links Zaehler + Alle/Keine
+                         (markieren nur SICHTBARE Faecher), rechts die zwei
+                         destruktiven Bulk-Buttons (disabled ohne Auswahl). -->
+                    <Border Grid.Row="2"
+                            Background="#F1F8E9" BorderBrush="#558B2F"
+                            BorderThickness="1" CornerRadius="4"
+                            Padding="8,6" Margin="0,0,0,8"
+                            Visibility="{Binding HasAnyBins, Converter={StaticResource BoolToVisibility}}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                                       Foreground="#33691E"
+                                       Text="{Binding SelectionCounterText, Mode=OneWay}"
+                                       FontWeight="SemiBold"
+                                       ToolTip="Anzahl markierter Faecher. Alle/Keine wirkt nur auf sichtbare Faecher."/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Content="Alle"
+                                        Command="{Binding SelectAllCommand}"
+                                        Padding="8,2" Margin="0,0,4,0"
+                                        ToolTip="Markiere alle sichtbaren Faecher (respektiert den aktiven Filter)."/>
+                                <Button Content="Keine"
+                                        Command="{Binding DeselectAllCommand}"
+                                        Padding="8,2" Margin="0,0,8,0"
+                                        ToolTip="Hebe die Auswahl aller sichtbaren Faecher auf."/>
+                                <Button Content="Markierte leeren"
+                                        Click="BinBulkEmpty_Click"
+                                        IsEnabled="{Binding HasAnySelected}"
+                                        Padding="8,2" Margin="0,0,4,0"
+                                        Background="#D32F2F" Foreground="White"
+                                        ToolTip="Leere alle markierten Faecher (Inhalt raus, Strg+Z moeglich)."/>
+                                <Button Content="Markierte loeschen"
+                                        Click="BinBulkDelete_Click"
+                                        IsEnabled="{Binding HasAnySelected}"
+                                        Padding="8,2"
+                                        Background="#D32F2F" Foreground="White"
+                                        ToolTip="Loesche alle markierten, freien Faecher (belegte werden uebersprungen)."/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
                     <!-- DataGrid -->
-                    <DataGrid Grid.Row="2"
+                    <DataGrid Grid.Row="3"
                               ItemsSource="{Binding BinsView}"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False" CanUserDeleteRows="False"
@@ -988,6 +1035,24 @@
                               GridLinesVisibility="Horizontal"
                               SelectionMode="Single">
                         <DataGrid.Columns>
+                            <!-- v0.1.25-beta.1: Auswahl-Checkbox-Spalte (Pattern
+                                 aus InventoryListView.xaml:157-169). MinWidth/
+                                 Padding/Margin=0 deaktiviert die tote rechte
+                                 Cell-Haelfte von ModernWpfUI. SelectionMode bleibt
+                                 Single - die Checkbox traegt die Mehrfach-Auswahl. -->
+                            <DataGridTemplateColumn Header="Aus..." Width="50" CanUserSort="False">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  MinWidth="0"
+                                                  Padding="0"
+                                                  Margin="0"
+                                                  ToolTip="Fuer Bulk-Aktionen auswaehlen (Leeren / Loeschen)."/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                             <DataGridTextColumn Header="Label"
                                                 Binding="{Binding Label}"
                                                 Width="*"/>
@@ -1032,7 +1097,7 @@
                     </DataGrid>
 
                     <!-- Footer mit Summary + Loading -->
-                    <Grid Grid.Row="3" Margin="0,8,0,0">
+                    <Grid Grid.Row="4" Margin="0,8,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
