@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -36,6 +37,17 @@ public partial class InventoryListView : UserControl
                 catch (System.Exception ex) { Log.Warning(ex, "InventoryListView Auto-Load fehlgeschlagen"); }
             }
         };
+
+        // Spalten-Persistenz (analog zur Splitter-Persistenz im SortingView):
+        // - Loaded   -> gespeichertes Layout wieder anwenden.
+        // - Sorting  -> aktive Sortierung sofort merken (fire-and-forget Save).
+        // - Unloaded -> aktuelle Spaltenbreiten einsammeln + speichern.
+        // Unloaded feuert beim Tab-Wechsel weg UND beim App-Schliessen - das
+        // ist der robuste Trigger fuer die Breiten (DataGrid hat kein sauberes
+        // Per-Spalte-DragCompleted-Event wie der GridSplitter).
+        Loaded += InventoryListView_Loaded;
+        Unloaded += InventoryListView_Unloaded;
+        InventoryGrid.Sorting += InventoryGrid_Sorting;
     }
 
     private static T Service<T>() where T : notnull => App.Services.GetRequiredService<T>();
@@ -581,6 +593,164 @@ public partial class InventoryListView : UserControl
             // Confirmation). Falls der Button im Visual-Tree ersetzt wurde
             // (z.B. weil die Liste neu geladen hat): kein Effekt, schadet nicht.
             b.IsEnabled = true;
+        }
+    }
+
+    // ====================================================================
+    // Spalten-Persistenz (Breiten + Sortierung)
+    //
+    // Vorbild: Splitter-Persistenz im SortingView (gleiches Muster -
+    // Werte in AppSettings, sofortiges fire-and-forget Save, Anwenden im
+    // Loaded). Identifikation der Spalten ueber den Header-Text.
+    // ====================================================================
+
+    /// <summary>
+    /// Wendet das gespeicherte Spalten-Layout (Breiten + Sortierung) beim
+    /// Sichtbarwerden des Views an. Defensiv: unbekannte/ungueltige Werte
+    /// werden ignoriert (siehe InventoryGridLayoutHelper).
+    /// </summary>
+    private void InventoryListView_Loaded(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var layout = Service<ISettingsService>().Current.InventoryGridLayout;
+            if (layout is null) return;
+
+            // --- Breiten anwenden ---
+            foreach (var column in InventoryGrid.Columns)
+            {
+                var header = column.Header as string;
+
+                // Star-Spalten (Breite waechst mit dem Fenster) NICHT ueberschreiben -
+                // die sollen flexibel bleiben. Nur Absolut-Breiten setzen.
+                if (column.Width.IsStar) continue;
+
+                var width = InventoryGridLayoutHelper.ResolveWidth(layout, header);
+                if (width.HasValue)
+                    column.Width = new DataGridLength(width.Value);
+            }
+
+            // --- Sortierung anwenden ---
+            ApplySavedSort(layout);
+        }
+        catch (System.Exception ex)
+        {
+            // Layout-Anwenden darf nie den Tab killen - schlimmstenfalls
+            // erscheint das Grid in den XAML-Defaults.
+            Log.Warning(ex, "InventoryListView: Spalten-Layout konnte nicht angewendet werden");
+        }
+    }
+
+    /// <summary>
+    /// Stellt die gemerkte Sortierung wieder her: setzt die SortDirection auf
+    /// der passenden Spalte und baut die SortDescription der CollectionView.
+    /// </summary>
+    private void ApplySavedSort(Core.Models.InventoryGridLayout layout)
+    {
+        if (string.IsNullOrEmpty(layout.SortColumnHeader)) return;
+
+        // Spalte per Header finden (kann fehlen, wenn das Layout sich geaendert hat).
+        DataGridColumn? target = null;
+        foreach (var column in InventoryGrid.Columns)
+        {
+            if (InventoryGridLayoutHelper.TryGetSort(layout, column.Header as string, out _))
+            {
+                target = column;
+                break;
+            }
+        }
+        if (target is null) return;
+
+        // SortMemberPath bestimmt nach welchem Property tatsaechlich sortiert
+        // wird. TextColumns binden direkt (z.B. "Quantity"), TemplateColumns
+        // setzen es explizit im XAML (SortMemberPath="ColorName" etc.).
+        var sortPath = target.SortMemberPath;
+        if (string.IsNullOrEmpty(sortPath)) return;
+
+        var direction = layout.SortAscending
+            ? ListSortDirection.Ascending
+            : ListSortDirection.Descending;
+
+        // Pfeil im Spalten-Header anzeigen.
+        target.SortDirection = direction;
+
+        // Tatsaechliche Sortierung auf der CollectionView. ItemsSource ist die
+        // ItemsView des VMs (eine ICollectionView); sonst Default-View holen.
+        var view = InventoryGrid.ItemsSource as System.ComponentModel.ICollectionView
+                   ?? (InventoryGrid.ItemsSource is System.Collections.IEnumerable items
+                       ? System.Windows.Data.CollectionViewSource.GetDefaultView(items)
+                       : null);
+        if (view is not null)
+        {
+            view.SortDescriptions.Clear();
+            view.SortDescriptions.Add(new SortDescription(sortPath, direction));
+        }
+    }
+
+    /// <summary>
+    /// Sortier-Event des DataGrids: merkt sich die neu gewaehlte Sortier-Spalte
+    /// + Richtung. Das DataGrid setzt die neue SortDirection erst NACH diesem
+    /// Event-Handler, deshalb leiten wir die kommende Richtung selbst ab
+    /// (Standard-Toggle-Verhalten von WPF: keine -> Asc -> Desc -> Asc ...).
+    /// Wir uebernehmen das Default-Sort-Verhalten (e.Handled bleibt false).
+    /// </summary>
+    private void InventoryGrid_Sorting(object? sender, DataGridSortingEventArgs e)
+    {
+        try
+        {
+            var header = e.Column.Header as string;
+            if (string.IsNullOrEmpty(header)) return;
+
+            // Kommende Richtung ableiten (WPF toggelt nach diesem Handler):
+            // null oder Descending -> Ascending, Ascending -> Descending.
+            var nextAscending = e.Column.SortDirection != ListSortDirection.Ascending;
+
+            var settings = Service<ISettingsService>();
+            settings.Current.InventoryGridLayout.SortColumnHeader = header;
+            settings.Current.InventoryGridLayout.SortAscending = nextAscending;
+            _ = settings.SaveAsync();
+        }
+        catch (System.Exception ex)
+        {
+            Log.Warning(ex, "InventoryListView: Sortierung konnte nicht gespeichert werden");
+        }
+    }
+
+    /// <summary>
+    /// Beim Verlassen des Views (Tab-Wechsel weg / App-Schliessen): die
+    /// aktuellen Spaltenbreiten einsammeln und persistieren. Star-Spalten
+    /// werden ausgelassen, damit "Beschreibung" weiter mitwaechst.
+    /// </summary>
+    private void InventoryListView_Unloaded(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var settings = Service<ISettingsService>();
+            var layout = settings.Current.InventoryGridLayout;
+
+            var changed = false;
+            foreach (var column in InventoryGrid.Columns)
+            {
+                if (column.Header is not string header || string.IsNullOrEmpty(header)) continue;
+
+                // Star-Spalten nicht speichern (sollen flexibel bleiben).
+                if (column.Width.IsStar) continue;
+
+                // ActualWidth ist die tatsaechlich gerenderte Breite nach
+                // User-Drag; DisplayValue faellt darauf zurueck.
+                var width = column.ActualWidth;
+                if (double.IsNaN(width) || width < InventoryGridLayoutHelper.MinColumnWidth) continue;
+
+                layout.ColumnWidths[header] = width;
+                changed = true;
+            }
+
+            if (changed)
+                _ = settings.SaveAsync();
+        }
+        catch (System.Exception ex)
+        {
+            Log.Warning(ex, "InventoryListView: Spaltenbreiten konnten nicht gespeichert werden");
         }
     }
 }

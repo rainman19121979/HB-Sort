@@ -252,6 +252,48 @@ public class AppSettings
     /// Null = noch nie. UTC.
     /// </summary>
     public DateTime? LastBackup { get; set; }
+
+    /// <summary>
+    /// Gemerktes Spalten-Layout (Breiten + Sortierung) der DataGrid im
+    /// Tab "Temporaeres Inventar" (InventoryListView). Wird beim Schliessen
+    /// des Views / App-Ende geschrieben und beim Oeffnen wieder angewendet.
+    /// Default = leeres Layout (greift dann auf die XAML-Defaults zurueck).
+    /// </summary>
+    public InventoryGridLayout InventoryGridLayout { get; set; } = new();
+}
+
+/// <summary>
+/// Persistiertes Spalten-Layout fuer die Lagerliste-DataGrid.
+///
+/// Bewusst KEINE DB-Tabelle (gehoert in settings.json, nicht in userdata.db):
+/// es ist reine UI-Praeferenz, keine Nutzdaten - daher keine EF-Migration.
+///
+/// Identifikation der Spalten ueber den Header-Text (stabiler String wie
+/// "Beschreibung" oder "Farbe"). Wenn sich das Spalten-Layout im Code aendert
+/// und eine gespeicherte Spalte nicht mehr existiert, wird sie beim Anwenden
+/// einfach ignoriert (kein Crash, siehe InventoryListView-Code-Behind).
+/// </summary>
+public class InventoryGridLayout
+{
+    /// <summary>
+    /// Gespeicherte Breiten pro Spalte. Key = Header-Text, Value = Breite in
+    /// Pixeln. Star-Spalten (z.B. "Beschreibung", Width="*") werden NICHT
+    /// gespeichert (siehe Code-Behind) - sie sollen weiter mitwachsen.
+    /// </summary>
+    public Dictionary<string, double> ColumnWidths { get; set; } = new();
+
+    /// <summary>
+    /// Header-Text der aktuell sortierten Spalte. Null/leer = keine aktive
+    /// Sortierung gemerkt (DataGrid bleibt unsortiert wie im XAML-Default).
+    /// </summary>
+    public string? SortColumnHeader { get; set; }
+
+    /// <summary>
+    /// Richtung der gemerkten Sortierung. true = aufsteigend (Ascending),
+    /// false = absteigend (Descending). Nur relevant wenn
+    /// <see cref="SortColumnHeader"/> gesetzt ist.
+    /// </summary>
+    public bool SortAscending { get; set; } = true;
 }
 
 /// <summary>
