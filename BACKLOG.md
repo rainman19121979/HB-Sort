@@ -48,11 +48,10 @@ Items archiviert werden.
   Zerlegen, Reverse-Match-Konsumieren, BuildSuggestion-Anlegen, Bin-
   Operationen, Pending-Persist mit Reverse-Match, BL-Reservierung.
   Aufwand: ~6-8h (eigene Sub-Iteration).
-- 📋 **Bulk-Bin-Aktionen im Settings-Tab Lagerfächer**
-  - Markierte löschen (nur leere Bins)
-  - Markierte leeren (Inhalt raus, mit Vorschau)
-  - Sicherheits-Bestätigungsdialog
-  Aufwand: ~3h
+- ✅ **Bulk-Bin-Aktionen im Settings-Tab Lagerfächer** — erledigt in
+  v0.1.25-beta.1 (`0bb0a7bd`, 2026-06-02). Markierte Faecher sammelweise
+  leeren oder loeschen mit Vorschau + Bestaetigungs-Dialog; belegte Faecher
+  werden beim Loeschen uebersprungen und im Ergebnis-Report sichtbar gemacht.
 - 📋 **Doppelt-Export-Tracking (Wanted-List Snapshot)**
   Snapshot vom letzten Export, Delta-Berechnung beim nächsten, "Reset-Tracking"-Button.
   Aufwand: ~3h
@@ -121,7 +120,9 @@ Items archiviert werden.
 
 ### UI/UX
 - 📋 **Wertabschätzung Statistik-Dashboard** - BL-Cache-Aggregation pro Bin/Figur
-- 📋 **Spalten-Persistenz Temporäres Inventar** - Sortierung + Spaltenbreite merken
+- ✅ **Spalten-Persistenz Temporäres Inventar** - Sortierung + Spaltenbreite
+  merken — erledigt in v0.1.25-beta.1 (`17e06216`, 2026-06-02). Sortierung
+  und Spaltenbreiten bleiben pro App-Start erhalten.
 - 📋 **Notiz-Feld auch für FloatingParts** - aktuell nur für TrackedMinifigs
 - 📋 **Statistik mit Charts/Diagrammen** - Zeitverlauf, Top-Kategorien
 - 📋 **Layout-Verhältnisse Sortier-Tab tunen** - Splitter-Defaults
@@ -193,11 +194,10 @@ Items archiviert werden.
 
 #### Aus Audit + Arbeit der beta.11-14-Strecke (2026-05-28)
 
-- 📋 **B1: Dialog-VMs ohne DI** — `ManageIgnoredViewModel` +
-  `MassUpdateExportViewModel` werden per `new` erzeugt statt via
-  `App.xaml.cs::ConfigureServices` (`BuildSuggestionsView.xaml.cs:35`,
-  `BlInventoryView.xaml.cs:35`). Konvention: Dialog-VMs `AddTransient`.
-  Schwere: M. Aufwand: ~30min.
+- ✅ **B1: Dialog-VMs ohne DI** — erledigt in v0.1.25-beta.1
+  (`refactor: Dialog-VM-DI + Silent-Catch + DialogResult (B1/B6/B10, v0.1.25)`).
+  `ManageIgnoredViewModel` + `MassUpdateExportViewModel` werden jetzt via
+  `App.xaml.cs::ConfigureServices` (`AddTransient`) aufgeloest statt per `new`.
 - 📋 **B2: Footer-Layout in zwei neuen Dialogen** — praezisiert durch
   ux-patterns.md-Drift-Inventur:
   - `ManageIgnoredDialog.xaml`: "Schliessen" hat `IsDefault="True"` UND
@@ -207,10 +207,10 @@ Items archiviert werden.
     Primaer-Button (Reihenfolge invertiert — Schliessen gehoert links).
   Konvention: links Abbrechen/Schliessen (IsCancel), rechts primaer
   (IsDefault + AccentButtonStyle). Schwere: L-M. Aufwand: ~30min.
-- 📋 **B6/B10: Kosmetik in ManageIgnored/MassUpdate-VMs** — Silent-Catch
-  ohne `Log.Debug`; `Close_Click` setzt `DialogResult=true` statt
-  `false`/`null` (`MassUpdateExportDialog.xaml.cs`). Schwere: L.
-  Aufwand: ~20min.
+- ✅ **B6/B10: Kosmetik in ManageIgnored/MassUpdate-VMs** — erledigt in
+  v0.1.25-beta.1 (`refactor: Dialog-VM-DI + Silent-Catch + DialogResult (B1/B6/B10, v0.1.25)`).
+  Silent-Catch bekommt jetzt `Log.Debug`; `Close_Click` setzt nicht mehr
+  `DialogResult=true`.
 - 📋 **BL-Inventar-Sync: UPSERT statt DELETE+INSERT** — Snapshot-Replace
   loescht + schreibt aktuell alle ~9.4k Lots neu. UPSERT der geaenderten
   Lots waere schneller, spart aber nur ~15% der 2,7s Sync-Zeit (85% sind
@@ -232,7 +232,8 @@ Sechs kosmetische Befunde (Severity L) plus ein strategisches Item aus
 dem finalen UX-Konsistenz-Check. Alle nicht stable-blockierend — Verdikt
 war STABLE-READY fuer v0.1.24.
 
-- 📋 **UX-1: Schliessen-Button mit AccentButtonStyle in 3 Dialogen** —
+- ✅ **UX-1: Schliessen-Button mit AccentButtonStyle in 3 Dialogen** —
+  erledigt in v0.1.25-beta.1 (Kosmetik-Sweep Welle 1-3).
   praezisiert durch die Drift-Inventur in `docs/ux-patterns.md`: betrifft
   nicht nur `MinifigSummaryDialog.xaml:198-201`, sondern auch
   `BinDetailDialog.xaml:157` + `FloatingPartDetailDialog.xaml:109`. Alle
@@ -241,15 +242,18 @@ war STABLE-READY fuer v0.1.24.
   Buttons rechts statt links/rechts-Split. In einem Rutsch fixbar.
   Schwere: L. Aufwand: ~25min. Quelle: ux-analyst 2026-05-28 +
   ux-patterns.md-Drift-Inventur.
-- 📋 **UX-2: BlReserveDialog Footer-Anordnung** — Abbrechen-Button steht
+- ✅ **UX-2: BlReserveDialog Footer-Anordnung** — erledigt in
+  v0.1.25-beta.1 (Kosmetik-Sweep). Abbrechen-Button steht
   in Grid-Spalte 1 (= rechts) statt links (`BlReserveDialog.xaml:120-124`).
   Konvention: links Abbrechen/Schliessen (IsCancel). Schwere: L. Aufwand:
   ~10min. Quelle: ux-analyst 2026-05-28 + ux-patterns.md-Drift-Inventur.
-- 📋 **UX-3: BL-Inventar Tooltip-Drift** — Tooltip sagt noch "aktuell
+- ✅ **UX-3: BL-Inventar Tooltip-Drift** — erledigt in v0.1.25-beta.1
+  (Kosmetik-Sweep). Tooltip sagt noch "aktuell
   durchgehend leer", stimmt seit beta.8 nicht mehr
   (`BlInventoryView.xaml:163`). Schwere: L. Aufwand: ~5min. Quelle:
   ux-analyst 2026-05-28.
-- 📋 **UX-4: BL-Shop-Badge Beschriftung uneinheitlich** — `MinifigSummary
+- ✅ **UX-4: BL-Shop-Badge Beschriftung uneinheitlich** — erledigt in
+  v0.1.25-beta.1 (Kosmetik-Sweep). `MinifigSummary
   Dialog.xaml:147` bindet `BlAvailability.BadgeText` (Mengen-Text, z.B.
   "3× Neu"), `BuildSuggestionDetailDialog.xaml:166` hat hartkodiert
   `Text="BL-Shop"` obwohl es dasselbe `BlAvailability`-Objekt bindet.
@@ -257,13 +261,16 @@ war STABLE-READY fuer v0.1.24.
   Fix ist ein reiner Binding-Tausch in BuildSuggestionDetailDialog.
   Schwere: L. Aufwand: ~10min. Quelle: ux-analyst 2026-05-28 +
   ux-patterns.md.
-- 📋 **UX-5: DataHealService Log-Text-Rest "via Lagerliste -> Details"** —
+- ✅ **UX-5: DataHealService Log-Text-Rest "via Lagerliste -> Details"** —
+  erledigt in v0.1.25-beta.1 (`refactor: Lagerliste-Reste in Log + Code-Kommentaren`).
   vergessener Lagerliste-Rest in Log-Ausgabe (`DataHealService.cs:68`).
   User-unsichtbar (Log-only), trotzdem konsistent ziehen. Schwere: L.
   Aufwand: ~2min. Quelle: ux-analyst 2026-05-28.
-- 📋 **UX-6: Code-Kommentar-Drift "Lagerliste-Tab"** — vergessener Rest 
+- ✅ **UX-6: Code-Kommentar-Drift "Lagerliste-Tab"** — vergessener Rest 
 im Kommentar (`MainViewModel.cs:399`). Schwere: L. Aufwand: ~2min.
-- 📋 **UX-7: Button "Alle Preise holen" überlappt Überschrift** — im
+  Erledigt in v0.1.25-beta.1 (`refactor: Lagerliste-Reste in Log + Code-Kommentaren`).
+- ✅ **UX-7: Button "Alle Preise holen" überlappt Überschrift** —
+  erledigt in v0.1.25-beta.1 (eigene Toolbar im Bau-Vorschlaege-Panel). Im
   Baubar-Tab (Was kann ich bauen) verdeckt der Button die Überschrift
   bzw. nimmt zu viel Platz im engen rechten Panel. Layout anpassen:
   kleinerer Button, anders positionieren oder in eine Symbolleiste
@@ -442,6 +449,28 @@ nach 2-3 dokumentierten Praxis-Vorfaellen.
 ---
 
 ## Erledigt ✅
+
+### v0.1.25-beta.1 (2026-06-02, Tag auf `0bb0a7bd`) - Sammel-Beta: Performance + Persistenz + Bulk-Bin + UI-Politur
+
+Sammel-Beta mit fuenf praxis-getesteten Inhalten seit v0.1.24. 652/652 Tests
+gruen. Pipeline (Run 26832417719) alle drei Jobs gruen, isPrerelease=true.
+
+- ✅ **PERF-1: SettingsViewModel-ctor Lazy-Tab-Load** (`70df47db`) — ctor-Zeit
+  von 1012ms auf 15ms (67×). Details im PERF-1-Eintrag oben.
+- ✅ **UX-Pattern-Katalog `docs/ux-patterns.md`** (`63b2af7d`) — 10 Patterns +
+  Drift-Inventur, verbindliche Referenz fuer kuenftige UI-Arbeit.
+- ✅ **Kosmetik-Sweep Welle 1-3** (UX-1..7 + B1/B6/B10, 11 Befunde) —
+  Schliessen-Buttons/Footer/Tooltips vereinheitlicht, BL-Shop-Badge-Beschriftung,
+  Dialog-VM-DI, Silent-Catch-Logging, Bau-Vorschlaege-Toolbar (UX-7).
+- ✅ **Spalten-Persistenz im Temporaeren Inventar** (`17e06216`) — Sortierung +
+  Spaltenbreiten bleiben pro App-Start erhalten.
+- ✅ **Bulk-Bin-Aktionen im Settings-Tab Lagerfaecher** (`0bb0a7bd`) — markierte
+  Faecher sammelweise leeren/loeschen mit Vorschau + Bestaetigung; belegte
+  Faecher werden beim Loeschen uebersprungen und im Ergebnis-Report aufgefuehrt.
+
+Bewusst NICHT in beta.1: B2 (Footer-Layout in ManageIgnored/MassUpdate-Dialog)
+bleibt als offenes 📋-Item. PERF-2 dokumentiert (Vorbedingung fuer E),
+B+E auf Hygiene-Status herabgestuft.
 
 ### v0.1.24-beta.15 (2026-05-28) - UI-Politur: Tab-Umbenennung + Reihenfolge
 
@@ -858,7 +887,8 @@ Aenderungen am Cache-Schema + Provider-Logik.
 | **v0.1.24-beta.14** | ✅ gemerged (`b3a8e044`, 2026-05-28) | Auto-Sync vor Mass-Update-Export (BlInventorySyncResult, Stale-Fallbacks, Cap-Hinweis). 616 Tests grün. |
 | **v0.1.24-beta.15** | ✅ gemerged (`97a53c63`, 2026-05-28) | UI-Politur: Tab "Temporäres Inventar" + Tab-Reihenfolge + Endanwender-Doku-Update. |
 | **v0.1.24** | ✅ stable (2026-05-29, Tag `e3b8f9ac`) | BL-Shop-Integration: Inventar-Sync, Reservieren beim Komplettieren, Mass-Update-Export, V5-Reservierungs-Aufloesung, Dialog-Vereinheitlichung, "Temporaeres Inventar"-Tab. |
-| **v0.1.25** | 💭 Brainstorming | Performance-Wurzel-Fixes (B+E aus Diagnoser-Bericht, ~4-5h) + OPEN-18 Single-Mode-Cleanup + Kategorie-Sperre + Bauteile-Bin-Konzept + Audit-Befunde B1/B2/B6/B10 + UPSERT-Sync-Optimierung + vollständiges Undo-System. |
+| **v0.1.25-beta.1** | ✅ released (2026-06-02, Tag `0bb0a7bd`) | Sammel-Beta: PERF-1 (Settings-ctor 1012ms→15ms), UX-Pattern-Katalog, Kosmetik-Sweep Welle 1-3 (UX-1..7 + B1/B6/B10), Spalten-Persistenz Temp-Inventar, Bulk-Bin-Aktionen. 652 Tests grün, isPrerelease=true. |
+| **v0.1.25** | 💭 Brainstorming (offen für Stable) | Praxis-Test beta.1 läuft. Rest-Kandidaten: B2 (Footer-Layout), OPEN-18 Single-Mode-Cleanup, Kategorie-Sperre, Bauteile-Bin-Konzept, B+E (Hygiene), UPSERT-Sync-Optimierung, vollständiges Undo-System. |
 | **v0.2.0** | 💭 Brainstorming | grosse Features aus Backlog (siehe oben) |
 
 Konvention:
@@ -867,8 +897,10 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-29 — v0.1.24 stable released, v0.1.25 
-läuft: Kosmetik-Sweep (UX-1..7 + B1/B6/B10) erledigt, UX-Pattern-Katalog 
-angelegt, PERF-1 erledigt (ctor 1012ms → 15ms). Nächste Kandidaten: 
-UX-Pattern-Katalog ist Referenz, B+E auf Hygiene-Status, Bauteile-Bin / 
-Undo-System / B2 / restliche Items im Backlog.*
+*Zuletzt aktualisiert: 2026-06-02 — v0.1.25-beta.1 getaggt (`0bb0a7bd`,
+Pipeline grün, isPrerelease=true). Gebündelt: PERF-1 (ctor 1012ms→15ms),
+UX-Pattern-Katalog, Kosmetik-Sweep Welle 1-3 (UX-1..7 + B1/B6/B10),
+Spalten-Persistenz Temp-Inventar, Bulk-Bin-Aktionen. Praxis-Test für
+Stable-Promote läuft. Offene v0.1.25-Kandidaten: B2 (Footer-Layout),
+OPEN-18, Kategorie-Sperre, Bauteile-Bin, B+E (Hygiene), UPSERT-Sync,
+Undo-System.*
