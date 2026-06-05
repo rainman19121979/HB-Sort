@@ -359,8 +359,6 @@ Daten zentral.
   akzeptierst Du implizit die Terms-of-Service von Brickognize
   (siehe brickognize.com -> "Legal" / "Terms of Service").
   Insbesondere:
-  - Brickognize-API ist fuer **persoenliche, nicht-kommerzielle
-    Nutzung** gedacht.
   - Hochgeladene Bilder werden gemaess Brickognize-ToS Section 8
     verarbeitet (Lizenz-Grant an Brickognize zur Nutzung der
     hochgeladenen Bilder fuer u.a. Modell-Training).
