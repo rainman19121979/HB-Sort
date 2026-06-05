@@ -369,9 +369,6 @@ Daten zentral.
     den Webcam-Erkennungs-Schritt (HB-Sort ist auch nutzbar fuer
     manuelle Item-Eingabe).
 
-  Falls Du HB-Sort kommerziell nutzen willst (z.B. fuer einen Shop):
-  bitte direkt an Brickognize wenden, das ist nicht durch die
-  HB-Sort-Doku abgedeckt.
 
 ### BrickStore-Datenbank (rgriebl/brickstore-database)
 
