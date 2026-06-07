@@ -89,4 +89,21 @@ public interface IBlCatalogService
     /// </summary>
     Task<List<BlMinifigSubsetMatch>> FindMinifigsContainingPartAsync(
         string blPartNo, int blColorId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Liefert die Komponenten-Teile eines "Combined Part" (z.B. montierter Torso →
+    /// bare Torso + Arme + Haende). REINER Cache-Lookup auf bl_subsets, KEIN BL-Call.
+    /// Leere Liste wenn das Teil atomar ist (keine Subsets).
+    ///
+    /// Zwei Pfade (v0.1.25):
+    ///   1. Direkt <c>GetSubsetsAsync("P", blPartNo)</c>.
+    ///   2. Falls leer: Reverse-Fallback ueber <c>FindParentsByItemAsync</c> auf den
+    ///      complete-Parent (cXX) und dessen Subsets - falls Brickognize beim Scan
+    ///      die bare-ID statt der complete-ID liefert.
+    ///
+    /// Filter: <c>is_alternate=0 AND is_counterpart=0 AND is_from_supersets=0</c>.
+    /// Namen/Farben werden aus dem lokalen Cache angereichert.
+    /// </summary>
+    Task<List<PartComponent>> GetPartComponentsAsync(
+        string blPartNo, int blColorId, CancellationToken ct = default);
 }

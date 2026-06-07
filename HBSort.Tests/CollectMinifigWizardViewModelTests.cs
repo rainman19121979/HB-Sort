@@ -377,6 +377,8 @@ public class CollectMinifigWizardViewModelTests
         public Task<List<BlMinifigSubsetMatch>> FindMinifigsContainingPartAsync(string blPartNo,
             int blColorId, CancellationToken ct = default)
             => throw new NotImplementedException();
+        public Task<List<PartComponent>> GetPartComponentsAsync(string blPartNo, int blColorId, CancellationToken ct = default)
+            => throw new NotImplementedException();
     }
 
     private sealed class StubPartLookup : IPartLookupService

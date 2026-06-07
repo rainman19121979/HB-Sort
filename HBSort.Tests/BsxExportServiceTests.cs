@@ -490,6 +490,8 @@ public class BsxExportServiceTests : IDisposable
             => Task.FromResult(new List<BlMinifigSubsetMatch>());
         public Task<List<BlColor>> GetKnownColorsAsync(string blPartNo, CancellationToken ct = default)
             => Task.FromResult(new List<BlColor>());
+        public Task<List<PartComponent>> GetPartComponentsAsync(string blPartNo, int blColorId, CancellationToken ct = default)
+            => Task.FromResult(new List<PartComponent>());
     }
 
     /// <summary>

@@ -274,6 +274,99 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+
+                <!--
+                    ===== KOMPONENTEN DES TEILS (Combined Part, v0.1.25) =====
+                    Zeigt bei einem montierten Torso die Einzelteile (bare Torso +
+                    Arme + Haende). Daten kommen aus dem lokalen bl_cache.db -
+                    KEIN BL-Call. Nur sichtbar wenn Komponenten existieren
+                    (atomare Teile -> kein Expander). Default aufgeklappt damit
+                    der User die Info beim Torso-Scan sofort sieht.
+                    Reine Info-Anzeige: keine Buttons, keine Aktionen.
+                -->
+                <Expander Header="Komponenten dieses Teils"
+                          Margin="0,12,0,0"
+                          IsExpanded="True"
+                          Visibility="{Binding HasComponents,
+                              Converter={StaticResource BoolToVisibility}}">
+                    <ItemsControl ItemsSource="{Binding Components}"
+                                  Margin="0,4,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                        BorderThickness="1" CornerRadius="4"
+                                        Padding="6" Margin="0,2,0,2">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Bild (klickbar via ImageZoom, ux-patterns.md §9) -->
+                                        <Image Grid.Column="0"
+                                               Source="{Binding ImageUrl, Converter={StaticResource NullToImageSource}}"
+                                               Width="48" Height="48" Stretch="Uniform"
+                                               b:ImageZoom.IsEnabled="True"/>
+
+                                        <!-- Name + BL-ID + ggf. Grund-Teil-Badge -->
+                                        <StackPanel Grid.Column="1" Margin="8,0" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding ItemName}"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           TextWrapping="Wrap"/>
+                                                <!--
+                                                    Grund-Teil-Kennzeichnung (Konzept 6.2):
+                                                    der bedruckte Rumpf selbst. Badge nur bei
+                                                    IsBaseItem sichtbar.
+                                                -->
+                                                <Border Background="{StaticResource InfoBoxBackground}"
+                                                        BorderBrush="{StaticResource StatusInfoBrush}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="4"
+                                                        Padding="6,1"
+                                                        Margin="8,0,0,0"
+                                                        VerticalAlignment="Center"
+                                                        ToolTip="Das ist das Grund-Teil (der bedruckte Rumpf) - Arme und Haende stecken zusaetzlich darin."
+                                                        Visibility="{Binding IsBaseItem,
+                                                            Converter={StaticResource BoolToVisibility}}">
+                                                    <TextBlock Text="Grund-Teil"
+                                                               FontSize="9" FontWeight="SemiBold"
+                                                               Foreground="{StaticResource StatusInfoBrush}"/>
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock FontSize="9"
+                                                       Foreground="Gray" FontFamily="Consolas">
+                                                <Run Text="BL:"/>
+                                                <Run Text="{Binding ItemNo, Mode=OneWay}"/>
+                                            </TextBlock>
+                                        </StackPanel>
+
+                                        <!-- Farb-Swatch + Farb-Name -->
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                                    VerticalAlignment="Center" Margin="8,0">
+                                            <Border Width="16" Height="16"
+                                                    Background="{Binding SwatchBrush}"
+                                                    BorderBrush="Black" BorderThickness="1"
+                                                    Margin="0,0,6,0"/>
+                                            <TextBlock Text="{Binding ColorName}"
+                                                       FontSize="10"
+                                                       Foreground="Gray"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
+
+                                        <!-- Menge -->
+                                        <TextBlock Grid.Column="3" Text="{Binding QuantityLabel}"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" Margin="8,0,4,0"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Expander>
                 </StackPanel>
             </ScrollViewer>
 

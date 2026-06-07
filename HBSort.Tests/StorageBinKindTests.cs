@@ -436,6 +436,7 @@ public class StorageBinKindTests : IDisposable
         public Task<List<BlSubset>> GetSupersetsAsync(string blPartNo, int blColorId, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<bool> EnsureFullSubsetsAsync(string blMinifigId, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<List<BlMinifigSubsetMatch>> FindMinifigsContainingPartAsync(string blPartNo, int blColorId, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<List<PartComponent>> GetPartComponentsAsync(string blPartNo, int blColorId, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<List<BlColor>> GetKnownColorsAsync(string blPartNo, CancellationToken ct = default) => throw new NotImplementedException();
     }
 

@@ -284,6 +284,159 @@ public class BlCatalogServiceTests : IDisposable
     }
 
     // ========================================================================
+    // v0.1.25: GetPartComponentsAsync (Combined Part -> Komponenten)
+    // ========================================================================
+
+    /// <summary>
+    /// Hilfsmethode: legt die Subset-Zeilen eines Combined Part im Cache an.
+    /// Vorbild: BlCacheRepositoryTests (befuellt bl_subsets direkt).
+    /// </summary>
+    private async Task SeedComponentSubsetsAsync(
+        string completeParentNo, IEnumerable<BlSubset> rows)
+    {
+        await _repo.BulkInsertSubsetsAsync(rows);
+        // resolvedParentNo wird vom Service genutzt; hier nur zur Klarheit.
+        _ = completeParentNo;
+    }
+
+    private static BlSubset MakeSubset(
+        string parentNo, string itemNo, int colorId, int qty,
+        bool isAlternate = false, bool isCounterpart = false, bool isFromSupersets = false)
+        => new()
+        {
+            ParentType = "P", ParentNo = parentNo,
+            ItemType = "P", ItemNo = itemNo, ColorId = colorId,
+            Quantity = qty,
+            IsAlternate = isAlternate,
+            IsCounterpart = isCounterpart,
+            IsFromSupersets = isFromSupersets,
+            FetchedAt = DateTime.UtcNow
+        };
+
+    [Fact]
+    public async Task GetPartComponents_atomic_part_returns_empty_list()
+    {
+        // Atomares Teil: keine Subsets im Cache.
+        var result = await _sut.GetPartComponentsAsync("3024", 11);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetPartComponents_combined_part_direct_returns_base_and_components()
+    {
+        // Combined Part "11692pb01c01" (Armor-Torso, vgl. Konzept Sektion 2):
+        //   11692pb01 (bare Torso, color 0) + 981982 (Arm, Red 5) + 983 (Hand x2, Black 11)
+        await SeedComponentSubsetsAsync("11692pb01c01", new[]
+        {
+            MakeSubset("11692pb01c01", "11692pb01", colorId: 0, qty: 1),  // bare = Grund-Teil
+            MakeSubset("11692pb01c01", "981982",    colorId: 5, qty: 1),  // Arm
+            MakeSubset("11692pb01c01", "983",       colorId: 11, qty: 2), // Hand x2
+        });
+
+        // Namen aus bl_items anreichern.
+        await _repo.UpsertItemsAsync(new[]
+        {
+            new BlItem { ItemType = "P", ItemNo = "11692pb01", Name = "Torso Modified", DataCompleteness = DataCompleteness.Subset },
+            new BlItem { ItemType = "P", ItemNo = "981982",    Name = "Arm Pair",       DataCompleteness = DataCompleteness.Subset },
+            new BlItem { ItemType = "P", ItemNo = "983",       Name = "Hand",           DataCompleteness = DataCompleteness.Subset },
+        });
+
+        // Farben anreichern.
+        await _repo.UpsertColorsAsync(new[]
+        {
+            new BlColor { ColorId = 5,  Name = "Red",   Rgb = "B40000" },
+            new BlColor { ColorId = 11, Name = "Black", Rgb = "212121" },
+        });
+
+        var result = await _sut.GetPartComponentsAsync("11692pb01c01", 0);
+
+        Assert.Equal(3, result.Count);
+
+        // Grund-Teil steht zuerst (OrderByDescending IsBaseItem).
+        var baseItem = result[0];
+        Assert.True(baseItem.IsBaseItem);
+        Assert.Equal("11692pb01", baseItem.ItemNo);
+        Assert.Equal("Torso Modified", baseItem.ItemName);
+
+        var arm = result.Single(c => c.ItemNo == "981982");
+        Assert.Equal("Arm Pair", arm.ItemName);
+        Assert.Equal("Red", arm.ColorName);
+        Assert.Equal(1, arm.Quantity);
+        Assert.False(arm.IsBaseItem);
+
+        var hand = result.Single(c => c.ItemNo == "983");
+        Assert.Equal("Hand", hand.ItemName);
+        Assert.Equal("Black", hand.ColorName);
+        Assert.Equal(2, hand.Quantity);
+    }
+
+    [Fact]
+    public async Task GetPartComponents_filters_alternate_counterpart_and_supersets()
+    {
+        await SeedComponentSubsetsAsync("973pb01c01", new[]
+        {
+            MakeSubset("973pb01c01", "973pb01", colorId: 0,  qty: 1),                        // echt (Grund-Teil)
+            MakeSubset("973pb01c01", "983",     colorId: 11, qty: 2),                        // echt (Hand)
+            MakeSubset("973pb01c01", "ALT",     colorId: 1,  qty: 1, isAlternate: true),     // raus
+            MakeSubset("973pb01c01", "CNT",     colorId: 1,  qty: 1, isCounterpart: true),   // raus
+            MakeSubset("973pb01c01", "SUP",     colorId: 1,  qty: 1, isFromSupersets: true), // raus
+        });
+
+        var result = await _sut.GetPartComponentsAsync("973pb01c01", 0);
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, c => c.ItemNo == "973pb01");
+        Assert.Contains(result, c => c.ItemNo == "983");
+        Assert.DoesNotContain(result, c => c.ItemNo == "ALT");
+        Assert.DoesNotContain(result, c => c.ItemNo == "CNT");
+        Assert.DoesNotContain(result, c => c.ItemNo == "SUP");
+    }
+
+    [Fact]
+    public async Task GetPartComponents_reverse_fallback_finds_components_via_parent()
+    {
+        // Brickognize liefert die bare-ID "973pb01" - die hat KEINE eigenen Subsets.
+        // Der Reverse-Index muss den complete-Parent "973pb01c01" finden und dessen
+        // Komponenten liefern.
+        await SeedComponentSubsetsAsync("973pb01c01", new[]
+        {
+            MakeSubset("973pb01c01", "973pb01", colorId: 0,  qty: 1),  // bare = Self-Ref
+            MakeSubset("973pb01c01", "983",     colorId: 11, qty: 2),  // Hand
+        });
+
+        // Sicherheit: das bare-Teil selbst hat keine eigenen Subsets.
+        var direct = await _repo.GetSubsetsAsync("P", "973pb01");
+        Assert.Empty(direct);
+
+        // FindParentsByItemAsync sucht ueber (item_no, color_id). Das bare-Teil
+        // steckt mit color 0 im Parent.
+        var result = await _sut.GetPartComponentsAsync("973pb01", 0);
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, c => c.ItemNo == "983");
+        // Self-Ref bare-Teil ist als Grund-Teil markiert.
+        Assert.Contains(result, c => c.ItemNo == "973pb01" && c.IsBaseItem);
+    }
+
+    [Fact]
+    public async Task GetPartComponents_sets_IsBaseItem_only_for_self_reference()
+    {
+        await SeedComponentSubsetsAsync("11692pb01c01", new[]
+        {
+            MakeSubset("11692pb01c01", "11692pb01", colorId: 0,  qty: 1),  // Praefix der Parent-ID -> Grund-Teil
+            MakeSubset("11692pb01c01", "983",       colorId: 11, qty: 2),  // kein Praefix -> normale Komponente
+        });
+
+        var result = await _sut.GetPartComponentsAsync("11692pb01c01", 0);
+
+        var baseItem = result.Single(c => c.ItemNo == "11692pb01");
+        var hand = result.Single(c => c.ItemNo == "983");
+        Assert.True(baseItem.IsBaseItem);
+        Assert.False(hand.IsBaseItem);
+    }
+
+    // ========================================================================
     // Fakes
     // ========================================================================
 

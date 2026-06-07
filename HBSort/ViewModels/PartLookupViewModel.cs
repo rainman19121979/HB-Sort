@@ -56,6 +56,16 @@ public partial class PartLookupViewModel : ObservableObject
 
     public bool HasBlCatalogMatches => BlCatalogMatches.Count > 0;
 
+    /// <summary>
+    /// v0.1.25: Komponenten eines "Combined Part" (z.B. montierter Torso →
+    /// bare Torso + Arme + Haende). Reine Info-Anzeige, befuellt aus dem lokalen
+    /// bl_cache.db (kein BL-Call). Leer bei atomaren Teilen → Expander erscheint nicht.
+    /// </summary>
+    public ObservableCollection<PartComponentViewModel> Components { get; } = new();
+
+    /// <summary>True wenn Komponenten existieren - steuert Sichtbarkeit des Expanders.</summary>
+    public bool HasComponents => Components.Count > 0;
+
     /// <summary>Verfuegbare Farben fuer das Korrektur-Dropdown (nur known colors).</summary>
     public ObservableCollection<BlColor> AvailableColors { get; } = new();
 
@@ -191,6 +201,36 @@ public partial class PartLookupViewModel : ObservableObject
         OnPropertyChanged(nameof(HasBlCatalogMatches));
     }
 
+    /// <summary>
+    /// v0.1.25: setzt die Komponenten-Liste (Combined-Part-Anzeige). Wird vom
+    /// ScanViewModel nach dem Cache-Lookup aufgerufen. Leere Liste → Expander
+    /// bleibt unsichtbar.
+    /// </summary>
+    public void ApplyComponents(IEnumerable<PartComponent> components)
+    {
+        Components.Clear();
+        foreach (var c in components)
+        {
+            // B3.5 (Praxis-Test 2026-06-07): Das Grund-Teil (IsBaseItem) kommt aus
+            // bl_subsets mit ColorId=0 ("Not Applicable"). Sein Bild laden wir aber
+            // unter der konkreten Scan-Farbe (siehe B3-Fix in ScanViewModel). Damit
+            // Text + Swatch nicht inkonsistent "(Not Applicable)" mit grauem Kaestchen
+            // zeigen, uebernimmt das Grund-Teil hier in der Anzeige die Scan-Farbe des
+            // Pending-Teils (BlColorId/ColorName/ColorRgb traegt dieses VM bereits aus
+            // ApplyLookupResult). Quelle = dieses VM selbst, KEIN extra bl_colors-Lookup.
+            // Arme/Haende (echte ColorId > 0) bleiben unveraendert.
+            if (c.IsBaseItem && c.ColorId == 0 && BlColorId > 0)
+            {
+                Components.Add(new PartComponentViewModel(c, BlColorId, ColorName, ColorRgb));
+            }
+            else
+            {
+                Components.Add(new PartComponentViewModel(c));
+            }
+        }
+        OnPropertyChanged(nameof(HasComponents));
+    }
+
     private static Brush ParseRgbBrush(string? hex)
     {
         if (string.IsNullOrWhiteSpace(hex)) return Brushes.Gray;
@@ -294,5 +334,79 @@ public partial class BlCatalogMatchViewModel : ObservableObject
         MinifigName = string.IsNullOrEmpty(m.MinifigName) ? m.BlMinifigId : m.MinifigName;
         QuantityInMinifig = m.QuantityInMinifig;
         _imageUrl = m.MinifigImageUrl;
+    }
+}
+
+/// <summary>
+/// v0.1.25: eine Komponenten-Zeile im Combined-Part-Expander der PartLookupView.
+/// Reine Anzeige (KISS) - kein Status-Check, kein Reserve-Flow. Das Bild wird vom
+/// ScanViewModel lazy nachgezogen (ImageUrl ist ObservableProperty).
+/// </summary>
+public partial class PartComponentViewModel : ObservableObject
+{
+    public string ItemNo { get; }
+    public string ItemName { get; }
+    public int ColorId { get; }
+    public string ColorName { get; }
+    public int Quantity { get; }
+
+    /// <summary>True = Grund-Teil (bare item). In der UI als "Grund-Teil" gekennzeichnet.</summary>
+    public bool IsBaseItem { get; }
+
+    [ObservableProperty]
+    private string? _imageUrl;
+
+    /// <summary>Farb-Swatch (gleiche Parse-Logik wie beim Haupt-Teil).</summary>
+    public Brush SwatchBrush { get; }
+
+    /// <summary>Anzeige-Label fuer die Menge, z.B. "2x".</summary>
+    public string QuantityLabel => $"{Quantity}x";
+
+    public PartComponentViewModel(PartComponent c)
+    {
+        ItemNo = c.ItemNo;
+        ItemName = string.IsNullOrEmpty(c.ItemName) ? c.ItemNo : c.ItemName;
+        ColorId = c.ColorId;
+        ColorName = c.ColorName;
+        Quantity = c.Quantity;
+        IsBaseItem = c.IsBaseItem;
+        SwatchBrush = ParseRgbBrush(c.ColorRgb);
+    }
+
+    /// <summary>
+    /// B3.5 (Praxis-Test 2026-06-07): Konstruktor mit Scan-Farb-Override. Wird
+    /// NUR fuer das Grund-Teil (IsBaseItem, ColorId=0) genutzt, dessen Bild unter
+    /// der konkreten Scan-Farbe geladen wird. Damit Text + Swatch konsistent zum
+    /// Bild sind, uebernimmt das Grund-Teil hier Farb-Id, Farb-Name und RGB der
+    /// Scan-Farbe (alles aus dem Pending-VM durchgereicht - kein extra Lookup).
+    /// </summary>
+    public PartComponentViewModel(PartComponent c, int scanColorId, string scanColorName, string? scanColorRgb)
+    {
+        ItemNo = c.ItemNo;
+        ItemName = string.IsNullOrEmpty(c.ItemName) ? c.ItemNo : c.ItemName;
+        // Anzeige-Farbe = Scan-Farbe statt der rohen ColorId=0 ("Not Applicable").
+        ColorId = scanColorId;
+        ColorName = scanColorName;
+        Quantity = c.Quantity;
+        IsBaseItem = c.IsBaseItem;
+        SwatchBrush = ParseRgbBrush(scanColorRgb);
+    }
+
+    // Eigene Kopie der Parse-Logik (die im PartLookupViewModel ist private static).
+    private static Brush ParseRgbBrush(string? hex)
+    {
+        if (string.IsNullOrWhiteSpace(hex)) return Brushes.Gray;
+        var clean = hex.TrimStart('#');
+        if (clean.Length != 6) return Brushes.Gray;
+        try
+        {
+            var r = byte.Parse(clean.Substring(0, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+            var g = byte.Parse(clean.Substring(2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+            var b = byte.Parse(clean.Substring(4, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+            var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+            brush.Freeze();
+            return brush;
+        }
+        catch { return Brushes.Gray; }
     }
 }

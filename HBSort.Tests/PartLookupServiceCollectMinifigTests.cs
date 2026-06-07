@@ -286,6 +286,8 @@ public class PartLookupServiceCollectMinifigTests : IDisposable
         public Task<List<BlMinifigSubsetMatch>> FindMinifigsContainingPartAsync(string blPartNo,
             int blColorId, CancellationToken ct = default)
             => throw new NotImplementedException();
+        public Task<List<PartComponent>> GetPartComponentsAsync(string blPartNo, int blColorId, CancellationToken ct = default)
+            => throw new NotImplementedException();
     }
 
     /// <summary>RaiseDataChanged-NoOp - die Anzahl ist fuer diese Tests irrelevant.</summary>

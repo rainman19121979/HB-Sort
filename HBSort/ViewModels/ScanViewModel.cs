@@ -1300,6 +1300,10 @@ public partial class ScanViewModel : ObservableObject, IDisposable
         // Known-Colors fuer Korrektur-Dropdown laden
         LoadKnownColorsForPendingPartAsync(pending).FireAndForget("PartScan-LoadKnownColors");
 
+        // v0.1.25: Komponenten eines Combined Part (Torso -> Arme + Haende) laden.
+        // Reine Info-Anzeige aus dem lokalen Cache, best-effort.
+        LoadPartComponentsAsync(pending).FireAndForget("PartScan-LoadComponents");
+
         // BL-Catalog-Treffer-Bilder im Hintergrund nachladen
         // v0.1.23-beta.2 Fix C: vorigen Lauf canceln + neue CTS.
         _blCatalogImagesCts?.Cancel();
@@ -1355,6 +1359,10 @@ public partial class ScanViewModel : ObservableObject, IDisposable
 
         LoadPartImageAsync(pending).FireAndForget("PartReLookup-LoadImage");
 
+        // v0.1.25: Komponenten ebenfalls neu laden (Farbe kann andere Subset-Farben
+        // ergeben; im Normalfall identisch, aber konsistent zum Re-Lookup-Pfad).
+        LoadPartComponentsAsync(pending).FireAndForget("PartReLookup-LoadComponents");
+
         // v0.1.23-beta.2 Fix C: vorigen Lauf canceln + neue CTS.
         _blCatalogImagesCts?.Cancel();
         _blCatalogImagesCts?.Dispose();
@@ -1405,6 +1413,87 @@ public partial class ScanViewModel : ObservableObject, IDisposable
         catch (Exception ex)
         {
             Log.Debug(ex, "Konnte Part-Bild nicht laden ({Part}/{Color})", pending.BlPartNo, pending.BlColorId);
+        }
+    }
+
+    /// <summary>
+    /// v0.1.25: laedt die Komponenten eines "Combined Part" (z.B. montierter Torso →
+    /// bare Torso + Arme + Haende) aus dem lokalen bl_cache.db und zieht pro
+    /// Komponente best-effort das Bild nach. KEIN BL-API-Call. Atomare Teile
+    /// liefern eine leere Liste → der Expander in der View erscheint gar nicht.
+    /// </summary>
+    private async Task LoadPartComponentsAsync(PartLookupViewModel pending)
+    {
+        try
+        {
+            var components = await _blCatalog.GetPartComponentsAsync(pending.BlPartNo, pending.BlColorId);
+            if (components.Count == 0)
+            {
+                // Atomares Teil: nichts anzuzeigen. Trotzdem ApplyComponents rufen,
+                // damit eine ggf. alte Liste (nach Farb-Korrektur) geleert wird.
+                pending.ApplyComponents(components);
+                return;
+            }
+
+            pending.ApplyComponents(components);
+
+            // Bilder pro Komponente nachziehen (best-effort, wie die anderen Bild-Lader).
+            foreach (var comp in pending.Components.ToList())
+            {
+                if (!string.IsNullOrEmpty(comp.ImageUrl)) continue;
+                try
+                {
+                    // B3-Fix (Praxis-Test 2026-06-07): Das Grund-Teil (IsBaseItem)
+                    // kommt aus bl_subsets mit ColorId=0 ("Not Applicable"). Frueher
+                    // schickten wir dann null an den Provider -> Lookup-Pfad /PN/0/...
+                    // -> 404, weil BL fuer bare-Torsos kein farbloses Bild hat. Das
+                    // Bild existiert aber unter der konkreten Scan-Farbe (visuell im
+                    // BL-Catalog verifiziert: z.B. /PN/85/973pb1727.png). Daher fuer
+                    // ein Grund-Teil mit ColorId=0 die echte Scan-Farbe (pending.BlColorId)
+                    // verwenden. Alle anderen Komponenten behalten ihre eigene Farbe
+                    // bzw. null (farblos), wie bisher.
+                    //
+                    // Brickognize-ID-Form-Befund (offene Frage aus dem vorigen Feature,
+                    // hier geklaert): Brickognize liefert die complete-ID, der direkte
+                    // Pfad in GetPartComponentsAsync reicht; der Reverse-Fallback ist
+                    // nur Robustness-Reserve.
+                    int? lookupColorId;
+                    if (comp.ColorId > 0)
+                    {
+                        lookupColorId = comp.ColorId;
+                    }
+                    else if (comp.IsBaseItem && pending.BlColorId > 0)
+                    {
+                        // bare-Teile haben oft kein Bild unter Color=0,
+                        // aber unter der konkreten Scan-Farbe (siehe Log 2026-06-07).
+                        lookupColorId = pending.BlColorId;
+                    }
+                    else
+                    {
+                        lookupColorId = null;
+                    }
+
+                    var url = await _imageProvider.GetImageFileByBlAsync(
+                        "P", comp.ItemNo, lookupColorId);
+                    if (!string.IsNullOrEmpty(url))
+                    {
+                        var disp = System.Windows.Application.Current?.Dispatcher;
+                        if (disp != null)
+                            await disp.InvokeAsync(() => comp.ImageUrl = url);
+                        else
+                            comp.ImageUrl = url;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug(ex, "Komponenten-Bild fuer {Item}/{Color} nicht ladbar",
+                        comp.ItemNo, comp.ColorId);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Komponenten-Lookup fuer {Part} fehlgeschlagen", pending.BlPartNo);
         }
     }
 

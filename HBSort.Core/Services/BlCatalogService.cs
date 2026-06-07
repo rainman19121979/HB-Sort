@@ -555,6 +555,103 @@ public class BlCatalogService : IBlCatalogService
         string blPartNo, int blColorId, CancellationToken ct = default)
         => _cache.FindMinifigsContainingPartAsync(blPartNo, blColorId, ct);
 
+    // ========================================================================
+    // v0.1.25: Komponenten eines "Combined Part" (Torso -> Arme + Haende)
+    // ========================================================================
+
+    public async Task<List<PartComponent>> GetPartComponentsAsync(
+        string blPartNo, int blColorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(blPartNo))
+            return new List<PartComponent>();
+
+        // --- Pfad 1: direkter Lookup ---
+        // Wenn Brickognize die complete-ID (z.B. "973pb01c01") liefert, stehen die
+        // Subsets direkt unter diesem Parent.
+        var subsets = await _cache.GetSubsetsAsync("P", blPartNo, ct);
+
+        // Den Parent merken, dessen Subsets wir am Ende verwenden - fuer die
+        // IsBaseItem-Heuristik (ItemNo ist Praefix der complete-ID).
+        var resolvedParentNo = blPartNo;
+
+        // --- Pfad 2: Reverse-Fallback ---
+        // Falls leer: Brickognize hat moeglicherweise die bare-ID ("973pb01")
+        // geliefert. Dann haengen die Subsets am complete-Parent (cXX). Wir suchen
+        // ueber den Reverse-Index welcher Parent dieses bare-Teil als Kind enthaelt
+        // und nehmen den ersten echten Parent (nicht das bare-Teil selbst).
+        //
+        // HINWEIS (Praxis-Test offen): Ob Brickognize beim Scan eines montierten
+        // Torsos die bare- oder die complete-ID liefert, ist noch nicht final
+        // verifiziert (siehe Konzept Sektion 3). Deshalb implementieren wir beide
+        // Pfade - robust gegen beide Verhalten.
+        if (subsets.Count == 0)
+        {
+            var parents = await _cache.FindParentsByItemAsync("P", blPartNo, blColorId, ct);
+            // Ersten Parent nehmen, der NICHT das bare-Teil selbst ist (= der cXX-Parent).
+            var completeParent = parents.FirstOrDefault(p => p != blPartNo);
+            if (completeParent != null)
+            {
+                resolvedParentNo = completeParent;
+                subsets = await _cache.GetSubsetsAsync("P", completeParent, ct);
+                Log.Debug("PartComponents Reverse-Fallback P:{Bare} -> Parent {Parent} ({Count} Subsets)",
+                    blPartNo, completeParent, subsets.Count);
+            }
+        }
+
+        if (subsets.Count == 0)
+            return new List<PartComponent>();
+
+        // --- Filter ---
+        // Defensiv konsistent mit dem Minifig-Subset-Pfad. In der Praxis fast ein
+        // No-Op bei parent_type='P' (siehe Konzept Sektion 2), aber zukunftssicher.
+        var filtered = subsets
+            .Where(s => !s.IsAlternate && !s.IsCounterpart && !s.IsFromSupersets)
+            .ToList();
+
+        if (filtered.Count == 0)
+            return new List<PartComponent>();
+
+        // --- Anreicherung: Farben aus dem Cache (bl_colors) ---
+        var allColors = await _cache.GetAllColorsAsync(ct);
+        var colorById = allColors.ToDictionary(c => c.ColorId, c => c);
+
+        var result = new List<PartComponent>();
+        foreach (var s in filtered)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            // Name aus bl_items (Cache-only, kein BL-Call). Fallback = ItemNo.
+            var item = await _cache.GetItemAsync(s.ItemType, s.ItemNo, ct);
+            var itemName = string.IsNullOrEmpty(item?.Name) ? s.ItemNo : item!.Name;
+
+            colorById.TryGetValue(s.ColorId, out var color);
+
+            // IsBaseItem-Heuristik: das Grund-Teil ist die bare-Form, deren ItemNo
+            // ein Praefix der complete-ID ist (Self-Reference, z.B. "973pb01" in
+            // "973pb01c01"). Greift sowohl im direkten Pfad als auch im Reverse-Pfad,
+            // da wir resolvedParentNo entsprechend mitfuehren.
+            var isBaseItem = !string.IsNullOrEmpty(s.ItemNo)
+                             && resolvedParentNo.StartsWith(s.ItemNo, StringComparison.OrdinalIgnoreCase)
+                             && resolvedParentNo.Length > s.ItemNo.Length;
+
+            result.Add(new PartComponent
+            {
+                ItemNo = s.ItemNo,
+                ItemName = itemName,
+                ColorId = s.ColorId,
+                ColorName = color?.Name ?? string.Empty,
+                ColorRgb = color?.Rgb,
+                Quantity = s.Quantity,
+                IsBaseItem = isBaseItem
+            });
+        }
+
+        // Grund-Teil zuerst (es ist das "Haupt-Teil"), danach die uebrigen Komponenten.
+        return result
+            .OrderByDescending(c => c.IsBaseItem)
+            .ToList();
+    }
+
     public async Task<List<BlColor>> GetKnownColorsAsync(string blPartNo, CancellationToken ct = default)
     {
         // 1) Cache-Hit?
