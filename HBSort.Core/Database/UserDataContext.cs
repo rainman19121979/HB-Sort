@@ -114,6 +114,14 @@ public class UserDataContext : DbContext
             // ScanType als String speichern
             entity.Property(e => e.Type)
                 .HasConversion<string>();
+
+            // PERF-5: Absteigender Index auf Timestamp. Die Hauptpfade
+            // (RecentScansViewModel.RefreshAsync, UndoService.GetUndoableActionsAsync,
+            // UndoService.GetHistoryAsync) machen alle "ORDER BY Timestamp DESC LIMIT N"
+            // gegen die monoton wachsende ScanEvents-Tabelle. Ohne Index ist das ein
+            // Full-Scan + Sort. Der absteigende Index liefert die juengsten Eintraege
+            // direkt sortiert, ohne dass die ganze Tabelle gelesen werden muss.
+            entity.HasIndex(e => e.Timestamp).IsDescending();
         });
 
         // --- DailyStats ---
