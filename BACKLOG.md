@@ -473,6 +473,43 @@ abgegrenzter Bug-Fix, BUILD-2 braucht Konzept-Vorlauf. Im Idealfall:
 BUILD-1 als eigene kleine Iteration nach PERF-4, dann BUILD-2 mit
 Konzept + Bau in einer weiteren.
 
+- 📋 **BUILD-3: Wartende Figuren tauchen nicht als baubar auf, obwohl
+  Lager+BL die fehlenden Teile haben** (User-Praxis 2026-06-07, Lesart
+  vom User bestaetigt). Eine wartende Figur (Status=Waiting) hat
+  typischerweise 3 von 5 Teilen gesammelt; die fehlenden 2 koennten
+  aus dem HBSort-Lager (FloatingPart-Stock) oder dem BL-Inventar
+  ergaenzt werden. Aktuell erscheint diese Figur NICHT im Baubar-Tab
+  als komplettierbarer Vorschlag.
+  
+  **Abgrenzung zu BUILD-2:** BUILD-2 will wartende Figuren als *Quelle*
+  nutzen (ausschlachten fuer andere). BUILD-3 will sie als *Ziel* zeigen
+  (komplettieren). BUILD-3 ist deutlich einfacher — keine Reservierungs-
+  Wechselwirkungen, nur eine Anzeige-/Filter-Erweiterung.
+  
+  **Abgrenzung zu BUILD-1:** beide haben dieselbe Grund-Logik ("Figur
+  taucht nicht im Baubar-Tab auf, obwohl baubar"), aber unterschiedliche
+  Ausschluss-Kriterien:
+  - BUILD-1: Filter auf HBSort-Lager-Inhalt (mindestens 1 Teil noetig)
+  - BUILD-3: Filter auf Status=Waiting (wartende werden vermutlich gar
+    nicht als Baubar-Kandidaten betrachtet)
+  
+  **Vorab klaeren bevor Bau:**
+  - Ist der Ausschluss von Status=Waiting Absicht oder Versehen?
+    Komplettieren-Workflow existiert ja schon im Sortier-Tab. Wenn das
+    bewusst war, ist BUILD-3 eher ein UX-Wunsch ("zeig mir auch im
+    Baubar-Tab welche wartenden sich gerade komplettieren liessen")
+    statt Bug-Fix.
+  - Wie sieht die Anzeige aus? Eigene Sektion "Wartende komplettierbar"
+    im Baubar-Tab oder unter den normalen Vorschlaegen mit Badge?
+  - Werden BL-Reservierungen die schon auf der wartenden Figur sitzen
+    angezeigt?
+  
+  **Empfehlung:** zusammen mit BUILD-1 anschauen — wenn beim Lesen des
+  BuildSuggestionsViewModel-Pfads klar wird, dass beide nur Filter-
+  Erweiterungen sind, kann man sie in einer Iteration mitnehmen.
+  Quelle: User-Praxis 2026-06-07. Schwere: M. Aufwand: ~30min Klaerung
+  + ~1-2h Bau (Hausnummer, je nach Filter-Komplexitaet).
+
 #### Aus Praxis-Nutzung (PERF-5-Test, 2026-06-07) — Beschreibung-Spalte
 
 Waehrend des PERF-5-Praxis-Tests im Temporaeren Inventar aufgefallen.
