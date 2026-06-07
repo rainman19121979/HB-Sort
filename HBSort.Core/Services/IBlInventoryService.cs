@@ -69,6 +69,25 @@ public interface IBlInventoryService
         string blPartNo, int? colorId, CancellationToken ct = default);
 
     /// <summary>
+    /// BUILD-3 (N+1-Hang Baubar-Tab): Bulk-Variante von
+    /// <see cref="FindLotsForPartAsync"/> fuer die verfuegbaren Mengen vieler
+    /// Teile in EINER DB-Query. Liefert pro angefragtem (PartNo, ColorId)-Paar
+    /// die Summe der verfuegbaren Mengen (<c>Quantity - ReservedQuantity</c>,
+    /// nur Lots mit Available &gt; 0) ueber alle passenden Teile-Lots
+    /// (<c>ItemType == "P"</c>).
+    ///
+    /// <para>Ergebnis-Identitaet zu <see cref="FindLotsForPartAsync"/>:
+    /// <c>AnalyzeBlShopHelpAsync</c> summierte bisher
+    /// <c>lots.Sum(l =&gt; l.Quantity - l.ReservedQuantity)</c> ueber das
+    /// Ergebnis von FindLotsForPartAsync (das bereits Available&lt;=0 ausfiltert).
+    /// Diese Methode liefert exakt denselben Summen-Wert. Paare ohne verfuegbares
+    /// Lot tauchen NICHT im Result auf (Caller behandelt fehlend wie 0 - identisch
+    /// zur leeren Lot-Liste von FindLotsForPartAsync).</para>
+    /// </summary>
+    Task<Dictionary<(string PartNo, int ColorId), int>> GetAvailableQuantitiesAsync(
+        IEnumerable<(string PartNo, int ColorId)> parts, CancellationToken ct = default);
+
+    /// <summary>
     /// Reserviert <paramref name="qty"/> Einheiten eines Lots: erhoeht
     /// <see cref="BlInventoryLot.ReservedQuantity"/>. Liefert true bei
     /// Erfolg, false wenn das Lot nicht (mehr) existiert oder nicht

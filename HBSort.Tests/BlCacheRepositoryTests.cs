@@ -518,4 +518,121 @@ public class BlCacheRepositoryTests : IDisposable
         Assert.NotNull(result);
         Assert.Empty(result);
     }
+
+    // ========================================================================
+    // FindMinifigsContainingPartsAsync - Skalierung (Crash-Fix)
+    // ========================================================================
+
+    [Fact]
+    public async Task FindMinifigsContainingPartsAsync_handles_empty_input()
+    {
+        // Leerer Input darf nie crashen und liefert eine leere Liste.
+        var result = await _sut.FindMinifigsContainingPartsAsync(
+            Array.Empty<(string, int)>());
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task FindMinifigsContainingPartsAsync_scales_to_large_pool_without_crash()
+    {
+        // Reproduktions-Test fuer den Skalierungs-Crash:
+        // Frueher baute die Methode eine OR-Liste mit N Klauseln. Bei einem
+        // grossen Pool (BUILD-1 uebergibt das ganze BL-Inventar, ~9.000+ Tuples)
+        // sprengt das die SQLite-Limit "Expression tree is too large
+        // (maximum depth 1000)".
+        //
+        // Wir legen einen Subset-Eintrag an, der auf eines der Tuples matcht,
+        // und uebergeben dann einen sehr grossen Pool (2000 Tuples).
+
+        // Ein "echter" Subset-Eintrag: Minifig "arc007" enthaelt Teil "3626" in Farbe 11.
+        await _sut.ReplaceSubsetsAsync("M", "arc007", new[]
+        {
+            new BlSubset
+            {
+                ParentType = "M", ParentNo = "arc007",
+                ItemType = "P", ItemNo = "3626", ColorId = 11,
+                Quantity = 1, IsFromSupersets = false
+            }
+        });
+
+        // Grosser Such-Pool: 2000 Tuples, weit ueber der 1000-Tiefe-Grenze.
+        // Das erste Tuple matcht den eingefuegten Subset, der Rest ist Fuellmaterial.
+        var pool = new List<(string PartNo, int ColorId)>
+        {
+            ("3626", 11)
+        };
+        for (int i = 0; i < 2000; i++)
+            pool.Add(($"dummy{i}", i % 50));
+
+        // Vor dem Fix: SqliteException "Expression tree is too large".
+        // Nach dem Fix: kein Crash, korrektes Ergebnis.
+        var result = await _sut.FindMinifigsContainingPartsAsync(pool);
+
+        Assert.Contains("arc007", result);
+    }
+
+    // ========================================================================
+    // BUILD-1 Perf-Fix (v0.1.25): Index auf der TEMP-Such-Tabelle.
+    //
+    // Gemessene Wurzel (Diagnose 2026-06-07, echte DB mit 1,38 Mio
+    // bl_subsets-Zeilen): JOIN ohne Index auf temp_search_parts = 43,7s,
+    // mit Index temp_search_parts(part_no, color_id) = 0,049s (identisch
+    // 3651 Parents). Ohne Index waehlt SQLite einen quadratischen Join-Plan.
+    //
+    // Ein Timing-Test bei 1,3 Mio Zeilen ist fuer CI zu schwer. Deshalb
+    // deterministisch via EXPLAIN QUERY PLAN: der Plan muss fuer
+    // temp_search_parts einen indizierten Lookup (SEARCH ... USING INDEX)
+    // zeigen, NICHT einen Full-Scan (SCAN temp_search_parts).
+    // ========================================================================
+
+    [Fact]
+    public async Task FindMinifigsContainingPartsAsync_join_uses_index_on_temp_search_parts()
+    {
+        // Funktionskorrektheit zuerst absichern: ein Subset-Eintrag, der von
+        // einem der ~100 Such-Tuples getroffen wird.
+        await _sut.ReplaceSubsetsAsync("M", "arc007", new[]
+        {
+            new BlSubset
+            {
+                ParentType = "M", ParentNo = "arc007",
+                ItemType = "P", ItemNo = "3626", ColorId = 11,
+                Quantity = 1, IsFromSupersets = false
+            }
+        });
+
+        var pool = new List<(string PartNo, int ColorId)> { ("3626", 11) };
+        for (int i = 0; i < 100; i++)
+            pool.Add(($"dummy{i}", i % 20));
+
+        // Echten Methoden-Aufruf machen: legt die TEMP-Tabelle (und - nach dem
+        // Fix - den Index) auf der langlebigen Connection an und fuellt sie.
+        var result = await _sut.FindMinifigsContainingPartsAsync(pool);
+        Assert.Contains("arc007", result); // Ergebnis-Korrektheit bleibt erhalten.
+
+        // Den Query-Plan derselben JOIN-Query auf derselben Connection holen.
+        var plan = _sut.GetFindMinifigsJoinQueryPlanForDiagnostics();
+        var planText = string.Join(" | ", plan);
+
+        // Beweis-Assertion: die Such-Tabelle (in der JOIN-Query als "t"
+        // aliasiert) muss per Index durchsucht werden.
+        //
+        // SQLite nennt im Plan den Tabellen-ALIAS ("t"), nicht den vollen
+        // Tabellen-Namen. Eindeutig und stabil ist dagegen der Index-Name
+        // temp_idx_search_parts, der nur auf temp_search_parts existiert.
+        // Vor dem Fix (kein Index): Plan enthaelt "SCAN t" -> ROT.
+        // Nach dem Fix (CREATE INDEX): "SEARCH t USING INDEX
+        // temp_idx_search_parts" -> GRUEN.
+        Assert.Contains(plan, line =>
+            line.Contains("SEARCH", StringComparison.OrdinalIgnoreCase)
+            && line.Contains("temp_idx_search_parts", StringComparison.OrdinalIgnoreCase));
+
+        // Gegenprobe: die Such-Tabelle "t" darf nicht voll gescannt werden.
+        Assert.DoesNotContain(plan, line =>
+            line.TrimStart().StartsWith("SCAN t", StringComparison.OrdinalIgnoreCase)
+            && !line.Contains("USING INDEX", StringComparison.OrdinalIgnoreCase));
+
+        // Sicherheitsnetz fuer den Fall dass die Plan-Texte sich aendern.
+        Assert.False(string.IsNullOrWhiteSpace(planText), "Query-Plan war leer.");
+    }
 }

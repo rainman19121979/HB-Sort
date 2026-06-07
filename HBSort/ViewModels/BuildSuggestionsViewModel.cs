@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HBSort.Core.Database;
 using HBSort.Core.Models;
+using HBSort.Core.Models.Bricklink;
 using HBSort.Core.Models.Pricing;
 using HBSort.Core.Services;
 using HBSort.Services;
@@ -343,15 +344,37 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
                 f => (f.PartNo, f.ColorId),
                 f => f.TotalQty);
 
-            var suggestions = new List<BuildSuggestionItem>();
-            foreach (var blMinifigId in minifigIds)
-            {
-                if (trackedSet.Contains(blMinifigId)) continue;
+            // BUILD-3 (N+1-Hang Fix): Statt pro Kandidat zwei serialisierte
+            // Repository-Queries (GetSubsetsAsync + GetItemAsync) zu machen -
+            // was bei Holgers 9k-Inventar tausende Kandidaten und damit zehntausende
+            // Queries unter dem Repo-Lock bedeutete (UI-Hang) - laden wir die
+            // Subsets + Item-Namen ALLER Kandidaten EINMAL vorab (Bulk, je in
+            // 500er-Chunks) und iterieren danach rein im Speicher.
+            //
+            // Wir filtern die getrackten Figuren VOR dem Bulk-Load raus, damit
+            // wir nicht unnoetig Daten fuer ausgeschlossene Kandidaten ziehen.
+            var candidateIds = minifigIds
+                .Where(id => !trackedSet.Contains(id))
+                .ToList();
 
-                var subsets = await _blCache.GetSubsetsAsync("M", blMinifigId);
-                // Pseudo-Eintraege filtern (Repository-Query macht das schon, aber
-                // GetSubsetsAsync liest die Subsets direkt - hier nochmal sicherheitshalber).
-                subsets = subsets.Where(s => !s.IsFromSupersets && s.ItemType == "P").ToList();
+            // (a) Subsets aller Kandidaten in einer Bulk-Query (pro Chunk eine
+            //     IN-Query). Liefert ALLE Subsets - die Pseudo-Eintrag-Filterung
+            //     (is_from_supersets=0, item_type='P') bleibt hier in der VM,
+            //     exakt wie vorher bei GetSubsetsAsync.
+            var allSubsets = await _blCache.GetSubsetsBulkAsync("M", candidateIds);
+
+            // (b) Item-Namen aller Kandidaten via existierende Bulk-Methode.
+            var summaryKeys = candidateIds.Select(id => ("M", id)).ToList();
+            var allSummaries = await _blCache.GetItemSummariesAsync(summaryKeys);
+
+            var suggestions = new List<BuildSuggestionItem>();
+            // (c) Reine In-Memory-Iteration - KEINE DB-Queries mehr in der Schleife.
+            foreach (var blMinifigId in candidateIds)
+            {
+                if (!allSubsets.TryGetValue(blMinifigId, out var rawSubsets))
+                    continue; // kein Subset-Eintrag -> wie leere Liste behandeln
+                // Pseudo-Eintraege filtern - identisch zum alten Per-Parent-Pfad.
+                var subsets = rawSubsets.Where(s => !s.IsFromSupersets && s.ItemType == "P").ToList();
                 if (subsets.Count == 0) continue;
 
                 var totalNeeded = subsets.Sum(s => s.Quantity);
@@ -371,13 +394,16 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
                 // Kein Mindest-Schwellenwert mehr - alle baubaren Vorschlaege
                 // werden gezeigt, sortiert nach Match-% absteigend.
 
-                var item = await _blCache.GetItemAsync("M", blMinifigId);
-                if (item == null) continue;
+                // Item-Name aus dem Bulk-Summary. Fehlt der Eintrag (kein
+                // bl_items-Match) -> ueberspringen, exakt wie vorher bei
+                // GetItemAsync == null.
+                if (!allSummaries.TryGetValue(("M", blMinifigId), out var summary))
+                    continue;
 
                 suggestions.Add(new BuildSuggestionItem
                 {
                     BricklinkId = blMinifigId,
-                    Name = item.Name,
+                    Name = summary.Name,
                     MatchPercent = matchPercent,
                     TotalParts = subsets.Count,
                     MissingPartsCount = missingPartCount,
@@ -421,7 +447,10 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
             var shopHelp = new Dictionary<string, (int helpCount, bool canComplete)>(StringComparer.OrdinalIgnoreCase);
             if (IncludeBlInventory && HasAnyBlInventory)
             {
-                shopHelp = await AnalyzeBlShopHelpAsync(suggestions, haveMap);
+                // BUILD-3: Subsets sind bereits gebulkt (allSubsets) - kein
+                // erneutes Per-Kandidat-Laden. Das BL-Inventar wird in EINER
+                // Bulk-Query statt N FindLotsForPartAsync abgefragt.
+                shopHelp = await AnalyzeBlShopHelpAsync(suggestions, haveMap, allSubsets);
             }
 
             // Kat.2-IDs (Shop-completable). Nur in Modus 2 relevant.
@@ -571,23 +600,51 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
     /// Jetzt unified: Caller entscheidet ob er nur canComplete=true (Kat.2)
     /// oder auch helpCount &gt; 0 (Kat.3-Annotation) nutzt.
     /// </summary>
+    /// <param name="allSubsets">
+    /// BUILD-3: bereits in RefreshAsync gebulkte Subsets (parentNo -&gt; Subset-Liste,
+    /// UNgefiltert). Wird hier wiederverwendet statt pro Kandidat erneut geladen.
+    /// </param>
     private async Task<Dictionary<string, (int helpCount, bool canComplete)>> AnalyzeBlShopHelpAsync(
         List<BuildSuggestionItem> allCandidates,
-        Dictionary<(string PartNo, int ColorId), int> haveMap)
+        Dictionary<(string PartNo, int ColorId), int> haveMap,
+        Dictionary<string, List<BlSubset>> allSubsets)
     {
         var result = new Dictionary<string, (int helpCount, bool canComplete)>(StringComparer.OrdinalIgnoreCase);
         var teilbare = allCandidates.Where(s => s.MatchPercent < 100).ToList();
+        if (teilbare.Count == 0) return result;
 
-        // Verfuegbarkeits-Map fuer BL-Inventar - eine Query pro (Part, Color)
-        // gecached, damit wir bei vielen Kandidaten mit gleichen Parts nicht
-        // N-mal die DB fragen.
-        var blCache = new Dictionary<(string, int), int>();
+        // BUILD-3: pro Kandidat die (bereits gebulkten) Subsets nehmen, Pseudo-
+        // Eintraege filtern (identisch zum alten Pfad) und in einem Pass ALLE
+        // (PartNo, ColorId)-Paare sammeln, fuer die ueberhaupt BL-Hilfe gebraucht
+        // wird. So koennen wir die Verfuegbarkeit in EINER Bulk-Query holen
+        // statt N FindLotsForPartAsync-Calls.
+        var filteredSubsets = new Dictionary<string, List<BlSubset>>(StringComparer.Ordinal);
+        var neededKeys = new HashSet<(string PartNo, int ColorId)>();
 
         foreach (var c in teilbare)
         {
-            var subsets = await _blCache.GetSubsetsAsync("M", c.BricklinkId);
-            subsets = subsets.Where(s => !s.IsFromSupersets && s.ItemType == "P").ToList();
+            if (!allSubsets.TryGetValue(c.BricklinkId, out var raw)) continue;
+            var subsets = raw.Where(s => !s.IsFromSupersets && s.ItemType == "P").ToList();
             if (subsets.Count == 0) continue;
+            filteredSubsets[c.BricklinkId] = subsets;
+
+            foreach (var s in subsets)
+            {
+                haveMap.TryGetValue((s.ItemNo, s.ColorId), out var hbHave);
+                var stillNeeded = s.Quantity - Math.Min(hbHave, s.Quantity);
+                if (stillNeeded > 0)
+                    neededKeys.Add((s.ItemNo, s.ColorId));
+            }
+        }
+
+        // EINE Bulk-Query fuer alle benoetigten Teile. Liefert dieselbe Summe
+        // (Quantity - ReservedQuantity, nur Available > 0) wie das alte
+        // FindLotsForPartAsync.Sum(...). Fehlendes Paar == 0 verfuegbar.
+        var blAvailMap = await _blInventory.GetAvailableQuantitiesAsync(neededKeys);
+
+        foreach (var c in teilbare)
+        {
+            if (!filteredSubsets.TryGetValue(c.BricklinkId, out var subsets)) continue;
 
             int blHelp = 0;
             bool canComplete = true;
@@ -600,12 +657,7 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
                 var stillNeeded = s.Quantity - hbTaken;
                 if (stillNeeded <= 0) continue;
 
-                if (!blCache.TryGetValue(key, out var blAvail))
-                {
-                    var lots = await _blInventory.FindLotsForPartAsync(s.ItemNo, s.ColorId);
-                    blAvail = lots.Sum(l => l.Quantity - l.ReservedQuantity);
-                    blCache[key] = blAvail;
-                }
+                blAvailMap.TryGetValue(key, out var blAvail);
 
                 var blTaken = Math.Min(stillNeeded, blAvail);
                 blHelp += blTaken;

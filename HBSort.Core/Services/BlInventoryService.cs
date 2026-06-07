@@ -216,6 +216,51 @@ public class BlInventoryService : IBlInventoryService
             .ToList();
     }
 
+    public async Task<Dictionary<(string PartNo, int ColorId), int>> GetAvailableQuantitiesAsync(
+        IEnumerable<(string PartNo, int ColorId)> parts, CancellationToken ct = default)
+    {
+        var result = new Dictionary<(string, int), int>();
+        if (parts == null) return result;
+
+        // Anfrage-Set deduplizieren (das brauchen wir auch um nach dem
+        // In-Memory-Available-Filter nur die angefragten Paare zu behalten).
+        var wanted = parts
+            .Where(p => !string.IsNullOrWhiteSpace(p.PartNo))
+            .Distinct()
+            .ToHashSet();
+        if (wanted.Count == 0) return result;
+
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+
+        // BUILD-3: Statt einer riesigen Contains()-IN-Klausel (bei Holgers
+        // 9k-Inventar tausende Parameter -> EF-Translation + SQLite-Execution
+        // wurden selbst zum Flaschenhals) holen wir ALLE Teile-Lots EINMAL und
+        // werten in-memory aus. Das BlInventory hat typisch ein paar tausend
+        // Lots - ein einziger Table-Scan ueber die schmale Projektion ist
+        // deutlich billiger als eine mehrere-tausend-Element-IN-Query.
+        //
+        // Available (= Quantity - ReservedQuantity) ist eine computed Property
+        // und kann ohnehin nicht per SQL gefiltert werden - genau wie bei
+        // FindLotsForPartAsync laeuft der Available-Filter in-memory.
+        var lots = await ctx.BlInventoryLots
+            .AsNoTracking()
+            .Where(l => l.ItemType == "P" && l.ColorId != null)
+            .Select(l => new { l.ItemNo, l.ColorId, l.Quantity, l.ReservedQuantity })
+            .ToListAsync(ct);
+
+        foreach (var l in lots)
+        {
+            var key = (l.ItemNo, l.ColorId!.Value);
+            if (!wanted.Contains(key)) continue; // nur angefragte Paare
+            var available = l.Quantity - l.ReservedQuantity;
+            if (available <= 0) continue; // identisch zu FindLotsForPartAsync-Filter
+            result.TryGetValue(key, out var sum);
+            result[key] = sum + available;
+        }
+
+        return result;
+    }
+
     public async Task<bool> ReserveAsync(int lotId, int qty = 1, CancellationToken ct = default)
     {
         if (qty <= 0) return false;

@@ -416,11 +416,40 @@ public class BuildSuggestionsViewModelTests : IDisposable
             return Task.FromResult(list ?? new List<BlSubset>());
         }
 
+        // BUILD-3: Bulk-Subsets. Spiegelt das echte Repository - liefert pro
+        // bekanntem Parent die (ungefilterte) Subset-Liste; unbekannte Parents
+        // tauchen nicht im Dict auf.
+        public Task<Dictionary<string, List<BlSubset>>> GetSubsetsBulkAsync(
+            string parentType, IReadOnlyList<string> parentNos, CancellationToken ct = default)
+        {
+            var result = new Dictionary<string, List<BlSubset>>(StringComparer.Ordinal);
+            foreach (var no in parentNos.Distinct(StringComparer.Ordinal))
+            {
+                if (Subsets.TryGetValue(no, out var list) && list.Count > 0)
+                    result[no] = list;
+            }
+            return Task.FromResult(result);
+        }
+
         public Task<BlItem?> GetItemAsync(string itemType, string itemNo, CancellationToken ct = default)
         {
             if (Minifigs.TryGetValue(itemNo, out var name))
                 return Task.FromResult<BlItem?>(new BlItem { ItemType = "M", ItemNo = itemNo, Name = name });
             return Task.FromResult<BlItem?>(null);
+        }
+
+        // BUILD-3: RefreshAsync nutzt jetzt GetItemSummariesAsync (Bulk) statt
+        // GetItemAsync. Liefert Name (+ leere ImageUrl) pro bekanntem Minifig.
+        public Task<Dictionary<(string ItemType, string ItemNo), BlItemSummary>> GetItemSummariesAsync(
+            IEnumerable<(string ItemType, string ItemNo)> keys, CancellationToken ct = default)
+        {
+            var result = new Dictionary<(string ItemType, string ItemNo), BlItemSummary>();
+            foreach (var (type, no) in keys)
+            {
+                if (Minifigs.TryGetValue(no, out var name))
+                    result[(type, no)] = new BlItemSummary(name, null);
+            }
+            return Task.FromResult(result);
         }
 
         // --- Rest: nicht von RefreshAsync genutzt ---
@@ -429,7 +458,6 @@ public class BuildSuggestionsViewModelTests : IDisposable
         public Task UpsertItemsAsync(IEnumerable<BlItem> items, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<bool> IsItemStaleAsync(string itemType, string itemNo, int staleDays, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Dictionary<string, int>> GetCategoryIdsForPartsAsync(IEnumerable<string> partNumbers, CancellationToken ct = default) => throw new NotImplementedException();
-        public Task<Dictionary<(string ItemType, string ItemNo), BlItemSummary>> GetItemSummariesAsync(IEnumerable<(string ItemType, string ItemNo)> keys, CancellationToken ct = default) => throw new NotImplementedException();
         public Task ReplaceSubsetsAsync(string parentType, string parentNo, IEnumerable<BlSubset> subsets, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<int> BulkInsertSubsetsAsync(IEnumerable<BlSubset> subsets, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<List<string>> FindParentsByItemAsync(string itemType, string itemNo, int colorId, CancellationToken ct = default) => throw new NotImplementedException();
@@ -479,6 +507,30 @@ public class BuildSuggestionsViewModelTests : IDisposable
                 .Where(l => l.Quantity - l.ReservedQuantity > 0)
                 .ToList();
             return Task.FromResult(available);
+        }
+
+        // BUILD-3: AnalyzeBlShopHelpAsync nutzt jetzt diese Bulk-Methode statt
+        // N FindLotsForPartAsync. Liefert pro angefragtem Paar die Summe der
+        // verfuegbaren Mengen - identisch zu FindLotsForPartAsync.Sum(available).
+        public Task<Dictionary<(string PartNo, int ColorId), int>> GetAvailableQuantitiesAsync(
+            IEnumerable<(string PartNo, int ColorId)> parts, CancellationToken ct = default)
+        {
+            var wanted = parts.Distinct().ToHashSet();
+            var result = new Dictionary<(string PartNo, int ColorId), int>();
+            foreach (var list in Lots.Values)
+            {
+                foreach (var l in list)
+                {
+                    if (l.ItemType != "P" || !l.ColorId.HasValue) continue;
+                    var available = l.Quantity - l.ReservedQuantity;
+                    if (available <= 0) continue;
+                    var key = (l.ItemNo, l.ColorId.Value);
+                    if (!wanted.Contains(key)) continue;
+                    result.TryGetValue(key, out var sum);
+                    result[key] = sum + available;
+                }
+            }
+            return Task.FromResult(result);
         }
 
         public void RaiseInventoryChanged() => InventoryChanged?.Invoke(this, EventArgs.Empty);

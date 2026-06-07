@@ -607,6 +607,83 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         return Task.FromResult(result);
     }
 
+    public Task<Dictionary<string, List<BlSubset>>> GetSubsetsBulkAsync(
+        string parentType, IReadOnlyList<string> parentNos, CancellationToken ct = default)
+    {
+        // BUILD-3 (N+1-Hang Baubar-Tab): Bulk-Lookup analog GetItemSummariesAsync.
+        // Eine IN-Query pro 500er-Chunk statt einer Query pro Parent.
+        var result = new Dictionary<string, List<BlSubset>>(StringComparer.Ordinal);
+        if (parentNos == null) return Task.FromResult(result);
+
+        // Distinct, Leere raus - damit die IN-Klausel keine doppelten Parameter
+        // hat (gleicher Stil wie GetItemSummariesAsync/GetItemNamesAsync).
+        var input = parentNos
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (input.Count == 0) return Task.FromResult(result);
+
+        const int chunkSize = 500;
+        lock (_lock)
+        {
+            for (int offset = 0; offset < input.Count; offset += chunkSize)
+            {
+                ct.ThrowIfCancellationRequested();
+                var chunk = input.Skip(offset).Take(chunkSize).ToList();
+
+                using var cmd = _connection.CreateCommand();
+                cmd.Parameters.AddWithValue("$pt", parentType);
+                var paramNames = new string[chunk.Count];
+                for (int i = 0; i < chunk.Count; i++)
+                {
+                    var name = $"$p{i}";
+                    paramNames[i] = name;
+                    cmd.Parameters.AddWithValue(name, chunk[i]);
+                }
+                // Spalten-Reihenfolge + Sortierung IDENTISCH zu GetSubsetsAsync,
+                // damit die je-Parent-Liste byte-fuer-byte dieselbe ist. Wir
+                // nehmen parent_no als ersten Sort-Key auf, damit die Eintraege
+                // pro Parent zusammenhaengen - innerhalb eines Parents bleibt die
+                // Reihenfolge (match_id, color_id, item_no) erhalten.
+                cmd.CommandText = @"
+                    SELECT parent_type, parent_no, item_type, item_no, color_id,
+                           quantity, extra_quantity, is_alternate, is_counterpart,
+                           match_id, fetched_at, is_from_supersets
+                    FROM bl_subsets
+                    WHERE parent_type = $pt
+                      AND parent_no IN (" + string.Join(",", paramNames) + @")
+                    ORDER BY parent_no, match_id, color_id, item_no;";
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    var sub = new BlSubset
+                    {
+                        ParentType = reader.GetString(0),
+                        ParentNo = reader.GetString(1),
+                        ItemType = reader.GetString(2),
+                        ItemNo = reader.GetString(3),
+                        ColorId = reader.GetInt32(4),
+                        Quantity = reader.GetInt32(5),
+                        ExtraQuantity = reader.GetInt32(6),
+                        IsAlternate = reader.GetInt32(7) == 1,
+                        IsCounterpart = reader.GetInt32(8) == 1,
+                        MatchId = reader.GetInt32(9),
+                        FetchedAt = ParseUtc(reader.GetString(10)),
+                        IsFromSupersets = reader.GetInt32(11) == 1
+                    };
+                    if (!result.TryGetValue(sub.ParentNo, out var list))
+                    {
+                        list = new List<BlSubset>();
+                        result[sub.ParentNo] = list;
+                    }
+                    list.Add(sub);
+                }
+            }
+        }
+        return Task.FromResult(result);
+    }
+
     public Task ReplaceSubsetsAsync(string parentType, string parentNo, IEnumerable<BlSubset> subsets, CancellationToken ct = default)
     {
         lock (_lock)
@@ -754,39 +831,150 @@ public class BlCacheRepository : IBlCacheRepository, IDisposable
         if (parts == null || parts.Count == 0)
             return Task.FromResult(new List<string>());
 
-        // Wir bauen eine OR-Liste mit benannten Parametern. Der Index
-        // idx_bl_subsets_item (item_type, item_no, color_id) traegt jede
-        // einzelne Bedingung; bei vielen Teilen kann das langsam werden,
-        // aber bei realistischen Floating-Pool-Groessen (<100 verschiedene
-        // Teile) ist das vernachlaessigbar.
-        var clauses = new List<string>(parts.Count);
-        for (int i = 0; i < parts.Count; i++)
-            clauses.Add($"(item_no = $p{i} AND color_id = $c{i})");
-
-        var sql = "SELECT DISTINCT parent_no FROM bl_subsets " +
-                  "WHERE parent_type = 'M' AND item_type = 'P' " +
-                  "  AND is_from_supersets = 0 " +
-                  $"  AND ({string.Join(" OR ", clauses)});";
-
+        // Wir schreiben die Such-Tuples in eine TEMP-Tabelle und joinen
+        // gegen bl_subsets. So skaliert die Abfrage linear mit der Input-
+        // Groesse, statt eine riesige OR-Liste zu bauen. Eine OR-Liste mit
+        // vielen tausend Klauseln sprengt sonst das SQLite-Limit
+        // "Expression tree is too large (maximum depth 1000)" - das passiert
+        // real seit BUILD-1 das ganze BL-Inventar (~9.000+ Tuples) uebergibt.
+        //
+        // Die TEMP-Tabelle wird mit CREATE IF NOT EXISTS angelegt und zu
+        // Beginn geleert (DELETE), weil die SqliteConnection langlebig und
+        // geteilt ist und ueber mehrere Aufrufe wiederverwendet wird.
         var result = new List<string>();
         lock (_lock)
         {
-            using var cmd = _connection.CreateCommand();
-            cmd.CommandText = sql;
-            for (int i = 0; i < parts.Count; i++)
+            using var transaction = _connection.BeginTransaction();
+
+            // TEMP-Tabelle anlegen + zuruecksetzen.
+            using (var setup = _connection.CreateCommand())
             {
-                cmd.Parameters.AddWithValue($"$p{i}", parts[i].PartNo);
-                cmd.Parameters.AddWithValue($"$c{i}", parts[i].ColorId);
+                setup.Transaction = transaction;
+                setup.CommandText = @"
+                    CREATE TEMP TABLE IF NOT EXISTS temp_search_parts (
+                        part_no TEXT NOT NULL,
+                        color_id INTEGER NOT NULL);
+                    DELETE FROM temp_search_parts;";
+                setup.ExecuteNonQuery();
             }
+
+            // Bulk-Insert aller Such-Tuples via Prepared Statement
+            // (Stil-Vorbild: ReplaceSubsetsAsync).
+            using (var ins = _connection.CreateCommand())
+            {
+                ins.Transaction = transaction;
+                ins.CommandText =
+                    "INSERT INTO temp_search_parts (part_no, color_id) VALUES ($pn, $cid);";
+                var pPn = ins.CreateParameter(); pPn.ParameterName = "$pn"; ins.Parameters.Add(pPn);
+                var pCid = ins.CreateParameter(); pCid.ParameterName = "$cid"; ins.Parameters.Add(pCid);
+                ins.Prepare();
+
+                for (int i = 0; i < parts.Count; i++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    pPn.Value = parts[i].PartNo;
+                    pCid.Value = parts[i].ColorId;
+                    ins.ExecuteNonQuery();
+                }
+            }
+
+            // BUILD-1 Perf-Fix (v0.1.25): Index auf der Such-Tabelle anlegen,
+            // NACH dem Bulk-Insert und VOR der JOIN-Query.
+            //
+            // Ohne diesen Index waehlt SQLite bei grosser bl_subsets-Tabelle
+            // einen quadratischen Join-Plan (scannt alle bl_subsets-P-Zeilen und
+            // probt die index-lose Such-Tabelle pro Zeile). Gemessen auf der
+            // echten DB (1,38 Mio bl_subsets-Zeilen): 43,7s ohne Index vs 0,049s
+            // mit Index - bei identischem Ergebnis (3651 Parents). Der Index auf
+            // (part_no, color_id) macht den Join zum indizierten Lookup.
+            //
+            // CREATE INDEX IF NOT EXISTS ist idempotent: die TEMP-Tabelle wird
+            // ueber Aufrufe wiederverwendet (CREATE TEMP TABLE IF NOT EXISTS +
+            // DELETE). Der Index ueberlebt das DELETE (nur die Zeilen werden
+            // geleert) - ab dem zweiten Aufruf existiert er also schon und der
+            // Aufruf ist ein No-op.
+            using (var idx = _connection.CreateCommand())
+            {
+                idx.Transaction = transaction;
+                idx.CommandText =
+                    "CREATE INDEX IF NOT EXISTS temp_idx_search_parts " +
+                    "ON temp_search_parts(part_no, color_id);";
+                idx.ExecuteNonQuery();
+            }
+
+            // JOIN gegen bl_subsets. Exakt dieselben WHERE-Bedingungen wie
+            // die alte OR-Listen-Query, damit das Ergebnis identisch bleibt:
+            //   parent_type = 'M' AND item_type = 'P' AND is_from_supersets = 0.
+            using (var query = _connection.CreateCommand())
+            {
+                query.Transaction = transaction;
+                query.CommandText = @"
+                    SELECT DISTINCT s.parent_no
+                    FROM bl_subsets s
+                    INNER JOIN temp_search_parts t
+                        ON s.item_no = t.part_no AND s.color_id = t.color_id
+                    WHERE s.parent_type = 'M'
+                      AND s.item_type = 'P'
+                      AND s.is_from_supersets = 0;";
+
+                using var reader = query.ExecuteReader();
+                while (reader.Read())
+                {
+                    ct.ThrowIfCancellationRequested();
+                    result.Add(reader.GetString(0));
+                }
+            }
+
+            transaction.Commit();
+        }
+        return Task.FromResult(result);
+    }
+
+    /// <summary>
+    /// Test-/Diagnose-Hook (BUILD-1 Perf-Fix, v0.1.25): liefert den
+    /// EXPLAIN-QUERY-PLAN-Text der JOIN-Query aus
+    /// <see cref="FindMinifigsContainingPartsAsync"/> - exakt so wie die
+    /// Methode sie absetzt, auf derselben langlebigen Connection.
+    ///
+    /// Die TEMP-Tabelle <c>temp_search_parts</c> ist connection-lokal und
+    /// ueberlebt den Transaction-Commit der vorherigen Methode. Darum spiegelt
+    /// dieser Plan, ob der nach dem Bulk-Insert angelegte Index
+    /// <c>temp_idx_search_parts</c> wirklich existiert: ohne Index zeigt der
+    /// Plan <c>SCAN temp_search_parts</c> (quadratischer Join), mit Index
+    /// <c>SEARCH temp_search_parts USING INDEX</c> (indizierter Lookup).
+    ///
+    /// Bewusst public (statt internal + InternalsVisibleTo) - reiner
+    /// Test-Hook, kein Architektur-Risiko. Voraussetzung: vorher muss einmal
+    /// <see cref="FindMinifigsContainingPartsAsync"/> gelaufen sein, damit die
+    /// TEMP-Tabelle auf dieser Connection existiert.
+    /// </summary>
+    public List<string> GetFindMinifigsJoinQueryPlanForDiagnostics()
+    {
+        var plan = new List<string>();
+        lock (_lock)
+        {
+            using var cmd = _connection.CreateCommand();
+            // Exakt dieselbe JOIN-Query wie in FindMinifigsContainingPartsAsync,
+            // nur mit EXPLAIN QUERY PLAN davor.
+            cmd.CommandText = @"
+                EXPLAIN QUERY PLAN
+                SELECT DISTINCT s.parent_no
+                FROM bl_subsets s
+                INNER JOIN temp_search_parts t
+                    ON s.item_no = t.part_no AND s.color_id = t.color_id
+                WHERE s.parent_type = 'M'
+                  AND s.item_type = 'P'
+                  AND s.is_from_supersets = 0;";
 
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
-                ct.ThrowIfCancellationRequested();
-                result.Add(reader.GetString(0));
+                // EXPLAIN QUERY PLAN liefert (id, parent, notused, detail).
+                // Der "detail"-Text (letzte Spalte) enthaelt SCAN/SEARCH.
+                plan.Add(reader.GetString(reader.FieldCount - 1));
             }
         }
-        return Task.FromResult(result);
+        return plan;
     }
 
     public Task<List<BlMinifigSubsetMatch>> FindMinifigsContainingPartAsync(

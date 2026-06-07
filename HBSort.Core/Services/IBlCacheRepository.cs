@@ -75,6 +75,23 @@ public interface IBlCacheRepository
     Task<List<BlSubset>> GetSubsetsAsync(string parentType, string parentNo, CancellationToken ct = default);
 
     /// <summary>
+    /// BUILD-3 (N+1-Hang Baubar-Tab): Bulk-Variante von <see cref="GetSubsetsAsync"/>.
+    /// Liefert die Subsets fuer alle uebergebenen Parent-Nos eines Typs in
+    /// 500er-Chunks (eine IN-Query pro Chunk, SQLite-Parameter-Limit 999), als
+    /// <c>Dictionary&lt;parentNo, List&lt;BlSubset&gt;&gt;</c>.
+    ///
+    /// <para>Liefert ALLE Subsets (KEINE Pseudo-Eintrag-Filterung) - die
+    /// Filterung (is_from_supersets=0, item_type='P') ist Anwendungs-Logik und
+    /// bleibt im Aufrufer, exakt wie bisher bei <see cref="GetSubsetsAsync"/>.
+    /// Leere Eingabe -&gt; leeres Dict, kein DB-Hit. Parent-Nos ohne Subsets
+    /// tauchen NICHT im Result auf (TryGetValue liefert dann false -&gt;
+    /// Caller behandelt das wie eine leere Subset-Liste, identisch zum alten
+    /// Per-Parent-Pfad).</para>
+    /// </summary>
+    Task<Dictionary<string, List<BlSubset>>> GetSubsetsBulkAsync(
+        string parentType, IReadOnlyList<string> parentNos, CancellationToken ct = default);
+
+    /// <summary>
     /// Loescht alle Subsets fuer (parentType,parentNo) und schreibt die neue Liste
     /// in einer Transaction. So bleiben "weggefallene" Eintraege nicht zurueck.
     /// </summary>
