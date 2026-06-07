@@ -377,16 +377,23 @@ NICHT direkter Fix** (Lehre aus PERF-1: erst messen, dann fixen).
   die Messung zeigte tatsaechlich ~105× pro Scan (105 Bild-Hits × 5 VMs
   abgekoppelt) und belegte ① als ehrliche Wurzel, nicht nur als Pflaster.
   Quelle: Diagnoser 2026-06-07 + Mess-Vorlauf + Praxis-Verifikation.
-- 📋 **PERF-5: ScanEvents-Tabelle ohne Index** — Tabelle hat keinen
-  einzigen Index (verifiziert via `sqlite_master`: weder auf `Timestamp`
-  noch auf `Type`), waechst monoton (+1 pro Scan, aktuell 2.346).
-  `RecentScansViewModel.RefreshAsync:74` macht
-  `OrderByDescending(Timestamp).Take(MaxItems)` → SQLite sortiert bei
-  jedem DataChanged alle Zeilen; Verlauf-Tab + Stats-Queries full-scannen
-  ebenfalls. Unabhaengiger Skalierungs-Vektor (ScanEvents, nicht Bilder),
-  daher getrennt von PERF-4 fixbar. Schwere: **M**. Aufwand: ~30min
-  (EF-Migration `CREATE INDEX IX_ScanEvents_Timestamp ON ScanEvents
-  (Timestamp DESC)`, ggf. zusaetzlich `Type`). Quelle: Diagnoser 2026-06-07.
+- ✅ **PERF-5: ScanEvents-Tabelle Timestamp-Index** — erledigt 2026-06-07
+  (`a4789ec5`). `HasIndex(e => e.Timestamp).IsDescending()` in
+  `UserDataContext.cs` + EF-Migration `AddScanEventTimestampIndex` (reines
+  `CREATE INDEX IX_ScanEvents_Timestamp ON ScanEvents (Timestamp DESC)`).
+  Hauptpfade `ORDER BY Timestamp DESC LIMIT N` profitieren
+  (`RecentScansViewModel`, `UndoService.GetUndoableActionsAsync`,
+  `UndoService.GetHistoryAsync`). **Type-Index NICHT angelegt:** Type
+  wird nur in einer Query gefiltert (`UndoService: Type != UndoApplied`),
+  SQLite filtert das auf den Top-N Timestamp-Ergebnissen schnell raus.
+  **Migrations-Pfad-Lehre (CLAUDE.md-Kandidat):** `dotnet ef database
+  update` zielt auf die Design-Time-Temp-DB (`design_time_userdata.db`),
+  NICHT auf `%APPDATA%\HBSort\userdata.db`. Echte User-DB migriert sich
+  beim App-Start via `Database.MigrateAsync()` (`App.xaml.cs:481`). Bei
+  aktueller Datenmenge (~2,4k Events) Migration instant, Effekt nicht
+  spuerbar — Architektur-Hygiene fuer kuenftiges Wachstum. Tests 654/654
+  gruen, Praxis-Test: App-Start sauber, Verlauf + Scans + Undo wie
+  gewohnt. Quelle: Diagnoser 2026-06-07.
 - ℹ️ **PERF-6: Spalten-Persistenz-Save (Notiz, kein akuter Fix)** —
   `InventoryListView.xaml.cs:711` (`InventoryGrid_Sorting`) schreibt die
   ganze `settings.json` fire-and-forget bei jedem Sort-Klick. **Nicht**
@@ -465,6 +472,47 @@ Reihenfolge-Empfehlung BUILD-1 vor BUILD-2: BUILD-1 ist ein klar
 abgegrenzter Bug-Fix, BUILD-2 braucht Konzept-Vorlauf. Im Idealfall:
 BUILD-1 als eigene kleine Iteration nach PERF-4, dann BUILD-2 mit
 Konzept + Bau in einer weiteren.
+
+#### Aus Praxis-Nutzung (PERF-5-Test, 2026-06-07) — Beschreibung-Spalte
+
+Waehrend des PERF-5-Praxis-Tests im Temporaeren Inventar aufgefallen.
+Nicht durch die Migration ausgeloest — betrifft die UI-Spalten-Darstellung
+unabhaengig.
+
+- 📋 **UI-1: Beschreibung-Spalte mehrzeilig mit fettem Teiletyp-Praefix**
+  — die Beschreibung-Spalte im Temporaeren Inventar laeuft aktuell
+  einzeilig und wird dadurch sehr breit (siehe Praxis-Screenshot: Texte
+  wie "Torso Hospital Lab Coat, Open Collar, Stethoscope, Pocket Pen,
+  and Thermometer Pattern / White Arms / Yellow Hands" verdraengen alle
+  anderen Spalten nach rechts). User-Wunsch:
+  - Teiletyp-Praefix ("Torso" / "Minifig" / "Helmet" etc.) als **erstes
+    Wort fett**
+  - Restlicher Text **mehrzeilig** umgebrochen darunter
+  - Spalte kann dadurch deutlich schmaler werden, Lesbarkeit steigt
+  
+  Offene USER-ENTSCHEIDUNGEN (vor Bau zu klaeren):
+  - **Geltungsbereich**: nur Temporaeres Inventar, oder auch BL-Inventar-
+    Tab, Verlauf-Tab, andere DataGrids mit Beschreibung?
+  - **Zeilen-Cap**: TextWrap unbegrenzt oder max 3 Zeilen mit Ellipse?
+  - **Praefix-Definition**: nur das erste Wort fett? Oder "bis zum
+    ersten Komma"? Oder ein dedizierter Teiletyp-Lookup (z.B.
+    PartName-Heuristik aus CategoryBinMappingService.DeriveCategoryFromPartName)?
+  Schwere: M (Lesbarkeit + Platz). Aufwand: ~1-2h Bau + 30min
+  Konzept-Klaerung. Quelle: User-Praxis 2026-06-07.
+
+- 📋 **UI-2: Spalten-Layout im Temporaeren Inventar kommt "komisch"
+  hoch** — User-Befund 2026-06-07: "die Tabelle vom Inventar ist komisch
+  gewesen, habe sie zurecht gezogen". Nicht-spezifizierte Layout-
+  Auffaelligkeit beim Oeffnen des Tabs — koennte mehrere Ursachen haben:
+  - Spalten-Persistenz vom letzten App-Lauf inkompatibel mit aktuellem
+    Spalten-Layout (neue Spalte hinzugekommen?)
+  - Defaultbreiten nicht gut gewaehlt fuer aktuelle Beschreibung-Spalte
+    (siehe UI-1 — verschwindet ggf. komplett wenn UI-1 umgesetzt ist)
+  - Anderer DataGrid-Effekt
+  Erst BEOBACHTEN bei kuenftigen Tab-Oeffnungen ob es reproduzierbar ist,
+  DANN diagnostizieren. Wenn UI-1 umgesetzt wird, koennte sich UI-2
+  miterledigen. Schwere: L bis ungewiss. Aufwand: ungewiss — erst Reprol
+  belegen.
 
 ### Konzept-Items für spätere Iterationen (v0.1.25+)
 
@@ -1042,14 +1090,15 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-06-07 — PERF-4 (Image-Cache-Stats-Storm)
-erledigt: GetStats-Calls/s von 17,8 auf 1,0 (~18×), UI-Blockade-Spitze
-von 47-98% auf <1%. Fix in zwei Commits (Fix mit Mess-Code + Cleanup-
-Commit), Praxis-verifiziert. B-Re-Evaluierung ist jetzt sinnvoll (war
-Multiplikator von PERF-4 — koennte nach dem Fix wieder Hygiene sein,
-offen). — v0.1.25-beta.1 bleibt released (2026-06-02, Tag `0bb0a7bd`).
-Offene v0.1.25-Kandidaten: PERF-5 (ScanEvents-Index ~30min), B2
-(Footer-Layout), BUILD-1 (100%-BL-Vorschlaege fehlen), BUILD-2 (Wartende
-als Quelle, mit Konzept), OPEN-18, Kategorie-Sperre, Bauteile-Bin,
-Torso-Komponenten, UPSERT-Sync, Undo-System. Naechster Schritt: nach
-Claude Code's PERF-4-Cleanup-Commit den Backlog-Commit hinterherschieben.*
+*Zuletzt aktualisiert: 2026-06-07 — PERF-4 (Image-Cache-Stats-Storm) +
+PERF-5 (ScanEvents-Index) beide erledigt. Performance-Track aktuell:
+GetStats-Calls/s 17,8 → 1,0 (~18×), UI-Blockade-Spitze 47-98% → <1%,
+ScanEvents-Queries indiziert. Neue UX-Befunde aus Praxis: UI-1
+(Beschreibung mehrzeilig + Teiletyp-Praefix fett, 3 USER-ENTSCHEIDUNGEN
+offen), UI-2 (komisches Spalten-Layout, beobachten ob reproduzierbar).
+B-Re-Evaluierung steht aus (subjektiv beim Sortieren, kein eigener
+Diagnose-Lauf noetig). — v0.1.25-beta.1 bleibt released (2026-06-02,
+Tag `0bb0a7bd`). Naechste v0.1.25-Kandidaten: BUILD-1 (100%-BL-
+Vorschlaege, klar definiert ~1-2h), UI-1 (Beschreibung-Spalte, braucht
+Entscheidungen), B2 (Footer-Layout). Beta.2-Tag-Frage offen — vermutlich
+nach BUILD-1 sinnvoll.*
