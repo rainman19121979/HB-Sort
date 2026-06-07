@@ -340,24 +340,43 @@ Strukturen `image_cache.db` (12.113 Eintraege, ~1 GB) und `ScanEvents`
 Read-only-Diagnose — **naechster Schritt ist gezielte Mess-Instrumentierung,
 NICHT direkter Fix** (Lehre aus PERF-1: erst messen, dann fixen).
 
-- 📋 **PERF-4: Image-Cache-Stats-Storm (HAUPTWURZEL)** —
-  `PersistentImageCache.TouchAccess` (`PersistentImageCache.cs:152`) feuert
-  `StatsChanged` bei JEDEM Bild-Cache-Hit; `MainViewModel.UpdateCacheStatusText`
-  (`MainViewModel.cs:622`) ruft daraufhin pro Tick `GetStats()` =
-  `SELECT COUNT(*), SUM(size_bytes), MIN(...)` Full-Scan ueber
-  `image_cache.db` (aktuell 12.113 Zeilen) auf dem UI-Thread, serialisiert
-  ueber globalen `_lock` auf der geteilten SqliteConnection. Skaliert
-  monoton mit der Cache-Groesse → erklaert das Symptom exakt. **5×
-  multipliziert** durch parallele Live-VMs: pro Scan feuert DataChanged,
-  alle 5 Live-VMs (LiveStats/RecentScans/WaitingDetail/BuildSuggestions/
-  InventoryList) laden parallel `LoadImagesAsync` → 5× der Stats-Storm
-  (= Multiplikator-Wirkung von B, siehe oben). Schwere: **H** (User-
-  spuerbar, waechst mit jeder Nutzung). Aufwand: ~1-2h. Fix-Richtung:
-  `StatsChanged` nicht bei Touch feuern (Touch aendert nur
-  `last_accessed_at`, fuer die Status-Anzeige irrelevant) + Stats
-  throttlen/coalescen oder inkrementell statt Full-Scan. **ERST gezielte
-  Messung** (Stopwatch um `GetStats` + Call-Counter fuer `OnCacheStatsChanged`),
-  DANN Fix. Quelle: Diagnoser 2026-06-07.
+- ✅ **PERF-4: Image-Cache-Stats-Storm (HAUPTWURZEL)** — erledigt
+  2026-06-07 in zwei Commits: Fix + Mess-Code-Cleanup direkt
+  hintereinander.
+  
+  **Vor dem Fix:** `PersistentImageCache.TouchAccess` feuerte
+  `StatsChanged` bei jedem Bild-Cache-Hit (~105 Bild-Hits pro Scan,
+  multipliziert ueber 5 Live-VMs). `MainViewModel.UpdateCacheStatusText`
+  rief daraufhin pro Event `GetStats()` = COUNT+SUM Full-Scan ueber
+  12.113 Zeilen image_cache.db auf dem UI-Thread. Storm-Spitzen bis
+  63 GetStats-Calls/s, UI-Blockade-Spitzen 47-98%.
+  
+  **Fix (zwei Eingriffe):**
+  - (①) `StatsChanged` aus `TouchAccess` entfernt — Touch aendert nur
+    `last_accessed_at`, das ist fuer Count+Size irrelevant. Das Event
+    feuert jetzt nur noch bei Add/Clear (echte Count/Size-Aenderungen).
+  - (②) `UpdateCacheStatusText` per Throttle: GetStats wird hoechstens
+    1×/s aufgerufen. Defense-in-Depth fuer den Add/Clear-Rest-Pfad.
+  
+  **Verifikation (Praxis-Lauf vor/nach):**
+  | Metrik | Vor | Nach | Ergebnis |
+  |---|---|---|---|
+  | GetStats-Calls/s (Ø) | 17,8 | 1,0 | ✅ |
+  | GetStats-Calls/s (Max) | 63 | 1 | ✅ |
+  | Storm-Spitzen >50/s | 20 Fenster | 0 | ✅ |
+  | Σ GetStats-Zeit (5 min) | 14,66s | 0,22s | 66× weniger |
+  | UI-Blockade Spitze | 47-98% | ~0,7% | ✅ |
+  | GetStats-Latenz/Call | 6,3ms | 6,9ms | ⟷ (③ nicht angefasst) |
+  
+  **③ (inkrementelles Count/Size statt Full-Scan)** bleibt Backlog-
+  Reserve — bei 1 Call/s ist die 6,9ms-Latenz harmlos.
+  
+  **Diagnose-/Engineering-Lehre (siehe Diagnoser-Block oben):** Klassifi-
+  zierungen muessen mit Datenmenge mitwachsen. Mess-Vorlauf hat den
+  Fix-Pfad gerettet — die erste Diagnoser-These war "5×-Multiplikator",
+  die Messung zeigte tatsaechlich ~105× pro Scan (105 Bild-Hits × 5 VMs
+  abgekoppelt) und belegte ① als ehrliche Wurzel, nicht nur als Pflaster.
+  Quelle: Diagnoser 2026-06-07 + Mess-Vorlauf + Praxis-Verifikation.
 - 📋 **PERF-5: ScanEvents-Tabelle ohne Index** — Tabelle hat keinen
   einzigen Index (verifiziert via `sqlite_master`: weder auf `Timestamp`
   noch auf `Type`), waechst monoton (+1 pro Scan, aktuell 2.346).
@@ -392,6 +411,60 @@ zuerst (groesster Hebel, isolierter Anzeige-Pfad, niedrigstes Risiko);
 (3) PERF-5 mitnehmen (billig, eigener Vektor); (4) B nur falls nach
 PERF-4+5 noch Symptom messbar — moeglich, dass PERF-4 das Symptom allein
 aufloest.
+
+#### Aus Praxis-Nutzung v0.1.25-beta.1 (2026-06-07) — Baubar-Tab
+
+Zwei Befunde aus mehreren Tagen Nutzung des "Was kann ich bauen"-Tabs.
+Angehen NACH PERF-4 (eigene Iteration, da fremder Code-Pfad und Risiko
+verwobener Sammel-Commits sonst wieder zuschlägt — Lehre beta.11-13).
+
+- 📋 **BUILD-1: 100%-BL-Vorschläge fehlen ganz** (Bug-Lesart vom User
+  bestätigt). Im Baubar-Tab erscheinen aktuell nur Figuren, bei denen
+  HBSort-Lager ≥ 1 passendes Teil hat. Eine Figur, die zu 100% aus dem
+  BL-Shop baubar wäre (kein einziges Teil im HBSort-Lager, aber alle
+  Required-Parts liegen reserviert im BL-Inventar), taucht **gar nicht**
+  als Vorschlag auf. Erwartetes Verhalten: solche "BL-only"-Vorschläge
+  sollen sichtbar sein — sonst entgehen dem User mit reinem BL-Shop
+  baubare Figuren. Vermutete Ursache: der Kandidaten-Vorfilter in
+  BuildSuggestionsViewModel (oder dahinter im Service) verlangt ≥ 1
+  HBSort-Lager-Teil bevor die Figur überhaupt evaluiert wird;
+  BL-Inventar wird erst danach "dazu gemischt". Fix-Richtung: Kandidaten-
+  Pool um Figuren erweitern, deren Required-Parts vollständig aus
+  BL-Inventar deckbar wären. Vorsicht: die UI-Toggle "BL-Inventar
+  berücksichtigen" soll weiter steuern, ob BL als Quelle zählt — bei
+  Toggle=aus muss das alte Verhalten erhalten bleiben (nur HBSort).
+  Quelle: User-Praxis 2026-06-07. Schwere: M (Funktions-Lücke, kein
+  Crash). Aufwand: vermutlich ~1-2h.
+
+- 📋 **BUILD-2: Wartende Figuren als zusätzliche Quelle** (Feature,
+  konzeptionell). Aktuell betrachtet der Baubar-Tab zwei Quellen:
+  HBSort-Lager (FloatingPart-Stock) + BL-Shop-Inventar. Wartende Figuren
+  (TrackedMinifig.Status=Waiting) tauchen nicht als Teile-Quelle auf.
+  User-Wunsch: wartende Figuren sollen auch zählen — deren bereits
+  gesammelte Teile könnten für Vorschläge zu anderen Figuren genutzt
+  werden.
+  **WICHTIG: Wechselwirkungen mit Reservierungs-/Sortier-Logik müssen
+  vor Bau geklärt werden:**
+  - Wenn Teile aus wartender Figur A als Quelle für neue Figur B
+    "gezählt" werden — was passiert, wenn A später selbst komplett
+    wird? Wem gehören die Teile dann?
+  - Reservierung nötig (analog BL-Reservierung)? Oder rein virtuelle
+    Anzeige ("könnte gebaut werden wenn man A ausschlachtet")?
+  - Was ist mit Required-Parts in A die noch fehlen (Waiting-Status hat
+    eh nur Teil-Bestand)? Zählt nur das was A bereits hat?
+  - Wenn User in Baubar einen Vorschlag anlegt, der A ausschlachtet:
+    explizite Bestätigung nötig ("Figur A wird dadurch zurück auf
+    weniger gesammelte Teile gesetzt")?
+  Empfehlung: erst ux-analyst Mode B + ggf. challenger über das Konzept
+  laufen lassen, weil das mehr ist als BUILD-1. Quelle: User-Praxis
+  2026-06-07. Schwere: M (sinnvolle Erweiterung, aber konzeptionell).
+  Aufwand: Konzept ~30-45min + Bau ~2-3h, je nach Reservierungs-
+  Entscheidung.
+
+Reihenfolge-Empfehlung BUILD-1 vor BUILD-2: BUILD-1 ist ein klar
+abgegrenzter Bug-Fix, BUILD-2 braucht Konzept-Vorlauf. Im Idealfall:
+BUILD-1 als eigene kleine Iteration nach PERF-4, dann BUILD-2 mit
+Konzept + Bau in einer weiteren.
 
 ### Konzept-Items für spätere Iterationen (v0.1.25+)
 
@@ -969,13 +1042,14 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-06-07 — Diagnoser-Lauf zum Praxis-Befund
-"je mehr ich scanne, desto zaeher" eingetragen: PERF-4 (Image-Cache-
-Stats-Storm, Hauptwurzel), PERF-5 (ScanEvents ohne Index), PERF-6
-(Spalten-Persistenz-Save, Notiz) + Widerruf der B-Hygiene-Herabstufung
-vom 29.05. (B wirkt als 5×-Multiplikator von PERF-4). Naechster Schritt:
-gezielte Mess-Instrumentierung (nicht direkter Fix). — v0.1.25-beta.1
-bleibt released (2026-06-02, Tag `0bb0a7bd`, Pipeline grün,
-isPrerelease=true). Offene v0.1.25-Kandidaten: PERF-4/5, B2 (Footer-
-Layout), OPEN-18, Kategorie-Sperre, Bauteile-Bin, Torso-Komponenten,
-UPSERT-Sync, Undo-System.*
+*Zuletzt aktualisiert: 2026-06-07 — PERF-4 (Image-Cache-Stats-Storm)
+erledigt: GetStats-Calls/s von 17,8 auf 1,0 (~18×), UI-Blockade-Spitze
+von 47-98% auf <1%. Fix in zwei Commits (Fix mit Mess-Code + Cleanup-
+Commit), Praxis-verifiziert. B-Re-Evaluierung ist jetzt sinnvoll (war
+Multiplikator von PERF-4 — koennte nach dem Fix wieder Hygiene sein,
+offen). — v0.1.25-beta.1 bleibt released (2026-06-02, Tag `0bb0a7bd`).
+Offene v0.1.25-Kandidaten: PERF-5 (ScanEvents-Index ~30min), B2
+(Footer-Layout), BUILD-1 (100%-BL-Vorschlaege fehlen), BUILD-2 (Wartende
+als Quelle, mit Konzept), OPEN-18, Kategorie-Sperre, Bauteile-Bin,
+Torso-Komponenten, UPSERT-Sync, Undo-System. Naechster Schritt: nach
+Claude Code's PERF-4-Cleanup-Commit den Backlog-Commit hinterherschieben.*
