@@ -308,21 +308,22 @@ public class BuildSuggestionsViewModelTests : IDisposable
     }
 
     // ====================================================================
-    // CHARAKTERISIERUNG (vor BUILD-1): BL-only-Figur erscheint NICHT
+    // BUILD-1: BL-only-Figur erscheint als Shop-completable (Kat.2)
     // ====================================================================
 
     [Fact]
-    public async Task BlOnlyFigure_withToggleOn_doesNotAppear_currentBehavior()
+    public async Task BlOnlyFigure_withToggleOn_appearsAsShopCompletable()
     {
-        // CHARAKTERISIERUNG: aktuelles Verhalten vor BUILD-1-Fix - eine Figur
-        // die KEIN Teil im FloatingPool hat, aber komplett aus BL-Inventar
-        // baubar waere, erscheint NICHT. Grund: der Kandidaten-Pool wird
-        // ausschliesslich aus FindMinifigsContainingPartsAsync (FloatingPool)
-        // gebildet - BL-Lots erweitern den Pool nicht.
-        // Dieser Test wird mit BUILD-1 invertiert/ersetzt.
+        // BUILD-1: eine Figur die KEIN Teil im FloatingPool hat, aber komplett
+        // aus BL-Inventar baubar waere, MUSS bei aktivem Toggle erscheinen -
+        // als Kat.2 (Shop-completable): MatchPercent=100, IsBlShopAddition=true,
+        // BlShopPartCount = Anzahl benoetigter Teile.
+        // (Invertierter Charakterisierungs-Test, der vor BUILD-1 das falsche
+        //  Verhalten - Figur erscheint NICHT - festhielt.)
 
-        // FloatingPool enthaelt nur ein irrelevantes Teil (sonst Early-Return),
-        // das zu KEINER Figur gehoert.
+        // FloatingPool enthaelt nur ein irrelevantes Teil, das zu KEINER Figur
+        // gehoert. (Bewusst nicht-leerer Pool: der reine Leer-Pool-Pfad ist in
+        // EmptyFloatingPool_withToggleOn_blFull_appearsAsShopCompletable abgedeckt.)
         await AddFloatingPartAsync("9999", 0, 1);
 
         // figBl braucht 3001/red, liegt NICHT im Pool, aber im BL-Shop.
@@ -335,7 +336,103 @@ public class BuildSuggestionsViewModelTests : IDisposable
 
         var vm = await CreateAndRefreshAsync(includeBl: true);
 
-        Assert.DoesNotContain(vm.Suggestions, s => s.BricklinkId == "figBl");
+        var item = Assert.Single(vm.Suggestions, s => s.BricklinkId == "figBl");
+        Assert.Equal(100, item.MatchPercent);
+        Assert.True(item.IsBlShopAddition);
+        Assert.Equal(1, item.BlShopPartCount);
+    }
+
+    // ====================================================================
+    // BUILD-1: Leerer FloatingPool + BL-Pool
+    // ====================================================================
+
+    [Fact]
+    public async Task EmptyFloatingPool_withToggleOn_blFull_appearsAsShopCompletable()
+    {
+        // Leerer FloatingPool, Toggle AN, BL hat ALLE Teile einer Figur ->
+        // Figur erscheint als Kat.2 (Shop-completable). Der Early-Return bei
+        // floats.Count == 0 darf NICHT mehr greifen, wenn der BL-Pool aktiv ist.
+        DefineMinifig("figFull", "Full From Shop", ("3001", 4, 1), ("3002", 1, 1));
+        _blInventory.HasAny = true;
+        _blInventory.Lots["3001:4"] = new List<BlInventoryLot>
+        {
+            new() { LotId = 1, ItemType = "P", ItemNo = "3001", ColorId = 4, Quantity = 5, ReservedQuantity = 0, Condition = "U" }
+        };
+        _blInventory.Lots["3002:1"] = new List<BlInventoryLot>
+        {
+            new() { LotId = 2, ItemType = "P", ItemNo = "3002", ColorId = 1, Quantity = 5, ReservedQuantity = 0, Condition = "U" }
+        };
+
+        var vm = await CreateAndRefreshAsync(includeBl: true);
+
+        var item = Assert.Single(vm.Suggestions, s => s.BricklinkId == "figFull");
+        Assert.Equal(100, item.MatchPercent);
+        Assert.True(item.IsBlShopAddition);
+        Assert.Equal(2, item.BlShopPartCount);
+    }
+
+    [Fact]
+    public async Task EmptyFloatingPool_withToggleOff_blFull_staysEmpty()
+    {
+        // Toggle-Vertrag-Regressionsschutz: leerer FloatingPool, Toggle AUS,
+        // BL voll -> Tab bleibt leer + Early-Return-Status-Meldung. Ohne
+        // aktiven Toggle darf der BL-Pool NICHT herangezogen werden.
+        DefineMinifig("figFull", "Full From Shop", ("3001", 4, 1));
+        _blInventory.HasAny = true;
+        _blInventory.Lots["3001:4"] = new List<BlInventoryLot>
+        {
+            new() { LotId = 1, ItemType = "P", ItemNo = "3001", ColorId = 4, Quantity = 5, ReservedQuantity = 0, Condition = "U" }
+        };
+
+        var vm = await CreateAndRefreshAsync(includeBl: false);
+
+        Assert.Empty(vm.Suggestions);
+        Assert.Equal("Keine losen Teile vorhanden.", vm.SummaryText);
+        // Reverse-Lookup darf bei leerem Pool + Toggle AUS gar nicht laufen.
+        Assert.False(_blCache.FindMinifigsCalled);
+    }
+
+    [Fact]
+    public async Task MixedSource_partlyFloatingPartlyBl_appearsAsShopCompletable()
+    {
+        // Figur braucht 2 Teile: 1 liegt im FloatingPool, 1 nur im BL-Shop.
+        // Toggle AN -> Kat.2 (100%) mit BlShopPartCount = 1 (nur das
+        // BL-bezogene Teil zaehlt als Shop-Beitrag).
+        DefineMinifig("figMix", "Mixed Source", ("3001", 4, 1), ("3002", 1, 1));
+        await AddFloatingPartAsync("3001", 4, 1); // dieses Teil aus HBSort
+
+        _blInventory.HasAny = true;
+        _blInventory.Lots["3002:1"] = new List<BlInventoryLot>
+        {
+            new() { LotId = 2, ItemType = "P", ItemNo = "3002", ColorId = 1, Quantity = 3, ReservedQuantity = 0, Condition = "U" }
+        };
+
+        var vm = await CreateAndRefreshAsync(includeBl: true);
+
+        var item = Assert.Single(vm.Suggestions, s => s.BricklinkId == "figMix");
+        Assert.Equal(100, item.MatchPercent);
+        Assert.True(item.IsBlShopAddition);
+        Assert.Equal(1, item.BlShopPartCount);
+    }
+
+    [Fact]
+    public async Task FullyReservedBlLot_doesNotContributeToPool()
+    {
+        // BL-Lot ist komplett reserviert (ReservedQuantity == Quantity) ->
+        // Available = 0 -> kein Pool-Beitrag. Die Figur, die NUR aus diesem
+        // Lot baubar waere, darf NICHT erscheinen.
+        DefineMinifig("figReserved", "Only Reserved", ("3001", 4, 1));
+        await AddFloatingPartAsync("9999", 0, 1); // irrelevantes Teil, kein Figur-Bezug
+
+        _blInventory.HasAny = true;
+        _blInventory.Lots["3001:4"] = new List<BlInventoryLot>
+        {
+            new() { LotId = 1, ItemType = "P", ItemNo = "3001", ColorId = 4, Quantity = 3, ReservedQuantity = 3, Condition = "U" }
+        };
+
+        var vm = await CreateAndRefreshAsync(includeBl: true);
+
+        Assert.DoesNotContain(vm.Suggestions, s => s.BricklinkId == "figReserved");
     }
 
     // ====================================================================
@@ -507,6 +604,22 @@ public class BuildSuggestionsViewModelTests : IDisposable
                 .Where(l => l.Quantity - l.ReservedQuantity > 0)
                 .ToList();
             return Task.FromResult(available);
+        }
+
+        public Task<List<(string PartNo, int ColorId)>> GetAvailablePartTuplesAsync(CancellationToken ct = default)
+        {
+            // Spiegelt die echte Implementierung: nur Teile-Lots (ItemType "P")
+            // mit gesetzter ColorId und verfuegbarer Menge (Quantity - Reserved > 0),
+            // distinct ueber (PartNo, ColorId).
+            var result = Lots.Values
+                .SelectMany(list => list)
+                .Where(l => l.ItemType == "P"
+                         && l.ColorId.HasValue
+                         && l.Quantity - l.ReservedQuantity > 0)
+                .Select(l => (l.ItemNo, ColorId: l.ColorId!.Value))
+                .Distinct()
+                .ToList();
+            return Task.FromResult(result);
         }
 
         // BUILD-3: AnalyzeBlShopHelpAsync nutzt jetzt diese Bulk-Methode statt

@@ -69,6 +69,24 @@ public interface IBlInventoryService
         string blPartNo, int? colorId, CancellationToken ct = default);
 
     /// <summary>
+    /// v0.1.25 (BUILD-1): liefert die distinct <c>(PartNo, ColorId)</c>-Paare
+    /// aller Lots mit verfuegbarer Menge (<c>Quantity - ReservedQuantity &gt; 0</c>).
+    /// Wird vom Baubar-Tab genutzt um den Reverse-Lookup-Pool ueber den
+    /// FloatingPool hinaus um BL-Inventar zu erweitern, damit Figuren erscheinen
+    /// die zu 100% aus dem BL-Shop baubar waeren (auch wenn der User kein
+    /// einziges Teil davon lose hat).
+    ///
+    /// <para>Nur Teile-Lots (<c>ItemType == "P"</c>) mit gesetzter ColorId
+    /// kommen in den Pool: der Reverse-Lookup laeuft ueber Subset-Teile, und
+    /// farblose Lots (<c>ColorId == null</c>, also Minifigs/Sets) ergeben in
+    /// einem teile-basierten Match keinen sinnvollen Treffer. Sie werden daher
+    /// uebersprungen — konsistent dazu, dass <see cref="FindLotsForPartAsync"/>
+    /// fuer einen farblosen Lookup ausdruecklich <c>colorId == null</c>
+    /// braucht und Subsets immer eine konkrete ColorId tragen.</para>
+    /// </summary>
+    Task<List<(string PartNo, int ColorId)>> GetAvailablePartTuplesAsync(CancellationToken ct = default);
+
+    /// <summary>
     /// BUILD-3 (N+1-Hang Baubar-Tab): Bulk-Variante von
     /// <see cref="FindLotsForPartAsync"/> fuer die verfuegbaren Mengen vieler
     /// Teile in EINER DB-Query. Liefert pro angefragtem (PartNo, ColorId)-Paar

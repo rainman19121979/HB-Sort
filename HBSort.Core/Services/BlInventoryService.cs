@@ -216,6 +216,29 @@ public class BlInventoryService : IBlInventoryService
             .ToList();
     }
 
+    public async Task<List<(string PartNo, int ColorId)>> GetAvailablePartTuplesAsync(CancellationToken ct = default)
+    {
+        await using var ctx = await _ctxFactory.CreateDbContextAsync(ct);
+
+        // Nur Teile-Lots mit gesetzter Farbe und tatsaechlich verfuegbarer
+        // Menge. Available (= Quantity - ReservedQuantity) ist eine computed
+        // Property, also kann der Filter nicht per SQL laufen - wir holen die
+        // Teile-Lots gefiltert nach ItemType/ColorId vor und werten Available
+        // in-memory aus. Farblose Lots (ColorId == null, also Minifig/Set)
+        // ergeben in einem teile-basierten Reverse-Lookup keinen Treffer und
+        // werden hier bewusst nicht beruecksichtigt.
+        var lots = await ctx.BlInventoryLots
+            .AsNoTracking()
+            .Where(l => l.ItemType == "P" && l.ColorId != null)
+            .ToListAsync(ct);
+
+        return lots
+            .Where(l => l.Quantity - l.ReservedQuantity > 0)
+            .Select(l => (l.ItemNo, ColorId: l.ColorId!.Value))
+            .Distinct()
+            .ToList();
+    }
+
     public async Task<Dictionary<(string PartNo, int ColorId), int>> GetAvailableQuantitiesAsync(
         IEnumerable<(string PartNo, int ColorId)> parts, CancellationToken ct = default)
     {

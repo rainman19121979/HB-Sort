@@ -23,8 +23,12 @@ namespace HBSort.ViewModels;
 ///
 /// Ablauf in RefreshAsync:
 ///   1. Floating-Pool laden, gruppiert nach (PartNo, BL-ColorId).
+///      Optional (wenn Toggle "BL-Inventar beruecksichtigen" aktiv und
+///      Inventar vorhanden): zusaetzlich die verfuegbaren BL-Inventar-Teile
+///      als Pool-Beitrag dazunehmen.
 ///   2. Bereits getrackte Minifig-IDs sammeln (die schlagen wir nicht vor).
-///   3. Im BL-Cache: alle Minifigs finden, die mind. eines dieser Teile enthalten.
+///   3. Reverse-Lookup im BL-Cache: alle Minifigs finden, die mind. eines der
+///      Teile des VEREINIGTEN Pools (Floating + optional BL-Inventar) enthalten.
 ///   4. Pro Kandidat: Match-Prozent berechnen (Quantity-aware).
 ///   5. Sortieren nach Match-%, Top 20.
 /// </summary>
@@ -320,7 +324,19 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
                 })
                 .ToList();
 
-            if (floats.Count == 0)
+            // BUILD-1: Wir muessen den BL-Toggle-Status schon hier kennen, weil
+            // er sowohl den Early-Return als auch die Pool-Erweiterung steuert.
+            // (HasAnyBlInventory wird weiter unten fuer die Kat.2-Logik erneut
+            // gebraucht - der Wert ist ueber den ganzen Refresh stabil.)
+            HasAnyBlInventory = await _blInventory.HasAnyInventoryAsync();
+            var useBlPool = IncludeBlInventory && HasAnyBlInventory;
+
+            // BUILD-1: Early-Return nur dann, wenn weder lose Teile noch ein
+            // nutzbarer BL-Inventar-Pool vorhanden sind. Bei aktivem Toggle +
+            // vorhandenem Inventar laufen wir mit leerem Floating-Pool weiter,
+            // damit rein aus dem BL-Shop baubare Figuren (0 lose Teile)
+            // gefunden werden koennen.
+            if (floats.Count == 0 && !useBlPool)
             {
                 Suggestions.Clear();
                 SummaryText = "Keine losen Teile vorhanden.";
@@ -335,8 +351,21 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
                 .ToListAsync();
             var trackedSet = new HashSet<string>(trackedIds, StringComparer.OrdinalIgnoreCase);
 
-            // 3) Reverse-Lookup im BL-Cache.
-            var partTuples = floats.Select(f => (f.PartNo, f.ColorId)).ToList();
+            // 3) Reverse-Lookup im BL-Cache ueber den VEREINIGTEN Pool:
+            //    Floating-Pool + (optional) verfuegbare BL-Inventar-Teile.
+            //    Die Vereinigung laeuft ueber (PartNo, ColorId) als Set-Key,
+            //    damit ein Teil das in beiden Quellen liegt nur einmal im
+            //    Reverse-Lookup landet.
+            var poolTuples = new HashSet<(string PartNo, int ColorId)>(
+                floats.Select(f => (f.PartNo, f.ColorId)));
+            if (useBlPool)
+            {
+                var blTuples = await _blInventory.GetAvailablePartTuplesAsync();
+                foreach (var t in blTuples)
+                    poolTuples.Add(t);
+            }
+
+            var partTuples = poolTuples.ToList();
             var minifigIds = await _blCache.FindMinifigsContainingPartsAsync(partTuples);
 
             // 4) Quick-Lookup-Dict fuer have-Mengen.
@@ -423,7 +452,8 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
             //
             //    Sortierung: Kat.1 (Name asc) -> Kat.2 (wenig Shop-Teile zuerst)
             //                -> Kat.3 (Match-% absteigend).
-            HasAnyBlInventory = await _blInventory.HasAnyInventoryAsync();
+            // (HasAnyBlInventory wurde bereits oben - vor dem Early-Return -
+            //  ermittelt und ist ueber den Refresh stabil.)
 
             // Persistente Ignorier-Liste laden + sofort filtern.
             var ignoredSet = await ctx.IgnoredBuildSuggestions
@@ -541,9 +571,15 @@ public partial class BuildSuggestionsViewModel : ObservableObject, IDisposable
             }
 
             SummaryText = top.Count == 0
-                ? (thresholdPercent > 0
-                    ? $"Keine Bauvorschlaege ueber {thresholdPercent}% Match - Schwellwert in Einstellungen pruefen."
-                    : "Keine Bauvorschlaege - keine deiner losen Teile passt zu einer ungetrackten Minifig.")
+                // BUILD-1: Sonderfall "keine losen Teile, aber BL-Pool aktiv" -
+                // wir haben das BL-Inventar geprueft, aber nichts ist zu 100%
+                // shop-baubar. Eigener Hinweis statt der Schwellwert-Meldung,
+                // die hier irrefuehrend waere (es gibt ja keine losen Teile).
+                ? (floats.Count == 0 && useBlPool
+                    ? "Keine losen Teile - BL-Inventar wird auf 100%-Vorschlaege geprueft, aktuell ist keine Figur komplett aus dem Shop baubar."
+                    : thresholdPercent > 0
+                        ? $"Keine Bauvorschlaege ueber {thresholdPercent}% Match - Schwellwert in Einstellungen pruefen."
+                        : "Keine Bauvorschlaege - keine deiner losen Teile passt zu einer ungetrackten Minifig.")
                 : (IncludeBlInventory && HasAnyBlInventory
                     ? $"{top.Count} Vorschlaege ({shownCat1} aus HBSort, {shownCat2} mit BL-Shop, {shownCat3} Teilmatches)"
                     : $"{top.Count} Vorschlaege ({shownCat1} aus HBSort, {shownCat3} Teilmatches)");

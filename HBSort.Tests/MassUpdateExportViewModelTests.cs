@@ -189,6 +189,7 @@ public class MassUpdateExportViewModelTests
         public Task<List<HBSort.Core.Models.BlInventoryLot>> GetInventoryAsync(CancellationToken ct = default) => throw new NotImplementedException();
         public Task<bool> HasAnyInventoryAsync(CancellationToken ct = default) => throw new NotImplementedException();
         public Task<List<HBSort.Core.Models.BlInventoryLot>> FindLotsForPartAsync(string blPartNo, int? colorId, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<List<(string PartNo, int ColorId)>> GetAvailablePartTuplesAsync(CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Dictionary<(string PartNo, int ColorId), int>> GetAvailableQuantitiesAsync(IEnumerable<(string PartNo, int ColorId)> parts, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<bool> ReserveAsync(int lotId, int qty = 1, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<bool> ReleaseAsync(int lotId, int qty = 1, CancellationToken ct = default) => throw new NotImplementedException();
