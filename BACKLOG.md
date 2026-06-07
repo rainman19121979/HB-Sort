@@ -425,23 +425,94 @@ Zwei Befunde aus mehreren Tagen Nutzung des "Was kann ich bauen"-Tabs.
 Angehen NACH PERF-4 (eigene Iteration, da fremder Code-Pfad und Risiko
 verwobener Sammel-Commits sonst wieder zuschlägt — Lehre beta.11-13).
 
-- 📋 **BUILD-1: 100%-BL-Vorschläge fehlen ganz** (Bug-Lesart vom User
-  bestätigt). Im Baubar-Tab erscheinen aktuell nur Figuren, bei denen
-  HBSort-Lager ≥ 1 passendes Teil hat. Eine Figur, die zu 100% aus dem
-  BL-Shop baubar wäre (kein einziges Teil im HBSort-Lager, aber alle
-  Required-Parts liegen reserviert im BL-Inventar), taucht **gar nicht**
-  als Vorschlag auf. Erwartetes Verhalten: solche "BL-only"-Vorschläge
-  sollen sichtbar sein — sonst entgehen dem User mit reinem BL-Shop
-  baubare Figuren. Vermutete Ursache: der Kandidaten-Vorfilter in
-  BuildSuggestionsViewModel (oder dahinter im Service) verlangt ≥ 1
-  HBSort-Lager-Teil bevor die Figur überhaupt evaluiert wird;
-  BL-Inventar wird erst danach "dazu gemischt". Fix-Richtung: Kandidaten-
-  Pool um Figuren erweitern, deren Required-Parts vollständig aus
-  BL-Inventar deckbar wären. Vorsicht: die UI-Toggle "BL-Inventar
-  berücksichtigen" soll weiter steuern, ob BL als Quelle zählt — bei
-  Toggle=aus muss das alte Verhalten erhalten bleiben (nur HBSort).
-  Quelle: User-Praxis 2026-06-07. Schwere: M (Funktions-Lücke, kein
-  Crash). Aufwand: vermutlich ~1-2h.
+- ✅ **BUILD-1: 100%-BL-Vorschlaege erscheinen im Baubar-Tab** —
+  erledigt 2026-06-07 in zwei Commits: `cac686c4` (Perf-Schicht: Wurzel-
+  Fix + Index + N+1-Bulk) + `b0ce7898` (Feature: Pool-Erweiterung).
+  Praxis-verifiziert mit Holger's echtem 9k-BL-Inventar.
+
+  **Wurzel:** Der Kandidaten-Pool wurde ausschliesslich aus dem
+  FloatingPool aufgebaut. Eine Figur ohne HBSort-Teile erzeugte keinen
+  OR-Treffer in `FindMinifigsContainingPartsAsync` und wurde nie
+  evaluiert. Plus: Early-Return bei `floats.Count == 0` machte den Tab
+  komplett leer, auch bei vollem BL-Inventar.
+
+  **Fix (Feature-Schicht in `b0ce7898`):**
+  - Neue Methode `IBlInventoryService.GetAvailablePartTuplesAsync` (Lots
+    mit `Quantity - ReservedQuantity > 0`, ColorId=null wird
+    uebersprungen weil Subset-Teile immer eine konkrete ColorId tragen)
+  - Bei aktivem Toggle Pool-Union (FloatingPool ∪ BL-Tuples), dann
+    normaler Reverse-Lookup
+  - Early-Return aufgeweicht: leerer Pool + Toggle AN evaluiert trotzdem,
+    Treffer landen in Kat.2 (Shop-completable, MatchPercent=100,
+    `IsBlShopAddition=true`)
+  - Toggle-AUS-Vertrag bleibt exakt erhalten (Regressionsschutz-Test)
+
+  **Drei Skalierungs-Wurzeln vorab gefixt (`cac686c4`):**
+  Beim Verbinden mit Holger's echtem 9k-BL-Inventar wurden drei
+  unabhaengige Skalierungs-Achsen sichtbar, die zusammen wirken:
+  - **Crash-Wurzel:** `FindMinifigsContainingPartsAsync` baute OR-Listen
+    (`WHERE (PartNo='A' AND ColorId=1) OR ...`). Bei 9000 Tuples ueber
+    1000 Expression-Tree-Nesting-Levels → `SQLite Error 1`. Fix: OR-Liste
+    durch TEMP-Tabelle + INNER JOIN ersetzt (Stil analog
+    `ReplaceSubsetsAsync`).
+  - **Index-Wurzel:** Nach dem Temp-Tabelle-Umbau kein Crash mehr, aber
+    JOIN gegen die ~1,4-Mio-zeilige `bl_subsets`-Tabelle ohne Index auf
+    der Temp-Tabelle erzeugte einen **quadratischen Scan**: 43,7s auf
+    Holger's echter DB. Fix: `CREATE INDEX IF NOT EXISTS
+    temp_idx_search_parts ON temp_search_parts(part_no, color_id)` nach
+    dem Insert, vor dem JOIN. Eine Zeile, **1.400× Hebel** (43,7s →
+    0,037s, identisch 3651 Parents).
+  - **N+1-Wurzel:** Bei Pool-Erweiterung lieferte der Reverse-Lookup
+    ~3651 Minifig-Kandidaten. Die VM iterierte mit `GetSubsetsAsync` +
+    `GetItemAsync` pro Kandidat = ~7000 serialisierte fake-async-Queries
+    auf dem UI-Thread → mehrere Sekunden bis Minuten UI-Hang. Fix: neue
+    Bulk-Methode `IBlCacheRepository.GetSubsetsBulkAsync` (500er-Chunks
+    via IN-Klausel) + bestehende `GetItemSummariesAsync` aktiv genutzt.
+    Match-Berechnung iteriert jetzt im Speicher gegen vorgeladene
+    Dictionaries. Analog `AnalyzeBlShopHelpAsync` mit
+    `GetAvailableQuantitiesAsync`.
+
+  **Tests (insgesamt 672 gruen, +20 vs. v0.1.25-beta.1-Baseline):**
+  - Charakterisierungs-Tests in `BuildSuggestionsViewModelTests.cs`
+    (`a89ce231`, separater Commit als Sicherheitsnetz): 10 Invarianten-
+    Tests + 1 Charakterisierungs-Test der die alte Bug-Lage festschreibt.
+    Der wurde im Fix-Commit invertiert (→
+    `BlOnlyFigure_withToggleOn_appearsAsShopCompletable`) + 4 neue Soll-
+    Tests.
+  - Reproduktions-Test fuer den SQLite-Expression-Tree-Crash (2000
+    Tuples gegen alten Code → SqliteException, gegen Fix → gruen).
+  - **EXPLAIN-QUERY-PLAN-Test** als strukturelle Sicherheit fuer den
+    Temp-Index: assertiert dass der JOIN-Plan `SEARCH ... USING INDEX`
+    enthaelt, nicht `SCAN`. Daten-unabhaengig, faengt Regression wenn
+    jemand das `CREATE INDEX` versehentlich rauslöscht. Bessere
+    Strategie als Timing-Tests bei SQLite-Skalierungs-Fragen.
+  - End-to-End-Skalierungs-Test fuer die N+1-Bulk-Umstellung (50
+    Minifigs, ~250 Subsets, ~5000 BL-Tuples, leerer FloatingPool — der
+    Test haengt am BUILD-1-Feature, lebt also in `b0ce7898`).
+
+  **Transparenz-Hinweis:** `GetFindMinifigsJoinQueryPlanForDiagnostics`
+  ist eine test-only API-Erweiterung am `BlCacheRepository`. Konvention-
+  konsistent zu `BlBulkImportService`. Sollte langfristig durch
+  `InternalsVisibleTo` ersetzt werden — kleines Backlog-Item.
+
+  **Engineering-Lehre der Skalierungs-Strecke (2026-06-07):** Heute drei
+  aufeinanderfolgende Iterationen mit gruenen Tests, die in der Praxis
+  alle umfielen — jede an einer anderen Skalierungs-Achse:
+
+  | Anlauf | Was Tests pruefen | Was Praxis-Daten enthielten |
+  |---|---|---|
+  | 1. Implementer-Fix | Kleine Pool-Groessen | 9k-BL-Inventar |
+  | 2. Temp-Tabelle | 250 bl_subsets-Eintraege | 1,4 Mio bl_subsets |
+  | 3. Bulk-Lookup vor Index-Fix | Synthetisches Tempfile | Plan-Wechsel ab Grossenordnung |
+
+  **Lehre:** Skalierungs-Tests muessen entweder den ECHTEN Datenpfad mit
+  realistischer Datenmenge UND Datentopologie simulieren — oder
+  strukturell pruefen (EXPLAIN QUERY PLAN, Bulk-Methode-Aufruf-Count)
+  statt zeitlich. Synthetische Test-DB mit 250 Subset-Eintraegen
+  reproduziert nicht denselben Query-Plan wie 1,4 Mio Zeilen.
+  Strukturelle Asserts sind CI-tauglich und daten-unabhaengig.
+  Quelle: User-Praxis 2026-06-07 + drei Diagnoser-Laeufe + Praxis-
+  Verifikation auf echter 9k-BL-DB.
 
 - 📋 **BUILD-2: Wartende Figuren als zusätzliche Quelle** (Feature,
   konzeptionell). Aktuell betrachtet der Baubar-Tab zwei Quellen:
@@ -481,34 +552,21 @@ Konzept + Bau in einer weiteren.
   ergaenzt werden. Aktuell erscheint diese Figur NICHT im Baubar-Tab
   als komplettierbarer Vorschlag.
   
-  **Abgrenzung zu BUILD-2:** BUILD-2 will wartende Figuren als *Quelle*
-  nutzen (ausschlachten fuer andere). BUILD-3 will sie als *Ziel* zeigen
-  (komplettieren). BUILD-3 ist deutlich einfacher — keine Reservierungs-
-  Wechselwirkungen, nur eine Anzeige-/Filter-Erweiterung.
+  **Status:** Konzept liegt vor in
+  `docs/v0.1.25-konzept-build3-wartende-figuren-baubar.md` (lokal-only,
+  gitignored). **Wartet auf User-Freigabe** — ux-analyst-Empfehlung ist
+  **Modell (b): gruenes "jetzt fertigstellbar"-Badge im bestehenden
+  WaitingDetailView-Tab**, NICHT als Eintrag im Baubar-Tab. Begruendung:
+  WaitingDetailView zeigt schon wartende Figuren mit effektiv fehlenden
+  Teilen — deckt ~80% des Use-Case ab. Modell (b) ergaenzt nur die
+  Deckbarkeits-Anzeige ("liesse sich JETZT mit Lager+BL fertigstellen"),
+  reine Anzeige, keine Buchung. Eliminiert beide Risiken strukturell:
+  Doppel-UI mit Komplettieren-Workflow + Reservierungs-Kollision.
   
-  **Abgrenzung zu BUILD-1:** beide haben dieselbe Grund-Logik ("Figur
-  taucht nicht im Baubar-Tab auf, obwohl baubar"), aber unterschiedliche
-  Ausschluss-Kriterien:
-  - BUILD-1: Filter auf HBSort-Lager-Inhalt (mindestens 1 Teil noetig)
-  - BUILD-3: Filter auf Status=Waiting (wartende werden vermutlich gar
-    nicht als Baubar-Kandidaten betrachtet)
-  
-  **Vorab klaeren bevor Bau:**
-  - Ist der Ausschluss von Status=Waiting Absicht oder Versehen?
-    Komplettieren-Workflow existiert ja schon im Sortier-Tab. Wenn das
-    bewusst war, ist BUILD-3 eher ein UX-Wunsch ("zeig mir auch im
-    Baubar-Tab welche wartenden sich gerade komplettieren liessen")
-    statt Bug-Fix.
-  - Wie sieht die Anzeige aus? Eigene Sektion "Wartende komplettierbar"
-    im Baubar-Tab oder unter den normalen Vorschlaegen mit Badge?
-  - Werden BL-Reservierungen die schon auf der wartenden Figur sitzen
-    angezeigt?
-  
-  **Empfehlung:** zusammen mit BUILD-1 anschauen — wenn beim Lesen des
-  BuildSuggestionsViewModel-Pfads klar wird, dass beide nur Filter-
-  Erweiterungen sind, kann man sie in einer Iteration mitnehmen.
-  Quelle: User-Praxis 2026-06-07. Schwere: M. Aufwand: ~30min Klaerung
-  + ~1-2h Bau (Hausnummer, je nach Filter-Komplexitaet).
+  KISS-Verdikt des ux-analyst: grenzwertiger Komfort-Gewinn,
+  BUILD-1 war die echte Funktions-Luecke. Aufwand Modell (b) ~1,5h.
+  Eigener Datenpfad (TrackedMinifigPart/EffectiveCollected), teilt
+  keinen Code mit BUILD-1.
 
 #### Aus Praxis-Nutzung (PERF-5-Test, 2026-06-07) — Beschreibung-Spalte
 
@@ -1118,7 +1176,7 @@ Aenderungen am Cache-Schema + Provider-Logik.
 | **v0.1.24-beta.15** | ✅ gemerged (`97a53c63`, 2026-05-28) | UI-Politur: Tab "Temporäres Inventar" + Tab-Reihenfolge + Endanwender-Doku-Update. |
 | **v0.1.24** | ✅ stable (2026-05-29, Tag `e3b8f9ac`) | BL-Shop-Integration: Inventar-Sync, Reservieren beim Komplettieren, Mass-Update-Export, V5-Reservierungs-Aufloesung, Dialog-Vereinheitlichung, "Temporaeres Inventar"-Tab. |
 | **v0.1.25-beta.1** | ✅ released (2026-06-02, Tag `0bb0a7bd`) | Sammel-Beta: PERF-1 (Settings-ctor 1012ms→15ms), UX-Pattern-Katalog, Kosmetik-Sweep Welle 1-3 (UX-1..7 + B1/B6/B10), Spalten-Persistenz Temp-Inventar, Bulk-Bin-Aktionen. 652 Tests grün, isPrerelease=true. |
-| **v0.1.25** | 💭 Brainstorming (offen für Stable) | Praxis-Test beta.1 läuft. Neuer Performance-Track aus Diagnoser 2026-06-07: PERF-4 (Image-Cache-Stats-Storm, Hauptwurzel), PERF-5 (ScanEvents ohne Index), B-Widerruf (Multiplikator von PERF-4). Rest-Kandidaten: B2 (Footer-Layout), OPEN-18 Single-Mode-Cleanup, Kategorie-Sperre, Bauteile-Bin-Konzept, Torso-Komponenten-Konzept, UPSERT-Sync-Optimierung, vollständiges Undo-System. |
+| **v0.1.25** | 📋 in-arbeit (Tag-Kandidat: v0.1.25-beta.2) | **PERF-4** + **PERF-5** + **BUILD-1** alle erledigt + dokumentiert, ungetaggt. Performance-Track: GetStats-Calls/s 17,8 → 1,0 (∼18×), UI-Blockade-Spitze 47-98% → <1%, ScanEvents-Queries indiziert, FindMinifigsContainingParts 43,7s → 0,037s (1.400× ueber Temp-Index), BuildSuggestions N+1 → Bulk-Load. BUILD-1: 100%-BL-Vorschlaege erscheinen im Baubar-Tab. Naechster Schritt: beta.2 taggen. Offene Kandidaten: BUILD-3 (Konzept liegt vor, wartet auf User-Freigabe — Modell b empfohlen), UI-1 (Beschreibung-Spalte, 3 User-Entscheidungen offen), B2 (Footer-Layout), B-Re-Evaluierung (subjektiv beim Sortieren ueber mehrere Tage). |
 | **v0.2.0** | 💭 Brainstorming | grosse Features aus Backlog (siehe oben) |
 
 Konvention:
@@ -1127,15 +1185,32 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-06-07 — PERF-4 (Image-Cache-Stats-Storm) +
-PERF-5 (ScanEvents-Index) beide erledigt. Performance-Track aktuell:
-GetStats-Calls/s 17,8 → 1,0 (~18×), UI-Blockade-Spitze 47-98% → <1%,
-ScanEvents-Queries indiziert. Neue UX-Befunde aus Praxis: UI-1
-(Beschreibung mehrzeilig + Teiletyp-Praefix fett, 3 USER-ENTSCHEIDUNGEN
-offen), UI-2 (komisches Spalten-Layout, beobachten ob reproduzierbar).
-B-Re-Evaluierung steht aus (subjektiv beim Sortieren, kein eigener
-Diagnose-Lauf noetig). — v0.1.25-beta.1 bleibt released (2026-06-02,
-Tag `0bb0a7bd`). Naechste v0.1.25-Kandidaten: BUILD-1 (100%-BL-
-Vorschlaege, klar definiert ~1-2h), UI-1 (Beschreibung-Spalte, braucht
-Entscheidungen), B2 (Footer-Layout). Beta.2-Tag-Frage offen — vermutlich
-nach BUILD-1 sinnvoll.*
+*Zuletzt aktualisiert: 2026-06-07 — **PERF-4 + PERF-5 + BUILD-1**
+alle drei erledigt und dokumentiert, ungetaggt auf `main`. Performance-
+Track-Bilanz: GetStats-Calls/s 17,8 → 1,0 (~18×, PERF-4), ScanEvents
+indiziert (PERF-5), FindMinifigsContainingParts 43,7s → 0,037s (1.400×
+ueber Temp-Index, im BUILD-1-Track entdeckt), BuildSuggestions-N+1 →
+Bulk-Load (im BUILD-1-Track entdeckt). BUILD-1-Feature: 100%-BL-
+Vorschlaege erscheinen jetzt im Baubar-Tab. Vier Skalierungs-Wurzeln
+an einem Tag entdeckt + behoben, Engineering-Lehre dauerhaft im
+BUILD-1-Eintrag dokumentiert: Skalierungs-Tests muessen entweder echte
+Datenmenge + Datentopologie simulieren oder strukturell pruefen (EXPLAIN
+QUERY PLAN, Bulk-Methode-Aufruf-Count) statt zeitlich.
+
+**Naechster Schritt: v0.1.25-beta.2 taggen** — drei substanzielle Inhalte
+(PERF-4 + PERF-5 + BUILD-1) als "Performance + Bau-Verbesserungen"-
+Update. Velopack zieht das automatisch auf die User-Installationen.
+v0.1.25-beta.1 (`0bb0a7bd`, 2026-06-02) bleibt released.
+
+**Offene v0.1.25-Kandidaten:**
+- BUILD-3 (Konzept liegt vor in docs/, Modell b empfohlen, wartet auf
+  User-Freigabe)
+- UI-1 (Beschreibung-Spalte mehrzeilig, 3 USER-ENTSCHEIDUNGEN offen)
+- UI-2 (komisches Spalten-Layout, beobachten ob reproduzierbar —
+  koennte sich mit UI-1 miterledigen)
+- B2 (Footer-Layout in ManageIgnored/MassUpdate-Dialog, ~30min)
+- B-Re-Evaluierung (subjektiv beim Sortieren ueber mehrere Tage, kein
+  eigener Diagnose-Lauf noetig)
+- OPEN-18 Single-Mode-Cleanup, BUILD-2, Torso-Komponenten-Konzept,
+  Bauteile-Bin-Konzept, UPSERT-Sync-Optimierung, vollstaendiges
+  Undo-System (alle eigene Iterationen mit unterschiedlichem Aufwand)*
