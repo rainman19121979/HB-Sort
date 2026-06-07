@@ -60,6 +60,77 @@ BrickStore- und BrickLink-Export.
   per **Mass-Update-Export** wieder aus dem Shop ausbuchen (XML, Upload
   bei BrickLink, dann Verifizieren in HB-Sort).
 
+## Was ist neu in v0.1.25
+
+Mehrere Performance- und Komfort-Iterationen, plus neue Anzeige-
+Features rund um Combined Parts und den Baubar-Tab.
+
+### Spürbar flüssigere App
+
+- **Einstellungen öffnen sofort** statt nach ~1 Sekunde Verzögerung.
+- **Sortieren bleibt zäh-frei über längere Sessions** — vorher wurde
+  die App mit steigender Scan-Zahl spuerbar langsamer (vor allem im
+  Temporaeren Inventar und Sortier-Tab). Wurzel: ein Cache-Statistik-
+  Event, das pro Bild-Cache-Hit gefeuert hat — jetzt nur noch bei
+  echten Mengen-Aenderungen, plus Throttle als Sicherheitsnetz.
+- **Schnelleres Laden der Scan-Historie** durch einen Datenbank-Index
+  auf der ScanEvents-Tabelle. Bei wachsender Historie spuerbar.
+
+### Baubar-Tab: 100%-BL-Vorschläge erscheinen jetzt
+
+Im Tab "Was kann ich bauen?" erscheinen jetzt auch Figuren die
+**ausschliesslich aus deinem BL-Shop-Inventar** baubar wären —
+auch wenn du gar keine passenden losen Teile im Lager hast. Aktiviert
+sich über den bestehenden Toggle **"BL-Inventar beruecksichtigen"**.
+Vorher fielen solche "BL-only"-Vorschläge stillschweigend raus, weil
+der Filter mindestens ein Teil im HBSort-Lager verlangt hat.
+
+Nebenbei wurden drei Skalierungs-Probleme im Baubar-Tab gefixt, die
+bei wachsendem BL-Inventar auftraten (Crash bei sehr grossen Pools,
+langsamer Query-Plan, vielfache Einzel-Datenbankabfragen). Der Tab
+lädt jetzt auch mit ~9000 Lots im BL-Inventar in unter 1 Sekunde.
+
+### Torso-Komponenten beim Einzelteil-Scan
+
+Beim Scan eines montierten Torsos (oder eines anderen "Combined
+Part" wie Wheels+Reifen, Turntables, Tier+Zubehör) zeigt HB-Sort
+jetzt automatisch einen aufgeklappten Bereich **"Komponenten dieses
+Teils"** im Scan-Result:
+
+- Grund-Teil mit Badge "Grund-Teil"
+- Alle Sub-Teile (Arme, Hände, ...) mit Bild, Farb-Swatch und Anzahl
+- Bilder klickbar zum Vergroessern
+
+Hilfreich beim Sortieren wenn du sehen willst was alles zu einem
+montierten Teil gehört. Reine Anzeige aus dem lokalen Cache, keine
+zusätzlichen BL-API-Aufrufe. Funktioniert generisch für alle
+Combined Parts, nicht nur Torsos. Bei atomaren Teilen (ein normaler
+2x4-Stein) erscheint der Bereich gar nicht.
+
+### Dialog-Konsistenz
+
+- **Footer-Buttons vereinheitlicht** in allen Dialogen: Abbrechen/
+  Schliessen immer links, primärer Button rechts mit Akzent-Farbe.
+- **Schliessen-Buttons** sind jetzt durchgaengig grau (vorher in drei
+  Dialogen fälschlich mit Akzent-Farbe wie ein primärer Button).
+- **BL-Shop-Badge-Beschriftung** in Bauvorschlag-Details vereinheitlicht
+  (zeigt jetzt die konkrete Stueckzahl wie ueberall sonst).
+- **Mehrere Tooltip- und Beschriftungs-Drifts** korrigiert.
+
+### Spalten-Persistenz im Temporären Inventar
+
+Sortierung und Spaltenbreiten bleiben jetzt zwischen App-Starts
+erhalten. Vorher musste man die Spalten nach jedem Neustart neu
+zurechtruecken.
+
+### Bulk-Aktionen auf Lagerfächern
+
+Im Einstellungs-Tab **Lagerfächer** kannst du jetzt markierte Fächer
+sammelweise leeren oder löschen — mit Vorschau und Bestaetigungs-
+Dialog. Belegte Fächer (mit Figuren oder Floating-Parts drin) werden
+beim Löschen automatisch übersprungen und im Ergebnis-Report
+aufgeführt.
+
 ## Was ist neu in v0.1.24
 
 Grosse Iteration in zwei Strecken: **SortInstruction-Konsolidierung**

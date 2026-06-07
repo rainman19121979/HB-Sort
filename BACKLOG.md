@@ -514,6 +514,52 @@ verwobener Sammel-Commits sonst wieder zuschlägt — Lehre beta.11-13).
   Quelle: User-Praxis 2026-06-07 + drei Diagnoser-Laeufe + Praxis-
   Verifikation auf echter 9k-BL-DB.
 
+- ✅ **Torso-/Combined-Part-Komponenten im Scan-Result** — erledigt
+  2026-06-07 (`c5deda7c`). Beim Scan eines montierten Torsos (oder
+  anderen "Combined Parts" wie Wheels+Reifen, Turntables) zeigt der
+  PartLookupView einen aufgeklappten Expander "Komponenten dieses
+  Teils" mit allen Sub-Teilen aus bl_subsets (parent_type='P'). Reine
+  Anzeige aus lokalem Cache, KEIN BL-API-Call.
+  
+  **Inhalte:**
+  - DTO `PartComponent` (record) + `GetPartComponentsAsync` in
+    IBlCatalogService/BlCatalogService
+  - Direkter Pfad + Reverse-Fallback via FindParentsByItemAsync
+    (Robustness-Reserve)
+  - Filter `is_alternate=0 AND is_counterpart=0 AND is_from_supersets=0`
+  - PartComponentViewModel-Wrapper mit Bild + Farb-Swatch + Menge
+  - Expander default aufgeklappt (User-Hauptanwendungsfall ist Torso-
+    Scan, will Komponenten sofort sehen)
+  - Grund-Teil mit Badge "Grund-Teil" gekennzeichnet (Self-Reference-
+    Heuristik: ItemNo ist Praefix von parent_no)
+  
+  **Zwei nachgezogene Konsistenz-Fixes:**
+  - **B3 (Bild-Fallback):** Beim Grund-Teil mit ColorId=0 nutzt der
+    Bild-Lookup die Scan-Farbe (`pending.BlColorId`) als Fallback.
+    Wurzel: bare-Torsos haben oft keine Bilder unter Color=0 in BL,
+    nur unter konkreten Farben (per Log + BL-Catalog-Screenshot
+    verifiziert: 973pb1727 unter `/PN/0/` = 404, unter `/PN/85/` =
+    existiert).
+  - **B3.5 (Color-Anzeige):** Konsequent dazu wird auch ColorId/
+    ColorName/Swatch des Grund-Teils auf die Scan-Farbe gesetzt —
+    sonst zeigt der Expander Bild in konkreter Farbe, aber
+    Anzeige-Farbe "(Not Applicable)". Praxis-Befund + Fix in selber
+    Iteration.
+  
+  **Brickognize-ID-Form geklaert (per Praxis-Test):**
+  Bei montiertem Torso liefert Brickognize die **complete-ID**
+  (z.B. `973pb1727c01`), nicht die bare-ID. Der direkte Pfad
+  `GetSubsetsAsync("P", id)` reicht. Der Reverse-Fallback ist
+  Robustness-Reserve. Diese Info dauerhaft im Code-Kommentar +
+  hier festgehalten fuer kuenftige Subset-Features.
+  
+  **Tests:** 5 Core-Tests fuer GetPartComponentsAsync (atomar, direkt,
+  Filter, Reverse-Fallback, IsBaseItem-Flag). 677/677 gruen.
+  
+  Pattern-konform (docs/ux-patterns.md): klickbare Bilder via
+  b:ImageZoom, keine neuen Buttons → kein Footer-Drift. Quelle:
+  User-Wunsch + Konzept docs/v0.1.25-konzept-torso-komponenten.md.
+
 - 📋 **BUILD-2: Wartende Figuren als zusätzliche Quelle** (Feature,
   konzeptionell). Aktuell betrachtet der Baubar-Tab zwei Quellen:
   HBSort-Lager (FloatingPart-Stock) + BL-Shop-Inventar. Wartende Figuren
@@ -567,6 +613,24 @@ Konzept + Bau in einer weiteren.
   BUILD-1 war die echte Funktions-Luecke. Aufwand Modell (b) ~1,5h.
   Eigener Datenpfad (TrackedMinifigPart/EffectiveCollected), teilt
   keinen Code mit BUILD-1.
+
+- 📋 **PERF-7: BuildSuggestionsScalingTests Wall-Clock-Assert ersetzen** —
+  Nebenbefund 2026-06-07 beim B3.5-Implementer-Lauf: der Skalierungs-
+  Test in HBSort.Tests (Commit `b0ce7898`) nutzt einen Timing-Assert
+  (`<2s`) und flakt unter Parallel-Last (mal 2,60s, mal gruen). Auf CI
+  wird er irgendwann rot blinken obwohl nichts kaputt ist.
+  
+  **Ironie:** das ist exakt das Muster gegen das die heute-frische
+  Engineering-Lehre warnt ("Skalierungs-Tests muessen strukturell
+  pruefen statt zeitlich"). Der Test ist ein Lehre-an-uns-selbst-Punkt.
+  
+  Fix-Empfehlung: Timing-Assert durch strukturellen ersetzen, z.B.
+  Query-Call-Counter ("RefreshAsync ruft GetSubsets/GetItem max.
+  O(Chunks)-mal statt O(Kandidaten)-mal"). Pruefen den N+1-Fix
+  deterministisch ohne Zeitschranke. Aufwand: ~30min. Schwere: L
+  (aktuell nur Test-Flakiness, kein Produkt-Bug). Kein Druck — aber
+  bevor es die Pipeline rot blinken laesst aufnehmen.
+  Quelle: Implementer-Bericht 2026-06-07.
 
 #### Aus Praxis-Nutzung (PERF-5-Test, 2026-06-07) — Beschreibung-Spalte
 
@@ -1176,7 +1240,7 @@ Aenderungen am Cache-Schema + Provider-Logik.
 | **v0.1.24-beta.15** | ✅ gemerged (`97a53c63`, 2026-05-28) | UI-Politur: Tab "Temporäres Inventar" + Tab-Reihenfolge + Endanwender-Doku-Update. |
 | **v0.1.24** | ✅ stable (2026-05-29, Tag `e3b8f9ac`) | BL-Shop-Integration: Inventar-Sync, Reservieren beim Komplettieren, Mass-Update-Export, V5-Reservierungs-Aufloesung, Dialog-Vereinheitlichung, "Temporaeres Inventar"-Tab. |
 | **v0.1.25-beta.1** | ✅ released (2026-06-02, Tag `0bb0a7bd`) | Sammel-Beta: PERF-1 (Settings-ctor 1012ms→15ms), UX-Pattern-Katalog, Kosmetik-Sweep Welle 1-3 (UX-1..7 + B1/B6/B10), Spalten-Persistenz Temp-Inventar, Bulk-Bin-Aktionen. 652 Tests grün, isPrerelease=true. |
-| **v0.1.25** | 📋 in-arbeit (Tag-Kandidat: v0.1.25-beta.2) | **PERF-4** + **PERF-5** + **BUILD-1** alle erledigt + dokumentiert, ungetaggt. Performance-Track: GetStats-Calls/s 17,8 → 1,0 (∼18×), UI-Blockade-Spitze 47-98% → <1%, ScanEvents-Queries indiziert, FindMinifigsContainingParts 43,7s → 0,037s (1.400× ueber Temp-Index), BuildSuggestions N+1 → Bulk-Load. BUILD-1: 100%-BL-Vorschlaege erscheinen im Baubar-Tab. Naechster Schritt: beta.2 taggen. Offene Kandidaten: BUILD-3 (Konzept liegt vor, wartet auf User-Freigabe — Modell b empfohlen), UI-1 (Beschreibung-Spalte, 3 User-Entscheidungen offen), B2 (Footer-Layout), B-Re-Evaluierung (subjektiv beim Sortieren ueber mehrere Tage). |
+| **v0.1.25** | 📋 in-arbeit (Tag-Kandidat: v0.1.25-beta.2) | **PERF-4** + **PERF-5** + **BUILD-1** + **Torso-Komponenten** alle erledigt + dokumentiert, ungetaggt. Performance-Track: GetStats-Calls/s 17,8 → 1,0 (∼18×), UI-Blockade-Spitze 47-98% → <1%, ScanEvents-Queries indiziert, FindMinifigsContainingParts 43,7s → 0,037s (1.400× ueber Temp-Index), BuildSuggestions N+1 → Bulk-Load. BUILD-1: 100%-BL-Vorschlaege erscheinen im Baubar-Tab. Torso-Komponenten: Combined-Part-Subteile sichtbar beim Scan inkl. Color-Konsistenz fuer Grund-Teile. Naechster Schritt: beta.2 taggen. Offene Kandidaten: BUILD-3 (Konzept liegt vor, wartet auf User-Freigabe — Modell b empfohlen), UI-1 (Beschreibung-Spalte, 3 User-Entscheidungen offen), B2 (Footer-Layout), PERF-7 (Wall-Clock-Test ersetzen), B-Re-Evaluierung (subjektiv beim Sortieren ueber mehrere Tage). |
 | **v0.2.0** | 💭 Brainstorming | grosse Features aus Backlog (siehe oben) |
 
 Konvention:
@@ -1185,22 +1249,23 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-06-07 — **PERF-4 + PERF-5 + BUILD-1**
-alle drei erledigt und dokumentiert, ungetaggt auf `main`. Performance-
-Track-Bilanz: GetStats-Calls/s 17,8 → 1,0 (~18×, PERF-4), ScanEvents
-indiziert (PERF-5), FindMinifigsContainingParts 43,7s → 0,037s (1.400×
-ueber Temp-Index, im BUILD-1-Track entdeckt), BuildSuggestions-N+1 →
-Bulk-Load (im BUILD-1-Track entdeckt). BUILD-1-Feature: 100%-BL-
-Vorschlaege erscheinen jetzt im Baubar-Tab. Vier Skalierungs-Wurzeln
-an einem Tag entdeckt + behoben, Engineering-Lehre dauerhaft im
-BUILD-1-Eintrag dokumentiert: Skalierungs-Tests muessen entweder echte
-Datenmenge + Datentopologie simulieren oder strukturell pruefen (EXPLAIN
-QUERY PLAN, Bulk-Methode-Aufruf-Count) statt zeitlich.
+*Zuletzt aktualisiert: 2026-06-07 — **PERF-4 + PERF-5 + BUILD-1 +
+Torso-Komponenten** alle vier erledigt und dokumentiert, ungetaggt auf
+`main`. Performance-Track-Bilanz: GetStats-Calls/s 17,8 → 1,0 (~18×,
+PERF-4), ScanEvents indiziert (PERF-5), FindMinifigsContainingParts
+43,7s → 0,037s (1.400× ueber Temp-Index, im BUILD-1-Track entdeckt),
+BuildSuggestions-N+1 → Bulk-Load (im BUILD-1-Track entdeckt). BUILD-1-
+Feature: 100%-BL-Vorschlaege erscheinen jetzt im Baubar-Tab. Torso-
+Feature: Combined-Part-Subteile sichtbar beim Scan inkl. Bild- und
+Color-Konsistenz fuer Grund-Teile (B3 + B3.5 nachgezogen in selber
+Iteration). Vier Skalierungs-Wurzeln an einem Tag entdeckt + behoben,
+Engineering-Lehre dauerhaft im BUILD-1-Eintrag dokumentiert.
 
-**Naechster Schritt: v0.1.25-beta.2 taggen** — drei substanzielle Inhalte
-(PERF-4 + PERF-5 + BUILD-1) als "Performance + Bau-Verbesserungen"-
-Update. Velopack zieht das automatisch auf die User-Installationen.
-v0.1.25-beta.1 (`0bb0a7bd`, 2026-06-02) bleibt released.
+**Naechster Schritt: v0.1.25-beta.2 taggen** — vier substanzielle Inhalte
+(PERF-4 + PERF-5 + BUILD-1 + Torso) als "Performance + Bau-Verbesserungen
++ Komponenten-Anzeige"-Update. Velopack zieht das automatisch auf die
+User-Installationen. v0.1.25-beta.1 (`0bb0a7bd`, 2026-06-02) bleibt
+released.
 
 **Offene v0.1.25-Kandidaten:**
 - BUILD-3 (Konzept liegt vor in docs/, Modell b empfohlen, wartet auf
@@ -1209,8 +1274,9 @@ v0.1.25-beta.1 (`0bb0a7bd`, 2026-06-02) bleibt released.
 - UI-2 (komisches Spalten-Layout, beobachten ob reproduzierbar —
   koennte sich mit UI-1 miterledigen)
 - B2 (Footer-Layout in ManageIgnored/MassUpdate-Dialog, ~30min)
+- PERF-7 (BuildSuggestionsScalingTests Wall-Clock → strukturell, ~30min)
 - B-Re-Evaluierung (subjektiv beim Sortieren ueber mehrere Tage, kein
   eigener Diagnose-Lauf noetig)
-- OPEN-18 Single-Mode-Cleanup, BUILD-2, Torso-Komponenten-Konzept,
-  Bauteile-Bin-Konzept, UPSERT-Sync-Optimierung, vollstaendiges
-  Undo-System (alle eigene Iterationen mit unterschiedlichem Aufwand)*
+- OPEN-18 Single-Mode-Cleanup, BUILD-2, Bauteile-Bin-Konzept,
+  UPSERT-Sync-Optimierung, vollstaendiges Undo-System (alle eigene
+  Iterationen mit unterschiedlichem Aufwand)*

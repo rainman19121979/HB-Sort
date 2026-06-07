@@ -79,6 +79,11 @@ docs/v*-ux-analyse.md
 # Pattern deckt design-schema.md + zukuenftige Schema-Drafts ab.
 docs/*-schema.md
 
+# Interne Versions-Roadmap-Dokumente (Steuerungs-/Disziplin-Anker pro
+# Version, z.B. v0.1.25-roadmap.md). Lebende Doku, lokal-only, nicht
+# fuer Public-Repo. Pattern deckt alle Versionen ab.
+docs/v*-roadmap.md
+
 # Lokale Planungs-/Engineering-Dokumente (nicht im Repo)
 ENGINEERING_PRINCIPLES.md
 
