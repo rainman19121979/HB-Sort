@@ -173,18 +173,25 @@ Items archiviert werden.
 - 📋 **OPEN-18: Single-Mode-Cleanup** — Audit-Bedarf welche Service-
   Aufrufe Single-Item vs. Bulk sind, ggf. konsolidieren (aus Phase 2a-
   Polish Diagnose 2026-05-16). Aufwand: ~2h.
-- 💭 **Performance-Wurzelfixes B + E (Hygiene)** — `RaiseDataChanged` aus
-  Service-Layer raus (B, ~20 Call-Sites über 4 Service-Dateien, mittleres
-  Regressions-Risiko), `RecalcBinKindAsync`-Context-Piggyback (E, ~22
-  Aufrufer, alle in offenem Context → Piggyback trivial, ~3-4h).
-  Strukturelle Wurzeln aus Diagnoser-Bericht 2026-05-14.
-  **Diagnose 2026-05-29: reine Architektur-Hygiene ohne erlebbaren
-  User-Mehrwert** — alle Lade-Pfade < 165ms, kein DataChanged-Storm,
-  die zwei Event-Busse (DataChanged/InventoryChanged) haben disjunkte
-  Listener (kein Doppel-Refresh). Sinnvoll nur wenn ein konkreter
-  Refresh-Bug auftaucht (B) oder im Zuge einer anderen Iteration die
-  diese Pfade ohnehin berührt (E). Reihenfolge falls doch: E zuerst
-  (lokal, risikoarm), B nur bei Bedarf. E-Vorbedingung siehe PERF-2.
+- 📋 **Performance-Wurzelfix B (DataChanged-Storm) — Hygiene-Herabstufung
+  WIDERRUFEN** + E (RecalcBinKind-Piggyback, bleibt Hygiene). B =
+  `RaiseDataChanged` aus Service-Layer raus (~20 Call-Sites über 4
+  Service-Dateien, mittleres Regressions-Risiko); E =
+  `RecalcBinKindAsync`-Context-Piggyback (~22 Aufrufer, alle in offenem
+  Context → Piggyback trivial, ~3-4h). Strukturelle Wurzeln aus
+  Diagnoser-Bericht 2026-05-14.
+  **Wurde 2026-05-29 auf 💭 Hygiene herabgestuft** (Diagnoser-Bericht
+  damals: alle Lade-Pfade < 165ms, kein DataChanged-Storm, disjunkte
+  Listener). **Widerruf fuer B 2026-06-07** nach neuem Diagnoser-Lauf:
+  bei wachsender Datenmenge (12k Image-Cache, 2k ScanEvents) wirkt B als
+  **Multiplikator von PERF-4** (5 Live-VMs laden parallel pro Scan → 5×
+  der Stats-Storm). Die 29.05.-Einschaetzung war bei kleinerer Datenmenge
+  richtig, ist es bei wachsendem Bestand nicht mehr. **Re-Evaluierung
+  NACH PERF-4-Fix sinnvoll** — wenn PERF-4 den 5×-Storm-Effekt eliminiert,
+  koennte B wieder Hygiene werden; heute keine Entscheidung erzwingen,
+  erst messen nach PERF-4. E bleibt Hygiene (lokal, risikoarm, nur bei
+  Bedarf). Reihenfolge: PERF-4 + PERF-5 zuerst (siehe Diagnoser-Lauf
+  2026-06-07 unten), dann B re-evaluieren. E-Vorbedingung siehe PERF-2.
 - 📋 **Kategorie-Sperre-Diagnose-Track** — wartet auf 2-3 dokumentierte
   Praxis-Vorfaelle (Befund 3 aus v0.1.23-beta.1). Ohne Vorfall-Daten kein
   Konzept-Entscheid (Engineering-Prinzip 1.2).
@@ -320,6 +327,71 @@ ein dritter, separater Befund.
   moeglich. Nur als Notiz: nicht weiter verfolgen, nicht als Bug
   behandeln. Die separat gelistete UPSERT-Optimierung wuerde nur ~15%
   sparen (85% sind API-Antwortzeit). Quelle: Diagnoser 2026-05-29.
+
+#### Aus Diagnoser-Lauf 2026-06-07 (Performance-Drift im Temp-Inventar/Sortier-Tab)
+
+Praxis-Befund nach mehreren Tagen Nutzung von v0.1.25-beta.1: *"Je mehr
+ich scanne, desto zaeher laeuft das Programm — besonders im Temporaeren
+Inventar und im Sortier-Tab."* Die Diagnose belegt: die Zaehigkeit
+skaliert **nicht** mit den sichtbaren Listen (TrackedMinifigs=0,
+FloatingParts=88 — winzig), sondern mit den zwei monoton wachsenden
+Strukturen `image_cache.db` (12.113 Eintraege, ~1 GB) und `ScanEvents`
+(2.346, ohne Index). Das erklaert das "je mehr ich scanne"-Wording exakt.
+Read-only-Diagnose — **naechster Schritt ist gezielte Mess-Instrumentierung,
+NICHT direkter Fix** (Lehre aus PERF-1: erst messen, dann fixen).
+
+- 📋 **PERF-4: Image-Cache-Stats-Storm (HAUPTWURZEL)** —
+  `PersistentImageCache.TouchAccess` (`PersistentImageCache.cs:152`) feuert
+  `StatsChanged` bei JEDEM Bild-Cache-Hit; `MainViewModel.UpdateCacheStatusText`
+  (`MainViewModel.cs:622`) ruft daraufhin pro Tick `GetStats()` =
+  `SELECT COUNT(*), SUM(size_bytes), MIN(...)` Full-Scan ueber
+  `image_cache.db` (aktuell 12.113 Zeilen) auf dem UI-Thread, serialisiert
+  ueber globalen `_lock` auf der geteilten SqliteConnection. Skaliert
+  monoton mit der Cache-Groesse → erklaert das Symptom exakt. **5×
+  multipliziert** durch parallele Live-VMs: pro Scan feuert DataChanged,
+  alle 5 Live-VMs (LiveStats/RecentScans/WaitingDetail/BuildSuggestions/
+  InventoryList) laden parallel `LoadImagesAsync` → 5× der Stats-Storm
+  (= Multiplikator-Wirkung von B, siehe oben). Schwere: **H** (User-
+  spuerbar, waechst mit jeder Nutzung). Aufwand: ~1-2h. Fix-Richtung:
+  `StatsChanged` nicht bei Touch feuern (Touch aendert nur
+  `last_accessed_at`, fuer die Status-Anzeige irrelevant) + Stats
+  throttlen/coalescen oder inkrementell statt Full-Scan. **ERST gezielte
+  Messung** (Stopwatch um `GetStats` + Call-Counter fuer `OnCacheStatsChanged`),
+  DANN Fix. Quelle: Diagnoser 2026-06-07.
+- 📋 **PERF-5: ScanEvents-Tabelle ohne Index** — Tabelle hat keinen
+  einzigen Index (verifiziert via `sqlite_master`: weder auf `Timestamp`
+  noch auf `Type`), waechst monoton (+1 pro Scan, aktuell 2.346).
+  `RecentScansViewModel.RefreshAsync:74` macht
+  `OrderByDescending(Timestamp).Take(MaxItems)` → SQLite sortiert bei
+  jedem DataChanged alle Zeilen; Verlauf-Tab + Stats-Queries full-scannen
+  ebenfalls. Unabhaengiger Skalierungs-Vektor (ScanEvents, nicht Bilder),
+  daher getrennt von PERF-4 fixbar. Schwere: **M**. Aufwand: ~30min
+  (EF-Migration `CREATE INDEX IX_ScanEvents_Timestamp ON ScanEvents
+  (Timestamp DESC)`, ggf. zusaetzlich `Type`). Quelle: Diagnoser 2026-06-07.
+- ℹ️ **PERF-6: Spalten-Persistenz-Save (Notiz, kein akuter Fix)** —
+  `InventoryListView.xaml.cs:711` (`InventoryGrid_Sorting`) schreibt die
+  ganze `settings.json` fire-and-forget bei jedem Sort-Klick. **Nicht**
+  Treiber des aktuellen Symptoms (feuert nur bei aktivem Sort-Klick,
+  selten — nicht "je mehr ich scanne"), aber als neuer Schreibpfad
+  notiert. Falls je auffaellig: Debounce. Schwere: **L**. Quelle:
+  Diagnoser 2026-06-07.
+
+**Engineering-Lehre (2026-06-07):** Klassifizierungen (Hygiene / kritisch /
+nicht-relevant) muessen mit der Datenmenge mitwachsen. Was bei kleinem
+Bestand Hygiene war, kann bei groesserem Bestand zur Wurzel werden (hier:
+B war am 29.05. bei kleinerer Datenmenge zu Recht Hygiene, wirkt jetzt
+als 5×-Multiplikator von PERF-4). Der ehrliche Widerruf einer frueheren
+Klassifizierung ist Teil der Disziplin, **kein Konsistenz-Problem**.
+Konsequenz: Performance-Klassifizierungen mit der zugrundeliegenden
+Datenmengen-Annahme versehen und bei Praxis-Befunden re-evaluieren statt
+als endgueltig behandeln.
+
+**Reihenfolge-Empfehlung:** (1) gezielte Mess-Instrumentierung PERF-4/5
+(~30min, Implementer, NICHT fixen) → Wurzel mit Zahlen belegen; (2) PERF-4
+zuerst (groesster Hebel, isolierter Anzeige-Pfad, niedrigstes Risiko);
+(3) PERF-5 mitnehmen (billig, eigener Vektor); (4) B nur falls nach
+PERF-4+5 noch Symptom messbar — moeglich, dass PERF-4 das Symptom allein
+aufloest.
 
 ### Konzept-Items für spätere Iterationen (v0.1.25+)
 
@@ -888,7 +960,7 @@ Aenderungen am Cache-Schema + Provider-Logik.
 | **v0.1.24-beta.15** | ✅ gemerged (`97a53c63`, 2026-05-28) | UI-Politur: Tab "Temporäres Inventar" + Tab-Reihenfolge + Endanwender-Doku-Update. |
 | **v0.1.24** | ✅ stable (2026-05-29, Tag `e3b8f9ac`) | BL-Shop-Integration: Inventar-Sync, Reservieren beim Komplettieren, Mass-Update-Export, V5-Reservierungs-Aufloesung, Dialog-Vereinheitlichung, "Temporaeres Inventar"-Tab. |
 | **v0.1.25-beta.1** | ✅ released (2026-06-02, Tag `0bb0a7bd`) | Sammel-Beta: PERF-1 (Settings-ctor 1012ms→15ms), UX-Pattern-Katalog, Kosmetik-Sweep Welle 1-3 (UX-1..7 + B1/B6/B10), Spalten-Persistenz Temp-Inventar, Bulk-Bin-Aktionen. 652 Tests grün, isPrerelease=true. |
-| **v0.1.25** | 💭 Brainstorming (offen für Stable) | Praxis-Test beta.1 läuft. Rest-Kandidaten: B2 (Footer-Layout), OPEN-18 Single-Mode-Cleanup, Kategorie-Sperre, Bauteile-Bin-Konzept, B+E (Hygiene), UPSERT-Sync-Optimierung, vollständiges Undo-System. |
+| **v0.1.25** | 💭 Brainstorming (offen für Stable) | Praxis-Test beta.1 läuft. Neuer Performance-Track aus Diagnoser 2026-06-07: PERF-4 (Image-Cache-Stats-Storm, Hauptwurzel), PERF-5 (ScanEvents ohne Index), B-Widerruf (Multiplikator von PERF-4). Rest-Kandidaten: B2 (Footer-Layout), OPEN-18 Single-Mode-Cleanup, Kategorie-Sperre, Bauteile-Bin-Konzept, Torso-Komponenten-Konzept, UPSERT-Sync-Optimierung, vollständiges Undo-System. |
 | **v0.2.0** | 💭 Brainstorming | grosse Features aus Backlog (siehe oben) |
 
 Konvention:
@@ -897,10 +969,13 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-06-02 — v0.1.25-beta.1 getaggt (`0bb0a7bd`,
-Pipeline grün, isPrerelease=true). Gebündelt: PERF-1 (ctor 1012ms→15ms),
-UX-Pattern-Katalog, Kosmetik-Sweep Welle 1-3 (UX-1..7 + B1/B6/B10),
-Spalten-Persistenz Temp-Inventar, Bulk-Bin-Aktionen. Praxis-Test für
-Stable-Promote läuft. Offene v0.1.25-Kandidaten: B2 (Footer-Layout),
-OPEN-18, Kategorie-Sperre, Bauteile-Bin, B+E (Hygiene), UPSERT-Sync,
-Undo-System.*
+*Zuletzt aktualisiert: 2026-06-07 — Diagnoser-Lauf zum Praxis-Befund
+"je mehr ich scanne, desto zaeher" eingetragen: PERF-4 (Image-Cache-
+Stats-Storm, Hauptwurzel), PERF-5 (ScanEvents ohne Index), PERF-6
+(Spalten-Persistenz-Save, Notiz) + Widerruf der B-Hygiene-Herabstufung
+vom 29.05. (B wirkt als 5×-Multiplikator von PERF-4). Naechster Schritt:
+gezielte Mess-Instrumentierung (nicht direkter Fix). — v0.1.25-beta.1
+bleibt released (2026-06-02, Tag `0bb0a7bd`, Pipeline grün,
+isPrerelease=true). Offene v0.1.25-Kandidaten: PERF-4/5, B2 (Footer-
+Layout), OPEN-18, Kategorie-Sperre, Bauteile-Bin, Torso-Komponenten,
+UPSERT-Sync, Undo-System.*
