@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http;
+using System.Threading;
 using HBSort.Core.Models;
 using Microsoft.Data.Sqlite;
 using Serilog;
@@ -41,6 +43,20 @@ public class PersistentImageCache : IPersistentImageCache, IDisposable
     private readonly object _lock = new();
     private readonly SqliteConnection _connection;
 
+    // ------------------------------------------------------------------------
+    // PERF-4 Mess-Instrumentierung (temporaer, wird nach Diagnose entfernt)
+    //
+    // Ziel: belegen mit Zahlen, dass der Stats-Storm (GetStats-Full-Scan +
+    // StatsChanged-Feuern bei jedem Cache-Hit) das Programm beim Scannen zaeh
+    // macht. Wir zaehlen Aufrufe/Trigger pro 1-Sekunden-Fenster und loggen sie
+    // einmal pro Sekunde (nur wenn im Fenster Aktivitaet war - keine Idle-Spam-
+    // Zeilen). Die Zaehler laufen via Interlocked, weil GetStats/TouchAccess
+    // aus mehreren Pfaden/Threads gerufen werden.
+    // ------------------------------------------------------------------------
+    private int _perf4GetStatsCalls;       // Aufrufe von GetStats() im aktuellen 1s-Fenster
+    private int _perf4StatsChangedTriggers; // StatsChanged-Trigger in TouchAccess im aktuellen 1s-Fenster
+    private readonly Timer _perf4ReportTimer;
+
     public event EventHandler? StatsChanged;
 
     public PersistentImageCache(HttpClient http, ISettingsService settings)
@@ -67,6 +83,34 @@ public class PersistentImageCache : IPersistentImageCache, IDisposable
         _connection.Open();
 
         EnsureSchema();
+
+        // PERF-4 Mess-Instrumentierung (temporaer, wird nach Diagnose entfernt):
+        // Timer feuert jede Sekunde und meldet die im letzten Fenster gezaehlten
+        // GetStats-Calls + StatsChanged-Trigger. Idle-Unterdrueckung: nur loggen,
+        // wenn im Fenster mind. 1 Call/Trigger war.
+        _perf4ReportTimer = new Timer(Perf4ReportWindow, null,
+            TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    /// <summary>
+    /// PERF-4 Mess-Instrumentierung (temporaer): liest die Fenster-Zaehler aus,
+    /// setzt sie atomar auf 0 zurueck und loggt sie (nur bei Aktivitaet).
+    /// Interlocked.Exchange liest+resettet in einem Rutsch, damit kein Call
+    /// zwischen Lesen und Reset verloren geht.
+    /// </summary>
+    private void Perf4ReportWindow(object? state)
+    {
+        var getStatsCalls = Interlocked.Exchange(ref _perf4GetStatsCalls, 0);
+        var statsChangedTriggers = Interlocked.Exchange(ref _perf4StatsChangedTriggers, 0);
+
+        if (getStatsCalls > 0)
+        {
+            Log.Information("[PERF-4] GetStats-Calls last 1s: {Count}", getStatsCalls);
+        }
+        if (statsChangedTriggers > 0)
+        {
+            Log.Information("[PERF-4] StatsChanged triggers last 1s: {Count}", statsChangedTriggers);
+        }
     }
 
     private void EnsureSchema()
@@ -148,8 +192,18 @@ public class PersistentImageCache : IPersistentImageCache, IDisposable
             cmd.Parameters.AddWithValue("$key", cacheKey);
             cmd.ExecuteNonQuery();
         }
-        // Touch ist ein leichter Stats-Wechsel (oldest_access aendert sich).
-        StatsChanged?.Invoke(this, EventArgs.Empty);
+        // PERF-4 Mess-Instrumentierung (temporaer, wird nach Diagnose entfernt):
+        // Zaehlt, wie oft TouchAccess durchlaeuft (frueher: 1 StatsChanged-Trigger
+        // pro Aufruf). Der Zaehler bleibt fuer die Verifikations-Messung drin.
+        Interlocked.Increment(ref _perf4StatsChangedTriggers);
+
+        // PERF-4 Fix (1): KEIN StatsChanged mehr aus TouchAccess.
+        // TouchAccess aktualisiert nur last_accessed_at (LRU). Count und Size
+        // bleiben dabei unveraendert - die Cache-Status-Anzeige (Anzahl/Groesse)
+        // muss also NICHT aktualisiert werden. Der frueher hier sitzende Trigger
+        // war die Wurzel des Stats-Storms: ~105 Cache-Hits/Scan -> ~105 Events,
+        // ~92% davon ohne echte Count/Size-Aenderung. Echte Mutationen
+        // (Add in GetOrDownloadAsync, Clear in ClearAsync) feuern weiterhin.
     }
 
     private bool IsRegistered(string cacheKey)
@@ -192,9 +246,19 @@ public class PersistentImageCache : IPersistentImageCache, IDisposable
 
     public CacheStats GetStats()
     {
+        // PERF-4 Mess-Instrumentierung (temporaer, wird nach Diagnose entfernt):
+        // Aufruf-Zaehler fuers 1s-Fenster (Timer loggt die Summe).
+        Interlocked.Increment(ref _perf4GetStatsCalls);
+
         lock (_lock)
         {
             long limitBytes = (long)_settings.Current.ImageCache.LimitMb * 1024L * 1024L;
+
+            // PERF-4 Mess-Instrumentierung (temporaer): Dauer des Full-Scan-Querys
+            // (COUNT/SUM/MIN ueber image_cache.db) messen. These: dieser Scan auf
+            // dem UI-Thread macht das Programm beim Scannen zaeh.
+            var sw = Stopwatch.StartNew();
+
             using var cmd = _connection.CreateCommand();
             cmd.CommandText = "SELECT COUNT(*), COALESCE(SUM(size_bytes), 0), MIN(last_accessed_at) FROM cache_entries;";
             using var reader = cmd.ExecuteReader();
@@ -211,8 +275,12 @@ public class PersistentImageCache : IPersistentImageCache, IDisposable
                         oldest = dt;
                     }
                 }
+                sw.Stop();
+                Log.Information("[PERF-4] GetStats: {Ms}ms", sw.Elapsed.TotalMilliseconds);
                 return new CacheStats(count, total, limitBytes, oldest);
             }
+            sw.Stop();
+            Log.Information("[PERF-4] GetStats: {Ms}ms", sw.Elapsed.TotalMilliseconds);
             return new CacheStats(0, 0, limitBytes, null);
         }
     }
@@ -350,6 +418,9 @@ public class PersistentImageCache : IPersistentImageCache, IDisposable
 
     public void Dispose()
     {
+        // PERF-4 Mess-Instrumentierung (temporaer, wird nach Diagnose entfernt):
+        // Report-Timer sauber stoppen, bevor die Connection schliesst.
+        _perf4ReportTimer.Dispose();
         _connection.Dispose();
     }
 }

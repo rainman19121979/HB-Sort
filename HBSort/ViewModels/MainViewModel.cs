@@ -40,6 +40,30 @@ public partial class MainViewModel : ObservableObject, IDisposable
         Interval = TimeSpan.FromSeconds(60)
     };
 
+    // PERF-4 Fix (2): Throttle fuer den Cache-Status-Text (Defense-in-Depth).
+    //
+    // Frueher rief jedes StatsChanged-Event sofort GetStats() (Full-Scan ueber
+    // bis zu 12k Zeilen, ~6ms) auf dem UI-Thread auf - bei ~105 Cache-Hits/Scan
+    // ein UI-blockierender Storm. Der Cache-Status-Text ("Cache: N Bilder, X / Y")
+    // muss aber NICHT in Echtzeit aktuell sein. Daher: StatsChanged setzt nur ein
+    // Dirty-Flag, ein 1s-Timer ruft GetStats nur dann auf, wenn seit dem letzten
+    // Tick mind. ein Event kam. Idle bleibt idle (kein unnoetiger GetStats-Call).
+    //
+    // Selber Stil wie _rateLimitTimer: DispatcherTimer laeuft auf dem UI-Thread,
+    // Start im ctor, Stop in Dispose.
+    private readonly DispatcherTimer _cacheStatsTimer = new()
+    {
+        Interval = TimeSpan.FromSeconds(1)
+    };
+
+    /// <summary>
+    /// PERF-4 Fix (2): wird von OnCacheStatsChanged gesetzt und vom 1s-Timer-Tick
+    /// abgefragt+zurueckgesetzt. Zugriff nur vom UI-Thread (OnCacheStatsChanged
+    /// marshallt via Dispatcher, Timer-Tick laeuft ohnehin auf dem UI-Thread),
+    /// daher kein Lock noetig.
+    /// </summary>
+    private bool _cacheStatsDirty;
+
     /// <summary>Letzter beobachteter State - fuer Toast-Trigger bei Wechseln.</summary>
     private RateLimitState _lastRateLimitState = RateLimitState.Ok;
 
@@ -209,8 +233,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
 
         // Image-Cache-Stats: initial laden + auf Aenderungen lauschen.
+        // PERF-4 Fix (2): StatsChanged setzt nur ein Dirty-Flag, der 1s-Timer
+        // ruft GetStats() gedrosselt auf (statt pro Event sofort).
         UpdateCacheStatusText();
         _imageCache.StatsChanged += OnCacheStatsChanged;
+        _cacheStatsTimer.Tick += OnCacheStatsTimerTick;
+        _cacheStatsTimer.Start();
 
         // BL-Rate-Limit: initial laden + auf jeden API-Call lauschen + alle 60s pollen.
         _ = RefreshRateLimitStatusAsync();
@@ -606,15 +634,33 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void OnCacheStatsChanged(object? sender, EventArgs e)
     {
+        // PERF-4 Fix (2): kein direkter GetStats-Call mehr. Wir setzen nur ein
+        // Dirty-Flag; der 1s-Timer (OnCacheStatsTimerTick) ruft GetStats
+        // gedrosselt auf. Das Flag muss auf dem UI-Thread gesetzt werden, damit
+        // der Timer-Tick (UI-Thread) es ohne Lock lesen kann - daher das
+        // Dispatcher-Marshalling beibehalten.
         var dispatcher = Application.Current?.Dispatcher;
         if (dispatcher != null && !dispatcher.CheckAccess())
         {
-            dispatcher.BeginInvoke(UpdateCacheStatusText);
+            dispatcher.BeginInvoke(() => _cacheStatsDirty = true);
         }
         else
         {
-            UpdateCacheStatusText();
+            _cacheStatsDirty = true;
         }
+    }
+
+    /// <summary>
+    /// PERF-4 Fix (2): 1s-Timer-Tick. Aktualisiert den Cache-Status-Text nur,
+    /// wenn seit dem letzten Tick mind. ein StatsChanged-Event kam (Dirty-Flag).
+    /// Ist nichts passiert, wird GetStats() NICHT aufgerufen - Idle bleibt idle.
+    /// Laeuft auf dem UI-Thread (DispatcherTimer), daher kein Marshalling noetig.
+    /// </summary>
+    private void OnCacheStatsTimerTick(object? sender, EventArgs e)
+    {
+        if (!_cacheStatsDirty) return;
+        _cacheStatsDirty = false;
+        UpdateCacheStatusText();
     }
 
     private void UpdateCacheStatusText()
@@ -686,6 +732,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         try { _rateLimitTimer.Stop(); } catch { /* defensiv */ }
         try { _rateLimiter.StatusChanged -= OnRateLimitChanged; } catch { /* defensiv */ }
         try { _imageCache.StatsChanged -= OnCacheStatsChanged; } catch { /* defensiv */ }
+        // PERF-4 Fix (2): Cache-Stats-Throttle-Timer stoppen.
+        try { _cacheStatsTimer.Stop(); } catch { /* defensiv */ }
+        try { _cacheStatsTimer.Tick -= OnCacheStatsTimerTick; } catch { /* defensiv */ }
 
         Log.Information("MainViewModel disposed");
         GC.SuppressFinalize(this);

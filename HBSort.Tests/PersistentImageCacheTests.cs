@@ -169,6 +169,46 @@ public class PersistentImageCacheTests : IDisposable
         Assert.True(fired >= 1);
     }
 
+    [Fact]
+    public async Task StatsChanged_does_not_fire_on_TouchAccess()
+    {
+        // PERF-4 Fix (1): TouchAccess aendert nur last_accessed_at - Count und
+        // Size bleiben gleich. Es darf daher KEIN StatsChanged mehr feuern
+        // (das war die Wurzel des Stats-Storms: ~105 Cache-Hits/Scan = 105 Events).
+        var http = MakeClient(_ => Reply(HttpStatusCode.OK, "x"));
+        var cache = NewCache(http, 1024);
+
+        // Einmal anlegen (dieser Add darf feuern), dann erst danach das Abo setzen,
+        // damit der Add-Trigger nicht mitgezaehlt wird.
+        await cache.GetOrDownloadAsync("https://example/a.png", "a.png");
+
+        var fired = 0;
+        cache.StatsChanged += (_, _) => fired++;
+
+        cache.TouchAccess("a.png");
+        cache.TouchAccess("a.png");
+
+        Assert.Equal(0, fired);
+    }
+
+    [Fact]
+    public async Task StatsChanged_fires_on_clear()
+    {
+        // PERF-4 Fix (1): ClearAsync setzt Count/Size auf 0 - echter Mutations-
+        // Pfad, StatsChanged muss weiterhin feuern.
+        var http = MakeClient(_ => Reply(HttpStatusCode.OK, "x"));
+        var cache = NewCache(http, 1024);
+
+        await cache.GetOrDownloadAsync("https://example/a.png", "a.png");
+
+        var fired = 0;
+        cache.StatsChanged += (_, _) => fired++;
+
+        await cache.ClearAsync();
+
+        Assert.True(fired >= 1);
+    }
+
     // ========================================================================
     // Helpers
     // ========================================================================
