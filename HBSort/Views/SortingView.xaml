@@ -51,10 +51,14 @@
         <!-- ===== SPALTE 1: Webcam (oben) + Brickognize (unten) ===== -->
         <!-- ============================================================ -->
         <Grid Grid.Column="0">
+            <!-- Tester-Feedback 2026-06-08: Col1 bewusst asymmetrisch zu Col2/Col3.
+                 Webcam oben kleiner (40*), Brickognize-Vorschlaege unten groesser (60*),
+                 weil der Vorschlaege-Bereich beim First-Run zu klein war.
+                 Default-Spiegelung im Code-Behind (DefaultCol1TopRatio = 0.40). -->
             <Grid.RowDefinitions>
-                <RowDefinition Height="65*" x:Name="Col1TopRow"/>
+                <RowDefinition Height="40*" x:Name="Col1TopRow"/>
                 <RowDefinition Height="5"/>
-                <RowDefinition Height="35*" x:Name="Col1BotRow"/>
+                <RowDefinition Height="60*" x:Name="Col1BotRow"/>
             </Grid.RowDefinitions>
 
             <GridSplitter Grid.Row="1"

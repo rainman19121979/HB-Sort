@@ -14,7 +14,13 @@ namespace HBSort.Views;
 ///
 /// Layout (UX X.19 Teil 3a refactor): Outer-Grid mit drei Inhalts-Spalten +
 /// zwei vertikalen Splittern. Jede Spalte ist ein eigenes Subgrid mit
-/// 65*/5/35*-RowDefinitions und einem eigenen horizontalen Splitter.
+/// einem eigenen horizontalen Splitter.
+///
+/// Default-Row-Ratios pro Spalte (Tester-Feedback 2026-06-08):
+/// - Col1 (Webcam / Brickognize-Vorschlaege): 40*/5/60* — Vorschlaege
+///   dominant, damit beim First-Run mehr Treffer sichtbar sind.
+/// - Col2 (Detail / Tabs): 65*/5/35* — Detail oben dominant.
+/// - Col3 (BuildSuggestions / Preise): 65*/5/35* — Liste oben dominant.
 ///
 /// Persistierung (UX X.19 Teil 3b):
 /// - Vertikale Splitter -> WindowState.SplitterColumnRatio + Ratio2
@@ -27,8 +33,16 @@ namespace HBSort.Views;
 /// </summary>
 public partial class SortingView : UserControl
 {
-    /// <summary>Default-Anteil der oberen Box pro Spalte. 65% = altes Verhaeltnis.</summary>
-    private const double DefaultHorizontalRatio = 0.65;
+    // Tester-Feedback 2026-06-08 - Brickognize-Vorschlaege-Bereich beim
+    // First-Run zu klein, Default fuer Col1 von 65:35 umgekehrt auf 40:60.
+    // Col2/Col3 unveraendert. Darum spalten-spezifische Defaults statt einer
+    // gemeinsamen Konstante.
+    /// <summary>Default-Anteil der oberen Box in Spalte 1 (Webcam). 40% = Webcam kleiner, Vorschlaege groesser.</summary>
+    private const double DefaultCol1TopRatio = 0.40;
+    /// <summary>Default-Anteil der oberen Box in Spalte 2 (Detail). 65% = altes Verhaeltnis.</summary>
+    private const double DefaultCol2TopRatio = 0.65;
+    /// <summary>Default-Anteil der oberen Box in Spalte 3 (BuildSuggestions). 65% = altes Verhaeltnis.</summary>
+    private const double DefaultCol3TopRatio = 0.65;
 
     /// <summary>Min/Max-Clamp damit eine Box nicht ganz verschwindet.</summary>
     private const double MinRatio = 0.05;
@@ -194,18 +208,19 @@ public partial class SortingView : UserControl
         RightCol.Width = new GridLength(c3, GridUnitType.Star);
 
         // --- Horizontale Splitter pro Spalte ---
-        ApplyRowRatio(Col1TopRow, Col1BotRow, ws.Column1HorizontalSplitterRatio);
-        ApplyRowRatio(Col2TopRow, Col2BotRow, ws.Column2HorizontalSplitterRatio);
-        ApplyRowRatio(Col3TopRow, Col3BotRow, ws.Column3HorizontalSplitterRatio);
+        ApplyRowRatio(Col1TopRow, Col1BotRow, ws.Column1HorizontalSplitterRatio, DefaultCol1TopRatio);
+        ApplyRowRatio(Col2TopRow, Col2BotRow, ws.Column2HorizontalSplitterRatio, DefaultCol2TopRatio);
+        ApplyRowRatio(Col3TopRow, Col3BotRow, ws.Column3HorizontalSplitterRatio, DefaultCol3TopRatio);
     }
 
     /// <summary>
     /// Wendet ein Top/Bot-Verhaeltnis auf zwei RowDefinitions an. Bei
-    /// ungueltigen Werten (NaN, &lt;0.05, &gt;0.95) Default 0.65.
+    /// ungueltigen Werten (NaN, &lt;0.05, &gt;0.95) faellt es auf den
+    /// spalten-spezifischen <paramref name="defaultRatio"/> zurueck.
     /// </summary>
-    private static void ApplyRowRatio(RowDefinition top, RowDefinition bot, double ratio)
+    private static void ApplyRowRatio(RowDefinition top, RowDefinition bot, double ratio, double defaultRatio)
     {
-        var topRatio = ClampOrDefault(ratio, DefaultHorizontalRatio);
+        var topRatio = ClampOrDefault(ratio, defaultRatio);
         var botRatio = 1.0 - topRatio;
         top.Height = new GridLength(topRatio, GridUnitType.Star);
         bot.Height = new GridLength(botRatio, GridUnitType.Star);
