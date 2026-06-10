@@ -324,21 +324,14 @@ public class WindowState
     // leben in Column[1-3]HorizontalSplitterRatio. Alte settings.json
     // mit "splitterRowRatio"-Eintrag wird von System.Text.Json ignoriert.
 
-    /// <summary>
-    /// UX X.19 Teil 3b: Anteil der oberen Box (Webcam) in Spalte 1.
-    /// Wert 0..1. Default 0.65 entspricht dem bisherigen 65/35-Layout.
-    /// </summary>
-    public double Column1HorizontalSplitterRatio { get; set; } = 0.65;
+    // Anteil der oberen Box in Spalte X. 0.0 = noch nie eingestellt
+    // (Default-Marker), dann greift der spalten-spezifische Default in
+    // SortingView.xaml.cs (DefaultCol1/2/3TopRatio). Bei manuell gezogenem
+    // Splitter wird der tatsaechliche Wert hier persistiert. Wertebereich
+    // gueltig: 0.05..0.95.
+    public double Column1HorizontalSplitterRatio { get; set; } = 0.0;
 
-    /// <summary>
-    /// UX X.19 Teil 3b: Anteil der oberen Box (MinifigDetail/PartLookup)
-    /// in Spalte 2. Default 0.65.
-    /// </summary>
-    public double Column2HorizontalSplitterRatio { get; set; } = 0.65;
+    public double Column2HorizontalSplitterRatio { get; set; } = 0.0;
 
-    /// <summary>
-    /// UX X.19 Teil 3b: Anteil der oberen Box (BuildSuggestions) in Spalte 3.
-    /// Default 0.65.
-    /// </summary>
-    public double Column3HorizontalSplitterRatio { get; set; } = 0.65;
+    public double Column3HorizontalSplitterRatio { get; set; } = 0.0;
 }

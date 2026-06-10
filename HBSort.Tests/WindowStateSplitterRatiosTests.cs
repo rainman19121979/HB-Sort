@@ -8,7 +8,9 @@ namespace HBSort.Tests;
 /// in WindowState.
 ///
 /// Schwerpunkte:
-/// - Defaults sind 0.65 (entspricht dem alten 65/35-Layout).
+/// - Defaults sind 0.0 (Default-Marker "noch nie eingestellt"; der
+///   spalten-spezifische Default greift dann via ClampOrDefault im
+///   SortingView-Code-Behind: Col1=0.50, Col2/Col3=0.65).
 /// - Alte settings.json (vor X.19) ohne diese Properties laedt sauber
 ///   und liefert Defaults zurueck.
 /// - Werte werden im Round-Trip JSON beibehalten.
@@ -27,12 +29,16 @@ public class WindowStateSplitterRatiosTests
     };
 
     [Fact]
-    public void Defaults_are_0_65_for_all_three_columns()
+    public void Defaults_are_0_0_marker_for_all_three_columns()
     {
+        // Default ist jetzt 0.0 (Default-Marker, "noch nie eingestellt").
+        // 0.0 < MinRatio 0.05 -> ClampOrDefault faellt im SortingView-Code-
+        // Behind auf den spalten-spezifischen Default (DefaultCol1/2/3TopRatio)
+        // zurueck. Damit greift bei First-Run Col1=0.50, Col2/Col3=0.65.
         var ws = new WindowState();
-        Assert.Equal(0.65, ws.Column1HorizontalSplitterRatio);
-        Assert.Equal(0.65, ws.Column2HorizontalSplitterRatio);
-        Assert.Equal(0.65, ws.Column3HorizontalSplitterRatio);
+        Assert.Equal(0.0, ws.Column1HorizontalSplitterRatio);
+        Assert.Equal(0.0, ws.Column2HorizontalSplitterRatio);
+        Assert.Equal(0.0, ws.Column3HorizontalSplitterRatio);
     }
 
     [Fact]
@@ -56,9 +62,10 @@ public class WindowStateSplitterRatiosTests
         Assert.Equal(0.4, loaded!.SplitterColumnRatio);
         Assert.Equal(0.3, loaded.SplitterColumnRatio2);
         // Horizontale Werte sind nicht in der JSON -> POCO-Defaults greifen.
-        Assert.Equal(0.65, loaded.Column1HorizontalSplitterRatio);
-        Assert.Equal(0.65, loaded.Column2HorizontalSplitterRatio);
-        Assert.Equal(0.65, loaded.Column3HorizontalSplitterRatio);
+        // Default ist jetzt 0.0 (Default-Marker fuer "noch nie eingestellt").
+        Assert.Equal(0.0, loaded.Column1HorizontalSplitterRatio);
+        Assert.Equal(0.0, loaded.Column2HorizontalSplitterRatio);
+        Assert.Equal(0.0, loaded.Column3HorizontalSplitterRatio);
     }
 
     [Fact]
@@ -98,7 +105,8 @@ public class WindowStateSplitterRatiosTests
 
         Assert.NotNull(loaded);
         Assert.Equal(0.5, loaded!.Column1HorizontalSplitterRatio);
-        Assert.Equal(0.65, loaded.Column2HorizontalSplitterRatio);
+        // Col2 nicht in der JSON -> POCO-Default 0.0 (Default-Marker).
+        Assert.Equal(0.0, loaded.Column2HorizontalSplitterRatio);
     }
 
     [Theory]

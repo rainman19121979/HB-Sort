@@ -17,8 +17,9 @@ namespace HBSort.Views;
 /// einem eigenen horizontalen Splitter.
 ///
 /// Default-Row-Ratios pro Spalte (Tester-Feedback 2026-06-08):
-/// - Col1 (Webcam / Brickognize-Vorschlaege): 40*/5/60* — Vorschlaege
-///   dominant, damit beim First-Run mehr Treffer sichtbar sind.
+/// - Col1 (Webcam / Brickognize-Vorschlaege): 50*/5/50* — symmetrisch,
+///   damit der Vorschlaege-Bereich beim First-Run genuegend Platz fuer
+///   Treffer-Karten hat.
 /// - Col2 (Detail / Tabs): 65*/5/35* — Detail oben dominant.
 /// - Col3 (BuildSuggestions / Preise): 65*/5/35* — Liste oben dominant.
 ///
@@ -34,11 +35,11 @@ namespace HBSort.Views;
 public partial class SortingView : UserControl
 {
     // Tester-Feedback 2026-06-08 - Brickognize-Vorschlaege-Bereich beim
-    // First-Run zu klein, Default fuer Col1 von 65:35 umgekehrt auf 40:60.
-    // Col2/Col3 unveraendert. Darum spalten-spezifische Defaults statt einer
-    // gemeinsamen Konstante.
-    /// <summary>Default-Anteil der oberen Box in Spalte 1 (Webcam). 40% = Webcam kleiner, Vorschlaege groesser.</summary>
-    private const double DefaultCol1TopRatio = 0.40;
+    // First-Run zu klein, Default fuer Col1 von 65:35 auf 50:50 geaendert
+    // (symmetrische Aufteilung). Col2/Col3 unveraendert. Darum spalten-
+    // spezifische Defaults statt einer gemeinsamen Konstante.
+    /// <summary>Default-Anteil der oberen Box in Spalte 1 (Webcam). 50% = symmetrisch zur Brickognize-Vorschlaege-Box.</summary>
+    private const double DefaultCol1TopRatio = 0.50;
     /// <summary>Default-Anteil der oberen Box in Spalte 2 (Detail). 65% = altes Verhaeltnis.</summary>
     private const double DefaultCol2TopRatio = 0.65;
     /// <summary>Default-Anteil der oberen Box in Spalte 3 (BuildSuggestions). 65% = altes Verhaeltnis.</summary>
