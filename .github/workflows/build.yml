@@ -5,7 +5,7 @@ name: Build & Test
 # - Release-Build
 # - Tests laufen lassen
 #
-# Laeuft auf windows-2025 weil das Projekt UseWPF=true hat (WPF +
+# Laeuft auf windows-2025-vs2026 weil das Projekt UseWPF=true hat (WPF +
 # native Dependencies wie OpenCvSharp4 brauchen Windows).
 #
 # dotnet-Version: 9.0.x. Begruendung: HBSort.slnx ist das neue XML-
@@ -32,7 +32,7 @@ env:
 
 jobs:
   build:
-    runs-on: windows-2025  # explizit gepinnt - Default-Alias-Wechsel am 15.06.2026
+    runs-on: windows-2025-vs2026  # Folgestufe vor 15.06.2026 — VS 2026 Image, explizit gepinnt
 
     steps:
       - name: Checkout
