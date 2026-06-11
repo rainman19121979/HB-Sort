@@ -107,6 +107,17 @@ zusätzlichen BL-API-Aufrufe. Funktioniert generisch für alle
 Combined Parts, nicht nur Torsos. Bei atomaren Teilen (ein normaler
 2x4-Stein) erscheint der Bereich gar nicht.
 
+### Brickognize-Vorschläge-Bereich größer beim First-Run
+
+Beim ersten Start nach einer Neuinstallation war der Bereich der
+Brickognize-Vorschläge (unten links im Sortier-Tab) zu klein, sodass
+mehrere Treffer-Karten kaum lesbar waren. Jetzt sind Webcam-Bild und
+Vorschläge-Bereich gleichberechtigt aufgeteilt (50:50).
+
+Wer den Splitter schon mal manuell gezogen hat, behält seine bisherige
+Einstellung — der neue Default greift nur bei Neuinstallationen oder
+frischen User-Daten.
+
 ### Dialog-Konsistenz
 
 - **Footer-Buttons vereinheitlicht** in allen Dialogen: Abbrechen/

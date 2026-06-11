@@ -1240,7 +1240,9 @@ Aenderungen am Cache-Schema + Provider-Logik.
 | **v0.1.24-beta.15** | ✅ gemerged (`97a53c63`, 2026-05-28) | UI-Politur: Tab "Temporäres Inventar" + Tab-Reihenfolge + Endanwender-Doku-Update. |
 | **v0.1.24** | ✅ stable (2026-05-29, Tag `e3b8f9ac`) | BL-Shop-Integration: Inventar-Sync, Reservieren beim Komplettieren, Mass-Update-Export, V5-Reservierungs-Aufloesung, Dialog-Vereinheitlichung, "Temporaeres Inventar"-Tab. |
 | **v0.1.25-beta.1** | ✅ released (2026-06-02, Tag `0bb0a7bd`) | Sammel-Beta: PERF-1 (Settings-ctor 1012ms→15ms), UX-Pattern-Katalog, Kosmetik-Sweep Welle 1-3 (UX-1..7 + B1/B6/B10), Spalten-Persistenz Temp-Inventar, Bulk-Bin-Aktionen. 652 Tests grün, isPrerelease=true. |
-| **v0.1.25** | 📋 in-arbeit (Tag-Kandidat: v0.1.25-beta.2) | **PERF-4** + **PERF-5** + **BUILD-1** + **Torso-Komponenten** alle erledigt + dokumentiert, ungetaggt. Performance-Track: GetStats-Calls/s 17,8 → 1,0 (∼18×), UI-Blockade-Spitze 47-98% → <1%, ScanEvents-Queries indiziert, FindMinifigsContainingParts 43,7s → 0,037s (1.400× ueber Temp-Index), BuildSuggestions N+1 → Bulk-Load. BUILD-1: 100%-BL-Vorschlaege erscheinen im Baubar-Tab. Torso-Komponenten: Combined-Part-Subteile sichtbar beim Scan inkl. Color-Konsistenz fuer Grund-Teile. Naechster Schritt: beta.2 taggen. Offene Kandidaten: BUILD-3 (Konzept liegt vor, wartet auf User-Freigabe — Modell b empfohlen), UI-1 (Beschreibung-Spalte, 3 User-Entscheidungen offen), B2 (Footer-Layout), PERF-7 (Wall-Clock-Test ersetzen), B-Re-Evaluierung (subjektiv beim Sortieren ueber mehrere Tage). |
+| **v0.1.25-beta.2** | ✅ released (2026-06-07, Tag `891857c9`) | Performance + Bau + Komponenten: PERF-4 (Image-Cache-Stats-Storm: GetStats-Calls/s 17,8 → 1,0), PERF-5 (ScanEvents-Timestamp-Index), BUILD-1 (100%-BL-Vorschlaege im Baubar-Tab + drei nebenbei gefixte Skalierungs-Wurzeln: Temp-Tabelle bei grossen Pools, Temp-Index 43,7s→0,037s, N+1-Bulk-Load), Torso-Komponenten (DTO + Service + VM + Expander + 5 Core-Tests inkl. B3 Bild-Fallback und B3.5 Color-Konsistenz). 677 Tests grün, isPrerelease=true. |
+| **v0.1.25-beta.3** | ✅ released (2026-06-09, Tag `8a517e56`) | Layout-Verbesserung + CI-Migration: Brickognize-Vorschlaege-Bereich beim First-Run groesser (50:50 statt 65:35), Wurzel-Fix im WindowState (Default-Werte 0.65→0.0 damit spalten-spezifischer Code-Behind-Default greift), CI-Pipeline auf `windows-2025`-Runner gepinnt (GitHub-Default-Wechsel 15.06.2026). Pipeline-Erstverifikation auf windows-2025 erfolgreich (windows-2025-vs2026 ist die naechste Migrationsstufe ab 15.06., wartet im Backlog). 677 Tests grün, isPrerelease=true. |
+| **v0.1.25** | 📋 Stable-Promote erwartet | Tag-Kandidat auf identischem Commit wie beta.3 (`8a517e56`), isPrerelease=false. Saubere Stable-Release-Notes mit Kennzeichnung der Konsistenz-Fixes als "seit v0.1.24". Velopack-Auto-Update liefert das automatisch an alle User. Offene v0.1.25-Kandidaten verschieben sich auf v0.1.26+: BUILD-3 (Konzept liegt vor), UI-1 (3 User-Entscheidungen offen), UI-2 (Beobachten), B2 (Footer-Layout), PERF-7 (Wall-Clock-Test ersetzen), B-Re-Evaluierung. |
 | **v0.2.0** | 💭 Brainstorming | grosse Features aus Backlog (siehe oben) |
 
 Konvention:
@@ -1249,25 +1251,33 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-06-07 — **PERF-4 + PERF-5 + BUILD-1 +
-Torso-Komponenten** alle vier erledigt und dokumentiert, ungetaggt auf
-`main`. Performance-Track-Bilanz: GetStats-Calls/s 17,8 → 1,0 (~18×,
-PERF-4), ScanEvents indiziert (PERF-5), FindMinifigsContainingParts
-43,7s → 0,037s (1.400× ueber Temp-Index, im BUILD-1-Track entdeckt),
-BuildSuggestions-N+1 → Bulk-Load (im BUILD-1-Track entdeckt). BUILD-1-
-Feature: 100%-BL-Vorschlaege erscheinen jetzt im Baubar-Tab. Torso-
-Feature: Combined-Part-Subteile sichtbar beim Scan inkl. Bild- und
-Color-Konsistenz fuer Grund-Teile (B3 + B3.5 nachgezogen in selber
-Iteration). Vier Skalierungs-Wurzeln an einem Tag entdeckt + behoben,
-Engineering-Lehre dauerhaft im BUILD-1-Eintrag dokumentiert.
+*Zuletzt aktualisiert: 2026-06-09 — **v0.1.25-beta.3** released und
+verifiziert (Tag `8a517e56`, 2026-06-09). Pipeline-Lauf auf
+`windows-2025`-Runner als Erst-Verifikation der CI-Migration
+erfolgreich (Run 27252584267, alle Jobs grün, keine fehlenden
+VS-Komponenten, OpenCvSharp-Native sauber, vpk-pack sauber).
 
-**Naechster Schritt: v0.1.25-beta.2 taggen** — vier substanzielle Inhalte
-(PERF-4 + PERF-5 + BUILD-1 + Torso) als "Performance + Bau-Verbesserungen
-+ Komponenten-Anzeige"-Update. Velopack zieht das automatisch auf die
-User-Installationen. v0.1.25-beta.1 (`0bb0a7bd`, 2026-06-02) bleibt
-released.
+Beta.3-Inhalte (3 Commits seit beta.2):
+- `7668a54e` — Spalten-spezifische Layout-Defaults eingefuehrt
+- `eae14657` — Wurzel-Fix im WindowState (Default 0.65→0.0 damit
+  spalten-spezifischer Code-Behind-Default greift), Col1 auf 50:50
+- `8a517e56` — CI-Pipeline auf `windows-2025` gepinnt
+  (Default-Alias-Wechsel 15.06.2026)
 
-**Offene v0.1.25-Kandidaten:**
+**Naechster Schritt: v0.1.25 Stable-Promote** — Tag wandert auf den
+identischen Commit `8a517e56`, isPrerelease=false. Saubere Stable-
+Release-Notes mit Konsistenz-Fixes als "seit v0.1.24" gekennzeichnet
+(Ehrlichkeits-Notiz vom Release-Manager 2026-06-07 wird eingearbeitet).
+Velopack-Auto-Update liefert das automatisch an alle User-Installationen
+(externer Tester war auf v0.1.24, weil UpdateService prerelease=false
+konfiguriert ist — bewusste Architektur-Entscheidung).
+
+**Externe Deadline windows-2025-Migration:** adressiert. Pipeline-Pin
+auf `windows-2025` ist sicher bis 15.06.2026. Naechste Stufe
+(`windows-2025` → `windows-2025-vs2026`) wartet als kleiner CI-Commit
+im Backlog, nicht akut.
+
+**Offene v0.1.25-Kandidaten verschieben sich auf v0.1.26+:**
 - BUILD-3 (Konzept liegt vor in docs/, Modell b empfohlen, wartet auf
   User-Freigabe)
 - UI-1 (Beschreibung-Spalte mehrzeilig, 3 USER-ENTSCHEIDUNGEN offen)
@@ -1275,8 +1285,16 @@ released.
   koennte sich mit UI-1 miterledigen)
 - B2 (Footer-Layout in ManageIgnored/MassUpdate-Dialog, ~30min)
 - PERF-7 (BuildSuggestionsScalingTests Wall-Clock → strukturell, ~30min)
-- B-Re-Evaluierung (subjektiv beim Sortieren ueber mehrere Tage, kein
-  eigener Diagnose-Lauf noetig)
+- B-Re-Evaluierung (subjektiv beim Sortieren ueber mehrere Tage)
 - OPEN-18 Single-Mode-Cleanup, BUILD-2, Bauteile-Bin-Konzept,
-  UPSERT-Sync-Optimierung, vollstaendiges Undo-System (alle eigene
-  Iterationen mit unterschiedlichem Aufwand)*
+  UPSERT-Sync-Optimierung, vollstaendiges Undo-System
+
+**Roadmap-Disziplin-Reflexion (Lehre 2026-06-09):** Ich (Claude) hatte
+in der ersten Iteration der Stable-Diskussion einen 24-48h Tester-Check-
+Pfad vorgeschlagen, der auf der falschen Annahme "Velopack zieht
+Auto-Update auch fuer Betas" basierte. UpdateService.cs hat aber
+`prerelease=false` explizit gesetzt. Der Plan war damit auf einer
+unverifizierten Annahme aufgebaut. Holger hat das durch konkrete
+Kenntnis seines eigenen Code korrigiert. Lehre: Plan-Annahmen
+verifizieren bevor Disziplin durchgesetzt wird, vor allem bei
+Komponenten die ich selbst nicht geschrieben habe.*
