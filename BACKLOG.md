@@ -1242,7 +1242,7 @@ Aenderungen am Cache-Schema + Provider-Logik.
 | **v0.1.25-beta.1** | ✅ released (2026-06-02, Tag `0bb0a7bd`) | Sammel-Beta: PERF-1 (Settings-ctor 1012ms→15ms), UX-Pattern-Katalog, Kosmetik-Sweep Welle 1-3 (UX-1..7 + B1/B6/B10), Spalten-Persistenz Temp-Inventar, Bulk-Bin-Aktionen. 652 Tests grün, isPrerelease=true. |
 | **v0.1.25-beta.2** | ✅ released (2026-06-07, Tag `891857c9`) | Performance + Bau + Komponenten: PERF-4 (Image-Cache-Stats-Storm: GetStats-Calls/s 17,8 → 1,0), PERF-5 (ScanEvents-Timestamp-Index), BUILD-1 (100%-BL-Vorschlaege im Baubar-Tab + drei nebenbei gefixte Skalierungs-Wurzeln: Temp-Tabelle bei grossen Pools, Temp-Index 43,7s→0,037s, N+1-Bulk-Load), Torso-Komponenten (DTO + Service + VM + Expander + 5 Core-Tests inkl. B3 Bild-Fallback und B3.5 Color-Konsistenz). 677 Tests grün, isPrerelease=true. |
 | **v0.1.25-beta.3** | ✅ released (2026-06-09, Tag `8a517e56`) | Layout-Verbesserung + CI-Migration: Brickognize-Vorschlaege-Bereich beim First-Run groesser (50:50 statt 65:35), Wurzel-Fix im WindowState (Default-Werte 0.65→0.0 damit spalten-spezifischer Code-Behind-Default greift), CI-Pipeline auf `windows-2025`-Runner gepinnt (GitHub-Default-Wechsel 15.06.2026). Pipeline-Erstverifikation auf windows-2025 erfolgreich (windows-2025-vs2026 ist die naechste Migrationsstufe ab 15.06., wartet im Backlog). 677 Tests grün, isPrerelease=true. |
-| **v0.1.25** | 📋 Stable-Promote erwartet | Tag-Kandidat auf identischem Commit wie beta.3 (`8a517e56`), isPrerelease=false. Saubere Stable-Release-Notes mit Kennzeichnung der Konsistenz-Fixes als "seit v0.1.24". Velopack-Auto-Update liefert das automatisch an alle User. Offene v0.1.25-Kandidaten verschieben sich auf v0.1.26+: BUILD-3 (Konzept liegt vor), UI-1 (3 User-Entscheidungen offen), UI-2 (Beobachten), B2 (Footer-Layout), PERF-7 (Wall-Clock-Test ersetzen), B-Re-Evaluierung. |
+| **v0.1.25** | ✅ released (Stable, 2026-06-09, Tag `v0.1.25`) | Sammel-Iteration: **Performance** (PERF-1 Settings-ctor 1012ms→15ms + PERF-4 Image-Cache-Stats-Storm + PERF-5 ScanEvents-Index), **BUILD-1** (100%-BL-Vorschlaege im Baubar-Tab inkl. drei Skalierungs-Wurzeln: Temp-Tabelle, Temp-Index 43,7s→0,037s, N+1-Bulk-Load), **Torso-/Combined-Part-Komponenten** (DTO + Service + VM + Expander + 5 Core-Tests inkl. B3 Bild-Fallback + B3.5 Color-Konsistenz), **Layout-Fix Brickognize-Vorschlaege-Bereich beim First-Run** (50:50 statt 65:35, Wurzel im WindowState), **Dialog-Konsistenz** (Footer-Buttons, Schliessen-Buttons grau), **Spalten-Persistenz Temp-Inventar**, **Bulk-Bin-Aktionen**. CI-Pipeline auf windows-2025-Runner gepinnt (GitHub-Default-Wechsel 15.06.2026 adressiert). 677/677 Tests gruen. Stable-Tag wandert auf identischen Commit wie beta.3 (`8a517e56`), isPrerelease=false, Velopack-Auto-Update an alle User ausgerollt. |
 | **v0.2.0** | 💭 Brainstorming | grosse Features aus Backlog (siehe oben) |
 
 Konvention:
@@ -1251,33 +1251,43 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-06-09 — **v0.1.25-beta.3** released und
-verifiziert (Tag `8a517e56`, 2026-06-09). Pipeline-Lauf auf
-`windows-2025`-Runner als Erst-Verifikation der CI-Migration
-erfolgreich (Run 27252584267, alle Jobs grün, keine fehlenden
-VS-Komponenten, OpenCvSharp-Native sauber, vpk-pack sauber).
+*Zuletzt aktualisiert: 2026-06-09 — **v0.1.25 Stable released** (Tag
+`v0.1.25` auf `8a517e56`, identisch mit beta.3, Pipeline Run 27321657478
+gruen auf windows-2025, isPrerelease=false). Velopack-Auto-Update zieht
+an alle User-Installationen.
 
-Beta.3-Inhalte (3 Commits seit beta.2):
-- `7668a54e` — Spalten-spezifische Layout-Defaults eingefuehrt
-- `eae14657` — Wurzel-Fix im WindowState (Default 0.65→0.0 damit
-  spalten-spezifischer Code-Behind-Default greift), Col1 auf 50:50
-- `8a517e56` — CI-Pipeline auf `windows-2025` gepinnt
-  (Default-Alias-Wechsel 15.06.2026)
+**Tag-Tag der v0.1.25-Stable-Iteration (an einem Tag durchgezogen, 2026-06-09):**
+Beta.2-Tag (gestern Abend) → Layout-Bug-Diagnose mit externem Tester-
+Screenshot → zwei Iterationen Layout-Fix (Spalten-spezifische Defaults
++ Wurzel-Fix im WindowState + 50:50-Endwert) → GitHub-Actions-Migration
+auf windows-2025 → Beta.3-Tag → windows-2025-Erst-Verifikation gruen
+→ Stable-Promote auf identischem Commit — alles innerhalb eines Tages.
 
-**Naechster Schritt: v0.1.25 Stable-Promote** — Tag wandert auf den
-identischen Commit `8a517e56`, isPrerelease=false. Saubere Stable-
-Release-Notes mit Konsistenz-Fixes als "seit v0.1.24" gekennzeichnet
-(Ehrlichkeits-Notiz vom Release-Manager 2026-06-07 wird eingearbeitet).
-Velopack-Auto-Update liefert das automatisch an alle User-Installationen
-(externer Tester war auf v0.1.24, weil UpdateService prerelease=false
-konfiguriert ist — bewusste Architektur-Entscheidung).
+**v0.1.25-Stable-Inhalte (alle Iterationen konsolidiert seit v0.1.24):**
+- PERF-1 SettingsViewModel-ctor 1012ms→15ms (Lazy-Tab-Load) — beta.1
+- PERF-4 Image-Cache-Stats-Storm (GetStats-Calls/s 17,8 → 1,0) — beta.2
+- PERF-5 ScanEvents-Timestamp-Index — beta.2
+- BUILD-1 100%-BL-Vorschlaege im Baubar-Tab inkl. drei Skalierungs-
+  Wurzeln (Crash-Wurzel + Temp-Index 43,7s→0,037s + N+1-Bulk-Load) — beta.2
+- Torso-/Combined-Part-Komponenten im Scan-Result (DTO + Service + VM
+  + Expander + 5 Core-Tests inkl. B3 + B3.5) — beta.2
+- Layout-Default Col1 Brickognize-Vorschlaege-Bereich 50:50 (Wurzel im
+  WindowState) — beta.3
+- CI-Pipeline auf windows-2025-Runner gepinnt — beta.3 (externe Deadline
+  15.06.2026 adressiert)
+- UX-Pattern-Katalog `docs/ux-patterns.md` — beta.1
+- Kosmetik-Sweep Welle 1-3 (Dialog-Konsistenz, Footer-Buttons,
+  Schliessen-Buttons grau, BL-Shop-Badge, Tooltips) — beta.1
+- Spalten-Persistenz im Temporaeren Inventar — beta.1
+- Bulk-Bin-Aktionen im Settings-Tab Lagerfaecher — beta.1
 
-**Externe Deadline windows-2025-Migration:** adressiert. Pipeline-Pin
-auf `windows-2025` ist sicher bis 15.06.2026. Naechste Stufe
-(`windows-2025` → `windows-2025-vs2026`) wartet als kleiner CI-Commit
-im Backlog, nicht akut.
+**Externe Deadline windows-2025-Migration: adressiert** (Pipeline-Pin
+verifiziert in beta.3 + Stable). Naechste Stufe (`windows-2025` →
+`windows-2025-vs2026`) wartet als kleiner CI-Commit, frueh in v0.1.26
+planen (akut ab 15.06.2026).
 
-**Offene v0.1.25-Kandidaten verschieben sich auf v0.1.26+:**
+**Naechste Iteration: v0.1.26** — noch nicht eroeffnet. Offene
+Kandidaten aus dem v0.1.25-Backlog die nicht reinpassten:
 - BUILD-3 (Konzept liegt vor in docs/, Modell b empfohlen, wartet auf
   User-Freigabe)
 - UI-1 (Beschreibung-Spalte mehrzeilig, 3 USER-ENTSCHEIDUNGEN offen)
@@ -1286,15 +1296,26 @@ im Backlog, nicht akut.
 - B2 (Footer-Layout in ManageIgnored/MassUpdate-Dialog, ~30min)
 - PERF-7 (BuildSuggestionsScalingTests Wall-Clock → strukturell, ~30min)
 - B-Re-Evaluierung (subjektiv beim Sortieren ueber mehrere Tage)
+- CI-Nachstufe `windows-2025` → `windows-2025-vs2026` (ab 15.06.2026)
 - OPEN-18 Single-Mode-Cleanup, BUILD-2, Bauteile-Bin-Konzept,
   UPSERT-Sync-Optimierung, vollstaendiges Undo-System
 
-**Roadmap-Disziplin-Reflexion (Lehre 2026-06-09):** Ich (Claude) hatte
-in der ersten Iteration der Stable-Diskussion einen 24-48h Tester-Check-
-Pfad vorgeschlagen, der auf der falschen Annahme "Velopack zieht
-Auto-Update auch fuer Betas" basierte. UpdateService.cs hat aber
-`prerelease=false` explizit gesetzt. Der Plan war damit auf einer
-unverifizierten Annahme aufgebaut. Holger hat das durch konkrete
-Kenntnis seines eigenen Code korrigiert. Lehre: Plan-Annahmen
-verifizieren bevor Disziplin durchgesetzt wird, vor allem bei
-Komponenten die ich selbst nicht geschrieben habe.*
+**Engineering-Lehren aus v0.1.25 (dauerhaft notiert):**
+1. **Skalierungs-Tests muessen entweder echte Datenmenge + Datentopologie
+   simulieren ODER strukturell pruefen** (EXPLAIN QUERY PLAN, Bulk-Methode-
+   Aufruf-Count) statt zeitlich. Synthetische Test-DB mit 250 Subset-
+   Eintraegen reproduziert nicht denselben Query-Plan wie 1,4 Mio Zeilen.
+   Dokumentiert in BUILD-1-Eintrag.
+2. **Plan-Annahmen verifizieren bevor Disziplin durchgesetzt wird.** Ich
+   (Claude) hatte in der Stable-Diskussion einen 24-48h Tester-Check-
+   Pfad vorgeschlagen, der auf falscher Annahme "Velopack zieht Auto-
+   Update auch fuer Betas" basierte. UpdateService.cs hat aber
+   `prerelease=false` explizit gesetzt. Holger hat das durch konkrete
+   Kenntnis seines eigenen Code korrigiert. Gilt vor allem fuer
+   Komponenten die ich selbst nicht geschrieben habe.
+3. **Default-Werte greifen entlang einer Lese-Kette.** Mein erster
+   Layout-Fix (Code-Behind-Default) griff nicht, weil der WindowState-
+   Default `0.65` ihn ueberschrieb. ClampOrDefault sieht 0.65 als
+   gueltigen Wert und gibt ihn unveraendert zurueck. Bei "Default greift
+   nicht"-Symptomen IMMER die ganze Lese-Kette nachvollziehen
+   (Property-Default → Settings-JSON → Service-Read → Clamp → Anwendung).*
