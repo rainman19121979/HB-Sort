@@ -205,15 +205,24 @@ Items archiviert werden.
   (`refactor: Dialog-VM-DI + Silent-Catch + DialogResult (B1/B6/B10, v0.1.25)`).
   `ManageIgnoredViewModel` + `MassUpdateExportViewModel` werden jetzt via
   `App.xaml.cs::ConfigureServices` (`AddTransient`) aufgeloest statt per `new`.
-- 📋 **B2: Footer-Layout in zwei neuen Dialogen** — praezisiert durch
-  ux-patterns.md-Drift-Inventur:
-  - `ManageIgnoredDialog.xaml`: "Schliessen" hat `IsDefault="True"` UND
-    `IsCancel="True"` zusammen (Read-Only-Verletzung) + `AccentButtonStyle`
-    faelschlich auf dem Schliessen-Button.
-  - `MassUpdateExportDialog.xaml`: Schliessen-Button steht hinter dem
-    Primaer-Button (Reihenfolge invertiert — Schliessen gehoert links).
-  Konvention: links Abbrechen/Schliessen (IsCancel), rechts primaer
-  (IsDefault + AccentButtonStyle). Schwere: L-M. Aufwand: ~30min.
+- ✅ **B2: Footer-Layout in zwei neuen Dialogen** — implizit erledigt in
+  v0.1.25-beta.1 (Kosmetik-Sweep Welle 1-3, `0bb0a7bd`), 2026-06-09 als
+  ✅ verifiziert nach Code-Sichtung im Rahmen v0.1.26-Planung. Beide
+  Dialoge sind heute konform zur Footer-Regel:
+  - `ManageIgnoredDialog.xaml`: Schliessen traegt nur `IsCancel="True"`
+    (kein IsDefault zusammen mit IsCancel), kein AccentButtonStyle.
+    Primaer-Aktion "Alle wiederherstellen" rechts mit AccentButtonStyle
+    + IsDefault="True". Footer-Kommentar dokumentiert die Regel im XAML.
+  - `MassUpdateExportDialog.xaml`: Schliessen in Col 0 (links) mit
+    IsCancel="True", Primaer-Aktion "Verifizieren" in Col 4 (rechts) mit
+    AccentButtonStyle. Sekundaer-Buttons dazwischen in Col 2-3.
+    Footer-Kommentar dokumentiert die Regel im XAML.
+  Restdifferenz bewusst akzeptiert: Verifizieren-Button hat KEIN
+  IsDefault="True" — das ist eine destruktive Aktion (Reservierungen
+  zu "physisch gesammelt" umbuchen). ENTER soll das nicht versehentlich
+  ausloesen. Quelle: B2-Backlog-Eintrag urspruenglich aus ux-patterns.md-
+  Drift-Inventur 2026-05-28 — Welle 1-3 hat das mit-gefixt, aber den
+  B2-Eintrag nicht explizit als ✅ markiert.
 - ✅ **B6/B10: Kosmetik in ManageIgnored/MassUpdate-VMs** — erledigt in
   v0.1.25-beta.1 (`refactor: Dialog-VM-DI + Silent-Catch + DialogResult (B1/B6/B10, v0.1.25)`).
   Silent-Catch bekommt jetzt `Log.Debug`; `Close_Click` setzt nicht mehr
@@ -1243,6 +1252,7 @@ Aenderungen am Cache-Schema + Provider-Logik.
 | **v0.1.25-beta.2** | ✅ released (2026-06-07, Tag `891857c9`) | Performance + Bau + Komponenten: PERF-4 (Image-Cache-Stats-Storm: GetStats-Calls/s 17,8 → 1,0), PERF-5 (ScanEvents-Timestamp-Index), BUILD-1 (100%-BL-Vorschlaege im Baubar-Tab + drei nebenbei gefixte Skalierungs-Wurzeln: Temp-Tabelle bei grossen Pools, Temp-Index 43,7s→0,037s, N+1-Bulk-Load), Torso-Komponenten (DTO + Service + VM + Expander + 5 Core-Tests inkl. B3 Bild-Fallback und B3.5 Color-Konsistenz). 677 Tests grün, isPrerelease=true. |
 | **v0.1.25-beta.3** | ✅ released (2026-06-09, Tag `8a517e56`) | Layout-Verbesserung + CI-Migration: Brickognize-Vorschlaege-Bereich beim First-Run groesser (50:50 statt 65:35), Wurzel-Fix im WindowState (Default-Werte 0.65→0.0 damit spalten-spezifischer Code-Behind-Default greift), CI-Pipeline auf `windows-2025`-Runner gepinnt (GitHub-Default-Wechsel 15.06.2026). Pipeline-Erstverifikation auf windows-2025 erfolgreich (windows-2025-vs2026 ist die naechste Migrationsstufe ab 15.06., wartet im Backlog). 677 Tests grün, isPrerelease=true. |
 | **v0.1.25** | ✅ released (Stable, 2026-06-09, Tag `v0.1.25`) | Sammel-Iteration: **Performance** (PERF-1 Settings-ctor 1012ms→15ms + PERF-4 Image-Cache-Stats-Storm + PERF-5 ScanEvents-Index), **BUILD-1** (100%-BL-Vorschlaege im Baubar-Tab inkl. drei Skalierungs-Wurzeln: Temp-Tabelle, Temp-Index 43,7s→0,037s, N+1-Bulk-Load), **Torso-/Combined-Part-Komponenten** (DTO + Service + VM + Expander + 5 Core-Tests inkl. B3 Bild-Fallback + B3.5 Color-Konsistenz), **Layout-Fix Brickognize-Vorschlaege-Bereich beim First-Run** (50:50 statt 65:35, Wurzel im WindowState), **Dialog-Konsistenz** (Footer-Buttons, Schliessen-Buttons grau), **Spalten-Persistenz Temp-Inventar**, **Bulk-Bin-Aktionen**. CI-Pipeline auf windows-2025-Runner gepinnt (GitHub-Default-Wechsel 15.06.2026 adressiert). 677/677 Tests gruen. Stable-Tag wandert auf identischen Commit wie beta.3 (`8a517e56`), isPrerelease=false, Velopack-Auto-Update an alle User ausgerollt. |
+| **v0.1.26-beta.1** | ✅ released (2026-06-09, Tag `b5127edc`) | CI-Folgestufen-Migration: Pipeline auf `windows-2025-vs2026` gepinnt (Folgestufe nach v0.1.25-beta.3-Migration auf `windows-2025`). VS-2026-Image-Erstverifikation gruen (Pipeline Run 27322575112), keine fehlenden VS-Komponenten, OpenCvSharp-Native sauber, vpk-pack sauber. Externe Deadline 15.06.2026 endgueltig adressiert. Reines Infrastruktur-Update, keine User-sichtbaren Aenderungen. 677/677 Tests gruen, isPrerelease=true. |
 | **v0.2.0** | 💭 Brainstorming | grosse Features aus Backlog (siehe oben) |
 
 Konvention:
@@ -1251,54 +1261,45 @@ Konvention:
 
 ---
 
-*Zuletzt aktualisiert: 2026-06-09 — **v0.1.25 Stable released** (Tag
-`v0.1.25` auf `8a517e56`, identisch mit beta.3, Pipeline Run 27321657478
-gruen auf windows-2025, isPrerelease=false). Velopack-Auto-Update zieht
-an alle User-Installationen.
+*Zuletzt aktualisiert: 2026-06-09 — **v0.1.26-beta.1 released**
+(Tag `b5127edc`, Pipeline Run 27322575112 gruen auf
+windows-2025-vs2026). Reines Infrastruktur-Tag: CI-Folgestufen-
+Migration windows-2025 → windows-2025-vs2026 vor Default-Wechsel
+15.06.2026.
 
-**Tag-Tag der v0.1.25-Stable-Iteration (an einem Tag durchgezogen, 2026-06-09):**
-Beta.2-Tag (gestern Abend) → Layout-Bug-Diagnose mit externem Tester-
-Screenshot → zwei Iterationen Layout-Fix (Spalten-spezifische Defaults
-+ Wurzel-Fix im WindowState + 50:50-Endwert) → GitHub-Actions-Migration
-auf windows-2025 → Beta.3-Tag → windows-2025-Erst-Verifikation gruen
-→ Stable-Promote auf identischem Commit — alles innerhalb eines Tages.
+**Externe Deadline windows-2025-vs2026: endgueltig adressiert.**
+Pipeline laeuft auf dem vs2026-Image, VS-2026-Erstverifikation
+gruen. Kein weiterer CI-Schritt fuer diese Migration noetig.
 
-**v0.1.25-Stable-Inhalte (alle Iterationen konsolidiert seit v0.1.24):**
-- PERF-1 SettingsViewModel-ctor 1012ms→15ms (Lazy-Tab-Load) — beta.1
-- PERF-4 Image-Cache-Stats-Storm (GetStats-Calls/s 17,8 → 1,0) — beta.2
-- PERF-5 ScanEvents-Timestamp-Index — beta.2
-- BUILD-1 100%-BL-Vorschlaege im Baubar-Tab inkl. drei Skalierungs-
-  Wurzeln (Crash-Wurzel + Temp-Index 43,7s→0,037s + N+1-Bulk-Load) — beta.2
-- Torso-/Combined-Part-Komponenten im Scan-Result (DTO + Service + VM
-  + Expander + 5 Core-Tests inkl. B3 + B3.5) — beta.2
-- Layout-Default Col1 Brickognize-Vorschlaege-Bereich 50:50 (Wurzel im
-  WindowState) — beta.3
-- CI-Pipeline auf windows-2025-Runner gepinnt — beta.3 (externe Deadline
-  15.06.2026 adressiert)
-- UX-Pattern-Katalog `docs/ux-patterns.md` — beta.1
-- Kosmetik-Sweep Welle 1-3 (Dialog-Konsistenz, Footer-Buttons,
-  Schliessen-Buttons grau, BL-Shop-Badge, Tooltips) — beta.1
-- Spalten-Persistenz im Temporaeren Inventar — beta.1
-- Bulk-Bin-Aktionen im Settings-Tab Lagerfaecher — beta.1
+**Backlog-Hygiene 2026-06-09:** B2-Eintrag (Footer-Layout in
+ManageIgnored/MassUpdate-Dialog) als ✅ verifiziert markiert
+nach Code-Sichtung. Footer-Regel ist in beiden Dialogen heute
+konform; die fruehere Beschwerde (IsDefault+IsCancel-Doppelung,
+Reihenfolgen-Invertierung) wurde implizit in v0.1.25-beta.1
+Kosmetik-Sweep Welle 1-3 mit-gefixt aber nicht explizit als
+B2-erledigt markiert. Lehre: nach grossen Polish-Sweeps Backlog
+systematisch auf implizit erledigte Items pruefen statt sie als
+offen mitzuschleppen.
 
-**Externe Deadline windows-2025-Migration: adressiert** (Pipeline-Pin
-verifiziert in beta.3 + Stable). Naechste Stufe (`windows-2025` →
-`windows-2025-vs2026`) wartet als kleiner CI-Commit, frueh in v0.1.26
-planen (akut ab 15.06.2026).
+**v0.1.26-Strategie: Variante B (sammeln statt direkt Stable).**
+beta.1 bleibt Prerelease bis weitere Items dazukommen. Stable-
+Promote erst wenn das Release User-sichtbare Substanz hat (analog
+v0.1.25-Muster).
 
-**Naechste Iteration: v0.1.26** — noch nicht eroeffnet. Offene
-Kandidaten aus dem v0.1.25-Backlog die nicht reinpassten:
-- BUILD-3 (Konzept liegt vor in docs/, Modell b empfohlen, wartet auf
-  User-Freigabe)
-- UI-1 (Beschreibung-Spalte mehrzeilig, 3 USER-ENTSCHEIDUNGEN offen)
-- UI-2 (komisches Spalten-Layout, beobachten ob reproduzierbar —
-  koennte sich mit UI-1 miterledigen)
-- B2 (Footer-Layout in ManageIgnored/MassUpdate-Dialog, ~30min)
-- PERF-7 (BuildSuggestionsScalingTests Wall-Clock → strukturell, ~30min)
+**Offene v0.1.26-Kandidaten:**
+- PERF-7 (BuildSuggestionsScalingTests Wall-Clock → strukturell,
+  ~30min) — eigene Engineering-Lehre umsetzen
+- UI-1 (Beschreibung-Spalte mehrzeilig, 3 USER-ENTSCHEIDUNGEN offen
+  + ~1-2h Bau)
+- BUILD-3 (wartende Figuren als "jetzt baubar" markieren, Modell b
+  empfohlen, ~5min User-OK + ~1.5h Bau)
+- UI-2 (komisches Spalten-Layout, passiv beobachten ob reproduzierbar)
 - B-Re-Evaluierung (subjektiv beim Sortieren ueber mehrere Tage)
-- CI-Nachstufe `windows-2025` → `windows-2025-vs2026` (ab 15.06.2026)
-- OPEN-18 Single-Mode-Cleanup, BUILD-2, Bauteile-Bin-Konzept,
-  UPSERT-Sync-Optimierung, vollstaendiges Undo-System
+- OPEN-18 (Single-Mode-Cleanup, ~2h)
+- Doppelt-Export-Tracking (~3h)
+- BUILD-2 (wartende als Quelle, konzept-vorlauf-pflichtig)
+- Bauteile-Bin-Konzept, UPSERT-Sync-Optimierung,
+  vollstaendiges Undo-System (alle eigene Iterationen)*
 
 **Engineering-Lehren aus v0.1.25 (dauerhaft notiert):**
 1. **Skalierungs-Tests muessen entweder echte Datenmenge + Datentopologie
