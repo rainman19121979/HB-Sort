@@ -92,7 +92,7 @@ jobs:
     needs: setup
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # Volle Historie noetig fuer "git describe" + Release-Notes-Generation.
           fetch-depth: 0
@@ -175,7 +175,7 @@ jobs:
     needs: [setup, build-zip]
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
